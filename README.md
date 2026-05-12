@@ -86,6 +86,26 @@ public/
 drizzle.config.ts
 ```
 
+## Photo enrichment
+
+Fighter portrait photos are pulled from Wikipedia and stored in Supabase Storage (`fighter-photos` bucket) by `scripts/photo_scraper/`. The scraper enforces license safety — only CC0 / Public Domain / CC BY / CC BY-SA images are kept; anything else is left blank and the UI falls back to the SVG silhouettes in `public/images/`. See [`scripts/photo_scraper/README.md`](./scripts/photo_scraper/README.md) for full details.
+
+```bash
+# One-time: create venv + install Python deps.
+pnpm photos:setup
+
+# Smoke test (no DB or Storage writes).
+pnpm photos:dry
+
+# Full run. Run AFTER scrape:enrich-bouts has finished.
+pnpm photos:fetch
+```
+
+Before the first real run, execute these two SQL files in the Supabase SQL Editor:
+
+- [`drizzle/migrations/0001_fighter_with_stats_view.sql`](./drizzle/migrations/0001_fighter_with_stats_view.sql) — `fighter_with_stats` view used by Wave 3A.
+- [`drizzle/migrations/0002_storage_bucket.sql`](./drizzle/migrations/0002_storage_bucket.sql) — creates the public `fighter-photos` bucket and its read policy.
+
 ## Data scraper
 
 Real UFC data lives in `scripts/scraper/` — a Python project that pulls fighters, events, bouts, and per-round stats from `ufcstats.com` and writes them into our Drizzle schema. See [`scripts/scraper/README.md`](./scripts/scraper/README.md) for full setup and usage. Quick start (from the project root):

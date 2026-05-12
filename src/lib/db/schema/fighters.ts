@@ -44,6 +44,12 @@ export const fighter = pgTable(
 
     photoUrl: text("photo_url"),
     photoSilhouetteUrl: text("photo_silhouette_url"),
+    photoThumbnailUrl: text("photo_thumbnail_url"),
+    photoLicense: text("photo_license"),
+    photoSourceUrl: text("photo_source_url"),
+    photoAttribution: text("photo_attribution"),
+    photoFetchedAt: timestamp("photo_fetched_at", { withTimezone: true }),
+    photoFetchStatus: text("photo_fetch_status"),
 
     ufcStatsId: text("ufc_stats_id").unique(),
     sherdogId: text("sherdog_id").unique(),
