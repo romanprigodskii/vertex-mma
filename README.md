@@ -86,6 +86,16 @@ public/
 drizzle.config.ts
 ```
 
+## Data scraper
+
+Real UFC data lives in `scripts/scraper/` — a Python project that pulls fighters, events, bouts, and per-round stats from `ufcstats.com` and writes them into our Drizzle schema. See [`scripts/scraper/README.md`](./scripts/scraper/README.md) for full setup and usage. Quick start (from the project root):
+
+```bash
+pnpm scrape:setup     # one-time venv + pip install
+pnpm scrape:quick     # ~5–10 min: events + fighters + bout metadata
+pnpm scrape:enrich    # ~30–60 min: per-fighter career stats + per-round bout stats
+```
+
 ## Scripts
 
 - `pnpm dev` — start the dev server

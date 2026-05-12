@@ -42,3 +42,9 @@ next-env.d.ts
 
 # Claude Code local state
 .claude/
+
+# Scraper artifacts
+scripts/scraper/venv/
+scripts/scraper/.checkpoint_*.json
+scripts/scraper/.errors.jsonl
+scripts/scraper/**/__pycache__/

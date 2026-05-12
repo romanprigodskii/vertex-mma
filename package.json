@@ -17,7 +17,11 @@
     "type-check": "tsc --noEmit",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "db:seed": "tsx src/lib/db/seed.ts"
+    "db:seed": "tsx src/lib/db/seed.ts",
+    "scrape:setup": "cd scripts/scraper && python3 -m venv venv && ./venv/bin/pip install -r requirements.txt",
+    "scrape:quick": "cd scripts/scraper && ./venv/bin/python scripts/run_all.py --phase quick",
+    "scrape:enrich": "cd scripts/scraper && ./venv/bin/python scripts/run_all.py --phase enrich",
+    "scrape:all": "cd scripts/scraper && ./venv/bin/python scripts/run_all.py --phase all"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.11",
