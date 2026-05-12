@@ -18,9 +18,42 @@ AI-powered MMA fight simulator and community platform for fight fans. Vertex MMA
 ```bash
 pnpm install
 cp .env.example .env.local   # fill in DATABASE_URL and Supabase keys
-pnpm db:push                 # apply schema (no-op in Wave 1)
 pnpm dev                     # http://localhost:3000
 ```
+
+## Database setup
+
+1. Create a Supabase project (https://supabase.com).
+2. Copy the credentials into `.env.local`:
+   - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` from **Project Settings → API**.
+   - `DATABASE_URL` from **Project Settings → Database → Connection string → URI** (direct connection, port 5432; URL-encode the password).
+3. In **Supabase → SQL Editor**, run the contents of [`drizzle/migrations/0000_enable_extensions.sql`](./drizzle/migrations/0000_enable_extensions.sql) once. `drizzle-kit push` runs without the privileges needed for `CREATE EXTENSION` on managed Postgres, so this step is manual.
+4. `pnpm db:push` — applies the Drizzle schema (all tables + enums + indexes).
+5. *(Optional)* `pnpm db:seed` — inserts 4 test fighters, a `UFC TEST` event, an Islam vs. Volkanovski main-event bout, and a winner market with two outcomes.
+
+## Schema overview
+
+The Drizzle schema lives under [`src/lib/db/schema/`](./src/lib/db/schema), split by domain:
+
+| Module             | Tables                                                       |
+| ------------------ | ------------------------------------------------------------ |
+| `enums.ts`         | All `pgEnum` definitions (weight class, stance, method, …)  |
+| `fighters.ts`      | `fighter`, `fighter_alias`, `fighter_stats_aggregate`        |
+| `events.ts`        | `event`, `bout`, `bout_round_stats`                          |
+| `users.ts`         | `user_profile`, `transaction`, `achievement`, `user_achievement` |
+| `markets.ts`       | `market`, `market_outcome`, `bet`                            |
+| `predictions.ts`   | `prediction_event`, `prediction_pick`, `prediction_event_result` |
+| `cards.ts`         | `fight_card`, `fight_card_like`                              |
+| `simulations.ts`   | `simulation`                                                 |
+| `news.ts`          | `news_source`, `news_item` (with `pgvector` embedding column) |
+
+Conventions:
+
+- All public entities expose a `slug` for URL routing.
+- UUIDs everywhere (no serial integers).
+- Timestamps are `timestamp with time zone`.
+- Fighter and alias names get `pg_trgm` GIN indexes for fuzzy search.
+- `user_profile.auth_user_id` references `auth.users.id` from Supabase Auth without a hard FK (cross-schema).
 
 ## Folder structure
 
@@ -62,6 +95,7 @@ drizzle.config.ts
 - `pnpm type-check` — `tsc --noEmit`
 - `pnpm db:push` — apply Drizzle schema to the database
 - `pnpm db:studio` — open Drizzle Studio
+- `pnpm db:seed` — insert minimal test data (fighters, event, bout, market)
 
 ## Roadmap
 
