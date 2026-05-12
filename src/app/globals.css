@@ -1,0 +1,165 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@theme {
+  /* ============================================================
+     Colors — OKLCH palette
+     ============================================================ */
+
+  /* Background */
+  --color-background-base: oklch(0.08 0.005 240);
+  --color-background-elevated: oklch(0.12 0.008 240);
+  --color-background-overlay: oklch(0.15 0.01 240);
+
+  /* Text */
+  --color-foreground: oklch(0.98 0 0);
+  --color-foreground-muted: oklch(0.65 0.01 240);
+  --color-foreground-subtle: oklch(0.45 0.01 240);
+
+  /* Brand */
+  --color-primary: oklch(0.62 0.22 27);
+  --color-primary-hover: oklch(0.55 0.22 27);
+  --color-primary-foreground: oklch(0.98 0 0);
+
+  /* Accent */
+  --color-gold: oklch(0.78 0.15 70);
+  --color-gold-foreground: oklch(0.15 0.05 70);
+
+  /* Semantic */
+  --color-success: oklch(0.65 0.18 145);
+  --color-danger: oklch(0.55 0.22 27);
+  --color-warning: oklch(0.75 0.18 70);
+  --color-info: oklch(0.55 0.15 230);
+
+  /* Borders */
+  --color-border: oklch(0.2 0.01 240);
+  --color-border-strong: oklch(0.3 0.01 240);
+
+  /* Tier */
+  --color-tier-bronze: oklch(0.55 0.12 50);
+  --color-tier-silver: oklch(0.75 0.02 240);
+  --color-tier-gold: oklch(0.78 0.15 70);
+  --color-tier-diamond: oklch(0.75 0.15 200);
+  --color-tier-champion: oklch(0.55 0.25 320);
+
+  /* ============================================================
+     Typography
+     ============================================================ */
+  --font-display: var(--font-display-bebas), "Bebas Neue", sans-serif;
+  --font-sans: var(--font-sans-inter), "Inter", system-ui, sans-serif;
+  --font-mono: var(--font-mono-jetbrains), "JetBrains Mono", monospace;
+
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1rem;
+  --text-sm: 0.875rem;
+  --text-sm--line-height: 1.25rem;
+  --text-base: 1rem;
+  --text-base--line-height: 1.5rem;
+  --text-lg: 1.125rem;
+  --text-lg--line-height: 1.75rem;
+  --text-xl: 1.25rem;
+  --text-xl--line-height: 1.75rem;
+  --text-2xl: 1.5rem;
+  --text-2xl--line-height: 2rem;
+  --text-3xl: 1.875rem;
+  --text-3xl--line-height: 2.25rem;
+  --text-4xl: 2.25rem;
+  --text-4xl--line-height: 2.5rem;
+  --text-5xl: 3rem;
+  --text-5xl--line-height: 1;
+  --text-6xl: 3.75rem;
+  --text-6xl--line-height: 1;
+  --text-7xl: 4.5rem;
+  --text-7xl--line-height: 1;
+  --text-8xl: 6rem;
+  --text-8xl--line-height: 1;
+  --text-9xl: 8rem;
+  --text-9xl--line-height: 1;
+
+  /* ============================================================
+     Radius
+     ============================================================ */
+  --radius-sm: 4px;
+  --radius-DEFAULT: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 24px;
+
+  /* ============================================================
+     Shadows
+     ============================================================ */
+  --shadow-glow-primary: 0 0 20px oklch(0.62 0.22 27 / 0.3);
+  --shadow-glow-gold: 0 0 20px oklch(0.78 0.15 70 / 0.3);
+  --shadow-elevation-1: 0 1px 2px oklch(0 0 0 / 0.4), 0 1px 3px oklch(0 0 0 / 0.25);
+  --shadow-elevation-2: 0 4px 12px oklch(0 0 0 / 0.5), 0 2px 6px oklch(0 0 0 / 0.3);
+}
+
+/* ============================================================
+   Custom utilities
+   ============================================================ */
+
+@utility tabular {
+  font-feature-settings: "tnum";
+  font-variant-numeric: tabular-nums;
+}
+
+/* ============================================================
+   Base styles
+   ============================================================ */
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html {
+    /* Smooth scroll disabled — Lenis will handle later */
+    scroll-behavior: auto;
+    color-scheme: dark;
+  }
+
+  body {
+    background-color: var(--color-background-base);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background-color: var(--color-primary);
+    color: var(--color-primary-foreground);
+  }
+
+  /* Scrollbar */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-border-strong) transparent;
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background-color: var(--color-border-strong);
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-primary);
+  }
+
+  /* Focus ring */
+  :focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+}
