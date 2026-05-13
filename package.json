@@ -22,6 +22,8 @@
     "scrape:quick": "cd scripts/scraper && ./venv/bin/python scripts/run_all.py --phase quick",
     "scrape:enrich": "cd scripts/scraper && ./venv/bin/python scripts/run_all.py --phase enrich",
     "scrape:all": "cd scripts/scraper && ./venv/bin/python scripts/run_all.py --phase all",
+    "scrape:country": "cd scripts/scraper && ./venv/bin/python scripts/06_backfill_country.py",
+    "scrape:country:dry": "cd scripts/scraper && ./venv/bin/python scripts/06_backfill_country.py --dry-run --limit 5 --workers 1",
     "photos:setup": "cd scripts/photo_scraper && python3 -m venv venv && ./venv/bin/pip install -r requirements.txt",
     "photos:dry": "cd scripts/photo_scraper && ./venv/bin/python scripts/fetch_photos.py --limit 5 --dry-run",
     "photos:fetch": "cd scripts/photo_scraper && ./venv/bin/python scripts/fetch_photos.py --workers 4"
