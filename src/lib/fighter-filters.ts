@@ -5,6 +5,7 @@ import type {
 } from "@/lib/fighter-search";
 
 const VALID_SORTS: ReadonlySet<CatalogSort> = new Set([
+  "elite_first",
   "champions_first",
   "fights",
   "recent",
@@ -59,7 +60,7 @@ export function parseCatalogFilters(
   const sort: CatalogSort =
     rawSort && VALID_SORTS.has(rawSort as CatalogSort)
       ? (rawSort as CatalogSort)
-      : "fights";
+      : "elite_first";
 
   const rawLimit = Number.parseInt(get("limit") ?? "", 10);
   const rawOffset = Number.parseInt(get("offset") ?? "", 10);

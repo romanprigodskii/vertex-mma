@@ -84,6 +84,7 @@ export async function searchFighters(
 /* -------------------------------------------------------------------------- */
 
 export type CatalogSort =
+  | "elite_first"
   | "champions_first"
   | "fights"
   | "recent"
@@ -232,10 +233,42 @@ function buildOrderBy(filters: FighterCatalogFilters): SQL {
         : sql`(CASE WHEN slug IN (${slugList}) THEN 0 ELSE 1 END), bout_count DESC, COALESCE(wins_total, 0) DESC`;
     }
     case "fights":
-    default:
       return hasQuery
         ? sql`match_score DESC, bout_count DESC`
         : sql`bout_count DESC, COALESCE(wins_total, 0) DESC`;
+    case "elite_first":
+    default: {
+      const slugList = sql.join(
+        CHAMPION_SLUGS.map((s) => sql`${s}`),
+        sql`, `,
+      );
+      // Champions first, then a composite "elite score":
+      //   wins * win_rate * recency_factor
+      // where recency_factor is 1.0 for fighters active within the past
+      // three years and 0.5 otherwise. Win rate is treated as 0.5 for
+      // fighters with no recorded W/L (avoids divide-by-zero killing the
+      // whole product) but the bout_count tiebreaker keeps the unfought
+      // out of the top anyway.
+      return hasQuery
+        ? sql`match_score DESC, (CASE WHEN slug IN (${slugList}) THEN 0 ELSE 1 END), bout_count DESC`
+        : sql`
+          (CASE WHEN slug IN (${slugList}) THEN 0 ELSE 1 END),
+          (
+            COALESCE(wins_total, 0)::float
+            * COALESCE(
+                wins_total::float / NULLIF(wins_total + losses_total, 0),
+                0.5
+              )
+            * (
+              CASE
+                WHEN last_fight_date > NOW() - INTERVAL '3 years' THEN 1.0
+                ELSE 0.5
+              END
+            )
+          ) DESC NULLS LAST,
+          bout_count DESC
+        `;
+    }
   }
 }
 

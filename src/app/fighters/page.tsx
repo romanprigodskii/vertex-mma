@@ -41,7 +41,7 @@ function toClientFilters(parsed: FighterCatalogFilters): CatalogFilterState {
     status: parsed.status ?? "all",
     hasPhoto: parsed.hasPhoto ?? false,
     hallOfFame: parsed.hallOfFame ?? false,
-    sort: parsed.sort ?? "fights",
+    sort: parsed.sort ?? "elite_first",
   };
 }
 

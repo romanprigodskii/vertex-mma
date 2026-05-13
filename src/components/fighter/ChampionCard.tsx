@@ -13,20 +13,34 @@ interface ChampionCardProps {
 }
 
 const CARD_BASE = cn(
-  "group relative flex shrink-0 snap-start items-center gap-4",
+  "group relative flex shrink-0 items-center gap-4 overflow-hidden",
   "h-[140px] w-[300px] sm:h-[150px] sm:w-[400px]",
   "rounded-lg border px-4 py-3",
   "bg-gradient-to-br from-background-elevated to-background-base",
   "transition-[transform,border-color] duration-200 ease-out",
 );
 
+/** Subtle gold-to-transparent diagonal overlay. Layered above the bg gradient
+ * but below content, so all text/avatar/trophy remain crisp. */
+const GOLD_GLOW_OVERLAY = (
+  <span
+    aria-hidden
+    className="pointer-events-none absolute inset-0 z-0"
+    style={{
+      background:
+        "linear-gradient(135deg, oklch(0.78 0.15 70 / 0.06) 0%, transparent 60%)",
+    }}
+  />
+);
+
 export function ChampionCard({ entry, fighter }: ChampionCardProps) {
   if (!fighter) {
     return (
       <div
-        className={cn(CARD_BASE, "border-border/40 text-foreground-subtle")}
+        className={cn(CARD_BASE, "border-primary/15 text-foreground-subtle")}
         aria-label={`${entry.division}: data missing`}
       >
+        {GOLD_GLOW_OVERLAY}
         <div className="flex h-[88px] w-[88px] items-center justify-center rounded-md border border-dashed border-border bg-background-base/40 sm:h-[100px] sm:w-[100px]">
           <span className="font-mono text-[10px] uppercase tracking-wider">
             n/a
@@ -62,17 +76,18 @@ export function ChampionCard({ entry, fighter }: ChampionCardProps) {
       prefetch={false}
       className={cn(
         CARD_BASE,
-        "border-red-accent/30",
-        "hover:scale-[1.02] hover:border-red-accent/55 hover:shadow-glow-red-accent",
+        "border-primary/30",
+        "hover:scale-[1.02] hover:border-primary/55 hover:shadow-glow-primary",
         "focus-visible:scale-[1.02] focus-visible:outline-none",
         "focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background-base",
       )}
       aria-label={`${fighter.name_en}, ${entry.division} ${titleLabel}, record ${record}`}
     >
+      {GOLD_GLOW_OVERLAY}
       {/* Trophy — top-right corner. Dimmed for interim. */}
       <Trophy
         className={cn(
-          "pointer-events-none absolute right-3 top-3 h-4 w-4",
+          "pointer-events-none absolute right-3 top-3 z-10 h-4 w-4",
           entry.isInterim ? "text-foreground-muted/70" : "text-primary",
         )}
         aria-hidden

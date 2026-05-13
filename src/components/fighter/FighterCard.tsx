@@ -53,9 +53,9 @@ function streakClassFor(
   type: "W" | "L" | null,
   count: number,
 ): string {
-  if (!type || count < 2) return "text-foreground-muted";
-  if (type === "W") return "text-primary";
-  return "text-red-accent/80";
+  if (!type || count < 1) return "text-foreground-muted";
+  if (type === "W") return "text-streak-win";
+  return "text-streak-loss";
 }
 
 export function FighterCard({
@@ -107,7 +107,7 @@ export function FighterCard({
       href={`/fighters/${fighter.slug}`}
       prefetch={false}
       className={cn(
-        "group relative flex min-h-[180px] gap-4 rounded-lg border border-foreground/10 bg-background-elevated/30 p-4",
+        "group relative flex min-h-[168px] gap-4 rounded-lg border border-foreground/10 bg-background-elevated/30 p-4",
         "transition-[border-color,background-color] duration-200 ease-out",
         "hover:border-primary/40 hover:bg-foreground/[0.02]",
         "focus-visible:outline-none focus-visible:border-primary/50 focus-visible:bg-foreground/[0.02]",
@@ -125,7 +125,7 @@ export function FighterCard({
           photoUrl={fighter.photo_url}
           size="2xl"
           priority={priority}
-          imageSizes="160px"
+          imageSizes="140px"
         />
       </div>
 

@@ -27,6 +27,7 @@ import { formatNumber } from "@/lib/format";
 
 const PAGE_SIZE = 48;
 const RANKED_SORTS: ReadonlySet<CatalogSort> = new Set([
+  "elite_first",
   "champions_first",
   "fights",
   "wins",
@@ -40,7 +41,7 @@ const DEFAULT_FILTERS: CatalogFilterState = {
   status: "all",
   hasPhoto: false,
   hallOfFame: false,
-  sort: "fights",
+  sort: "elite_first",
 };
 
 function serializeFilters(filters: CatalogFilterState): URLSearchParams {
@@ -53,7 +54,7 @@ function serializeFilters(filters: CatalogFilterState): URLSearchParams {
   if (filters.status !== "all") params.set("status", filters.status);
   if (filters.hasPhoto) params.set("has_photo", "1");
   if (filters.hallOfFame) params.set("hof", "1");
-  if (filters.sort !== "fights") params.set("sort", filters.sort);
+  if (filters.sort !== "elite_first") params.set("sort", filters.sort);
   return params;
 }
 
@@ -319,13 +320,20 @@ export function FighterCatalogClient({
             </div>
           ) : null}
 
-          {/* Header above the list — totals + indexed-of caption */}
-          <div className="mb-1 flex items-baseline justify-between gap-3 px-2 pb-2 sm:px-4">
-            <p className="font-display text-sm uppercase tracking-[0.18em] text-foreground-subtle">
+          {/* Header above the list — mirrors the champion strip's
+              "CURRENT CHAMPIONS / 12 BELTS" pair for visual symmetry. */}
+          <div className="mb-3 mt-2 flex items-baseline justify-between gap-3 border-b border-foreground/10 px-1 pb-3 sm:mt-4 sm:px-2">
+            <p className="font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
               Roster
             </p>
-            <p className="font-mono text-[10px] uppercase tracking-widest text-foreground-subtle tabular">
-              {formatNumber(total)} / {formatNumber(totalAll)}
+            <p className="font-sans text-[11px] uppercase tracking-widest text-foreground-subtle">
+              <span className="font-mono tabular text-foreground">
+                {formatNumber(total)}
+              </span>{" "}
+              of{" "}
+              <span className="font-mono tabular">
+                {formatNumber(totalAll)}
+              </span>
             </p>
           </div>
 

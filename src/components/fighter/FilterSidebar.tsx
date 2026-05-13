@@ -50,7 +50,7 @@ export function activeFilterCount(filters: CatalogFilterState): number {
   if (filters.status !== "all") n += 1;
   if (filters.hasPhoto) n += 1;
   if (filters.hallOfFame) n += 1;
-  if (filters.sort !== "fights") n += 1;
+  if (filters.sort !== "elite_first") n += 1;
   return n;
 }
 
