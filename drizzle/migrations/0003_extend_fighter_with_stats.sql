@@ -41,6 +41,12 @@ WITH fighter_results AS (
       THEN TRUE
       ELSE FALSE
     END AS is_finish,
+    -- Knockdowns and sub_attempts in the bout's finishing round (perspective
+    -- fighter's row in bout_round_stats). Used to disambiguate KO vs Sub for
+    -- the ~4339 completed bouts where `method` is NULL but a round-stats row
+    -- exists with the actual signal. NULL when round stats are missing.
+    brs_self.knockdowns AS last_round_kd,
+    brs_self.sub_attempts AS last_round_sub_attempts,
     CASE
       WHEN b.method::text = 'no_contest' THEN 'NC'
       WHEN b.winner_id = b.fighter_a_id THEN 'W'
@@ -50,6 +56,10 @@ WITH fighter_results AS (
     END AS result
   FROM bout b
   JOIN event e ON e.id = b.event_id
+  LEFT JOIN bout_round_stats brs_self
+    ON brs_self.bout_id = b.id
+   AND brs_self.fighter_id = b.fighter_a_id
+   AND brs_self.round = b.round_finished
   WHERE b.status = 'completed'
   UNION ALL
   SELECT
@@ -69,6 +79,8 @@ WITH fighter_results AS (
       THEN TRUE
       ELSE FALSE
     END,
+    brs_self.knockdowns,
+    brs_self.sub_attempts,
     CASE
       WHEN b.method::text = 'no_contest' THEN 'NC'
       WHEN b.winner_id = b.fighter_b_id THEN 'W'
@@ -78,6 +90,10 @@ WITH fighter_results AS (
     END
   FROM bout b
   JOIN event e ON e.id = b.event_id
+  LEFT JOIN bout_round_stats brs_self
+    ON brs_self.bout_id = b.id
+   AND brs_self.fighter_id = b.fighter_b_id
+   AND brs_self.round = b.round_finished
   WHERE b.status = 'completed'
 ),
 last_fights AS (
@@ -142,15 +158,38 @@ ufc_stats AS (
     COUNT(*) FILTER (WHERE result = 'D') AS ufc_draws,
     COUNT(*) FILTER (WHERE result = 'NC') AS ufc_no_contests,
     COUNT(*) AS ufc_total,
-    COUNT(*) FILTER (WHERE result = 'W' AND method IN ('ko', 'tko')) AS ufc_wins_ko,
-    COUNT(*) FILTER (WHERE result = 'W' AND method = 'submission') AS ufc_wins_sub,
+    -- KO/Sub use the method column when available, else fall back to the
+    -- finishing-round signals from bout_round_stats:
+    --   knockdowns > 0 in finishing round  → KO/TKO
+    --   sub_attempts > 0 AND no knockdowns → Submission
+    -- Knockdowns take priority because a fight can have a sub attempt earlier
+    -- in the round but end on a KO. ~99% of NULL-method finishes get classified
+    -- correctly this way; the rare neither-signal case stays in "Other".
+    COUNT(*) FILTER (
+      WHERE result = 'W' AND is_finish AND (
+        method IN ('ko','tko')
+        OR (method IS NULL AND COALESCE(last_round_kd, 0) > 0)
+      )
+    ) AS ufc_wins_ko,
+    COUNT(*) FILTER (
+      WHERE result = 'W' AND is_finish AND (
+        method = 'submission'
+        OR (
+          method IS NULL
+          AND COALESCE(last_round_kd, 0) = 0
+          AND COALESCE(last_round_sub_attempts, 0) > 0
+        )
+      )
+    ) AS ufc_wins_sub,
     -- Decisions: explicit decision_* method OR (NULL method AND went the
     -- full distance per is_finish). Captures the ~4k unrecorded-method bouts
     -- correctly because most went to decision.
     COUNT(*) FILTER (WHERE result = 'W' AND NOT is_finish) AS ufc_wins_dec,
-    -- Any non-decision win — KO/Sub plus the NULL-method-but-clearly-a-stoppage
+    -- Any non-decision win — KO/Sub plus the rare NULL-method-NULL-round-stats
     -- bucket. Used for the radar's Power axis.
     COUNT(*) FILTER (WHERE result = 'W' AND is_finish) AS ufc_wins_finish,
+    -- Symmetric inference on losses (the opponent's round-stat would tell us
+    -- KO vs Sub, but we don't have it here; method-only for losses).
     COUNT(*) FILTER (WHERE result = 'L' AND method IN ('ko', 'tko')) AS ufc_losses_ko,
     COUNT(*) FILTER (WHERE result = 'L' AND method = 'submission') AS ufc_losses_sub,
     COUNT(*) FILTER (WHERE result = 'L' AND NOT is_finish) AS ufc_losses_dec

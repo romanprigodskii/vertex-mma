@@ -98,10 +98,15 @@ export function RadarChart({
     };
   });
 
+  // Expand viewBox horizontally so left-side labels ("ACTIVITY", "POWER")
+  // don't clip when text-anchor="end" pushes them past x=0. ~36 px on each
+  // side fits the widest 10 px / tracking-0.12em label without trimming.
+  const viewBoxPad = 40;
   return (
     <svg
-      viewBox={`0 0 ${size} ${size}`}
-      className={cn("h-auto w-full max-w-[380px]", className)}
+      viewBox={`${-viewBoxPad} 0 ${size + viewBoxPad * 2} ${size}`}
+      preserveAspectRatio="xMidYMid meet"
+      className={cn("h-auto w-full max-w-[420px]", className)}
       role="img"
       aria-label="Fighter attribute radar"
     >

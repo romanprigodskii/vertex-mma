@@ -84,10 +84,26 @@ export async function generateMetadata({
 
 function BoutCard({ bout }: { bout: EventBout }) {
   const weightLabel = WEIGHT_LABEL[bout.weight_class] ?? bout.weight_class;
+  const time = formatRoundTime(bout.time_finished_seconds);
+  // Method may be NULL for many completed bouts (scraper gap, Wave 3.5 will
+  // backfill). Fall back to "Finish" / "Decision" inferred from how the bout
+  // ended, so the bout card never reads just "vs".
+  const wentFullDistance =
+    bout.round_finished != null &&
+    bout.round_finished >= bout.scheduled_rounds &&
+    (bout.time_finished_seconds ?? 0) >= 280;
+  const inferredFromTime: string | null =
+    bout.status === "completed"
+      ? wentFullDistance
+        ? "Decision"
+        : bout.round_finished
+          ? "Finish"
+          : null
+      : null;
   const methodLabel = bout.method
     ? METHOD_SHORT[bout.method] ?? bout.method
-    : null;
-  const time = formatRoundTime(bout.time_finished_seconds);
+    : inferredFromTime;
+
   const finishDetail =
     bout.status === "completed" && bout.round_finished
       ? `R${bout.round_finished}${time ? ` · ${time}` : ""}`
@@ -103,7 +119,7 @@ function BoutCard({ bout }: { bout: EventBout }) {
   const aWon = winnerId === bout.fighter_a.id;
   const bWon = winnerId === bout.fighter_b.id;
   const isDraw =
-    bout.status === "completed" && bout.method && bout.method !== "no_contest" && !winnerId;
+    bout.status === "completed" && !winnerId && bout.method !== "no_contest";
   const isNc = bout.method === "no_contest";
 
   return (
@@ -117,12 +133,9 @@ function BoutCard({ bout }: { bout: EventBout }) {
           <span>{weightLabel}</span>
           <span className="mx-1.5 text-foreground-subtle/40">·</span>
           <span>{bout.scheduled_rounds} rounds</span>
-          {bout.is_title_fight ? (
-            <>
-              <span className="mx-1.5 text-foreground-subtle/40">·</span>
-              <span className="text-primary">Title</span>
-            </>
-          ) : null}
+          {/* TITLE chip suppressed — `bout.is_title_fight` is event-level in
+              the scraper data, so it lights up on every bout of a title-headlined
+              card. Re-enable after Wave 3.5 data backfill. */}
         </p>
         {finishDetail ? (
           <p className="font-mono text-[11px] tabular text-foreground-subtle">
@@ -143,11 +156,19 @@ function BoutCard({ bout }: { bout: EventBout }) {
           <p className="font-display text-lg uppercase tracking-widest text-foreground-subtle">
             vs
           </p>
-          {methodLabel && bout.status === "completed" ? (
+          {bout.status === "completed" ? (
             <p className="mt-0.5 font-sans text-[11px] uppercase tracking-widest text-foreground-muted">
-              {methodLabel}
+              {isNc
+                ? "No Contest"
+                : isDraw
+                  ? `Draw${methodLabel ? ` · ${methodLabel}` : ""}`
+                  : methodLabel ?? "Result —"}
             </p>
-          ) : null}
+          ) : (
+            <p className="mt-0.5 font-sans text-[11px] uppercase tracking-widest text-foreground-subtle">
+              {bout.status}
+            </p>
+          )}
         </div>
         <FighterSide
           fighter={bout.fighter_b}
