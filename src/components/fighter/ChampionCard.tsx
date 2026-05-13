@@ -63,8 +63,8 @@ export function ChampionCard({ entry, fighter }: ChampionCardProps) {
       prefetch={false}
       className={cn(
         CARD_BASE,
-        "border-primary/30",
-        "hover:scale-[1.02] hover:border-primary/55 hover:shadow-glow-primary",
+        "border-red-accent/30",
+        "hover:scale-[1.02] hover:border-red-accent/55 hover:shadow-glow-red-accent",
         "focus-visible:scale-[1.02] focus-visible:outline-none",
         "focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background-base",
       )}

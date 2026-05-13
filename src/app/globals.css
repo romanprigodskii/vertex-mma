@@ -16,18 +16,26 @@
   --color-foreground-muted: oklch(0.65 0.01 240);
   --color-foreground-subtle: oklch(0.45 0.01 240);
 
-  /* Brand */
-  --color-primary: oklch(0.62 0.22 27);
-  --color-primary-hover: oklch(0.55 0.22 27);
-  --color-primary-foreground: oklch(0.98 0 0);
+  /* Brand — gold is the primary surface for active state, focus, CTA. */
+  --color-primary: oklch(0.78 0.15 70);
+  --color-primary-hover: oklch(0.72 0.15 70);
+  --color-primary-foreground: oklch(0.15 0.05 70);
 
-  /* Accent */
+  /* Accent — red is reserved for rare, decorative moments (champion border). */
+  --color-red-accent: oklch(0.62 0.22 27);
+  --color-red-accent-hover: oklch(0.55 0.22 27);
+
+  /* Gold alias kept for back-compat with components that still spell it out
+     (Badge/Button gold variant, ChampionCard label, navbar coin icon).
+     Same oklch as primary by design. */
   --color-gold: oklch(0.78 0.15 70);
   --color-gold-foreground: oklch(0.15 0.05 70);
 
-  /* Semantic */
+  /* Semantic — danger keeps the red hue as a universal warning signal,
+     independent of brand. */
   --color-success: oklch(0.65 0.18 145);
   --color-danger: oklch(0.55 0.22 27);
+  --color-danger-foreground: oklch(0.98 0 0);
   --color-warning: oklch(0.75 0.18 70);
   --color-info: oklch(0.55 0.15 230);
 
@@ -89,8 +97,9 @@
   /* ============================================================
      Shadows
      ============================================================ */
-  --shadow-glow-primary: 0 0 20px oklch(0.62 0.22 27 / 0.3);
+  --shadow-glow-primary: 0 0 20px oklch(0.78 0.15 70 / 0.3);
   --shadow-glow-gold: 0 0 20px oklch(0.78 0.15 70 / 0.3);
+  --shadow-glow-red-accent: 0 0 20px oklch(0.62 0.22 27 / 0.3);
   --shadow-elevation-1: 0 1px 2px oklch(0 0 0 / 0.4), 0 1px 3px oklch(0 0 0 / 0.25);
   --shadow-elevation-2: 0 4px 12px oklch(0 0 0 / 0.5), 0 2px 6px oklch(0 0 0 / 0.3);
 }
