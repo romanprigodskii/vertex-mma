@@ -101,13 +101,19 @@ ufc_stats AS (
   -- wins_total which is the fighter's career total across all promotions —
   -- that's why Dan Severn appears with 101 wins despite only 13 UFC bouts).
   -- "ufc_total" counts completed UFC bouts including draws and NCs.
+  -- The method breakdown is needed by the fighter-detail radar (power,
+  -- cardio) since fighter_stats_aggregate.wins_ko/sub/dec are all 0 in our
+  -- data — never populated by the scraper.
   SELECT
     fighter_id,
     COUNT(*) FILTER (WHERE result = 'W') AS ufc_wins,
     COUNT(*) FILTER (WHERE result = 'L') AS ufc_losses,
     COUNT(*) FILTER (WHERE result = 'D') AS ufc_draws,
     COUNT(*) FILTER (WHERE result = 'NC') AS ufc_no_contests,
-    COUNT(*) AS ufc_total
+    COUNT(*) AS ufc_total,
+    COUNT(*) FILTER (WHERE result = 'W' AND method IN ('ko', 'tko')) AS ufc_wins_ko,
+    COUNT(*) FILTER (WHERE result = 'W' AND method = 'submission') AS ufc_wins_sub,
+    COUNT(*) FILTER (WHERE result = 'W' AND method LIKE 'decision%') AS ufc_wins_dec
   FROM fighter_results
   GROUP BY fighter_id
 )
@@ -148,6 +154,9 @@ SELECT
   COALESCE(us.ufc_draws, 0)::int AS ufc_draws,
   COALESCE(us.ufc_no_contests, 0)::int AS ufc_no_contests,
   COALESCE(us.ufc_total, 0)::int AS ufc_total,
+  COALESCE(us.ufc_wins_ko, 0)::int AS ufc_wins_ko,
+  COALESCE(us.ufc_wins_sub, 0)::int AS ufc_wins_sub,
+  COALESCE(us.ufc_wins_dec, 0)::int AS ufc_wins_dec,
   (
     SELECT COUNT(*)
     FROM bout
