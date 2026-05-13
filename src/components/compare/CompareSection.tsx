@@ -18,7 +18,7 @@ export function CompareSection({
   children,
 }: CompareSectionProps) {
   return (
-    <section className={cn("mt-16 sm:mt-20", className)}>
+    <section className={cn("mt-10 sm:mt-14", className)}>
       <Container size="xl">
         <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
           <SectionHeader label={label} explainer={explainer} />

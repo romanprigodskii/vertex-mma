@@ -294,21 +294,15 @@ export function CareerTimeline({ bouts }: CareerTimelineProps) {
             const t = new Date(b.event_date).getTime();
             const x = PADDING_X + ((t - startMs) / span) * innerWidth;
             const r = b.is_title_fight ? TITLE_DOT_R : DOT_R;
+            const isHovered = tooltip?.bout.bout_id === b.bout_id;
             return (
               <a
                 key={b.bout_id}
                 href={`/events/${b.event_slug}#bout-${b.bout_id}`}
-                onMouseEnter={(e) =>
-                  onEnter(b, e.currentTarget.querySelector("circle.dot") as SVGCircleElement)
-                }
-                onMouseLeave={onLeave}
-                onFocus={(e) =>
-                  onEnter(b, e.currentTarget.querySelector("circle.dot") as SVGCircleElement)
-                }
-                onBlur={onLeave}
                 aria-label={`${b.event_date.slice(0, 10)} ${RESULT_LABEL[b.result]} vs ${b.opponent_name}`}
                 style={{ outline: "none" }}
               >
+                {/* Halo: pointer-events:none so it doesn't catch hover. */}
                 <circle
                   cx={x}
                   cy={yCenter}
@@ -317,14 +311,44 @@ export function CareerTimeline({ bouts }: CareerTimelineProps) {
                   opacity={0.25}
                   pointerEvents="none"
                 />
+                {/* Visible dot: no hover transform, pointer-events:none —
+                    prevents the boundary-vibration loop where a scaled dot
+                    chases the cursor in/out of itself. */}
                 <circle
-                  className="dot transition-transform duration-150 hover:scale-110"
+                  className="dot"
                   cx={x}
                   cy={yCenter}
                   r={r}
                   fill={colorFor(b.result)}
                   stroke="oklch(0.08 0.005 240)"
                   strokeWidth={1.5}
+                  pointerEvents="none"
+                />
+                {/* Hover-only outer ring — rendered when this bout's tooltip
+                    is showing. Doesn't catch hover, so toggle is stable. */}
+                {isHovered ? (
+                  <circle
+                    cx={x}
+                    cy={yCenter}
+                    r={r + 4}
+                    fill="none"
+                    stroke={colorFor(b.result)}
+                    strokeWidth={1.5}
+                    opacity={0.55}
+                    pointerEvents="none"
+                  />
+                ) : null}
+                {/* Stable invisible hit target — generously larger than the
+                    visible dot so hover doesn't flicker, but doesn't grow. */}
+                <circle
+                  cx={x}
+                  cy={yCenter}
+                  r={14}
+                  fill="transparent"
+                  onMouseEnter={(e) => onEnter(b, e.currentTarget)}
+                  onMouseLeave={onLeave}
+                  onFocus={(e) => onEnter(b, e.currentTarget)}
+                  onBlur={onLeave}
                 />
               </a>
             );

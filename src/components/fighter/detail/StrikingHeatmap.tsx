@@ -83,47 +83,47 @@ function Silhouette({
         {/* Head — circle. */}
         <circle
           cx={100}
-          cy={60}
+          cy={56}
           r={36}
           fill={zoneFill(headPct, side)}
           stroke="oklch(0.30 0.01 240)"
           strokeWidth={1}
         />
-        {/* Body — torso rect (rounded). */}
-        <rect
-          x={50}
-          y={108}
-          width={100}
-          height={150}
-          rx={18}
-          fill={zoneFill(bodyPct, side)}
-          stroke="oklch(0.30 0.01 240)"
-          strokeWidth={1}
-        />
-        {/* Shoulders accent so the torso doesn't read as a floating box. */}
+        {/* Body — single rounded path with slightly wider shoulders so the
+            torso reads as a body, not a floating brick. No arms; we only
+            have head/body/legs data, and detached arm shapes were
+            visually noisy. */}
         <path
-          d="M50 124 Q40 116 30 110 L36 120 Q44 124 50 130 Z M150 124 Q160 116 170 110 L164 120 Q156 124 150 130 Z"
+          d="M62 110
+             Q50 116 50 134
+             L50 252
+             Q50 264 62 264
+             L138 264
+             Q150 264 150 252
+             L150 134
+             Q150 116 138 110
+             Z"
           fill={zoneFill(bodyPct, side)}
           stroke="oklch(0.30 0.01 240)"
           strokeWidth={1}
         />
         {/* Legs — two long rounded rectangles. */}
         <rect
-          x={56}
-          y={264}
+          x={60}
+          y={268}
           width={36}
           height={120}
-          rx={12}
+          rx={14}
           fill={zoneFill(legsPct, side)}
           stroke="oklch(0.30 0.01 240)"
           strokeWidth={1}
         />
         <rect
-          x={108}
-          y={264}
+          x={104}
+          y={268}
           width={36}
           height={120}
-          rx={12}
+          rx={14}
           fill={zoneFill(legsPct, side)}
           stroke="oklch(0.30 0.01 240)"
           strokeWidth={1}
@@ -131,7 +131,7 @@ function Silhouette({
         {/* Zone labels in-SVG so they stay aligned at small sizes. */}
         <text
           x={100}
-          y={64}
+          y={60}
           textAnchor="middle"
           dominantBaseline="central"
           fill="oklch(0.98 0 0)"
@@ -151,7 +151,7 @@ function Silhouette({
         </text>
         <text
           x={100}
-          y={328}
+          y={332}
           textAnchor="middle"
           dominantBaseline="central"
           fill="oklch(0.98 0 0)"

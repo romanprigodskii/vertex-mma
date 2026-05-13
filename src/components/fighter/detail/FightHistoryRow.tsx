@@ -1,19 +1,8 @@
 import Link from "next/link";
 
 import type { FightHistoryEntry } from "@/lib/fighter-detail";
+import { abbreviateMethod } from "@/lib/method";
 import { cn } from "@/lib/utils";
-
-const METHOD_SHORT: Record<string, string> = {
-  ko: "KO",
-  tko: "TKO",
-  submission: "Sub",
-  decision_unanimous: "U-Dec",
-  decision_split: "S-Dec",
-  decision_majority: "M-Dec",
-  draw: "Draw",
-  no_contest: "NC",
-  dq: "DQ",
-};
 
 function formatRoundTime(sec: number | null): string {
   if (sec == null) return "";
@@ -39,17 +28,16 @@ interface FightHistoryRowProps {
 
 export function FightHistoryRow({ entry }: FightHistoryRowProps) {
   const date = entry.event_date.slice(0, 10);
-  const methodLabel = entry.method
-    ? METHOD_SHORT[entry.method] ?? entry.method
-    : null;
+  const methodLabel = abbreviateMethod(entry.method_resolved ?? entry.method);
+  // Method is "inferred" when the raw column was NULL but we resolved from
+  // round-stats. Slight visual hint so the user knows it's a best guess.
+  const methodInferred =
+    entry.method == null && entry.method_resolved != null;
   const time = formatRoundTime(entry.time_finished_seconds);
   const finishDetail = entry.round_finished
     ? `R${entry.round_finished}${time ? ` · ${time}` : ""}`
     : null;
 
-  // TITLE chip intentionally removed in 3B.1.2 — `bout.is_title_fight` was
-  // scraped at event level, so undercard bouts of title-headlined events were
-  // tagged incorrectly. Re-enable after the data fix lands in Wave 3.5.
   return (
     <li
       className={cn(
@@ -59,10 +47,10 @@ export function FightHistoryRow({ entry }: FightHistoryRowProps) {
         "sm:grid-cols-[minmax(0,260px)_minmax(0,1fr)_auto] sm:gap-x-4",
       )}
     >
-      {/* Event + date — truncated so long names ("UFC 322: Della Maddalena
-          vs. Makhachev") don't run into the opponent column. */}
+      {/* Event + date → /events/{slug}#bout-{id}: lands on event with the bout
+          row briefly highlighted (BoutAnchorHighlight from Wave 3B.3). */}
       <Link
-        href={`/events/${entry.event_slug}`}
+        href={`/events/${entry.event_slug}#bout-${entry.bout_id}`}
         prefetch={false}
         title={entry.event_name}
         className="col-span-2 flex min-w-0 items-baseline gap-2 sm:col-span-1 sm:flex-col sm:gap-0.5"
@@ -90,7 +78,7 @@ export function FightHistoryRow({ entry }: FightHistoryRowProps) {
         </Link>
       </div>
 
-      {/* Result */}
+      {/* Result · method · round/time */}
       <div
         className={cn(
           "col-span-2 flex shrink-0 items-baseline justify-end gap-1.5 font-sans text-sm tabular sm:col-span-1",
@@ -100,11 +88,21 @@ export function FightHistoryRow({ entry }: FightHistoryRowProps) {
         <span className="font-display text-base tracking-wider">
           {entry.result}
         </span>
-        {methodLabel ? (
-          <span className="text-foreground-muted">· {methodLabel}</span>
-        ) : null}
+        <span className="text-foreground-subtle/40">·</span>
+        <span
+          className={cn(
+            "font-sans text-foreground",
+            methodInferred && "italic text-foreground-muted",
+          )}
+          title={methodInferred ? "Method inferred from round stats" : undefined}
+        >
+          {methodLabel}
+        </span>
         {finishDetail ? (
-          <span className="text-foreground-subtle">· {finishDetail}</span>
+          <>
+            <span className="text-foreground-subtle/40">·</span>
+            <span className="text-foreground-muted">{finishDetail}</span>
+          </>
         ) : null}
       </div>
     </li>

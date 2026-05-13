@@ -144,7 +144,7 @@ export default async function ComparePage({ searchParams }: PageProps) {
           </Container>
         </div>
 
-        <section className="py-10 md:py-14">
+        <section className="py-8 md:py-10">
           <Container size="xl">
             <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground-subtle">
               Side-by-side
@@ -156,7 +156,7 @@ export default async function ComparePage({ searchParams }: PageProps) {
               Compare fighters
             </h1>
 
-            <div className="mt-10 md:mt-12">
+            <div className="mt-6 md:mt-8">
               <CompareHero
                 a={fighterA}
                 b={fighterB}
@@ -219,7 +219,7 @@ export default async function ComparePage({ searchParams }: PageProps) {
               ? `${common.length} shared opponent${common.length === 1 ? "" : "s"}`
               : null
           }
-          className="mt-16 pb-20 sm:mt-20"
+          className="pb-16 sm:pb-20"
         >
           <CommonOpponents
             entries={common}

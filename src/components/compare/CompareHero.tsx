@@ -173,9 +173,11 @@ interface CompareHeroProps {
 
 export function CompareHero({ a, b, championA, championB }: CompareHeroProps) {
   return (
-    <div className="grid grid-cols-1 items-start gap-10 lg:grid-cols-[1fr_auto_1fr] lg:gap-12">
+    <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[1fr_auto_1fr] lg:gap-12">
       <FighterPanel fighter={a} champion={championA} align="left" />
-      <div className="flex items-center justify-center lg:mt-24">
+      {/* `vs` aligned with photo centerline — explicit height matches the
+          240 px photo (280 on sm+) so it doesn't drift with text below. */}
+      <div className="flex h-3 items-center justify-center lg:h-[200px] lg:items-center">
         <span className="font-display text-3xl uppercase tracking-[0.4em] text-foreground-subtle">
           vs
         </span>

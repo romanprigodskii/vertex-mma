@@ -73,7 +73,15 @@ export type FightHistoryEntry = {
   opponent_name: string;
   opponent_nickname: string | null;
   result: "W" | "L" | "D" | "NC";
+  /** Raw `bout.method` value as the scraper recorded it (often NULL). */
   method: string | null;
+  /**
+   * Method that survived the scraper's NULL gap by falling back to
+   * round-stat signals (knockdowns / sub_attempts in the finishing round)
+   * and the round_finished/time signal (full distance ⇒ decision).
+   * Never NULL when the bout was completed.
+   */
+  method_resolved: string | null;
   round_finished: number | null;
   time_finished_seconds: number | null;
   is_title_fight: boolean;
@@ -285,7 +293,15 @@ export async function getFighterBoutRounds(
   return [...(result as unknown as FighterBoutRound[])];
 }
 
-/** Reverse-chronological list of completed bouts with opponent + event info. */
+/**
+ * Reverse-chronological list of completed bouts with opponent + event info.
+ *
+ * `method_resolved` falls back to round-stat signals when `bout.method` is
+ * NULL (scraper coverage gap): knockdowns >0 in finishing round → KO,
+ * sub_attempts >0 → Sub, otherwise full-distance bouts → Dec. The raw
+ * `method` column is also returned for callers that need to distinguish
+ * recorded from inferred.
+ */
 export async function getFightHistory(
   fighterId: string,
 ): Promise<FightHistoryEntry[]> {
@@ -306,6 +322,17 @@ export async function getFightHistory(
         ELSE 'D'
       END AS result,
       b.method::text AS method,
+      CASE
+        WHEN b.method IS NOT NULL THEN b.method::text
+        WHEN b.round_finished IS NOT NULL
+          AND b.scheduled_rounds IS NOT NULL
+          AND b.round_finished >= b.scheduled_rounds
+          AND COALESCE(b.time_finished_seconds, 0) >= 280
+        THEN 'decision_unanimous'
+        WHEN COALESCE(brs_win.knockdowns, 0) > 0 THEN 'ko'
+        WHEN COALESCE(brs_win.sub_attempts, 0) > 0 THEN 'submission'
+        ELSE NULL
+      END AS method_resolved,
       b.round_finished,
       b.time_finished_seconds,
       b.is_title_fight
@@ -316,6 +343,10 @@ export async function getFightHistory(
         WHEN b.fighter_a_id = ${fighterId}::uuid THEN b.fighter_b_id
         ELSE b.fighter_a_id
       END
+    LEFT JOIN bout_round_stats brs_win
+      ON brs_win.bout_id = b.id
+     AND brs_win.fighter_id = b.winner_id
+     AND brs_win.round = b.round_finished
     WHERE (b.fighter_a_id = ${fighterId}::uuid OR b.fighter_b_id = ${fighterId}::uuid)
       AND b.status = 'completed'
     ORDER BY e.date DESC, b.bout_order DESC NULLS LAST
