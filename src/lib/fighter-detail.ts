@@ -63,23 +63,6 @@ export type FighterDetail = {
   bout_count: number;
 };
 
-export type RoundAverage = {
-  round: number;
-  avg_sig_str_landed: number;
-  avg_sig_str_attempted: number;
-  avg_sig_str_absorbed: number;
-  avg_total_str_landed: number;
-  avg_total_str_absorbed: number;
-  avg_td_landed: number;
-  avg_td_attempted: number;
-  avg_td_absorbed: number;
-  avg_sub_attempts: number;
-  avg_kd_landed: number;
-  avg_kd_absorbed: number;
-  avg_control_seconds: number;
-  sample_size: number;
-};
-
 export type FightHistoryEntry = {
   bout_id: string;
   event_name: string;
@@ -94,6 +77,35 @@ export type FightHistoryEntry = {
   round_finished: number | null;
   time_finished_seconds: number | null;
   is_title_fight: boolean;
+};
+
+/** One row per (bout, round) for a given fighter, with the opponent's
+ *  same-round numbers under "_absorbed" aliases and enough bout meta to
+ *  filter client-side (wins/losses/title/last-5). Single source of truth for
+ *  both the RBR chart and the striking heatmap. */
+export type FighterBoutRound = {
+  bout_id: string;
+  round: number;
+  event_date: string;
+  result: "W" | "L" | "D" | "NC";
+  is_title_fight: boolean;
+  sig_str_landed: number;
+  sig_str_absorbed: number;
+  sig_str_head_landed: number;
+  sig_str_head_absorbed: number;
+  sig_str_body_landed: number;
+  sig_str_body_absorbed: number;
+  sig_str_legs_landed: number;
+  sig_str_legs_absorbed: number;
+  total_str_landed: number;
+  total_str_absorbed: number;
+  td_landed: number;
+  td_absorbed: number;
+  td_attempted: number;
+  sub_attempts: number;
+  kd_landed: number;
+  kd_absorbed: number;
+  control_seconds: number;
 };
 
 /** Fetch a fighter row by slug or return null. Uses the catalog view so the
@@ -162,40 +174,55 @@ export async function getFighterBySlug(
 }
 
 /**
- * Per-round averages across this fighter's completed bouts.
- * Self-join on `bout_round_stats` to get the opponent's strikes per round
- * for the "absorbed" column. Empty rounds (e.g. a fighter who never reached
- * round 4) are simply absent — caller decides whether to fill in "—".
+ * Raw per-round entries for the fighter. The RBR chart and StrikingHeatmap
+ * both consume this single dataset and filter/aggregate client-side; ~150
+ * rows per fighter, so memory cost is negligible vs. re-querying on every
+ * filter toggle.
  */
-export async function computeRoundAverages(
+export async function getFighterBoutRounds(
   fighterId: string,
-): Promise<RoundAverage[]> {
-  const result = await db.execute<RoundAverage>(sql`
+): Promise<FighterBoutRound[]> {
+  const result = await db.execute<FighterBoutRound>(sql`
     SELECT
+      brs.bout_id::text AS bout_id,
       brs.round,
-      AVG(brs.sig_str_landed)::float AS avg_sig_str_landed,
-      AVG(brs.sig_str_attempted)::float AS avg_sig_str_attempted,
-      AVG(opp.sig_str_landed)::float AS avg_sig_str_absorbed,
-      AVG(brs.total_str_landed)::float AS avg_total_str_landed,
-      AVG(opp.total_str_landed)::float AS avg_total_str_absorbed,
-      AVG(brs.takedowns_landed)::float AS avg_td_landed,
-      AVG(brs.takedowns_attempted)::float AS avg_td_attempted,
-      AVG(opp.takedowns_landed)::float AS avg_td_absorbed,
-      AVG(brs.sub_attempts)::float AS avg_sub_attempts,
-      AVG(brs.knockdowns)::float AS avg_kd_landed,
-      AVG(opp.knockdowns)::float AS avg_kd_absorbed,
-      AVG(brs.control_time_seconds)::float AS avg_control_seconds,
-      COUNT(DISTINCT brs.bout_id)::int AS sample_size
+      e.date::text AS event_date,
+      b.is_title_fight,
+      CASE
+        WHEN b.method::text = 'no_contest' THEN 'NC'
+        WHEN b.winner_id = ${fighterId}::uuid THEN 'W'
+        WHEN b.winner_id IS NOT NULL THEN 'L'
+        ELSE 'D'
+      END AS result,
+      brs.sig_str_landed,
+      COALESCE(opp.sig_str_landed, 0) AS sig_str_absorbed,
+      brs.sig_str_head_landed,
+      COALESCE(opp.sig_str_head_landed, 0) AS sig_str_head_absorbed,
+      brs.sig_str_body_landed,
+      COALESCE(opp.sig_str_body_landed, 0) AS sig_str_body_absorbed,
+      brs.sig_str_legs_landed,
+      COALESCE(opp.sig_str_legs_landed, 0) AS sig_str_legs_absorbed,
+      brs.total_str_landed,
+      COALESCE(opp.total_str_landed, 0) AS total_str_absorbed,
+      brs.takedowns_landed AS td_landed,
+      COALESCE(opp.takedowns_landed, 0) AS td_absorbed,
+      brs.takedowns_attempted AS td_attempted,
+      brs.sub_attempts,
+      brs.knockdowns AS kd_landed,
+      COALESCE(opp.knockdowns, 0) AS kd_absorbed,
+      brs.control_time_seconds AS control_seconds
     FROM bout_round_stats brs
-    JOIN bout_round_stats opp
+    JOIN bout b ON b.id = brs.bout_id
+    JOIN event e ON e.id = b.event_id
+    LEFT JOIN bout_round_stats opp
       ON opp.bout_id = brs.bout_id
-      AND opp.round = brs.round
-      AND opp.fighter_id <> brs.fighter_id
-    WHERE brs.fighter_id = ${fighterId}
-    GROUP BY brs.round
-    ORDER BY brs.round
+     AND opp.round = brs.round
+     AND opp.fighter_id <> brs.fighter_id
+    WHERE brs.fighter_id = ${fighterId}::uuid
+      AND b.status = 'completed'
+    ORDER BY e.date DESC, brs.round ASC
   `);
-  return [...(result as unknown as RoundAverage[])];
+  return [...(result as unknown as FighterBoutRound[])];
 }
 
 /** Reverse-chronological list of completed bouts with opponent + event info. */
