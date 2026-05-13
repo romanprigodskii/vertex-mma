@@ -95,6 +95,21 @@ current_streak AS (
     WHERE rn = 1
   )
   GROUP BY fighter_id, result
+),
+ufc_stats AS (
+  -- UFC-only aggregates derived from the bout table (vs fighter_stats_aggregate.
+  -- wins_total which is the fighter's career total across all promotions —
+  -- that's why Dan Severn appears with 101 wins despite only 13 UFC bouts).
+  -- "ufc_total" counts completed UFC bouts including draws and NCs.
+  SELECT
+    fighter_id,
+    COUNT(*) FILTER (WHERE result = 'W') AS ufc_wins,
+    COUNT(*) FILTER (WHERE result = 'L') AS ufc_losses,
+    COUNT(*) FILTER (WHERE result = 'D') AS ufc_draws,
+    COUNT(*) FILTER (WHERE result = 'NC') AS ufc_no_contests,
+    COUNT(*) AS ufc_total
+  FROM fighter_results
+  GROUP BY fighter_id
 )
 SELECT
   f.*,
@@ -128,6 +143,11 @@ SELECT
   lf.method AS last_fight_method,
   cs.streak_type AS current_streak_type,
   COALESCE(cs.streak_count, 0)::int AS current_streak_count,
+  COALESCE(us.ufc_wins, 0)::int AS ufc_wins,
+  COALESCE(us.ufc_losses, 0)::int AS ufc_losses,
+  COALESCE(us.ufc_draws, 0)::int AS ufc_draws,
+  COALESCE(us.ufc_no_contests, 0)::int AS ufc_no_contests,
+  COALESCE(us.ufc_total, 0)::int AS ufc_total,
   (
     SELECT COUNT(*)
     FROM bout
@@ -136,4 +156,5 @@ SELECT
 FROM fighter f
 LEFT JOIN fighter_stats_aggregate fsa ON fsa.fighter_id = f.id
 LEFT JOIN last_fights lf ON lf.fighter_id = f.id
-LEFT JOIN current_streak cs ON cs.fighter_id = f.id;
+LEFT JOIN current_streak cs ON cs.fighter_id = f.id
+LEFT JOIN ufc_stats us ON us.fighter_id = f.id;

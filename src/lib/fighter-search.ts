@@ -238,22 +238,25 @@ function buildOrderBy(filters: FighterCatalogFilters): SQL {
         ? sql`match_score DESC, bout_count DESC`
         : sql`bout_count DESC, COALESCE(wins_total, 0) DESC`;
     case "all_time":
-      // Historical greatness — no champion pin, no recency penalty. A
-      // tighter credibility floor (20 vs 25 bouts) so 13-bout Khabib still
-      // hits the 0.65 multiplier instead of being clipped to 0.52. Retired
-      // GOATs are the explicit target audience here.
+      // Historical greatness — no champion pin, no recency penalty.
+      // Uses UFC-only wins/losses (from the view's ufc_stats CTE), NOT
+      // career totals. Career totals via fighter_stats_aggregate include
+      // pre-UFC fights (Dan Severn 101W, Jeremy Horn 91W…) and would
+      // surface regional-circuit pioneers above actual UFC legends.
+      // Credibility floor at 20 UFC bouts so 13-bout Khabib still hits
+      // a 0.65 multiplier instead of being clipped to 0.52 at 25.
       return hasQuery
-        ? sql`match_score DESC, bout_count DESC`
+        ? sql`match_score DESC, ufc_total DESC`
         : sql`
           (
-            COALESCE(wins_total, 0)::float
+            ufc_wins::float
             * COALESCE(
-                wins_total::float / NULLIF(wins_total + losses_total, 0),
+                ufc_wins::float / NULLIF(ufc_wins + ufc_losses, 0),
                 0.5
               )
-            * (LEAST(bout_count, 20)::float / 20.0)
+            * (LEAST(ufc_total, 20)::float / 20.0)
           ) DESC NULLS LAST,
-          bout_count DESC
+          ufc_total DESC
         `;
     case "elite_first":
     default: {
