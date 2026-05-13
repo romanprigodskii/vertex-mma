@@ -48,16 +48,27 @@ export function FightHistoryRow({ entry }: FightHistoryRowProps) {
     : null;
 
   return (
-    <li className="grid grid-cols-[auto_1fr_auto] items-baseline gap-x-3 gap-y-1 border-b border-foreground/[0.06] py-3 sm:grid-cols-[120px_minmax(0,1fr)_auto] sm:gap-x-4">
+    <li
+      className={cn(
+        "grid grid-cols-[auto_1fr_auto] items-baseline gap-x-3 gap-y-1",
+        "border-b border-foreground/[0.06] px-2 py-3",
+        "transition-colors duration-150 hover:bg-foreground/[0.03]",
+        "sm:grid-cols-[140px_minmax(0,1fr)_auto] sm:gap-x-4",
+      )}
+    >
       {/* Event + date */}
-      <div className="col-span-3 flex items-baseline gap-2 sm:col-span-1 sm:flex-col sm:gap-0.5">
-        <span className="font-sans text-sm text-foreground">
+      <Link
+        href={`/events/${entry.event_slug}`}
+        prefetch={false}
+        className="col-span-3 flex min-w-0 items-baseline gap-2 sm:col-span-1 sm:flex-col sm:gap-0.5"
+      >
+        <span className="truncate font-sans text-sm text-foreground hover:text-primary transition-colors">
           {entry.event_name}
         </span>
         <span className="font-mono text-[11px] tabular text-foreground-muted">
           {date}
         </span>
-      </div>
+      </Link>
 
       {/* Opponent */}
       <div className="min-w-0 flex flex-wrap items-baseline gap-x-1.5">

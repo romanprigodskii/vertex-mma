@@ -17,11 +17,30 @@ DROP VIEW IF EXISTS fighter_with_stats CASCADE;
 CREATE VIEW fighter_with_stats AS
 WITH fighter_results AS (
   -- One row per (fighter, completed bout) — perspective-of-fighter result.
+  --
+  -- `is_finish` infers whether a bout was a stoppage when the method column
+  -- is unrecorded — the Wave 2B scraper left `bout.method` NULL for ~4339 of
+  -- completed bouts (including all of Khabib's submission wins). We treat
+  -- "bout did not reach the end of the final scheduled round" as a finish so
+  -- the radar's Power axis isn't zeroed out for famous finishers. The
+  -- `>= 280` (4:40) threshold tolerates per-round time encoding quirks.
   SELECT
     b.fighter_a_id AS fighter_id,
     e.date AS fight_date,
     b.id AS bout_id,
     b.method::text AS method,
+    CASE
+      WHEN b.method::text LIKE 'decision%' THEN FALSE
+      WHEN b.method::text IN ('ko','tko','submission','dq') THEN TRUE
+      WHEN b.round_finished IS NOT NULL
+        AND b.scheduled_rounds IS NOT NULL
+        AND NOT (
+          b.round_finished >= b.scheduled_rounds
+          AND COALESCE(b.time_finished_seconds, 0) >= 280
+        )
+      THEN TRUE
+      ELSE FALSE
+    END AS is_finish,
     CASE
       WHEN b.method::text = 'no_contest' THEN 'NC'
       WHEN b.winner_id = b.fighter_a_id THEN 'W'
@@ -38,6 +57,18 @@ WITH fighter_results AS (
     e.date,
     b.id,
     b.method::text,
+    CASE
+      WHEN b.method::text LIKE 'decision%' THEN FALSE
+      WHEN b.method::text IN ('ko','tko','submission','dq') THEN TRUE
+      WHEN b.round_finished IS NOT NULL
+        AND b.scheduled_rounds IS NOT NULL
+        AND NOT (
+          b.round_finished >= b.scheduled_rounds
+          AND COALESCE(b.time_finished_seconds, 0) >= 280
+        )
+      THEN TRUE
+      ELSE FALSE
+    END,
     CASE
       WHEN b.method::text = 'no_contest' THEN 'NC'
       WHEN b.winner_id = b.fighter_b_id THEN 'W'
@@ -113,7 +144,16 @@ ufc_stats AS (
     COUNT(*) AS ufc_total,
     COUNT(*) FILTER (WHERE result = 'W' AND method IN ('ko', 'tko')) AS ufc_wins_ko,
     COUNT(*) FILTER (WHERE result = 'W' AND method = 'submission') AS ufc_wins_sub,
-    COUNT(*) FILTER (WHERE result = 'W' AND method LIKE 'decision%') AS ufc_wins_dec
+    -- Decisions: explicit decision_* method OR (NULL method AND went the
+    -- full distance per is_finish). Captures the ~4k unrecorded-method bouts
+    -- correctly because most went to decision.
+    COUNT(*) FILTER (WHERE result = 'W' AND NOT is_finish) AS ufc_wins_dec,
+    -- Any non-decision win — KO/Sub plus the NULL-method-but-clearly-a-stoppage
+    -- bucket. Used for the radar's Power axis.
+    COUNT(*) FILTER (WHERE result = 'W' AND is_finish) AS ufc_wins_finish,
+    COUNT(*) FILTER (WHERE result = 'L' AND method IN ('ko', 'tko')) AS ufc_losses_ko,
+    COUNT(*) FILTER (WHERE result = 'L' AND method = 'submission') AS ufc_losses_sub,
+    COUNT(*) FILTER (WHERE result = 'L' AND NOT is_finish) AS ufc_losses_dec
   FROM fighter_results
   GROUP BY fighter_id
 )
@@ -157,6 +197,10 @@ SELECT
   COALESCE(us.ufc_wins_ko, 0)::int AS ufc_wins_ko,
   COALESCE(us.ufc_wins_sub, 0)::int AS ufc_wins_sub,
   COALESCE(us.ufc_wins_dec, 0)::int AS ufc_wins_dec,
+  COALESCE(us.ufc_wins_finish, 0)::int AS ufc_wins_finish,
+  COALESCE(us.ufc_losses_ko, 0)::int AS ufc_losses_ko,
+  COALESCE(us.ufc_losses_sub, 0)::int AS ufc_losses_sub,
+  COALESCE(us.ufc_losses_dec, 0)::int AS ufc_losses_dec,
   (
     SELECT COUNT(*)
     FROM bout

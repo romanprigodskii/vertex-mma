@@ -15,7 +15,7 @@ export default function FighterDetailLoading() {
 
         {/* Hero skeleton */}
         <section className="border-b border-foreground/10">
-          <div className="mx-auto flex max-w-[1440px] flex-col gap-8 px-4 py-10 sm:px-6 md:py-14 lg:flex-row lg:gap-12 lg:px-8 lg:py-16">
+          <div className="mx-auto flex max-w-[1440px] flex-col gap-6 px-4 py-8 sm:px-6 md:py-10 lg:flex-row lg:gap-10 lg:px-8 lg:py-12">
             <div className="aspect-[3/4] w-full shrink-0 rounded-md border border-foreground/10 bg-foreground/[0.05] animate-pulse lg:h-[480px] lg:w-[360px] lg:aspect-auto" />
             <div className="flex min-w-0 flex-1 flex-col gap-6">
               <span className="h-16 w-3/4 rounded-md bg-foreground/[0.07] animate-pulse md:h-24" />

@@ -49,12 +49,12 @@ function baselineFor(angle: number): "alphabetic" | "central" | "hanging" {
 /** Pure-SVG hex radar. No JS, no interaction — server-renderable. */
 export function RadarChart({
   attributes,
-  size = 360,
+  size = 380,
   className,
 }: RadarChartProps) {
   const cx = size / 2;
   const cy = size / 2;
-  const outerRadius = size / 2 - 56; // leave room for labels
+  const outerRadius = size / 2 - 70; // leave room for value + label rings
 
   // Grid hexagons (5 concentric)
   const gridPolys = RING_PERCENTS.map((p) => {
@@ -75,12 +75,16 @@ export function RadarChart({
     pointAt(cx, cy, angleFor(i), (outerRadius * attributes[k]) / 100),
   );
 
-  // Labels at outer ring + offset
-  const labelOffset = 22;
+  // Values sit just outside the outer ring; labels sit further out. Putting
+  // numbers closer to the chart (and labels in a second ring) keeps them
+  // from colliding even on long words like "GRAPPLING" — which the previous
+  // tight stacking did overlap with the value beneath.
+  const valueOffset = 16;
+  const labelOffset = 38;
   const labels = ATTRIBUTE_KEYS.map((k, i) => {
     const a = angleFor(i);
+    const [vx, vy] = pointAt(cx, cy, a, outerRadius + valueOffset);
     const [lx, ly] = pointAt(cx, cy, a, outerRadius + labelOffset);
-    const [vx, vy] = pointAt(cx, cy, a, outerRadius + labelOffset + 14);
     return {
       key: k as AttributeKey,
       label: ATTRIBUTE_LABELS[k],
@@ -97,7 +101,7 @@ export function RadarChart({
   return (
     <svg
       viewBox={`0 0 ${size} ${size}`}
-      className={cn("h-auto w-full max-w-[360px]", className)}
+      className={cn("h-auto w-full max-w-[380px]", className)}
       role="img"
       aria-label="Fighter attribute radar"
     >

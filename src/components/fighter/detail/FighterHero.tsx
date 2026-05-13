@@ -134,7 +134,7 @@ export function FighterHero({ fighter, championEntry }: FighterHeroProps) {
 
   return (
     <section className="border-b border-foreground/10">
-      <div className="mx-auto flex max-w-[1440px] flex-col gap-8 px-4 py-10 sm:px-6 md:py-14 lg:flex-row lg:gap-12 lg:px-8 lg:py-16">
+      <div className="mx-auto flex max-w-[1440px] flex-col gap-6 px-4 py-8 sm:px-6 md:py-10 lg:flex-row lg:gap-10 lg:px-8 lg:py-12">
         {/* Photo column */}
         <div className="relative shrink-0 lg:w-[360px]">
           <HeroPhoto
@@ -167,7 +167,7 @@ export function FighterHero({ fighter, championEntry }: FighterHeroProps) {
             </p>
           ) : null}
 
-          <p className="mt-6 flex flex-wrap items-center gap-x-1.5 gap-y-1 font-sans text-[11px] uppercase tracking-[0.22em] text-foreground-muted md:text-xs">
+          <p className="mt-4 flex flex-wrap items-center gap-x-1.5 gap-y-1 font-sans text-[11px] uppercase tracking-[0.22em] text-foreground-muted md:text-xs">
             {fighter.country_code ? (
               <>
                 <span aria-hidden className="text-[14px] leading-none">
@@ -184,7 +184,7 @@ export function FighterHero({ fighter, championEntry }: FighterHeroProps) {
             ))}
           </p>
 
-          <div className="mt-10 md:mt-12">
+          <div className="mt-6 md:mt-8">
             <p
               className="font-display tabular tracking-tight text-foreground leading-none"
               style={{ fontSize: "clamp(56px, 9vw, 96px)" }}
@@ -196,9 +196,7 @@ export function FighterHero({ fighter, championEntry }: FighterHeroProps) {
               {ncs > 0 ? (
                 <>
                   <span className="mx-1.5 text-foreground-subtle/50">·</span>
-                  <span>
-                    {formatNumber(ncs)} NC
-                  </span>
+                  <span>{formatNumber(ncs)} NC</span>
                 </>
               ) : null}
             </p>

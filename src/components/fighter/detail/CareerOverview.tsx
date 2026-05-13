@@ -47,8 +47,16 @@ function StatRow({
 
 export function CareerOverview({ fighter }: CareerOverviewProps) {
   const ufcWins = fighter.ufc_wins;
+  // Finishes we know the method for vs. ones the scraper left as NULL.
+  const knownFinishMethods = fighter.ufc_wins_ko + fighter.ufc_wins_sub;
+  const unrecordedFinishes = Math.max(
+    0,
+    fighter.ufc_wins_finish - knownFinishMethods,
+  );
   const koBreakdown = ufcWins
-    ? `KO/TKO ${fighter.ufc_wins_ko} · Sub ${fighter.ufc_wins_sub} · Dec ${fighter.ufc_wins_dec}`
+    ? unrecordedFinishes > 0
+      ? `KO/TKO ${fighter.ufc_wins_ko} · Sub ${fighter.ufc_wins_sub} · Dec ${fighter.ufc_wins_dec} · Other finish ${unrecordedFinishes}`
+      : `KO/TKO ${fighter.ufc_wins_ko} · Sub ${fighter.ufc_wins_sub} · Dec ${fighter.ufc_wins_dec}`
     : null;
 
   const lastFight = fighter.last_fight_date

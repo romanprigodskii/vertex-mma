@@ -63,13 +63,15 @@ export function computeAttributes(f: FighterDetail): FighterAttributes {
       ? 50
       : clamp(Math.round((f.ufc_wins_dec / totalUfcWins) * 100 + 30));
 
-  // --- Power: finish rate ---
+  // --- Power: finish rate (non-decision wins / total wins). Uses
+  //     `ufc_wins_finish` which infers finish from round_finished when
+  //     `bout.method` is NULL (half the corpus). Without this the score
+  //     would zero out for famous finishers like Khabib whose submissions
+  //     all have unrecorded methods.
   const power =
     totalUfcWins === 0
       ? 30
-      : clamp(
-          Math.round(((f.ufc_wins_ko + f.ufc_wins_sub) / totalUfcWins) * 100),
-        );
+      : clamp(Math.round((f.ufc_wins_finish / totalUfcWins) * 100));
 
   // --- Activity: bouts vs. a "high tenure" benchmark of 30 UFC bouts ---
   const activity = clamp(Math.round((f.ufc_total / 30) * 100));

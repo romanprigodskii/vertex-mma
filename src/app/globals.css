@@ -44,6 +44,12 @@
   --color-streak-win: oklch(0.65 0.15 145);
   --color-streak-loss: oklch(0.55 0.15 27);
 
+  /* Metric tints used on the round-by-round bars. Chosen so the four bars
+     remain distinct against the dark background without competing with the
+     gold primary brand color. */
+  --color-submission: oklch(0.62 0.13 250);
+  --color-knockdown: oklch(0.72 0.16 60);
+
   /* Borders */
   --color-border: oklch(0.2 0.01 240);
   --color-border-strong: oklch(0.3 0.01 240);

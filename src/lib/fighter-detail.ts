@@ -41,6 +41,10 @@ export type FighterDetail = {
   ufc_wins_ko: number;
   ufc_wins_sub: number;
   ufc_wins_dec: number;
+  ufc_wins_finish: number;
+  ufc_losses_ko: number;
+  ufc_losses_sub: number;
+  ufc_losses_dec: number;
   // Per-round / advanced stats (often null for low-tenure fighters)
   slpm: number | null;
   str_acc: number | null;
@@ -64,8 +68,14 @@ export type RoundAverage = {
   avg_sig_str_landed: number;
   avg_sig_str_attempted: number;
   avg_sig_str_absorbed: number;
+  avg_total_str_landed: number;
+  avg_total_str_absorbed: number;
   avg_td_landed: number;
   avg_td_attempted: number;
+  avg_td_absorbed: number;
+  avg_sub_attempts: number;
+  avg_kd_landed: number;
+  avg_kd_absorbed: number;
   avg_control_seconds: number;
   sample_size: number;
 };
@@ -125,6 +135,10 @@ export async function getFighterBySlug(
       f.ufc_wins_ko,
       f.ufc_wins_sub,
       f.ufc_wins_dec,
+      f.ufc_wins_finish,
+      f.ufc_losses_ko,
+      f.ufc_losses_sub,
+      f.ufc_losses_dec,
       f.slpm,
       f.str_acc,
       f.sapm,
@@ -162,8 +176,14 @@ export async function computeRoundAverages(
       AVG(brs.sig_str_landed)::float AS avg_sig_str_landed,
       AVG(brs.sig_str_attempted)::float AS avg_sig_str_attempted,
       AVG(opp.sig_str_landed)::float AS avg_sig_str_absorbed,
+      AVG(brs.total_str_landed)::float AS avg_total_str_landed,
+      AVG(opp.total_str_landed)::float AS avg_total_str_absorbed,
       AVG(brs.takedowns_landed)::float AS avg_td_landed,
       AVG(brs.takedowns_attempted)::float AS avg_td_attempted,
+      AVG(opp.takedowns_landed)::float AS avg_td_absorbed,
+      AVG(brs.sub_attempts)::float AS avg_sub_attempts,
+      AVG(brs.knockdowns)::float AS avg_kd_landed,
+      AVG(opp.knockdowns)::float AS avg_kd_absorbed,
       AVG(brs.control_time_seconds)::float AS avg_control_seconds,
       COUNT(DISTINCT brs.bout_id)::int AS sample_size
     FROM bout_round_stats brs
