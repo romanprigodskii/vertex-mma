@@ -19,12 +19,27 @@ we return `(None, reason)` so the caller can log/skip.
 from __future__ import annotations
 
 import urllib.parse
-from typing import Iterable, Optional
+from typing import Iterable, Optional, Protocol
 
 import httpx
 
 
 WIKIDATA_API = "https://www.wikidata.org/w/api.php"
+
+
+class HttpClient(Protocol):
+    """Anything with a `.get(url, params=...) -> httpx.Response`.
+
+    Callers should pass a retry/rate-limiting wrapper here, not a raw
+    `httpx.Client` — the first full run of Wave 2.6 lost ~2500 matches
+    because Wikipedia's REST API 429'd us and the raw client silently
+    returned the 429 response body as an empty payload.
+    """
+
+    def get(
+        self, url: str, *, params: dict | None = None
+    ) -> httpx.Response:  # pragma: no cover - protocol
+        ...
 
 
 # Wikidata QID → ISO 3166-1 alpha-2.
@@ -51,6 +66,11 @@ WIKIDATA_COUNTRY_TO_ISO: dict[str, str] = {
     "Q804": "PA",
     "Q242": "BZ",
     "Q763": "JM",
+    "Q766": "JM",   # Jamaica (alternate Q-id)
+    "Q730": "SR",   # Suriname
+    "Q790": "HT",   # Haiti
+    "Q754": "TT",   # Trinidad and Tobago
+    "Q769": "GP",   # Guadeloupe (French overseas department; surface as GP)
     "Q786": "DO",
     "Q734": "GY",
     "Q736": "EC",
@@ -62,6 +82,7 @@ WIKIDATA_COUNTRY_TO_ISO: dict[str, str] = {
     # Europe
     "Q145": "GB",
     "Q21": "GB",   # England (subdivision, but commonly mapped to GB in casual data)
+    "Q42406": "GB",  # "English people" (ethnicity tagged as P27 on some articles)
     "Q22": "GB",   # Scotland
     "Q25": "GB",   # Wales
     "Q26": "GB",   # Northern Ireland
@@ -72,12 +93,14 @@ WIKIDATA_COUNTRY_TO_ISO: dict[str, str] = {
     "Q29": "ES",
     "Q45": "PT",
     "Q55": "NL",
+    "Q29999": "NL",  # "Kingdom of the Netherlands" (constitutional realm — same ISO)
     "Q31": "BE",
     "Q39": "CH",
     "Q40": "AT",
     "Q34": "SE",
     "Q33": "FI",
     "Q35": "DK",
+    "Q756617": "DK",  # "Kingdom of Denmark" (constitutional realm — same ISO)
     "Q20": "NO",
     "Q189": "IS",
     "Q36": "PL",
@@ -107,6 +130,8 @@ WIKIDATA_COUNTRY_TO_ISO: dict[str, str] = {
     "Q237": "VA",
     # Eurasia / former USSR
     "Q159": "RU",
+    "Q15180": "RU",  # Soviet Union (historical) — defaulting successor to RU
+
     "Q212": "UA",
     "Q184": "BY",
     "Q217": "MD",
@@ -164,6 +189,9 @@ WIKIDATA_COUNTRY_TO_ISO: dict[str, str] = {
     "Q1020": "MW",
     "Q1032": "NE",
     "Q1005": "GM",
+    "Q916": "AO",   # Angola
+    "Q974": "CD",   # Democratic Republic of the Congo
+    "Q1011": "CV",  # Cape Verde
     # Asia
     "Q17": "JP",
     "Q148": "CN",
@@ -212,9 +240,15 @@ class WikidataLookupError(Exception):
     """Raised for unexpected payload shapes — caller logs and skips."""
 
 
-def _http_get_json(client: httpx.Client, url: str, params: dict) -> dict:
-    """Single GET returning JSON. Raises WikidataLookupError on 4xx/5xx."""
-    response = client.get(url, params=params)
+def _http_get_json(client: HttpClient, url: str, params: dict) -> dict:
+    """Single GET returning JSON. Raises WikidataLookupError on any failure.
+
+    `client` is expected to retry on 429/5xx already (see `HttpClient`).
+    """
+    try:
+        response = client.get(url, params=params)
+    except Exception as exc:  # noqa: BLE001 — wrap network/retry-exhaustion failures
+        raise WikidataLookupError(f"GET {url} raised {exc!r}") from exc
     if response.status_code >= 400:
         raise WikidataLookupError(
             f"GET {url} -> {response.status_code} {response.text[:200]!r}"
@@ -235,7 +269,7 @@ def _select_best_p27_claim(claims: list[dict]) -> Optional[dict]:
 
 
 def country_for_wiki_title(
-    client: httpx.Client,
+    client: HttpClient,
     title: str,
 ) -> tuple[Optional[str], str]:
     """Resolve a Wikipedia article title to an ISO 3166-1 alpha-2 country code.
@@ -333,18 +367,21 @@ def _name_similarity(a: str, b: str) -> float:
     return len(na & nb) / max(len(na), len(nb))
 
 
-def _search_titles(client: httpx.Client, query: str, *, limit: int = 5) -> list[str]:
-    response = client.get(
-        WIKI_API,
-        params={
-            "action": "opensearch",
-            "search": query,
-            "limit": str(limit),
-            "namespace": "0",
-            "format": "json",
-            "redirects": "resolve",
-        },
-    )
+def _search_titles(client: HttpClient, query: str, *, limit: int = 5) -> list[str]:
+    try:
+        response = client.get(
+            WIKI_API,
+            params={
+                "action": "opensearch",
+                "search": query,
+                "limit": str(limit),
+                "namespace": "0",
+                "format": "json",
+                "redirects": "resolve",
+            },
+        )
+    except Exception:  # noqa: BLE001 — retry-exhaustion etc. surface as "no results"
+        return []
     if response.status_code >= 400:
         return []
     try:
@@ -356,11 +393,14 @@ def _search_titles(client: httpx.Client, query: str, *, limit: int = 5) -> list[
     return list(data[1])
 
 
-def _fetch_summary(client: httpx.Client, title: str) -> dict | None:
+def _fetch_summary(client: HttpClient, title: str) -> dict | None:
     url = WIKI_REST_SUMMARY.format(
         title=urllib.parse.quote(title.replace(" ", "_"), safe="")
     )
-    response = client.get(url)
+    try:
+        response = client.get(url)
+    except Exception:  # noqa: BLE001
+        return None
     if response.status_code in (404, 410) or response.status_code >= 400:
         return None
     try:
@@ -387,7 +427,7 @@ def _has_mma_keywords(summary: dict) -> bool:
 
 
 def find_article_title(
-    client: httpx.Client,
+    client: HttpClient,
     name_en: str,
     *,
     extra_queries: Iterable[str] = (),
