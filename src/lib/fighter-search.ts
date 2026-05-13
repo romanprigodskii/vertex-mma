@@ -155,15 +155,27 @@ function buildWhere(filters: FighterCatalogFilters): SQL {
   }
 
   if (filters.weight && filters.weight.length > 0) {
-    conditions.push(sql`f.weight_class_primary::text = ANY(${filters.weight})`);
+    const values = sql.join(
+      filters.weight.map((v) => sql`${v}`),
+      sql`, `,
+    );
+    conditions.push(sql`f.weight_class_primary::text IN (${values})`);
   }
 
   if (filters.country && filters.country.length > 0) {
-    conditions.push(sql`f.country_code = ANY(${filters.country})`);
+    const values = sql.join(
+      filters.country.map((v) => sql`${v}`),
+      sql`, `,
+    );
+    conditions.push(sql`f.country_code IN (${values})`);
   }
 
   if (filters.stance && filters.stance.length > 0) {
-    conditions.push(sql`f.stance::text = ANY(${filters.stance})`);
+    const values = sql.join(
+      filters.stance.map((v) => sql`${v}`),
+      sql`, `,
+    );
+    conditions.push(sql`f.stance::text IN (${values})`);
   }
 
   if (filters.status && filters.status !== "all") {
