@@ -152,8 +152,8 @@ class RateLimitedClient:
 
     @retry(
         retry=retry_if_exception_type(_RetryableHTTPError),
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=2, min=1, max=30),
+        stop=stop_after_attempt(6),
+        wait=wait_exponential(multiplier=2, min=2, max=60),
         reraise=True,
     )
     def get(self, url: str, *, params: dict | None = None) -> httpx.Response:
@@ -163,9 +163,15 @@ class RateLimitedClient:
         except httpx.HTTPError as exc:
             raise _RetryableHTTPError(repr(exc)) from exc
         if response.status_code == 429 or response.status_code >= 500:
+            retry_after = response.headers.get("retry-after")
             log.warning(
-                f"GET {url} -> {response.status_code} — will retry"
+                f"GET {url} -> {response.status_code} retry-after={retry_after} — will retry"
             )
+            if retry_after:
+                try:
+                    time.sleep(min(60.0, float(retry_after)))
+                except ValueError:
+                    pass
             raise _RetryableHTTPError(f"status {response.status_code}")
         return response
 
@@ -246,14 +252,14 @@ def _resolve_country(http: RateLimitedClient, fighter: dict) -> Outcome:
 
     override_title = CHAMPION_TITLE_OVERRIDES.get(slug)
     if override_title is not None:
-        iso, reason = country_for_wiki_title(http._client, override_title)
+        iso, reason = country_for_wiki_title(http, override_title)
         return Outcome(slug, name, iso, f"override:{reason}", via_override=True)
 
-    title, find_reason = find_article_title(http._client, name)
+    title, find_reason = find_article_title(http, name)
     if title is None:
         return Outcome(slug, name, None, f"search:{find_reason}", via_override=False)
 
-    iso, p27_reason = country_for_wiki_title(http._client, title)
+    iso, p27_reason = country_for_wiki_title(http, title)
     return Outcome(slug, name, iso, f"wiki:{title}|{p27_reason}", via_override=False)
 
 
