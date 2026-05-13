@@ -79,6 +79,66 @@ export type FightHistoryEntry = {
   is_title_fight: boolean;
 };
 
+/**
+ * Fight history entry enriched with per-bout aggregates (summed across the
+ * bout's recorded rounds). Powers the timeline's rich hover tooltip without
+ * a second SQL trip — we already fetch the per-round entries for the RBR
+ * chart and heatmap.
+ */
+export type TimelineBout = FightHistoryEntry & {
+  sig_str_landed: number;
+  sig_str_absorbed: number;
+  td_landed: number;
+  td_attempted: number;
+  control_seconds: number;
+  /** True when bout_round_stats actually exists for this bout. */
+  has_stats: boolean;
+};
+
+/** Sum per-round stats into per-bout aggregates and zip with fight history. */
+export function buildTimelineBouts(
+  history: FightHistoryEntry[],
+  boutRounds: FighterBoutRound[],
+): TimelineBout[] {
+  const agg = new Map<
+    string,
+    {
+      sig_str_landed: number;
+      sig_str_absorbed: number;
+      td_landed: number;
+      td_attempted: number;
+      control_seconds: number;
+    }
+  >();
+  for (const r of boutRounds) {
+    const cur = agg.get(r.bout_id) ?? {
+      sig_str_landed: 0,
+      sig_str_absorbed: 0,
+      td_landed: 0,
+      td_attempted: 0,
+      control_seconds: 0,
+    };
+    cur.sig_str_landed += r.sig_str_landed;
+    cur.sig_str_absorbed += r.sig_str_absorbed;
+    cur.td_landed += r.td_landed;
+    cur.td_attempted += r.td_attempted;
+    cur.control_seconds += r.control_seconds;
+    agg.set(r.bout_id, cur);
+  }
+  return history.map((h) => {
+    const a = agg.get(h.bout_id);
+    return {
+      ...h,
+      sig_str_landed: a?.sig_str_landed ?? 0,
+      sig_str_absorbed: a?.sig_str_absorbed ?? 0,
+      td_landed: a?.td_landed ?? 0,
+      td_attempted: a?.td_attempted ?? 0,
+      control_seconds: a?.control_seconds ?? 0,
+      has_stats: a != null,
+    };
+  });
+}
+
 /** One row per (bout, round) for a given fighter, with the opponent's
  *  same-round numbers under "_absorbed" aliases and enough bout meta to
  *  filter client-side (wins/losses/title/last-5). Single source of truth for

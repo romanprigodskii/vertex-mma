@@ -10,6 +10,7 @@ import { FighterHero } from "@/components/fighter/detail/FighterHero";
 import { PhysicalInfo } from "@/components/fighter/detail/PhysicalInfo";
 import { RadarChart } from "@/components/fighter/detail/RadarChart";
 import { RoundByRoundChart } from "@/components/fighter/detail/RoundByRoundChart";
+import { SectionHeader } from "@/components/fighter/detail/SectionHeader";
 import { SimilarFighters } from "@/components/fighter/detail/SimilarFighters";
 import { StrikingHeatmap } from "@/components/fighter/detail/StrikingHeatmap";
 import { Container } from "@/components/layout/container";
@@ -18,6 +19,7 @@ import { Navbar } from "@/components/layout/navbar";
 import { CHAMPION_BY_SLUG } from "@/lib/champions";
 import { computeAttributes } from "@/lib/fighter-attributes";
 import {
+  buildTimelineBouts,
   getFightHistory,
   getFighterBoutRounds,
   getFighterBySlug,
@@ -62,29 +64,20 @@ export async function generateMetadata({
 }
 
 function Section({
-  title,
-  description,
+  label,
+  explainer,
   children,
   className,
 }: {
-  title: string;
-  description?: string;
+  label: string;
+  explainer?: string;
   children: React.ReactNode;
   className?: string;
 }) {
   return (
     <section className={className}>
       <Container size="xl">
-        <header className="mb-5 flex flex-wrap items-baseline justify-between gap-3">
-          <h2 className="font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
-            {title}
-          </h2>
-          {description ? (
-            <p className="font-sans text-[11px] text-foreground-subtle">
-              {description}
-            </p>
-          ) : null}
-        </header>
+        <SectionHeader label={label} explainer={explainer} />
         {children}
       </Container>
     </section>
@@ -104,6 +97,7 @@ export default async function FighterDetailPage({ params }: PageProps) {
 
   const championEntry = CHAMPION_BY_SLUG.get(slug) ?? null;
   const attributes = computeAttributes(fighter);
+  const timelineBouts = buildTimelineBouts(history, boutRounds);
 
   return (
     <>
@@ -129,9 +123,7 @@ export default async function FighterDetailPage({ params }: PageProps) {
           <Link
             href={`/fighters/${slug}/card`}
             prefetch={false}
-            className={
-              "group flex flex-wrap items-center justify-between gap-3 rounded-md border border-primary/30 bg-primary/[0.04] px-4 py-3 transition-colors hover:border-primary/55 hover:bg-primary/[0.08]"
-            }
+            className="group flex flex-wrap items-center justify-between gap-3 rounded-md border border-primary/30 bg-primary/[0.04] px-4 py-3 transition-colors hover:border-primary/55 hover:bg-primary/[0.08]"
           >
             <span className="font-sans text-[11px] uppercase tracking-[0.22em] text-primary">
               Collectible holographic card
@@ -143,14 +135,25 @@ export default async function FighterDetailPage({ params }: PageProps) {
           </Link>
         </Container>
 
-        <Section title="Key stats" className="py-10 md:py-14">
+        <Section
+          label="Career timeline"
+          explainer="Each dot is a fight — green wins, red losses, larger dots are title fights. Hover for details, click to open the event."
+          className="mt-16 sm:mt-20"
+        >
+          <CareerTimeline bouts={timelineBouts} />
+        </Section>
+
+        <Section
+          label="Key stats"
+          explainer="Six attributes derived from striking, grappling, and finishing rates."
+          className="mt-16 sm:mt-20"
+        >
           <div className="grid grid-cols-1 gap-10 lg:grid-cols-2 lg:gap-16">
             <div className="flex flex-col items-center lg:items-start">
               <RadarChart attributes={attributes} />
               <p className="mt-4 max-w-sm text-center font-sans text-[11px] text-foreground-subtle lg:text-left">
-                Attributes derived from striking/grappling rates, UFC method
-                breakdown, and bout count. Fighters with sparse method data
-                (older bouts) will read lower on Power and Cardio.
+                Fighters with sparse method data (older bouts) will read lower
+                on Power and Cardio.
               </p>
             </div>
             <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
@@ -171,40 +174,35 @@ export default async function FighterDetailPage({ params }: PageProps) {
         </Section>
 
         <Section
-          title="Striking heatmap"
-          description="Aggregated significant strikes by target zone across all recorded rounds."
-          className="border-t border-foreground/[0.06] py-10 md:py-14"
+          label="Striking heatmap"
+          explainer="Significant strikes by target zone, aggregated across all UFC rounds."
+          className="mt-16 sm:mt-20"
         >
           <StrikingHeatmap boutRounds={boutRounds} />
         </Section>
 
         <Section
-          title="Round-by-round averages"
-          className="border-t border-foreground/[0.06] py-10 md:py-14"
+          label="Round-by-round averages"
+          explainer="Average values per round across the selected fights — toggle metrics below."
+          className="mt-16 sm:mt-20"
         >
           <RoundByRoundChart boutRounds={boutRounds} />
         </Section>
 
         <Section
-          title="Career timeline"
-          className="border-t border-foreground/[0.06] py-10 md:py-14"
-        >
-          <CareerTimeline history={history} />
-        </Section>
-
-        <Section
-          title="Similar fighters"
-          description="Cosine similarity over striking + grappling rate vector, same weight class."
-          className="border-t border-foreground/[0.06] py-10 md:py-14"
-        >
-          <SimilarFighters fighters={similar} />
-        </Section>
-
-        <Section
-          title="Fight history"
-          className="border-t border-foreground/[0.06] py-10 pb-16 md:py-14 md:pb-20"
+          label="Fight history"
+          explainer="Career UFC bouts in reverse chronological order."
+          className="mt-16 sm:mt-20"
         >
           <FightHistoryList history={history} />
+        </Section>
+
+        <Section
+          label="Similar fighters"
+          explainer="Closest stylistic matches by inverse-Euclidean similarity over striking and grappling rates."
+          className="mt-16 pb-20 sm:mt-20"
+        >
+          <SimilarFighters fighters={similar} />
         </Section>
       </main>
       <Footer />

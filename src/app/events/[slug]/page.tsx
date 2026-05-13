@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 
+import { BoutAnchorHighlight } from "@/components/event/BoutAnchorHighlight";
 import { Container } from "@/components/layout/container";
 import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
@@ -123,7 +124,10 @@ function BoutCard({ bout }: { bout: EventBout }) {
   const isNc = bout.method === "no_contest";
 
   return (
-    <article className="rounded-md border border-foreground/10 bg-background-elevated/30 px-4 py-4">
+    <article
+      id={`bout-${bout.id}`}
+      className="scroll-mt-24 rounded-md border border-foreground/10 bg-background-elevated/30 px-4 py-4"
+    >
       <header className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
         <p className="font-sans text-[11px] uppercase tracking-widest text-foreground-muted">
           {placement ? (
@@ -312,13 +316,16 @@ export default async function EventDetailPage({ params }: PageProps) {
                 </p>
               </div>
             ) : (
-              <ul className="flex flex-col gap-3">
-                {bouts.map((b) => (
-                  <li key={b.id}>
-                    <BoutCard bout={b} />
-                  </li>
-                ))}
-              </ul>
+              <>
+                <BoutAnchorHighlight />
+                <ul className="flex flex-col gap-3">
+                  {bouts.map((b) => (
+                    <li key={b.id}>
+                      <BoutCard bout={b} />
+                    </li>
+                  ))}
+                </ul>
+              </>
             )}
           </Container>
         </section>

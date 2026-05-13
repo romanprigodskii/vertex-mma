@@ -45,7 +45,7 @@ export default function FighterDetailLoading() {
         </section>
 
         {/* Lower sections skeleton */}
-        <section className="border-t border-foreground/[0.06] py-10 md:py-14">
+        <section className="mt-16 sm:mt-20">
           <Container size="xl">
             <span className="mb-5 block h-3 w-44 rounded-sm bg-foreground/[0.06] animate-pulse" />
             <div className="h-40 w-full rounded-md bg-foreground/[0.04] animate-pulse" />
