@@ -9,22 +9,22 @@ interface EmptyStateProps {
 
 export function EmptyState({
   onReset,
-  hint = "Try a different name or remove some filters.",
+  hint = "No fighters match these filters.",
 }: EmptyStateProps) {
   return (
-    <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-border bg-background-elevated/40 px-6 py-20 text-center">
-      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-background-overlay text-foreground-subtle">
+    <div className="flex flex-col items-center justify-center gap-4 border-y border-dashed border-foreground/10 px-6 py-20 text-center">
+      <div className="flex h-12 w-12 items-center justify-center rounded-full border border-foreground/10 bg-background-elevated/60 text-foreground-subtle">
         <SearchX className="h-5 w-5" />
       </div>
       <div className="space-y-1">
         <p className="font-display text-2xl uppercase tracking-wide text-foreground">
-          No fighters found
+          Nothing here
         </p>
         <p className="max-w-sm text-sm text-foreground-muted">{hint}</p>
       </div>
       {onReset ? (
         <Button variant="outline" size="sm" onClick={onReset}>
-          Reset filters
+          Clear filters
         </Button>
       ) : null}
     </div>

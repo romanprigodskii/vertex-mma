@@ -1,5 +1,6 @@
 import { sql, type SQL } from "drizzle-orm";
 
+import { CHAMPION_SLUGS } from "@/lib/champions";
 import { db } from "@/lib/db";
 
 export type FighterSearchResult = {
@@ -83,6 +84,7 @@ export async function searchFighters(
 /* -------------------------------------------------------------------------- */
 
 export type CatalogSort =
+  | "champions_first"
   | "fights"
   | "recent"
   | "wins"
@@ -211,10 +213,23 @@ function buildOrderBy(filters: FighterCatalogFilters): SQL {
     case "recent":
       return sql`last_bout_date DESC NULLS LAST, bout_count DESC`;
     case "fights":
-    default:
       return hasQuery
         ? sql`match_score DESC, bout_count DESC`
         : sql`bout_count DESC, COALESCE(fsa.wins_total, 0) DESC`;
+    case "champions_first":
+    default: {
+      const slugList = sql.join(
+        CHAMPION_SLUGS.map((s) => sql`${s}`),
+        sql`, `,
+      );
+      // Champions get rank 0 (top), everyone else rank 1. Within each tier,
+      // sort by bout count → wins. When a query is present, similarity wins
+      // over champion-status (the user almost certainly wants the matching
+      // person at the top, not unrelated champions).
+      return hasQuery
+        ? sql`match_score DESC, (CASE WHEN f.slug IN (${slugList}) THEN 0 ELSE 1 END), bout_count DESC`
+        : sql`(CASE WHEN f.slug IN (${slugList}) THEN 0 ELSE 1 END), bout_count DESC, COALESCE(fsa.wins_total, 0) DESC`;
+    }
   }
 }
 
@@ -339,4 +354,53 @@ export async function getFighterTotal(): Promise<number> {
   );
   const rows = result as unknown as Array<{ total: number }>;
   return rows[0]?.total ?? 0;
+}
+
+/**
+ * Fetch the catalog rows for an explicit slug list (used by the champion strip).
+ * Preserves the input order so the caller can render champions in spec-order.
+ */
+export async function getFightersBySlug(
+  slugs: readonly string[],
+): Promise<FighterCatalogRow[]> {
+  if (slugs.length === 0) return [];
+  const values = sql.join(
+    slugs.map((s) => sql`${s}`),
+    sql`, `,
+  );
+  const result = await db.execute<FighterCatalogRow>(sql`
+    SELECT
+      f.id::text AS id,
+      f.slug,
+      f.name_en,
+      f.name_ru,
+      f.nickname,
+      f.photo_url,
+      f.photo_silhouette_url,
+      f.photo_thumbnail_url,
+      f.weight_class_primary::text AS weight_class_primary,
+      f.country_code,
+      f.stance::text AS stance,
+      f.status::text AS status,
+      f.hall_of_fame_year,
+      COALESCE(fsa.wins_total, 0) AS wins_total,
+      COALESCE(fsa.losses_total, 0) AS losses_total,
+      COALESCE(fsa.draws_total, 0) AS draws_total,
+      COALESCE(fsa.no_contests, 0) AS no_contests,
+      (
+        SELECT COUNT(*)::int FROM bout
+        WHERE bout.fighter_a_id = f.id OR bout.fighter_b_id = f.id
+      ) AS bout_count
+    FROM fighter f
+    LEFT JOIN fighter_stats_aggregate fsa ON fsa.fighter_id = f.id
+    WHERE f.slug IN (${values})
+  `);
+  const rows = result as unknown as FighterCatalogRow[];
+
+  // Re-order to match the input slug list. Missing fighters drop out — the
+  // caller is responsible for rendering a placeholder.
+  const bySlug = new Map(rows.map((r) => [r.slug, r]));
+  return slugs
+    .map((slug) => bySlug.get(slug))
+    .filter((r): r is FighterCatalogRow => r !== undefined);
 }

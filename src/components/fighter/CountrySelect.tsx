@@ -50,11 +50,11 @@ export function CountrySelect({
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Find country (e.g. US, RU)…"
+          placeholder="Find country…"
           className={cn(
-            "h-8 w-full rounded-md border border-border bg-background-base pl-8 pr-2 text-xs text-foreground",
+            "h-7 w-full rounded-sm border border-foreground/10 bg-background-base pl-7 pr-2 text-[11px] text-foreground",
             "placeholder:text-foreground-subtle",
-            "focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/30",
+            "focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/40",
             "transition-colors",
           )}
           aria-label="Search countries"

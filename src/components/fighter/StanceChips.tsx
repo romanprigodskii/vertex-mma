@@ -16,7 +16,7 @@ interface StanceChipsProps {
 
 export function StanceChips({ selected, onToggle }: StanceChipsProps) {
   return (
-    <div className="flex flex-wrap gap-1.5">
+    <div className="flex flex-wrap gap-1">
       {STANCES.map((s) => {
         const isActive = selected.includes(s.id);
         return (
@@ -26,10 +26,10 @@ export function StanceChips({ selected, onToggle }: StanceChipsProps) {
             onClick={() => onToggle(s.id)}
             aria-pressed={isActive}
             className={cn(
-              "inline-flex h-7 items-center rounded-md border px-2.5 text-xs transition-colors",
+              "inline-flex h-6 items-center rounded-sm border px-2 text-[11px] transition-colors",
               isActive
                 ? "border-primary bg-primary text-primary-foreground"
-                : "border-border bg-transparent text-foreground-muted hover:border-border-strong hover:text-foreground",
+                : "border-foreground/10 bg-transparent text-foreground-muted hover:border-foreground/30 hover:text-foreground",
             )}
           >
             {s.label}

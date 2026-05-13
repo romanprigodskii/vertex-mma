@@ -22,7 +22,7 @@ export function StatusRadio({ value, onChange }: StatusRadioProps) {
     <div
       role="radiogroup"
       aria-label="Fighter status"
-      className="grid grid-cols-2 gap-1.5"
+      className="grid grid-cols-2 gap-1"
     >
       {STATUSES.map((s) => {
         const isActive = value === s.id;
@@ -34,10 +34,10 @@ export function StatusRadio({ value, onChange }: StatusRadioProps) {
             aria-checked={isActive}
             onClick={() => onChange(s.id)}
             className={cn(
-              "inline-flex h-8 items-center justify-center rounded-md border px-2 text-xs transition-colors",
+              "inline-flex h-7 items-center justify-center rounded-sm border px-2 text-[11px] transition-colors",
               isActive
                 ? "border-primary bg-primary text-primary-foreground"
-                : "border-border bg-transparent text-foreground-muted hover:border-border-strong hover:text-foreground",
+                : "border-foreground/10 bg-transparent text-foreground-muted hover:border-foreground/30 hover:text-foreground",
             )}
           >
             {s.label}

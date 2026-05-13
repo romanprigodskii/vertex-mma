@@ -5,12 +5,15 @@ import { Navbar } from "@/components/layout/navbar";
 import { Container } from "@/components/layout/container";
 import { FighterCatalogClient } from "@/components/fighter/FighterCatalogClient";
 import type { CatalogFilterState } from "@/components/fighter/FilterSidebar";
+import { CHAMPION_SLUGS } from "@/lib/champions";
 import { parseCatalogFilters } from "@/lib/fighter-filters";
 import {
   CATALOG_DEFAULT_LIMIT,
   type FighterCatalogFilters,
+  type FighterCatalogRow,
   getFighterCountries,
   getFighterTotal,
+  getFightersBySlug,
   searchFightersWithFilters,
 } from "@/lib/fighter-search";
 
@@ -22,7 +25,8 @@ export const metadata: Metadata = {
     "Explore UFC fighters with detailed career stats, fight history, and AI-powered analysis.",
   openGraph: {
     title: "Vertex MMA — Fighter Database",
-    description: "AI-powered MMA fight simulator with detailed fighter analytics.",
+    description:
+      "AI-powered MMA fight simulator with detailed fighter analytics.",
     type: "website",
   },
 };
@@ -36,12 +40,11 @@ function toClientFilters(parsed: FighterCatalogFilters): CatalogFilterState {
     status: parsed.status ?? "all",
     hasPhoto: parsed.hasPhoto ?? false,
     hallOfFame: parsed.hallOfFame ?? false,
-    sort: parsed.sort ?? "fights",
+    sort: parsed.sort ?? "champions_first",
   };
 }
 
 interface PageProps {
-  // Next.js 15+ App Router exposes searchParams as a Promise.
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
@@ -51,37 +54,36 @@ export default async function FightersPage({ searchParams }: PageProps) {
   filters.limit = CATALOG_DEFAULT_LIMIT;
   filters.offset = 0;
 
-  // Run the three SSR queries in parallel — they're independent.
-  const [page, countries, totalAll] = await Promise.all([
+  const [page, countries, totalAll, championRows] = await Promise.all([
     searchFightersWithFilters(filters),
     getFighterCountries(),
     getFighterTotal(),
+    getFightersBySlug(CHAMPION_SLUGS),
   ]);
 
   const clientFilters = toClientFilters(filters);
+  const championFighters: Record<string, FighterCatalogRow> = Object.fromEntries(
+    championRows.map((f) => [f.slug, f]),
+  );
+
+  // Surface missing champion slugs in the server log so the user notices when
+  // the hardcoded champions.ts drifts from the live DB. Doesn't fail the build.
+  const missingChampions = CHAMPION_SLUGS.filter(
+    (slug) => !(slug in championFighters),
+  );
+  if (missingChampions.length > 0) {
+    console.warn(
+      "[/fighters] champion slugs not found in DB:",
+      missingChampions.join(", "),
+    );
+  }
 
   return (
     <>
       <Navbar />
       <main className="flex-1">
-        <section className="border-b border-border">
-          <Container size="xl" className="py-10 md:py-14">
-            <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground-subtle">
-              Catalog
-            </p>
-            <h1 className="mt-2 font-display text-6xl md:text-7xl lg:text-8xl tracking-wider leading-none text-foreground">
-              FIGHTERS
-            </h1>
-            <p className="mt-4 max-w-2xl text-base md:text-lg text-foreground-muted">
-              <span className="font-mono tabular text-foreground">
-                {totalAll.toLocaleString()}
-              </span>{" "}
-              fighters indexed · UFC roster since 1993
-            </p>
-          </Container>
-        </section>
-
-        <Container size="xl" className="py-6 md:py-8">
+        <CatalogHero totalAll={totalAll} />
+        <Container size="xl" className="pb-16 pt-2">
           <FighterCatalogClient
             initialFighters={page.fighters}
             initialTotal={page.total}
@@ -89,10 +91,40 @@ export default async function FightersPage({ searchParams }: PageProps) {
             initialFilters={clientFilters}
             countries={countries}
             totalAll={totalAll}
+            championFighters={championFighters}
           />
         </Container>
       </main>
       <Footer />
     </>
+  );
+}
+
+function CatalogHero({ totalAll }: { totalAll: number }) {
+  return (
+    <section className="relative border-b border-foreground/10">
+      <Container size="xl" className="pb-16 pt-20 md:pt-24">
+        <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground-subtle">
+          The roster
+        </p>
+        <h1
+          className="mt-3 font-display tracking-[-0.01em] text-foreground leading-[0.85]"
+          style={{ fontSize: "clamp(64px, 8vw, 144px)" }}
+        >
+          FIGHTERS
+        </h1>
+        <div className="mt-6 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <span className="font-display text-[28px] leading-none text-primary">
+            {totalAll.toLocaleString()}
+          </span>
+          <span className="font-sans text-base text-foreground-muted">
+            fighters indexed
+          </span>
+        </div>
+        <p className="mt-4 font-sans text-[11px] uppercase tracking-[0.24em] text-foreground-muted">
+          8 Divisions · 12 Active Champions · UFC, 1993 → Today
+        </p>
+      </Container>
+    </section>
   );
 }

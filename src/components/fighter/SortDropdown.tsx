@@ -6,6 +6,7 @@ import type { CatalogSort } from "@/lib/fighter-search";
 import { cn } from "@/lib/utils";
 
 const SORT_OPTIONS: Array<{ id: CatalogSort; label: string }> = [
+  { id: "champions_first", label: "Champions first" },
   { id: "fights", label: "Most fights" },
   { id: "recent", label: "Recently active" },
   { id: "wins", label: "Most wins" },

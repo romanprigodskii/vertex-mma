@@ -10,7 +10,7 @@ interface WeightClassChipsProps {
 
 export function WeightClassChips({ selected, onToggle }: WeightClassChipsProps) {
   return (
-    <div className="flex flex-wrap gap-1.5">
+    <div className="flex flex-wrap gap-1">
       {WEIGHT_CLASSES.map((wc) => {
         const isActive = selected.includes(wc.id);
         return (
@@ -20,17 +20,17 @@ export function WeightClassChips({ selected, onToggle }: WeightClassChipsProps) 
             onClick={() => onToggle(wc.id)}
             aria-pressed={isActive}
             className={cn(
-              "inline-flex h-7 items-center gap-1 rounded-md border px-2 text-xs transition-colors",
+              "inline-flex h-6 items-center gap-1 rounded-sm border px-1.5 text-[11px] transition-colors",
               isActive
                 ? "border-primary bg-primary text-primary-foreground"
-                : "border-border bg-transparent text-foreground-muted hover:border-border-strong hover:text-foreground",
+                : "border-foreground/10 bg-transparent text-foreground-muted hover:border-foreground/30 hover:text-foreground",
             )}
           >
             <span className="truncate">{wc.label}</span>
             <span
               className={cn(
-                "font-mono text-[10px]",
-                isActive ? "opacity-80" : "text-foreground-subtle",
+                "font-mono text-[9px]",
+                isActive ? "opacity-75" : "text-foreground-subtle",
               )}
             >
               {wc.limitLb}

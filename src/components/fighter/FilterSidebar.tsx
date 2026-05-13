@@ -32,6 +32,11 @@ interface FilterSidebarProps {
   countries: CountryAggregate[];
   /** When non-null, rendered above the filters as "Showing X of Y". */
   resultCount?: { shown: number; total: number };
+  /**
+   * Compact spacing/typography for the desktop 220px rail. The drawer
+   * intentionally stays a touch roomier.
+   */
+  dense?: boolean;
   className?: string;
 }
 
@@ -44,7 +49,7 @@ export function activeFilterCount(filters: CatalogFilterState): number {
   if (filters.status !== "all") n += 1;
   if (filters.hasPhoto) n += 1;
   if (filters.hallOfFame) n += 1;
-  if (filters.sort !== "fights") n += 1;
+  if (filters.sort !== "champions_first") n += 1;
   return n;
 }
 
@@ -59,14 +64,14 @@ function Section({
 }) {
   const [open, setOpen] = React.useState(defaultOpen);
   return (
-    <div className="border-b border-border last:border-b-0">
+    <div className="border-b border-foreground/[0.06] last:border-b-0">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="flex w-full items-center justify-between gap-2 py-3 text-left"
+        className="flex w-full items-center justify-between gap-2 py-2.5 text-left"
       >
-        <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-foreground-subtle">
+        <span className="font-sans text-[11px] font-medium uppercase tracking-[0.16em] text-foreground-muted">
           {title}
         </span>
         <ChevronDown
@@ -131,6 +136,7 @@ export function FilterSidebar({
   onClear,
   countries,
   resultCount,
+  dense = false,
   className,
 }: FilterSidebarProps) {
   const toggleInArray = React.useCallback(
@@ -147,16 +153,26 @@ export function FilterSidebar({
   const activeCount = activeFilterCount(filters);
 
   return (
-    <aside className={cn("flex flex-col text-foreground", className)}>
+    <aside
+      className={cn(
+        "flex flex-col text-foreground",
+        dense ? "text-xs" : "text-sm",
+        className,
+      )}
+    >
       {resultCount ? (
-        <div className="mb-2 flex items-baseline justify-between gap-2 border-b border-border pb-3">
-          <p className="text-xs text-foreground-muted">
-            Showing{" "}
+        <div
+          className={cn(
+            "flex items-baseline justify-between gap-2 border-b border-foreground/10",
+            dense ? "mb-1 pb-2.5" : "mb-2 pb-3",
+          )}
+        >
+          <p className="font-sans text-[11px] uppercase tracking-widest text-foreground-subtle">
             <span className="font-mono tabular text-foreground">
               {resultCount.shown.toLocaleString()}
-            </span>{" "}
-            of{" "}
-            <span className="font-mono tabular text-foreground">
+            </span>
+            <span className="mx-1 text-foreground-subtle/50">/</span>
+            <span className="font-mono tabular">
               {resultCount.total.toLocaleString()}
             </span>
           </p>
@@ -165,10 +181,10 @@ export function FilterSidebar({
               variant="ghost"
               size="sm"
               onClick={onClear}
-              className="h-7 px-2 text-xs"
+              className="h-6 px-1.5 text-[11px] uppercase tracking-wider"
             >
               <X className="h-3 w-3" />
-              Clear ({activeCount})
+              Clear
             </Button>
           ) : null}
         </div>

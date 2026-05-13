@@ -5,8 +5,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 
 import { CatalogSkeleton } from "@/components/fighter/CatalogSkeleton";
+import { ChampionStrip } from "@/components/fighter/ChampionStrip";
 import { EmptyState } from "@/components/fighter/EmptyState";
-import { FighterCard } from "@/components/fighter/FighterCard";
+import { FighterRow } from "@/components/fighter/FighterRow";
 import { FilterDrawer } from "@/components/fighter/FilterDrawer";
 import {
   type CatalogFilterState,
@@ -24,6 +25,11 @@ import type {
 } from "@/lib/fighter-search";
 
 const PAGE_SIZE = 48;
+const RANKED_SORTS: ReadonlySet<CatalogSort> = new Set([
+  "champions_first",
+  "fights",
+  "wins",
+]);
 
 const DEFAULT_FILTERS: CatalogFilterState = {
   q: "",
@@ -33,7 +39,7 @@ const DEFAULT_FILTERS: CatalogFilterState = {
   status: "all",
   hasPhoto: false,
   hallOfFame: false,
-  sort: "fights",
+  sort: "champions_first",
 };
 
 function serializeFilters(filters: CatalogFilterState): URLSearchParams {
@@ -46,7 +52,7 @@ function serializeFilters(filters: CatalogFilterState): URLSearchParams {
   if (filters.status !== "all") params.set("status", filters.status);
   if (filters.hasPhoto) params.set("has_photo", "1");
   if (filters.hallOfFame) params.set("hof", "1");
-  if (filters.sort !== "fights") params.set("sort", filters.sort);
+  if (filters.sort !== "champions_first") params.set("sort", filters.sort);
   return params;
 }
 
@@ -61,6 +67,7 @@ interface FighterCatalogClientProps {
   initialFilters: CatalogFilterState;
   countries: CountryAggregate[];
   totalAll: number;
+  championFighters: Record<string, FighterCatalogRow>;
 }
 
 export function FighterCatalogClient({
@@ -70,6 +77,7 @@ export function FighterCatalogClient({
   initialFilters,
   countries,
   totalAll,
+  championFighters,
 }: FighterCatalogClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -77,7 +85,6 @@ export function FighterCatalogClient({
   const [filters, setFilters] = React.useState<CatalogFilterState>(initialFilters);
   const [searchInput, setSearchInput] = React.useState(initialFilters.q);
 
-  // Result state — seeded from SSR so the first paint is instant.
   const [fighters, setFighters] = React.useState<FighterCatalogRow[]>(initialFighters);
   const [total, setTotal] = React.useState(initialTotal);
   const [hasMore, setHasMore] = React.useState(initialHasMore);
@@ -88,9 +95,8 @@ export function FighterCatalogClient({
   const [loadingMore, setLoadingMore] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
-  // The most recent filter key we kicked a fetch for — used to discard
-  // out-of-order responses if the user keeps typing.
   const inflightKeyRef = React.useRef<string>(filtersKey(initialFilters));
+  const initialKeyRef = React.useRef<string>(filtersKey(initialFilters));
 
   // ---------- Search input → filters (debounced 250ms) ----------
   React.useEffect(() => {
@@ -101,7 +107,7 @@ export function FighterCatalogClient({
     return () => window.clearTimeout(timer);
   }, [searchInput, filters.q]);
 
-  // ---------- URL sync (replace, no scroll) ----------
+  // ---------- URL sync ----------
   const urlFilterKey = filtersKey(filters);
   React.useEffect(() => {
     const next = urlFilterKey;
@@ -112,10 +118,8 @@ export function FighterCatalogClient({
   }, [urlFilterKey]);
 
   // ---------- Filter-change fetch ----------
-  const initialKeyRef = React.useRef<string>(filtersKey(initialFilters));
   React.useEffect(() => {
     const key = filtersKey(filters);
-    // Don't refetch on mount if filters still match SSR'd state.
     if (key === initialKeyRef.current) {
       inflightKeyRef.current = key;
       return;
@@ -135,7 +139,6 @@ export function FighterCatalogClient({
       .then(async (res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data: FighterCatalogResponse = await res.json();
-        // Stale response check
         if (inflightKeyRef.current !== key) return;
         setFighters(data.fighters);
         setTotal(data.total);
@@ -178,7 +181,7 @@ export function FighterCatalogClient({
         setOffset((prev) => prev + data.fighters.length);
       })
       .catch(() => {
-        // Quiet failure for pagination — user can hit "Load more" again.
+        /* user can retry via the "Load more" button */
       })
       .finally(() => setLoadingMore(false));
   }, [filters, hasMore, loading, loadingMore, offset]);
@@ -216,13 +219,22 @@ export function FighterCatalogClient({
   const resultCount = { shown: fighters.length, total };
   const showSkeleton = loading && fighters.length === 0;
   const showEmpty = !loading && fighters.length === 0;
+  const showRank = RANKED_SORTS.has(filters.sort);
+
+  // Champion strip is a discovery aid; hide it as soon as the user starts
+  // filtering or searching — otherwise it competes with what they're focused on.
+  const showChampionStrip = activeCount === 0;
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
+      {showChampionStrip ? (
+        <ChampionStrip fightersBySlug={championFighters} />
+      ) : null}
+
       {/* Sticky controls bar */}
-      <div className="sticky top-16 z-30 -mx-4 border-b border-border bg-background-base/85 px-4 py-3 backdrop-blur-md sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
-        <div className="flex items-center gap-2 sm:gap-3">
-          <div className="flex-1">
+      <div className="sticky top-16 z-30 -mx-4 border-b border-foreground/10 bg-background-base/90 px-4 py-3 backdrop-blur-md sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          <div className="min-w-0 flex-1 sm:max-w-[360px]">
             <SearchBar
               value={searchInput}
               onChange={(v) => {
@@ -234,33 +246,37 @@ export function FighterCatalogClient({
               loading={searching}
             />
           </div>
-          {/* Sort visible inline on desktop */}
-          <div className="hidden lg:block w-44">
-            <FilterDrawerSortInline
-              sort={filters.sort}
-              onChange={(sort) => onFiltersChange({ sort })}
-            />
-          </div>
-          {/* Mobile filter drawer */}
-          <div className="lg:hidden">
-            <FilterDrawer
-              filters={filters}
-              onChange={onFiltersChange}
-              onClear={onClear}
-              countries={countries}
-              resultCount={resultCount}
-            />
-          </div>
-          <p className="hidden sm:block text-xs text-foreground-muted tabular">
-            <span className="font-mono text-foreground">
-              {total.toLocaleString()}
+          <p className="hidden sm:block whitespace-nowrap font-sans text-xs text-foreground-muted">
+            Showing{" "}
+            <span className="font-mono tabular text-foreground">
+              {fighters.length.toLocaleString()}
             </span>{" "}
-            / {totalAll.toLocaleString()}
+            of{" "}
+            <span className="font-mono tabular text-foreground">
+              {total.toLocaleString()}
+            </span>
           </p>
+          <div className="ml-auto flex items-center gap-2">
+            <div className="hidden w-48 lg:block">
+              <SortDropdown
+                value={filters.sort}
+                onChange={(sort) => onFiltersChange({ sort })}
+              />
+            </div>
+            <div className="lg:hidden">
+              <FilterDrawer
+                filters={filters}
+                onChange={onFiltersChange}
+                onClear={onClear}
+                countries={countries}
+                resultCount={resultCount}
+              />
+            </div>
+          </div>
         </div>
         {activeCount > 0 ? (
-          <p className="mt-2 text-[11px] text-foreground-subtle">
-            {activeCount} filter{activeCount === 1 ? "" : "s"} active —{" "}
+          <p className="mt-2 font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
+            {activeCount} filter{activeCount === 1 ? "" : "s"} active ·{" "}
             <button
               type="button"
               onClick={onClear}
@@ -273,8 +289,8 @@ export function FighterCatalogClient({
       </div>
 
       <div className="flex gap-6 lg:gap-8">
-        {/* Desktop filter sidebar */}
-        <div className="hidden lg:block w-[260px] shrink-0">
+        {/* Desktop filter sidebar — tightened to 220px */}
+        <div className="hidden lg:block w-[220px] shrink-0">
           <div className="sticky top-36 max-h-[calc(100vh-9rem)] overflow-y-auto pr-2">
             <FilterSidebar
               filters={filters}
@@ -282,17 +298,28 @@ export function FighterCatalogClient({
               onClear={onClear}
               countries={countries}
               resultCount={resultCount}
+              dense
             />
           </div>
         </div>
 
-        {/* Catalog grid */}
+        {/* Roster column */}
         <div className="min-w-0 flex-1">
           {error ? (
-            <div className="rounded-md border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-foreground">
+            <div className="mb-3 rounded-md border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-foreground">
               {error}
             </div>
           ) : null}
+
+          {/* Header above the list — totals + indexed-of caption */}
+          <div className="mb-1 flex items-baseline justify-between gap-3 px-2 pb-2 sm:px-4">
+            <p className="font-display text-sm uppercase tracking-[0.18em] text-foreground-subtle">
+              Roster
+            </p>
+            <p className="font-mono text-[10px] uppercase tracking-widest text-foreground-subtle tabular">
+              {total.toLocaleString()} / {totalAll.toLocaleString()}
+            </p>
+          </div>
 
           {showSkeleton ? (
             <CatalogSkeleton count={12} />
@@ -300,29 +327,34 @@ export function FighterCatalogClient({
             <EmptyState onReset={activeCount > 0 ? onClear : undefined} />
           ) : (
             <>
-              <motion.div
+              <motion.ul
                 key={urlFilterKey}
-                variants={GRID_VARIANTS}
+                variants={LIST_VARIANTS}
                 initial="hidden"
                 animate="show"
-                className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+                className="flex flex-col divide-y divide-foreground/[0.06] border-y border-foreground/[0.06]"
               >
                 <AnimatePresence initial={false}>
                   {fighters.map((f, i) => (
-                    <motion.div
+                    <motion.li
                       key={f.id}
-                      variants={CARD_VARIANTS}
+                      variants={ROW_VARIANTS}
                       layout="position"
+                      className="list-none"
                     >
-                      <FighterCard fighter={f} priority={i < 8} />
-                    </motion.div>
+                      <FighterRow
+                        fighter={f}
+                        rank={i + 1}
+                        showRank={showRank}
+                        priority={i < 6}
+                      />
+                    </motion.li>
                   ))}
                 </AnimatePresence>
-              </motion.div>
+              </motion.ul>
 
-              {/* Pagination footer */}
               <div className="mt-10 flex flex-col items-center gap-3 text-center">
-                <p className="text-xs text-foreground-subtle tabular">
+                <p className="font-mono text-[10px] uppercase tracking-widest text-foreground-subtle tabular">
                   Loaded {fighters.length.toLocaleString()} of{" "}
                   {total.toLocaleString()}
                 </p>
@@ -340,7 +372,6 @@ export function FighterCatalogClient({
                     End of results
                   </p>
                 ) : null}
-                {/* Sentinel — IntersectionObserver triggers loadMore when visible */}
                 <div ref={sentinelRef} aria-hidden className="h-1 w-full" />
               </div>
             </>
@@ -351,37 +382,19 @@ export function FighterCatalogClient({
   );
 }
 
-/* -------------------------------------------------------------------------- */
-/*  Animation variants                                                         */
-/* -------------------------------------------------------------------------- */
-
-const GRID_VARIANTS = {
+const LIST_VARIANTS = {
   hidden: { opacity: 1 },
   show: {
     opacity: 1,
-    transition: { staggerChildren: 0.03, delayChildren: 0.04 },
+    transition: { staggerChildren: 0.03 },
   },
 };
 
-const CARD_VARIANTS = {
-  hidden: { opacity: 0, y: 8 },
+const ROW_VARIANTS = {
+  hidden: { opacity: 0, y: 4 },
   show: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.25, ease: "easeOut" as const },
+    transition: { duration: 0.2, ease: "easeOut" as const },
   },
 };
-
-/* -------------------------------------------------------------------------- */
-/*  Inline sort dropdown (visible in desktop top-bar)                         */
-/* -------------------------------------------------------------------------- */
-
-function FilterDrawerSortInline({
-  sort,
-  onChange,
-}: {
-  sort: CatalogSort;
-  onChange: (s: CatalogSort) => void;
-}) {
-  return <SortDropdown value={sort} onChange={onChange} />;
-}
