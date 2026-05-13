@@ -6,6 +6,7 @@ import type {
 
 const VALID_SORTS: ReadonlySet<CatalogSort> = new Set([
   "elite_first",
+  "all_time",
   "champions_first",
   "fights",
   "recent",

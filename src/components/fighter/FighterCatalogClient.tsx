@@ -28,6 +28,7 @@ import { formatNumber } from "@/lib/format";
 const PAGE_SIZE = 48;
 const RANKED_SORTS: ReadonlySet<CatalogSort> = new Set([
   "elite_first",
+  "all_time",
   "champions_first",
   "fights",
   "wins",

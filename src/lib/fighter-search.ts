@@ -85,6 +85,7 @@ export async function searchFighters(
 
 export type CatalogSort =
   | "elite_first"
+  | "all_time"
   | "champions_first"
   | "fights"
   | "recent"
@@ -236,6 +237,24 @@ function buildOrderBy(filters: FighterCatalogFilters): SQL {
       return hasQuery
         ? sql`match_score DESC, bout_count DESC`
         : sql`bout_count DESC, COALESCE(wins_total, 0) DESC`;
+    case "all_time":
+      // Historical greatness — no champion pin, no recency penalty. A
+      // tighter credibility floor (20 vs 25 bouts) so 13-bout Khabib still
+      // hits the 0.65 multiplier instead of being clipped to 0.52. Retired
+      // GOATs are the explicit target audience here.
+      return hasQuery
+        ? sql`match_score DESC, bout_count DESC`
+        : sql`
+          (
+            COALESCE(wins_total, 0)::float
+            * COALESCE(
+                wins_total::float / NULLIF(wins_total + losses_total, 0),
+                0.5
+              )
+            * (LEAST(bout_count, 20)::float / 20.0)
+          ) DESC NULLS LAST,
+          bout_count DESC
+        `;
     case "elite_first":
     default: {
       const slugList = sql.join(
