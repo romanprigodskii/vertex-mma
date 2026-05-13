@@ -243,12 +243,13 @@ function buildOrderBy(filters: FighterCatalogFilters): SQL {
         sql`, `,
       );
       // Champions first, then a composite "elite score":
-      //   wins * win_rate * recency_factor
-      // where recency_factor is 1.0 for fighters active within the past
-      // three years and 0.5 otherwise. Win rate is treated as 0.5 for
-      // fighters with no recorded W/L (avoids divide-by-zero killing the
-      // whole product) but the bout_count tiebreaker keeps the unfought
-      // out of the top anyway.
+      //   wins * win_rate * recency_factor * credibility_floor
+      // - recency_factor: 1.0 if last fight within 3 years, else 0.5.
+      // - credibility_floor: LEAST(bout_count, 25) / 25 — caps the multiplier
+      //   at 1.0 once a fighter hits 25 UFC bouts. Penalizes regional-circuit
+      //   fighters with huge career records but only 1–2 UFC bouts (Travis
+      //   Fulton, etc.) so they don't crowd out actual UFC legends.
+      // Win rate falls back to 0.5 for unfought (NULLIF avoids divide-by-zero).
       return hasQuery
         ? sql`match_score DESC, (CASE WHEN slug IN (${slugList}) THEN 0 ELSE 1 END), bout_count DESC`
         : sql`
@@ -265,6 +266,7 @@ function buildOrderBy(filters: FighterCatalogFilters): SQL {
                 ELSE 0.5
               END
             )
+            * (LEAST(bout_count, 25)::float / 25.0)
           ) DESC NULLS LAST,
           bout_count DESC
         `;
