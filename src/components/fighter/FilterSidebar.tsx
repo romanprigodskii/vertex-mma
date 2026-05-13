@@ -14,6 +14,7 @@ import type {
   CountryAggregate,
   FighterCatalogFilters,
 } from "@/lib/fighter-search";
+import { formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 export type CatalogFilterState = Required<
@@ -49,7 +50,7 @@ export function activeFilterCount(filters: CatalogFilterState): number {
   if (filters.status !== "all") n += 1;
   if (filters.hasPhoto) n += 1;
   if (filters.hallOfFame) n += 1;
-  if (filters.sort !== "champions_first") n += 1;
+  if (filters.sort !== "fights") n += 1;
   return n;
 }
 
@@ -169,11 +170,11 @@ export function FilterSidebar({
         >
           <p className="font-sans text-[11px] uppercase tracking-widest text-foreground-subtle">
             <span className="font-mono tabular text-foreground">
-              {resultCount.shown.toLocaleString()}
+              {formatNumber(resultCount.shown)}
             </span>
             <span className="mx-1 text-foreground-subtle/50">/</span>
             <span className="font-mono tabular">
-              {resultCount.total.toLocaleString()}
+              {formatNumber(resultCount.total)}
             </span>
           </p>
           {activeCount > 0 ? (

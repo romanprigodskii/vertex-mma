@@ -11,6 +11,7 @@ import {
 } from "@/components/fighter/FilterSidebar";
 import { Button } from "@/components/ui/button";
 import type { CountryAggregate } from "@/lib/fighter-search";
+import { formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 interface FilterDrawerProps {
@@ -120,7 +121,7 @@ export function FilterDrawer({
               className="flex-1"
             >
               {resultCount
-                ? `Show ${resultCount.shown.toLocaleString()}`
+                ? `Show ${formatNumber(resultCount.shown)}`
                 : "Apply"}
             </Button>
           </footer>

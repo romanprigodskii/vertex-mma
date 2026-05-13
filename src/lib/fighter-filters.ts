@@ -59,7 +59,7 @@ export function parseCatalogFilters(
   const sort: CatalogSort =
     rawSort && VALID_SORTS.has(rawSort as CatalogSort)
       ? (rawSort as CatalogSort)
-      : "champions_first";
+      : "fights";
 
   const rawLimit = Number.parseInt(get("limit") ?? "", 10);
   const rawOffset = Number.parseInt(get("offset") ?? "", 10);

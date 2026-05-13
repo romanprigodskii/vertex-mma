@@ -7,7 +7,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { CatalogSkeleton } from "@/components/fighter/CatalogSkeleton";
 import { ChampionStrip } from "@/components/fighter/ChampionStrip";
 import { EmptyState } from "@/components/fighter/EmptyState";
-import { FighterRow } from "@/components/fighter/FighterRow";
+import { FighterCard } from "@/components/fighter/FighterCard";
 import { FilterDrawer } from "@/components/fighter/FilterDrawer";
 import {
   type CatalogFilterState,
@@ -23,6 +23,7 @@ import type {
   FighterCatalogResponse,
   FighterCatalogRow,
 } from "@/lib/fighter-search";
+import { formatNumber } from "@/lib/format";
 
 const PAGE_SIZE = 48;
 const RANKED_SORTS: ReadonlySet<CatalogSort> = new Set([
@@ -39,7 +40,7 @@ const DEFAULT_FILTERS: CatalogFilterState = {
   status: "all",
   hasPhoto: false,
   hallOfFame: false,
-  sort: "champions_first",
+  sort: "fights",
 };
 
 function serializeFilters(filters: CatalogFilterState): URLSearchParams {
@@ -52,7 +53,7 @@ function serializeFilters(filters: CatalogFilterState): URLSearchParams {
   if (filters.status !== "all") params.set("status", filters.status);
   if (filters.hasPhoto) params.set("has_photo", "1");
   if (filters.hallOfFame) params.set("hof", "1");
-  if (filters.sort !== "champions_first") params.set("sort", filters.sort);
+  if (filters.sort !== "fights") params.set("sort", filters.sort);
   return params;
 }
 
@@ -221,15 +222,22 @@ export function FighterCatalogClient({
   const showEmpty = !loading && fighters.length === 0;
   const showRank = RANKED_SORTS.has(filters.sort);
 
-  // Champion strip is a discovery aid; hide it as soon as the user starts
-  // filtering or searching — otherwise it competes with what they're focused on.
-  const showChampionStrip = activeCount === 0;
+  // Strip is always visible — champions are universally relevant as a
+  // navigation anchor. Dim it slightly when filters are active so the user
+  // understands the main content is what's narrowed.
+  const stripDimmed = activeCount > 0;
 
   return (
     <div className="flex flex-col gap-6">
-      {showChampionStrip ? (
+      <div
+        className={
+          stripDimmed
+            ? "opacity-70 transition-opacity duration-200"
+            : "opacity-100 transition-opacity duration-200"
+        }
+      >
         <ChampionStrip fightersBySlug={championFighters} />
-      ) : null}
+      </div>
 
       {/* Sticky controls bar */}
       <div className="sticky top-16 z-30 -mx-4 border-b border-foreground/10 bg-background-base/90 px-4 py-3 backdrop-blur-md sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
@@ -249,11 +257,11 @@ export function FighterCatalogClient({
           <p className="hidden sm:block whitespace-nowrap font-sans text-xs text-foreground-muted">
             Showing{" "}
             <span className="font-mono tabular text-foreground">
-              {fighters.length.toLocaleString()}
+              {formatNumber(fighters.length)}
             </span>{" "}
             of{" "}
             <span className="font-mono tabular text-foreground">
-              {total.toLocaleString()}
+              {formatNumber(total)}
             </span>
           </p>
           <div className="ml-auto flex items-center gap-2">
@@ -317,7 +325,7 @@ export function FighterCatalogClient({
               Roster
             </p>
             <p className="font-mono text-[10px] uppercase tracking-widest text-foreground-subtle tabular">
-              {total.toLocaleString()} / {totalAll.toLocaleString()}
+              {formatNumber(total)} / {formatNumber(totalAll)}
             </p>
           </div>
 
@@ -332,7 +340,7 @@ export function FighterCatalogClient({
                 variants={LIST_VARIANTS}
                 initial="hidden"
                 animate="show"
-                className="flex flex-col divide-y divide-foreground/[0.06] border-y border-foreground/[0.06]"
+                className="grid grid-cols-1 gap-4 lg:grid-cols-2"
               >
                 <AnimatePresence initial={false}>
                   {fighters.map((f, i) => (
@@ -342,11 +350,11 @@ export function FighterCatalogClient({
                       layout="position"
                       className="list-none"
                     >
-                      <FighterRow
+                      <FighterCard
                         fighter={f}
                         rank={i + 1}
                         showRank={showRank}
-                        priority={i < 6}
+                        priority={i < 4}
                       />
                     </motion.li>
                   ))}
@@ -355,8 +363,8 @@ export function FighterCatalogClient({
 
               <div className="mt-10 flex flex-col items-center gap-3 text-center">
                 <p className="font-mono text-[10px] uppercase tracking-widest text-foreground-subtle tabular">
-                  Loaded {fighters.length.toLocaleString()} of{" "}
-                  {total.toLocaleString()}
+                  Loaded {formatNumber(fighters.length)} of{" "}
+                  {formatNumber(total)}
                 </p>
                 {hasMore ? (
                   <Button

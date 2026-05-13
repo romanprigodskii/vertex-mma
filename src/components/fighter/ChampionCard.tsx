@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Trophy } from "lucide-react";
 
 import { FighterAvatar } from "@/components/fighter/FighterAvatar";
 import type { ChampionEntry } from "@/lib/champions";
@@ -12,8 +13,8 @@ interface ChampionCardProps {
 }
 
 const CARD_BASE = cn(
-  "group relative flex h-[120px] shrink-0 snap-start items-center gap-4",
-  "w-[280px] sm:w-[320px]",
+  "group relative flex shrink-0 snap-start items-center gap-4",
+  "h-[140px] w-[300px] sm:h-[150px] sm:w-[400px]",
   "rounded-lg border px-4 py-3",
   "bg-gradient-to-br from-background-elevated to-background-base",
   "transition-[transform,border-color] duration-200 ease-out",
@@ -23,13 +24,10 @@ export function ChampionCard({ entry, fighter }: ChampionCardProps) {
   if (!fighter) {
     return (
       <div
-        className={cn(
-          CARD_BASE,
-          "border-border/40 text-foreground-subtle",
-        )}
+        className={cn(CARD_BASE, "border-border/40 text-foreground-subtle")}
         aria-label={`${entry.division}: data missing`}
       >
-        <div className="flex h-20 w-20 items-center justify-center rounded-md border border-dashed border-border bg-background-base/40">
+        <div className="flex h-[88px] w-[88px] items-center justify-center rounded-md border border-dashed border-border bg-background-base/40 sm:h-[100px] sm:w-[100px]">
           <span className="font-mono text-[10px] uppercase tracking-wider">
             n/a
           </span>
@@ -39,7 +37,8 @@ export function ChampionCard({ entry, fighter }: ChampionCardProps) {
             TBD
           </p>
           <p className="font-sans text-[11px] uppercase tracking-widest text-gold">
-            {entry.divisionShort} · {entry.isInterim ? "INTERIM" : "CHAMPION"}
+            {entry.divisionShort} ·{" "}
+            {entry.isInterim ? "INTERIM" : "CHAMPION"}
           </p>
           <p className="mt-2 font-mono text-[10px] uppercase tracking-wider text-foreground-subtle">
             slug not found
@@ -55,7 +54,7 @@ export function ChampionCard({ entry, fighter }: ChampionCardProps) {
     fighter.draws_total > 0
       ? `${fighter.wins_total}-${fighter.losses_total}-${fighter.draws_total}`
       : `${fighter.wins_total}-${fighter.losses_total}`;
-  const titleLabel = entry.isInterim ? "INTERIM CHAMP" : "CHAMPION";
+  const titleLabel = entry.isInterim ? "INTERIM" : "CHAMPION";
 
   return (
     <Link
@@ -70,18 +69,27 @@ export function ChampionCard({ entry, fighter }: ChampionCardProps) {
       )}
       aria-label={`${fighter.name_en}, ${entry.division} ${titleLabel}, record ${record}`}
     >
+      {/* Trophy — top-right corner. Dimmed for interim. */}
+      <Trophy
+        className={cn(
+          "pointer-events-none absolute right-3 top-3 h-4 w-4",
+          entry.isInterim ? "text-foreground-muted/70" : "text-primary",
+        )}
+        aria-hidden
+      />
+
       <FighterAvatar
         name={fighter.name_en}
         photoUrl={fighter.photo_url}
-        size="lg"
-        imageSizes="80px"
+        size="xl"
+        imageSizes="100px"
       />
       <div className="flex min-w-0 flex-1 flex-col">
-        <h3 className="truncate font-display text-[22px] uppercase leading-none tracking-tight text-foreground">
+        <h3 className="truncate font-display text-[22px] uppercase leading-none tracking-tight text-foreground sm:text-[26px]">
           {fighter.name_en}
         </h3>
         {hasNickname ? (
-          <p className="truncate font-sans text-[12px] italic leading-snug text-foreground-muted">
+          <p className="truncate font-sans text-[12px] italic leading-snug text-foreground-muted sm:text-[13px]">
             &ldquo;{fighter.nickname}&rdquo;
           </p>
         ) : (

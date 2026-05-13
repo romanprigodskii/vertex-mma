@@ -6,28 +6,39 @@ interface CatalogSkeletonProps {
 }
 
 /**
- * Roster-row skeleton matching the FighterRow grid (rank · avatar · identity · record).
+ * Skeleton grid matching the wide FighterCard layout.
+ * 2 columns on lg+, 1 column below. Pure CSS, no JS.
  */
 export function CatalogSkeleton({
   count = 12,
   className,
 }: CatalogSkeletonProps) {
   return (
-    <ul className={cn("flex flex-col", className)} aria-hidden>
+    <ul
+      className={cn("grid grid-cols-1 gap-4 lg:grid-cols-2", className)}
+      aria-hidden
+    >
       {Array.from({ length: count }).map((_, i) => (
         <li
           key={i}
-          className="grid grid-cols-[40px_64px_1fr_auto] items-center gap-3 border-b border-foreground/[0.06] px-2 py-3 last:border-b-0 sm:grid-cols-[48px_72px_1fr_auto] sm:gap-4 sm:px-4"
+          className="flex min-h-[180px] gap-4 rounded-lg border border-foreground/10 bg-background-elevated/30 p-4"
         >
-          <span className="h-5 w-8 justify-self-end rounded-sm bg-foreground/[0.06] animate-pulse" />
-          <span className="h-16 w-16 rounded-md bg-foreground/[0.06] animate-pulse sm:h-[72px] sm:w-[72px]" />
-          <span className="flex flex-col gap-1.5">
-            <span className="h-4 w-44 rounded-sm bg-foreground/[0.08] animate-pulse" />
-            <span className="h-3 w-32 rounded-sm bg-foreground/[0.05] animate-pulse" />
-            <span className="h-3 w-52 rounded-sm bg-foreground/[0.04] animate-pulse" />
+          <span className="h-[160px] w-[160px] shrink-0 rounded-md bg-foreground/[0.06] animate-pulse" />
+          <span className="flex min-w-0 flex-1 flex-col justify-between gap-3">
+            <span className="flex flex-col gap-2">
+              <span className="h-3 w-10 rounded-sm bg-foreground/[0.05] animate-pulse" />
+              <span className="h-6 w-56 rounded-sm bg-foreground/[0.09] animate-pulse" />
+              <span className="h-3 w-36 rounded-sm bg-foreground/[0.05] animate-pulse" />
+            </span>
+            <span className="flex flex-col gap-2">
+              <span className="h-px w-full bg-foreground/[0.07]" />
+              <span className="h-3 w-44 rounded-sm bg-foreground/[0.05] animate-pulse" />
+              <span className="h-3 w-52 rounded-sm bg-foreground/[0.04] animate-pulse" />
+            </span>
           </span>
-          <span className="flex flex-col items-end gap-1.5">
-            <span className="h-5 w-16 rounded-sm bg-foreground/[0.08] animate-pulse" />
+          <span className="flex flex-col items-end gap-2 pl-1">
+            <span className="h-7 w-20 rounded-sm bg-foreground/[0.09] animate-pulse" />
+            <span className="h-px w-6 bg-foreground/[0.1]" />
             <span className="h-3 w-10 rounded-sm bg-foreground/[0.05] animate-pulse" />
           </span>
         </li>

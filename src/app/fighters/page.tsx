@@ -7,6 +7,7 @@ import { FighterCatalogClient } from "@/components/fighter/FighterCatalogClient"
 import type { CatalogFilterState } from "@/components/fighter/FilterSidebar";
 import { CHAMPION_SLUGS } from "@/lib/champions";
 import { parseCatalogFilters } from "@/lib/fighter-filters";
+import { formatNumber } from "@/lib/format";
 import {
   CATALOG_DEFAULT_LIMIT,
   type FighterCatalogFilters,
@@ -40,7 +41,7 @@ function toClientFilters(parsed: FighterCatalogFilters): CatalogFilterState {
     status: parsed.status ?? "all",
     hasPhoto: parsed.hasPhoto ?? false,
     hallOfFame: parsed.hallOfFame ?? false,
-    sort: parsed.sort ?? "champions_first",
+    sort: parsed.sort ?? "fights",
   };
 }
 
@@ -115,7 +116,7 @@ function CatalogHero({ totalAll }: { totalAll: number }) {
         </h1>
         <div className="mt-6 flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <span className="font-display text-[28px] leading-none text-primary">
-            {totalAll.toLocaleString()}
+            {formatNumber(totalAll)}
           </span>
           <span className="font-sans text-base text-foreground-muted">
             fighters indexed

@@ -124,6 +124,12 @@ export type FighterCatalogRow = {
   draws_total: number;
   no_contests: number;
   bout_count: number;
+  /** From fighter_with_stats view (Wave 3A.3). */
+  last_fight_date: string | null;
+  last_fight_result: "W" | "L" | "D" | "NC" | null;
+  last_fight_method: string | null;
+  current_streak_type: "W" | "L" | null;
+  current_streak_count: number;
 };
 
 export type FighterCatalogResponse = {
@@ -211,13 +217,8 @@ function buildOrderBy(filters: FighterCatalogFilters): SQL {
         / NULLIF(COALESCE(fsa.wins_total, 0) + COALESCE(fsa.losses_total, 0), 0)
       ) DESC NULLS LAST, COALESCE(fsa.wins_total, 0) DESC`;
     case "recent":
-      return sql`last_bout_date DESC NULLS LAST, bout_count DESC`;
-    case "fights":
-      return hasQuery
-        ? sql`match_score DESC, bout_count DESC`
-        : sql`bout_count DESC, COALESCE(fsa.wins_total, 0) DESC`;
-    case "champions_first":
-    default: {
+      return sql`last_fight_date DESC NULLS LAST, bout_count DESC`;
+    case "champions_first": {
       const slugList = sql.join(
         CHAMPION_SLUGS.map((s) => sql`${s}`),
         sql`, `,
@@ -227,9 +228,14 @@ function buildOrderBy(filters: FighterCatalogFilters): SQL {
       // over champion-status (the user almost certainly wants the matching
       // person at the top, not unrelated champions).
       return hasQuery
-        ? sql`match_score DESC, (CASE WHEN f.slug IN (${slugList}) THEN 0 ELSE 1 END), bout_count DESC`
-        : sql`(CASE WHEN f.slug IN (${slugList}) THEN 0 ELSE 1 END), bout_count DESC, COALESCE(fsa.wins_total, 0) DESC`;
+        ? sql`match_score DESC, (CASE WHEN slug IN (${slugList}) THEN 0 ELSE 1 END), bout_count DESC`
+        : sql`(CASE WHEN slug IN (${slugList}) THEN 0 ELSE 1 END), bout_count DESC, COALESCE(wins_total, 0) DESC`;
     }
+    case "fights":
+    default:
+      return hasQuery
+        ? sql`match_score DESC, bout_count DESC`
+        : sql`bout_count DESC, COALESCE(wins_total, 0) DESC`;
   }
 }
 
@@ -258,17 +264,6 @@ export async function searchFightersWithFilters(
       )::float AS match_score`
     : sql``;
 
-  const lastBoutDateSelect =
-    filters.sort === "recent"
-      ? sql`,
-      (
-        SELECT MAX(e.date)
-        FROM bout b
-        JOIN event e ON e.id = b.event_id
-        WHERE b.fighter_a_id = f.id OR b.fighter_b_id = f.id
-      ) AS last_bout_date`
-      : sql``;
-
   const rowsQuery = sql`
     SELECT
       f.id::text AS id,
@@ -284,19 +279,18 @@ export async function searchFightersWithFilters(
       f.stance::text AS stance,
       f.status::text AS status,
       f.hall_of_fame_year,
-      COALESCE(fsa.wins_total, 0) AS wins_total,
-      COALESCE(fsa.losses_total, 0) AS losses_total,
-      COALESCE(fsa.draws_total, 0) AS draws_total,
-      COALESCE(fsa.no_contests, 0) AS no_contests,
-      (
-        SELECT COUNT(*)::int
-        FROM bout
-        WHERE bout.fighter_a_id = f.id OR bout.fighter_b_id = f.id
-      ) AS bout_count
+      COALESCE(f.wins_total, 0) AS wins_total,
+      COALESCE(f.losses_total, 0) AS losses_total,
+      COALESCE(f.draws_total, 0) AS draws_total,
+      COALESCE(f.no_contests, 0) AS no_contests,
+      f.bout_count,
+      f.last_fight_date,
+      f.last_fight_result,
+      f.last_fight_method,
+      f.current_streak_type,
+      f.current_streak_count
       ${matchScoreSelect}
-      ${lastBoutDateSelect}
-    FROM fighter f
-    LEFT JOIN fighter_stats_aggregate fsa ON fsa.fighter_id = f.id
+    FROM fighter_with_stats f
     ${where}
     ORDER BY ${orderBy}
     OFFSET ${offset}
@@ -305,7 +299,7 @@ export async function searchFightersWithFilters(
 
   const countQuery = sql`
     SELECT COUNT(*)::int AS total
-    FROM fighter f
+    FROM fighter_with_stats f
     ${where}
   `;
 
@@ -383,16 +377,17 @@ export async function getFightersBySlug(
       f.stance::text AS stance,
       f.status::text AS status,
       f.hall_of_fame_year,
-      COALESCE(fsa.wins_total, 0) AS wins_total,
-      COALESCE(fsa.losses_total, 0) AS losses_total,
-      COALESCE(fsa.draws_total, 0) AS draws_total,
-      COALESCE(fsa.no_contests, 0) AS no_contests,
-      (
-        SELECT COUNT(*)::int FROM bout
-        WHERE bout.fighter_a_id = f.id OR bout.fighter_b_id = f.id
-      ) AS bout_count
-    FROM fighter f
-    LEFT JOIN fighter_stats_aggregate fsa ON fsa.fighter_id = f.id
+      COALESCE(f.wins_total, 0) AS wins_total,
+      COALESCE(f.losses_total, 0) AS losses_total,
+      COALESCE(f.draws_total, 0) AS draws_total,
+      COALESCE(f.no_contests, 0) AS no_contests,
+      f.bout_count,
+      f.last_fight_date,
+      f.last_fight_result,
+      f.last_fight_method,
+      f.current_streak_type,
+      f.current_streak_count
+    FROM fighter_with_stats f
     WHERE f.slug IN (${values})
   `);
   const rows = result as unknown as FighterCatalogRow[];

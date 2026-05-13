@@ -2,7 +2,7 @@ import Image from "next/image";
 
 import { cn } from "@/lib/utils";
 
-type AvatarSize = "sm" | "md" | "lg";
+type AvatarSize = "sm" | "md" | "lg" | "xl" | "2xl";
 
 interface FighterAvatarProps {
   name: string;
@@ -15,11 +15,19 @@ interface FighterAvatarProps {
   priority?: boolean;
 }
 
-const PX: Record<AvatarSize, number> = { sm: 48, md: 64, lg: 80 };
+const PX: Record<AvatarSize, number> = {
+  sm: 48,
+  md: 64,
+  lg: 80,
+  xl: 100,
+  "2xl": 160,
+};
 const INITIAL_TEXT_PX: Record<AvatarSize, string> = {
   sm: "text-[18px]",
   md: "text-[24px]",
   lg: "text-[32px]",
+  xl: "text-[40px]",
+  "2xl": "text-[56px]",
 };
 
 // MMA-appropriate dark palette in OKLCH. Each is dark enough that white initials
