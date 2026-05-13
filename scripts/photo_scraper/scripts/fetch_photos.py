@@ -6,6 +6,13 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import _path  # noqa: F401
 
+from src.dns_override import install as install_dns_override
+
+# Install the DNS override before importing anything that opens a socket. The
+# host's primary nameserver (8.8.8.8) is currently timing out from this network;
+# the override resolves via 1.1.1.1 / 9.9.9.9 on system-DNS failure.
+install_dns_override()
+
 from rich.progress import BarColumn, Progress, TextColumn, TimeElapsedColumn
 
 from src.db import get_connection
@@ -34,7 +41,12 @@ def _select_targets(conn, limit: int | None) -> list[dict]:
                 ) AS bout_count
             FROM fighter f
             WHERE f.ufc_stats_id IS NOT NULL
-              AND (f.photo_fetch_status IS NULL OR f.photo_fetch_status = 'fetch_error')
+              AND (
+                f.photo_fetch_status IS NULL
+                OR f.photo_fetch_status IN (
+                  'fetch_error', 'license_blocked', 'no_match'
+                )
+              )
             ORDER BY bout_count DESC, f.name_en ASC
         """
         if limit is not None:
