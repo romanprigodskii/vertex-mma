@@ -46,11 +46,11 @@ function BoutLine({
     ? `R${bout.round_finished}${t ? ` · ${t}` : ""}`
     : null;
   return (
-    <div className="grid grid-cols-[60px_auto_1fr] items-baseline gap-2 font-sans text-[12px] text-foreground-muted sm:grid-cols-[80px_auto_1fr] sm:gap-3">
-      <span className="font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
+    <div className="grid grid-cols-[64px_auto_1fr] items-baseline gap-2 font-sans text-sm text-foreground-muted sm:grid-cols-[88px_auto_1fr] sm:gap-3">
+      <span className="font-mono text-[11px] uppercase tracking-widest text-foreground-subtle">
         {label}
       </span>
-      <span className={cn("font-display tabular text-sm tracking-wider", resultClass(bout.result))}>
+      <span className={cn("font-display tabular text-base tracking-wider", resultClass(bout.result))}>
         {bout.result}
       </span>
       <span className="flex min-w-0 flex-wrap items-baseline gap-x-1.5">
@@ -94,7 +94,7 @@ export function CommonOpponents({
   if (entries.length === 0) {
     return (
       <div className="rounded-md border border-dashed border-foreground/10 bg-background-elevated/30 px-6 py-10 text-center">
-        <p className="font-sans text-sm text-foreground-muted">
+        <p className="font-sans text-base text-foreground-muted">
           No common UFC opponents between {fighterAName} and {fighterBName}.
         </p>
       </div>
@@ -106,23 +106,23 @@ export function CommonOpponents({
       {entries.map((e) => (
         <li
           key={e.opponent_slug}
-          className="rounded-md border border-foreground/10 bg-background-elevated/30 px-4 py-3"
+          className="rounded-md border border-foreground/10 bg-background-elevated/30 px-5 py-4"
         >
-          <div className="mb-2 flex items-baseline justify-between gap-3">
+          <div className="mb-3 flex items-baseline justify-between gap-3">
             <Link
               href={`/fighters/${e.opponent_slug}`}
               prefetch={false}
-              className="font-display text-lg uppercase tracking-tight text-foreground hover:text-primary transition-colors sm:text-xl"
+              className="font-display text-2xl uppercase tracking-tight text-foreground hover:text-primary transition-colors sm:text-3xl"
             >
               {e.opponent_name}
             </Link>
             {e.opponent_nickname ? (
-              <span className="truncate font-sans text-[12px] italic text-foreground-subtle">
+              <span className="truncate font-sans text-sm italic text-foreground-subtle">
                 &ldquo;{e.opponent_nickname}&rdquo;
               </span>
             ) : null}
           </div>
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-2">
             <BoutLine label={fighterAName.split(" ")[0]} bout={e.a_bout} />
             <BoutLine label={fighterBName.split(" ")[0]} bout={e.b_bout} />
           </div>

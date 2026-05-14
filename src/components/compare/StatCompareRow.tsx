@@ -84,10 +84,10 @@ export function StatCompareRow({
   const tie = leader === "tie";
 
   return (
-    <div className="grid grid-cols-[1fr_auto_2fr_auto_1fr] items-baseline gap-3 border-b border-foreground/[0.06] py-2.5 last:border-b-0 sm:gap-4">
+    <div className="grid grid-cols-[1fr_auto_2fr_auto_1fr] items-baseline gap-3 border-b border-foreground/[0.06] py-4 last:border-b-0 sm:gap-4 sm:py-5">
       <div
         className={cn(
-          "text-right font-display tabular text-lg tracking-tight sm:text-xl",
+          "text-right font-display tabular text-2xl tracking-tight sm:text-3xl",
           aWon
             ? "text-streak-win"
             : tie
@@ -97,32 +97,32 @@ export function StatCompareRow({
       >
         <span>{format(valueA, fmt, decimals, unit)}</span>
         {noteA ? (
-          <p className="font-sans text-[10px] uppercase tracking-widest text-foreground-subtle">
+          <p className="font-sans text-[11px] uppercase tracking-widest text-foreground-subtle">
             {noteA}
           </p>
         ) : null}
       </div>
       <div
-        className="flex h-5 w-5 items-center justify-center text-foreground-subtle"
+        className="flex h-6 w-6 items-center justify-center text-foreground-subtle"
         aria-hidden
       >
         {aWon ? (
-          <ArrowLeft className="h-3.5 w-3.5 text-streak-win" />
+          <ArrowLeft className="h-5 w-5 text-streak-win" />
         ) : tie ? (
           <span className="text-foreground-subtle/60">=</span>
         ) : (
           <span className="text-foreground-subtle/30">·</span>
         )}
       </div>
-      <div className="text-center font-sans text-[11px] uppercase tracking-widest text-foreground-muted">
+      <div className="text-center font-sans text-[13px] font-medium uppercase tracking-widest text-foreground-muted">
         {label}
       </div>
       <div
-        className="flex h-5 w-5 items-center justify-center text-foreground-subtle"
+        className="flex h-6 w-6 items-center justify-center text-foreground-subtle"
         aria-hidden
       >
         {bWon ? (
-          <ArrowRight className="h-3.5 w-3.5 text-streak-win" />
+          <ArrowRight className="h-5 w-5 text-streak-win" />
         ) : tie ? (
           <span className="text-foreground-subtle/60">=</span>
         ) : (
@@ -131,7 +131,7 @@ export function StatCompareRow({
       </div>
       <div
         className={cn(
-          "text-left font-display tabular text-lg tracking-tight sm:text-xl",
+          "text-left font-display tabular text-2xl tracking-tight sm:text-3xl",
           bWon
             ? "text-streak-win"
             : tie
@@ -141,7 +141,7 @@ export function StatCompareRow({
       >
         <span>{format(valueB, fmt, decimals, unit)}</span>
         {noteB ? (
-          <p className="font-sans text-[10px] uppercase tracking-widest text-foreground-subtle">
+          <p className="font-sans text-[11px] uppercase tracking-widest text-foreground-subtle">
             {noteB}
           </p>
         ) : null}
@@ -165,11 +165,11 @@ export function StatTextRow({
   noteB?: string | null;
 }) {
   return (
-    <div className="grid grid-cols-[1fr_auto_2fr_auto_1fr] items-baseline gap-3 border-b border-foreground/[0.06] py-2.5 last:border-b-0 sm:gap-4">
-      <div className="text-right font-sans text-sm text-foreground">
+    <div className="grid grid-cols-[1fr_auto_2fr_auto_1fr] items-baseline gap-3 border-b border-foreground/[0.06] py-4 last:border-b-0 sm:gap-4 sm:py-5">
+      <div className="text-right font-display text-2xl uppercase tracking-tight text-foreground sm:text-3xl">
         {valueA ?? "—"}
         {noteA ? (
-          <p className="font-sans text-[10px] uppercase tracking-widest text-foreground-subtle">
+          <p className="font-sans text-[11px] uppercase tracking-widest text-foreground-subtle">
             {noteA}
           </p>
         ) : null}
@@ -177,16 +177,16 @@ export function StatTextRow({
       <span aria-hidden className="text-foreground-subtle/30">
         ·
       </span>
-      <div className="text-center font-sans text-[11px] uppercase tracking-widest text-foreground-muted">
+      <div className="text-center font-sans text-[13px] font-medium uppercase tracking-widest text-foreground-muted">
         {label}
       </div>
       <span aria-hidden className="text-foreground-subtle/30">
         ·
       </span>
-      <div className="text-left font-sans text-sm text-foreground">
+      <div className="text-left font-display text-2xl uppercase tracking-tight text-foreground sm:text-3xl">
         {valueB ?? "—"}
         {noteB ? (
-          <p className="font-sans text-[10px] uppercase tracking-widest text-foreground-subtle">
+          <p className="font-sans text-[11px] uppercase tracking-widest text-foreground-subtle">
             {noteB}
           </p>
         ) : null}

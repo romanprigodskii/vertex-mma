@@ -88,21 +88,21 @@ export function OverlapRadar({
   });
 
   return (
-    <div className="flex flex-col items-center gap-3">
+    <div className="flex flex-col items-center gap-4">
       {/* Legend */}
       <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-1">
-        <span className="flex items-center gap-2 font-sans text-[11px] uppercase tracking-widest text-foreground-muted">
+        <span className="flex items-center gap-2 font-sans text-sm uppercase tracking-widest text-foreground-muted">
           <span
             aria-hidden
-            className="h-2.5 w-2.5 rounded-sm"
+            className="h-3 w-3 rounded-sm"
             style={{ backgroundColor: COLOR_A }}
           />
           <span className="truncate text-foreground">{fighterA.name}</span>
         </span>
-        <span className="flex items-center gap-2 font-sans text-[11px] uppercase tracking-widest text-foreground-muted">
+        <span className="flex items-center gap-2 font-sans text-sm uppercase tracking-widest text-foreground-muted">
           <span
             aria-hidden
-            className="h-2.5 w-2.5 rounded-sm"
+            className="h-3 w-3 rounded-sm"
             style={{ backgroundColor: COLOR_B }}
           />
           <span className="truncate text-foreground">{fighterB.name}</span>
@@ -112,7 +112,7 @@ export function OverlapRadar({
       <svg
         viewBox={`${-viewBoxPad} 0 ${size + viewBoxPad * 2} ${size}`}
         preserveAspectRatio="xMidYMid meet"
-        className={cn("h-auto w-full max-w-[460px]", className)}
+        className={cn("h-auto w-full max-w-[560px]", className)}
         role="img"
         aria-label="Six-attribute radar comparison"
       >
@@ -166,12 +166,13 @@ export function OverlapRadar({
             key={l.key}
             x={l.x}
             y={l.y}
-            fill="oklch(0.65 0.01 240)"
+            fill="oklch(0.72 0.01 240)"
             textAnchor={l.anchor}
             dominantBaseline={l.baseline}
             className="font-sans"
             style={{
-              fontSize: 10,
+              fontSize: 13,
+              fontWeight: 500,
               letterSpacing: "0.16em",
               textTransform: "uppercase",
             }}

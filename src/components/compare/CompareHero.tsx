@@ -60,7 +60,10 @@ function splitName(name: string): { first: string; rest: string | null } {
 // Filter / mask shared by the photo halves and the mobile banner. Slightly
 // darker than the catalog treatment so the white overlay text always reads.
 const PHOTO_FILTER = "grayscale(20%) brightness(0.72) saturate(1.1)";
-const TEXT_SHADOW = "0 2px 12px oklch(0 0 0 / 0.85)";
+// Dual-layer text shadow: tight near-black halo for crisp letterform
+// readability + a wider soft drop that lifts text off busy photo regions.
+const TEXT_SHADOW =
+  "0 2px 4px oklch(0 0 0 / 0.92), 0 4px 16px oklch(0 0 0 / 0.7)";
 
 interface HalfPhotoProps {
   fighter: FighterDetail;
@@ -155,7 +158,7 @@ function FighterIdentity({ fighter, champion, align }: IdentityProps) {
     >
       {champion ? (
         <span
-          className="inline-flex items-center gap-1.5 rounded-md border border-primary/45 bg-primary/15 px-2 py-1 font-sans text-[10px] uppercase tracking-[0.2em] text-primary backdrop-blur-sm"
+          className="inline-flex items-center gap-1.5 rounded-md border border-primary/45 bg-primary/15 px-2 py-1 font-sans text-[11px] uppercase tracking-[0.2em] text-primary backdrop-blur-sm"
           aria-label={`${champion.division} champion`}
         >
           <Trophy className="h-3 w-3" aria-hidden />
@@ -172,16 +175,13 @@ function FighterIdentity({ fighter, champion, align }: IdentityProps) {
       </h2>
 
       {fighter.nickname ? (
-        <p
-          className="max-w-[26ch] truncate font-sans italic text-foreground-muted"
-          style={{ fontSize: 13 }}
-        >
+        <p className="max-w-[26ch] truncate font-sans text-base italic leading-snug text-foreground-muted md:text-lg">
           &ldquo;{fighter.nickname}&rdquo;
         </p>
       ) : null}
 
-      <p className="flex items-center gap-1.5 font-sans text-[11px] uppercase tracking-[0.22em] text-foreground-muted">
-        <span aria-hidden className="text-[13px] leading-none">
+      <p className="flex items-center gap-2 font-sans text-sm uppercase leading-snug tracking-[0.22em] text-foreground-muted">
+        <span aria-hidden className="text-base leading-none">
           {flag}
         </span>
         {fighter.country_code ? <span>{fighter.country_code}</span> : null}
@@ -195,7 +195,7 @@ function FighterIdentity({ fighter, champion, align }: IdentityProps) {
 
       <div
         className={cn(
-          "mt-1 flex items-baseline gap-2",
+          "mt-1 flex items-baseline gap-3",
           isLeft ? "" : "flex-row-reverse",
         )}
       >
@@ -206,7 +206,7 @@ function FighterIdentity({ fighter, champion, align }: IdentityProps) {
           {record}
         </span>
         {wr != null ? (
-          <span className="font-sans text-xs text-foreground-muted">
+          <span className="font-sans text-sm text-foreground-muted">
             {wr}% win rate
           </span>
         ) : null}
@@ -215,16 +215,16 @@ function FighterIdentity({ fighter, champion, align }: IdentityProps) {
       <Link
         href={`/fighters/${fighter.slug}`}
         prefetch={false}
-        className="mt-1 inline-flex items-center gap-1 font-sans text-[11px] uppercase tracking-widest text-foreground-muted transition-colors hover:text-primary"
+        className="mt-2 inline-flex items-center gap-1.5 font-sans text-sm uppercase tracking-widest text-foreground-muted transition-colors hover:text-primary"
       >
         {isLeft ? (
           <>
             View profile
-            <ChevronRight className="h-3 w-3" aria-hidden />
+            <ChevronRight className="h-3.5 w-3.5" aria-hidden />
           </>
         ) : (
           <>
-            <ChevronLeft className="h-3 w-3" aria-hidden />
+            <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
             View profile
           </>
         )}
@@ -369,6 +369,27 @@ export function CompareHero({ a, b, championA, championB }: CompareHeroProps) {
           <HalfPhoto fighter={a} champion={championA} align="left" />
           <HalfPhoto fighter={b} champion={championB} align="right" />
         </motion.div>
+
+        {/* Localized darkening under each identity column. Radial ellipses
+            sit roughly where the text overlay lives (20% / 80% of the banner
+            width) so faces remain visible at center while names + record
+            never compete with photo content. */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-y-0 left-0 w-2/3"
+          style={{
+            background:
+              "radial-gradient(ellipse 60% 80% at 20% 50%, oklch(0 0 0 / 0.65) 0%, transparent 100%)",
+          }}
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-y-0 right-0 w-2/3"
+          style={{
+            background:
+              "radial-gradient(ellipse 60% 80% at 80% 50%, oklch(0 0 0 / 0.65) 0%, transparent 100%)",
+          }}
+        />
 
         {/* Center vertical fade — solidifies the VS strip and absorbs both
             photo edges so the seam between them never reads as a hard line. */}
