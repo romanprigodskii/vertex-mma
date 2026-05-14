@@ -56,13 +56,18 @@ export const fighter = pgTable(
     // championshipPedigree — 0-100, backfilled by
     //   scripts/compute_championship_pedigree.ts from championship-history.ts
     //   (+ title-challenger-history.ts).
+    // peakScore — 0-100, backfilled by scripts/compute_peak_scores.ts using a
+    //   sliding 5-fight window (wins*12 + KO*5 + sub*5 + title*4, cap 100).
+    //   NULL for fighters with < 10 UFC bouts; the all-time formula treats
+    //   NULL as 0 via COALESCE.
     // vertexScore — current score, materialized from the fighter_vertex_score
     //   view. NULL for fighters with <3 UFC bouts OR last_fight_date older
     //   than 36 months (we don't rank retired legends as "current").
     // vertexScoreAllTime — same view, populated for any fighter with >= 3
-    //   UFC bouts; drops the Activity component so retired legends rank
-    //   alongside active champions.
+    //   UFC bouts; drops Activity, adds Peak, applies a flat total-loss
+    //   penalty so retired legends and journeymen calibrate correctly.
     championshipPedigree: integer("championship_pedigree").default(0).notNull(),
+    peakScore: integer("peak_score"),
     vertexScore: integer("vertex_score"),
     vertexScoreAllTime: integer("vertex_score_all_time"),
 
