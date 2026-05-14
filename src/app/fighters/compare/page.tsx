@@ -144,7 +144,7 @@ export default async function ComparePage({ searchParams }: PageProps) {
           </Container>
         </div>
 
-        <section className="pt-6 pb-4 md:pt-8 md:pb-6">
+        <section className="pt-6 md:pt-8">
           <Container size="xl">
             <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground-subtle">
               Side-by-side
@@ -156,7 +156,9 @@ export default async function ComparePage({ searchParams }: PageProps) {
               Compare fighters
             </h1>
 
-            <div className="mt-5 md:mt-6">
+            {/* Tilted cards extend visually past their own box; mb-12/16 keeps
+                the next section's header clear of the rotated top corners. */}
+            <div className="mt-6 mb-4 md:mt-8 md:mb-6">
               <CompareHero
                 a={fighterA}
                 b={fighterB}

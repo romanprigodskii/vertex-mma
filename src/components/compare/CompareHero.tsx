@@ -1,5 +1,8 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
+import { motion, useReducedMotion } from "framer-motion";
 import { ChevronRight, Trophy } from "lucide-react";
 
 import { type ChampionEntry } from "@/lib/champions";
@@ -43,15 +46,13 @@ function initialsOf(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-function FighterPanel({
-  fighter,
-  champion,
-  align,
-}: {
+interface TradingCardProps {
   fighter: FighterDetail;
   champion: ChampionEntry | null;
-  align: "left" | "right";
-}) {
+  side: "left" | "right";
+}
+
+function TradingCard({ fighter, champion, side }: TradingCardProps) {
   const flag = getCountryFlag(fighter.country_code);
   const weightLabel = fighter.weight_class_primary
     ? WEIGHT_LABEL[fighter.weight_class_primary] ??
@@ -66,18 +67,28 @@ function FighterPanel({
   const isChampion = champion !== null;
 
   return (
-    <div
+    <article
       className={cn(
-        "flex flex-col items-center gap-3",
-        align === "right" ? "lg:items-end lg:text-right" : "lg:items-start lg:text-left",
+        // base card — fixed aspect ratio keeps VS centered vertically
+        "group relative flex w-full max-w-sm flex-col overflow-hidden rounded-xl p-5",
+        "border-2 bg-gradient-to-b from-background-elevated to-background",
+        "transition-transform duration-300 ease-out will-change-transform",
+        // tilt + hover-straighten only at sm+, mobile lays flat & stacked
+        side === "left"
+          ? "sm:rotate-[-4deg] sm:hover:rotate-0"
+          : "sm:rotate-[4deg] sm:hover:rotate-0",
+        "sm:origin-bottom sm:hover:scale-[1.02]",
+        // width — full mobile, 280 tablet, 320 desktop
+        "sm:w-[280px] lg:w-[320px]",
+        isChampion
+          ? "border-primary/45 shadow-glow-primary"
+          : "border-foreground/15",
       )}
     >
       <div
         className={cn(
-          "relative h-[200px] w-[200px] overflow-hidden rounded-md sm:h-[240px] sm:w-[240px]",
-          isChampion
-            ? "border-2 border-primary/40 shadow-glow-primary"
-            : "border border-foreground/10",
+          "relative aspect-[4/3] w-full overflow-hidden rounded-md",
+          isChampion ? "ring-1 ring-primary/30" : "ring-1 ring-foreground/10",
         )}
       >
         {fighter.photo_url ? (
@@ -85,9 +96,9 @@ function FighterPanel({
             src={fighter.photo_url}
             alt=""
             fill
-            sizes="240px"
+            sizes="320px"
             priority
-            className="object-cover object-top brightness-[0.95]"
+            className="object-cover object-top brightness-[0.92] saturate-[0.95]"
           />
         ) : (
           <div
@@ -97,7 +108,7 @@ function FighterPanel({
           >
             <span
               className="font-display uppercase tracking-wider text-foreground/90"
-              style={{ fontSize: 64 }}
+              style={{ fontSize: 56 }}
             >
               {initialsOf(fighter.name_en)}
             </span>
@@ -105,7 +116,7 @@ function FighterPanel({
         )}
         {champion ? (
           <span
-            className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-md border border-primary/35 bg-primary/15 px-1.5 py-0.5 font-sans text-[10px] uppercase tracking-widest text-primary backdrop-blur-sm"
+            className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-md border border-primary/40 bg-primary/15 px-1.5 py-0.5 font-sans text-[10px] uppercase tracking-widest text-primary backdrop-blur-sm"
             aria-label={`${champion.division} champion`}
           >
             <Trophy className="h-3 w-3" aria-hidden />
@@ -114,53 +125,56 @@ function FighterPanel({
         ) : null}
       </div>
 
-      <div className="flex flex-col items-center gap-1 lg:items-stretch">
-        <h2
-          className={cn(
-            "font-display uppercase leading-[0.92] tracking-tight text-foreground",
-            "text-[36px] sm:text-[44px]",
-            align === "right" ? "lg:text-right" : "lg:text-left",
-          )}
+      <h2
+        className="mt-3 font-display uppercase leading-[0.92] tracking-tight text-foreground"
+        style={{ fontSize: 28 }}
+      >
+        {fighter.name_en}
+      </h2>
+      {fighter.nickname ? (
+        <p
+          className="mt-0.5 truncate font-sans italic text-foreground-muted"
+          style={{ fontSize: 13 }}
         >
-          {fighter.name_en}
-        </h2>
-        {fighter.nickname ? (
-          <p className="font-sans text-sm italic text-foreground-muted">
-            &ldquo;{fighter.nickname}&rdquo;
-          </p>
-        ) : null}
-        <p className="flex items-center gap-1.5 font-sans text-[11px] uppercase tracking-[0.22em] text-foreground-muted">
-          <span aria-hidden className="text-[13px] leading-none">
-            {flag}
-          </span>
-          {fighter.country_code ? <span>{fighter.country_code}</span> : null}
-          {weightLabel ? (
-            <>
-              <span aria-hidden className="text-foreground-subtle/40">·</span>
-              <span>{weightLabel}</span>
-            </>
-          ) : null}
+          &ldquo;{fighter.nickname}&rdquo;
         </p>
-      </div>
+      ) : null}
+      <p className="mt-1 flex items-center gap-1.5 font-sans text-[11px] uppercase tracking-widest text-foreground-muted">
+        <span aria-hidden className="text-[13px] leading-none">
+          {flag}
+        </span>
+        {fighter.country_code ? <span>{fighter.country_code}</span> : null}
+        {weightLabel ? (
+          <>
+            <span aria-hidden className="text-foreground-subtle/40">·</span>
+            <span>{weightLabel}</span>
+          </>
+        ) : null}
+      </p>
 
-      <div className="flex flex-col items-center gap-0.5">
-        <span className="font-display tabular text-4xl leading-none tracking-tight text-foreground sm:text-[44px]">
+      <div className="mt-3 flex items-baseline gap-2">
+        <span
+          className="font-display tabular leading-none tracking-tight text-foreground"
+          style={{ fontSize: 48 }}
+        >
           {record}
         </span>
-        <span className="font-sans text-xs text-foreground-muted">
-          {wr != null ? `${wr}% win rate` : "Record pending"}
-        </span>
+        {wr != null ? (
+          <span className="font-sans text-xs text-foreground-muted">
+            {wr}% WR
+          </span>
+        ) : null}
       </div>
 
       <Link
         href={`/fighters/${fighter.slug}`}
         prefetch={false}
-        className="inline-flex items-center gap-1 font-sans text-[11px] uppercase tracking-widest text-foreground-muted transition-colors hover:text-primary"
+        className="mt-3 inline-flex items-center gap-1 self-start font-sans text-[11px] uppercase tracking-widest text-foreground-muted transition-colors hover:text-primary"
       >
         View profile
         <ChevronRight className="h-3 w-3" aria-hidden />
       </Link>
-    </div>
+    </article>
   );
 }
 
@@ -172,17 +186,57 @@ interface CompareHeroProps {
 }
 
 export function CompareHero({ a, b, championA, championB }: CompareHeroProps) {
+  const reduced = useReducedMotion();
+
+  // Mount-time entrance: cards slide in from outside and settle into tilt.
+  // Honor reduced-motion — render static if the user prefers it.
+  const leftInit = reduced
+    ? { opacity: 1, x: 0, rotate: 0 }
+    : { opacity: 0, x: -40, rotate: -10 };
+  const leftAnim = reduced
+    ? { opacity: 1, x: 0, rotate: 0 }
+    : { opacity: 1, x: 0, rotate: 0 };
+  const rightInit = reduced
+    ? { opacity: 1, x: 0, rotate: 0 }
+    : { opacity: 0, x: 40, rotate: 10 };
+  const rightAnim = reduced
+    ? { opacity: 1, x: 0, rotate: 0 }
+    : { opacity: 1, x: 0, rotate: 0 };
+
   return (
-    <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[1fr_auto_1fr] lg:gap-12">
-      <FighterPanel fighter={a} champion={championA} align="left" />
-      {/* `vs` aligned with photo centerline — explicit height matches the
-          240 px photo (280 on sm+) so it doesn't drift with text below. */}
-      <div className="flex h-3 items-center justify-center lg:h-[200px] lg:items-center">
-        <span className="font-display text-3xl uppercase tracking-[0.4em] text-foreground-subtle">
+    <div className="flex flex-col items-center justify-center gap-6 sm:flex-row sm:gap-4 md:gap-8 lg:gap-12">
+      <motion.div
+        initial={leftInit}
+        animate={leftAnim}
+        transition={{ duration: 0.5, ease: "easeOut" }}
+        className="w-full max-w-sm sm:w-auto"
+      >
+        <TradingCard fighter={a} champion={championA} side="left" />
+      </motion.div>
+
+      <motion.div
+        initial={reduced ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.4 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.4, delay: 0.3, ease: "easeOut" }}
+        className="flex shrink-0 items-center justify-center sm:w-[80px] lg:w-[120px]"
+      >
+        <span
+          aria-hidden
+          className="font-display uppercase tracking-[0.2em] text-primary"
+          style={{ fontSize: "clamp(56px, 7vw, 96px)", lineHeight: 1 }}
+        >
           vs
         </span>
-      </div>
-      <FighterPanel fighter={b} champion={championB} align="right" />
+      </motion.div>
+
+      <motion.div
+        initial={rightInit}
+        animate={rightAnim}
+        transition={{ duration: 0.5, ease: "easeOut" }}
+        className="w-full max-w-sm sm:w-auto"
+      >
+        <TradingCard fighter={b} champion={championB} side="right" />
+      </motion.div>
     </div>
   );
 }
