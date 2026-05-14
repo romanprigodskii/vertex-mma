@@ -27,6 +27,8 @@ import { formatNumber } from "@/lib/format";
 
 const PAGE_SIZE = 48;
 const RANKED_SORTS: ReadonlySet<CatalogSort> = new Set([
+  "vertex_current",
+  "vertex_all_time",
   "elite_first",
   "all_time",
   "champions_first",
@@ -42,7 +44,8 @@ const DEFAULT_FILTERS: CatalogFilterState = {
   status: "all",
   hasPhoto: false,
   hallOfFame: false,
-  sort: "elite_first",
+  sort: "vertex_current",
+  tier: "all",
 };
 
 function serializeFilters(filters: CatalogFilterState): URLSearchParams {
@@ -55,7 +58,8 @@ function serializeFilters(filters: CatalogFilterState): URLSearchParams {
   if (filters.status !== "all") params.set("status", filters.status);
   if (filters.hasPhoto) params.set("has_photo", "1");
   if (filters.hallOfFame) params.set("hof", "1");
-  if (filters.sort !== "elite_first") params.set("sort", filters.sort);
+  if (filters.sort !== "vertex_current") params.set("sort", filters.sort);
+  if (filters.tier !== "all") params.set("tier", filters.tier);
   return params;
 }
 

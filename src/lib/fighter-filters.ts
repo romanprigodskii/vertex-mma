@@ -1,10 +1,13 @@
 import { WEIGHT_CLASSES } from "@/lib/constants";
 import type {
   CatalogSort,
+  CatalogTierFilter,
   FighterCatalogFilters,
 } from "@/lib/fighter-search";
 
 const VALID_SORTS: ReadonlySet<CatalogSort> = new Set([
+  "vertex_current",
+  "vertex_all_time",
   "elite_first",
   "all_time",
   "champions_first",
@@ -14,6 +17,15 @@ const VALID_SORTS: ReadonlySet<CatalogSort> = new Set([
   "winrate",
   "name_asc",
   "name_desc",
+]);
+
+const VALID_TIERS: ReadonlySet<CatalogTierFilter> = new Set([
+  "all",
+  "champion",
+  "elite",
+  "contender",
+  "pro",
+  "veteran",
 ]);
 
 const VALID_WEIGHTS = new Set(WEIGHT_CLASSES.map((w) => w.id as string));
@@ -58,10 +70,18 @@ export function parseCatalogFilters(
     : "all";
 
   const rawSort = get("sort");
+  // Default sort is Vertex Score (current) as of Wave 3.5 step 4A. Old URLs
+  // with `sort=winrate` etc. continue to work via VALID_SORTS lookup.
   const sort: CatalogSort =
     rawSort && VALID_SORTS.has(rawSort as CatalogSort)
       ? (rawSort as CatalogSort)
-      : "elite_first";
+      : "vertex_current";
+
+  const rawTier = get("tier");
+  const tier: CatalogTierFilter =
+    rawTier && VALID_TIERS.has(rawTier as CatalogTierFilter)
+      ? (rawTier as CatalogTierFilter)
+      : "all";
 
   const rawLimit = Number.parseInt(get("limit") ?? "", 10);
   const rawOffset = Number.parseInt(get("offset") ?? "", 10);
@@ -74,6 +94,7 @@ export function parseCatalogFilters(
     status,
     hasPhoto: parseBool(get("has_photo")),
     hallOfFame: parseBool(get("hof")),
+    tier,
     sort,
     limit: Number.isFinite(rawLimit) ? rawLimit : undefined,
     offset: Number.isFinite(rawOffset) ? rawOffset : undefined,

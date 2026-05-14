@@ -20,7 +20,14 @@ import { cn } from "@/lib/utils";
 export type CatalogFilterState = Required<
   Pick<
     FighterCatalogFilters,
-    "weight" | "country" | "stance" | "status" | "hasPhoto" | "hallOfFame" | "sort"
+    | "weight"
+    | "country"
+    | "stance"
+    | "status"
+    | "hasPhoto"
+    | "hallOfFame"
+    | "sort"
+    | "tier"
   >
 > & {
   q: string;
@@ -50,7 +57,8 @@ export function activeFilterCount(filters: CatalogFilterState): number {
   if (filters.status !== "all") n += 1;
   if (filters.hasPhoto) n += 1;
   if (filters.hallOfFame) n += 1;
-  if (filters.sort !== "elite_first") n += 1;
+  if (filters.sort !== "vertex_current") n += 1;
+  if (filters.tier !== "all") n += 1;
   return n;
 }
 

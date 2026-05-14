@@ -84,6 +84,8 @@ export async function searchFighters(
 /* -------------------------------------------------------------------------- */
 
 export type CatalogSort =
+  | "vertex_current"
+  | "vertex_all_time"
   | "elite_first"
   | "all_time"
   | "champions_first"
@@ -94,6 +96,17 @@ export type CatalogSort =
   | "name_asc"
   | "name_desc";
 
+/** Tier filter for the catalog. `'champion'` covers all three champion
+ *  sub-tiers (Active / Dominant / Former) by pedigree alone — the sub-tier
+ *  split is computed client-side from championship_history. */
+export type CatalogTierFilter =
+  | "all"
+  | "champion"
+  | "elite"
+  | "contender"
+  | "pro"
+  | "veteran";
+
 export type FighterCatalogFilters = {
   q?: string;
   weight?: string[];
@@ -102,6 +115,8 @@ export type FighterCatalogFilters = {
   status?: "all" | "active" | "retired" | "inactive";
   hasPhoto?: boolean;
   hallOfFame?: boolean;
+  /** Vertex Score tier filter. Defaults to "all". */
+  tier?: CatalogTierFilter;
   sort?: CatalogSort;
   offset?: number;
   limit?: number;
@@ -132,6 +147,15 @@ export type FighterCatalogRow = {
   last_fight_method: string | null;
   current_streak_type: "W" | "L" | null;
   current_streak_count: number;
+  /** Vertex Score data (Wave 3.5). NULL for fighters with <3 UFC bouts; for
+   *  `vertex_score` also NULL for inactive fighters. The frontend computes the
+   *  tier via `classifyFighter()` from src/lib/vertex-tier.ts using these
+   *  fields plus the slug. */
+  vertex_score: number | null;
+  vertex_score_all_time: number | null;
+  championship_pedigree: number;
+  is_dominant_champion: boolean;
+  ufc_bouts: number;
 };
 
 export type FighterCatalogResponse = {
@@ -200,6 +224,37 @@ function buildWhere(filters: FighterCatalogFilters): SQL {
     conditions.push(sql`f.hall_of_fame_year IS NOT NULL`);
   }
 
+  // Vertex Score tier filter — `champion` includes all 3 champion sub-tiers
+  // by pedigree alone; the rest match on the better of current / all-time
+  // score AND exclude fighters with a champion pedigree (so a Pro who happens
+  // to have been a champion doesn't appear in `tier=pro`).
+  if (filters.tier && filters.tier !== "all") {
+    const bestScore = sql`COALESCE(f.vertex_score, f.vertex_score_all_time)`;
+    switch (filters.tier) {
+      case "champion":
+        conditions.push(sql`f.championship_pedigree >= 80`);
+        break;
+      case "elite":
+        conditions.push(sql`${bestScore} >= 95 AND f.championship_pedigree < 80`);
+        break;
+      case "contender":
+        conditions.push(
+          sql`${bestScore} >= 75 AND ${bestScore} < 95 AND f.championship_pedigree < 80`,
+        );
+        break;
+      case "pro":
+        conditions.push(
+          sql`${bestScore} >= 50 AND ${bestScore} < 75 AND f.championship_pedigree < 80`,
+        );
+        break;
+      case "veteran":
+        conditions.push(
+          sql`${bestScore} IS NOT NULL AND ${bestScore} < 50 AND f.championship_pedigree < 80`,
+        );
+        break;
+    }
+  }
+
   if (conditions.length === 0) return sql``;
   return sql`WHERE ${sql.join(conditions, sql` AND `)}`;
 }
@@ -207,6 +262,17 @@ function buildWhere(filters: FighterCatalogFilters): SQL {
 function buildOrderBy(filters: FighterCatalogFilters): SQL {
   const hasQuery = Boolean(filters.q?.trim());
   switch (filters.sort) {
+    case "vertex_current":
+      // Active fighters' current Vertex Score, falling back to all-time so
+      // retired legends still rank somewhere. NULL scores (<3 UFC bouts)
+      // sink to the bottom.
+      return hasQuery
+        ? sql`match_score DESC, COALESCE(f.vertex_score, f.vertex_score_all_time) DESC NULLS LAST`
+        : sql`f.vertex_score DESC NULLS LAST, f.vertex_score_all_time DESC NULLS LAST, f.bout_count DESC`;
+    case "vertex_all_time":
+      return hasQuery
+        ? sql`match_score DESC, f.vertex_score_all_time DESC NULLS LAST`
+        : sql`f.vertex_score_all_time DESC NULLS LAST, f.bout_count DESC`;
     case "name_asc":
       return sql`f.name_en ASC`;
     case "name_desc":
@@ -345,7 +411,12 @@ export async function searchFightersWithFilters(
       f.last_fight_result,
       f.last_fight_method,
       f.current_streak_type,
-      f.current_streak_count
+      f.current_streak_count,
+      f.vertex_score,
+      f.vertex_score_all_time,
+      COALESCE(f.championship_pedigree, 0)::int AS championship_pedigree,
+      COALESCE(f.is_dominant_champion, false) AS is_dominant_champion,
+      COALESCE(f.ufc_total, 0)::int AS ufc_bouts
       ${matchScoreSelect}
     FROM fighter_with_stats f
     ${where}
@@ -443,7 +514,12 @@ export async function getFightersBySlug(
       f.last_fight_result,
       f.last_fight_method,
       f.current_streak_type,
-      f.current_streak_count
+      f.current_streak_count,
+      f.vertex_score,
+      f.vertex_score_all_time,
+      COALESCE(f.championship_pedigree, 0)::int AS championship_pedigree,
+      COALESCE(f.is_dominant_champion, false) AS is_dominant_champion,
+      COALESCE(f.ufc_total, 0)::int AS ufc_bouts
     FROM fighter_with_stats f
     WHERE f.slug IN (${values})
   `);
