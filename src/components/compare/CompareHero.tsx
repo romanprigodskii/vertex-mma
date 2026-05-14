@@ -5,6 +5,7 @@ import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
 import { ChevronLeft, ChevronRight, Trophy } from "lucide-react";
 
+import { Container } from "@/components/layout/container";
 import { type ChampionEntry } from "@/lib/champions";
 import type { FighterDetail } from "@/lib/fighter-detail";
 import { getCountryFlag } from "@/lib/fighter-helpers";
@@ -396,34 +397,40 @@ export function CompareHero({ a, b, championA, championB }: CompareHeroProps) {
           }}
         />
 
-        {/* Content overlay — 3-column grid pins identity to outer edges and
-            keeps VS in the center regardless of name length. */}
-        <div className="absolute inset-0 grid grid-cols-[1fr_auto_1fr] items-center gap-4 px-6 md:px-10 lg:px-16">
-          <motion.div
-            initial={leftTextIn}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5, delay: 0.15, ease: "easeOut" }}
-          >
-            <FighterIdentity fighter={a} champion={championA} align="left" />
-          </motion.div>
+        {/* Content overlay — photos run edge-to-edge for the cinematic feel,
+            but the identity text + VS respect the same xl Container bounds
+            as the rest of the page so nothing clips at viewport edges. */}
+        <div className="absolute inset-0">
+          <Container size="xl" className="flex h-full items-center">
+            <div className="grid w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-4 md:gap-8">
+              <motion.div
+                initial={leftTextIn}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.5, delay: 0.15, ease: "easeOut" }}
+                className="min-w-0"
+              >
+                <FighterIdentity fighter={a} champion={championA} align="left" />
+              </motion.div>
 
-          <motion.div
-            initial={vsIn}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.4, delay: 0.25, ease: "easeOut" }}
-            className="flex shrink-0 items-center justify-center px-2"
-          >
-            <VsBlock />
-          </motion.div>
+              <motion.div
+                initial={vsIn}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.4, delay: 0.25, ease: "easeOut" }}
+                className="flex shrink-0 items-center justify-center px-2"
+              >
+                <VsBlock />
+              </motion.div>
 
-          <motion.div
-            initial={rightTextIn}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5, delay: 0.15, ease: "easeOut" }}
-            className="flex justify-end"
-          >
-            <FighterIdentity fighter={b} champion={championB} align="right" />
-          </motion.div>
+              <motion.div
+                initial={rightTextIn}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.5, delay: 0.15, ease: "easeOut" }}
+                className="flex min-w-0 justify-end"
+              >
+                <FighterIdentity fighter={b} champion={championB} align="right" />
+              </motion.div>
+            </div>
+          </Container>
         </div>
       </section>
 

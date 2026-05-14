@@ -145,7 +145,7 @@ export default async function ComparePage({ searchParams }: PageProps) {
         </div>
 
         <section className="pt-6 md:pt-8">
-          <Container size="xl">
+          <Container size="xl" className="mb-8 md:mb-12">
             <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground-subtle">
               Side-by-side
             </p>
@@ -161,14 +161,12 @@ export default async function ComparePage({ searchParams }: PageProps) {
               bleed edge-to-edge. The banner has its own top + bottom fade to
               background, so it sits flush against the next section without a
               visible seam. */}
-          <div className="mt-6 md:mt-8">
-            <CompareHero
-              a={fighterA}
-              b={fighterB}
-              championA={championA}
-              championB={championB}
-            />
-          </div>
+          <CompareHero
+            a={fighterA}
+            b={fighterB}
+            championA={championA}
+            championB={championB}
+          />
         </section>
 
         <CompareSection
