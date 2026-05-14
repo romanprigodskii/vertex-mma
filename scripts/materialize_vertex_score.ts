@@ -113,6 +113,68 @@ async function main() {
     console.log(`${String(i + 1).padStart(2)} | ${name} | ${cur} | ${String(r.all_time_score).padStart(3)} | ${String(r.ufc_bouts).padStart(5)} | ${wl} | ${peak} | ${String(r.total_loss_penalty).padStart(7)} | ${last}`);
   });
 
+  // Component diagnostic — verify uncap produces values > 100 for elite
+  // specialists and surface the raw (pre-compression) totals so we can see
+  // how much soft compression actually fires.
+  const diag = await sql<Array<{
+    name_en: string;
+    wq: number;
+    cp: number;
+    act: number;
+    strk: number;
+    grap: number;
+    peak: number;
+    rec_pen: number;
+    tot_pen: number;
+    raw_curr: number;
+    raw_at: number;
+    curr: number | null;
+    at: number | null;
+  }>>`
+    SELECT
+      f.name_en,
+      ROUND(vs.win_quality)::int AS wq,
+      ROUND(vs.championship_pedigree)::int AS cp,
+      ROUND(vs.activity)::int AS act,
+      ROUND(vs.striking_excellence)::int AS strk,
+      ROUND(vs.grappling_excellence)::int AS grap,
+      ROUND(vs.peak_score)::int AS peak,
+      ROUND(vs.recent_loss_penalty)::int AS rec_pen,
+      ROUND(vs.total_loss_penalty)::int AS tot_pen,
+      ROUND(vs.raw_current_total)::int AS raw_curr,
+      ROUND(vs.raw_all_time_total)::int AS raw_at,
+      f.vertex_score AS curr,
+      f.vertex_score_all_time AS at
+    FROM fighter_vertex_score vs
+    JOIN fighter f ON f.id = vs.id
+    WHERE f.slug IN (
+      'islam-makhachev-275aca',
+      'jon-jones-07f72a',
+      'georges-st-pierre-6506c1',
+      'khabib-nurmagomedov-032cc3',
+      'alex-pereira-e5549c',
+      'anderson-silva-1f4543',
+      'valentina-shevchenko-132deb',
+      'alexander-volkanovski-e12489',
+      'charles-oliveira-07225b',
+      'demetrious-johnson-8a304b',
+      'ilia-topuria-54f64b',
+      'tom-aspinall-399afb',
+      'khamzat-chimaev-767755'
+    )
+    ORDER BY vs.raw_all_time_total DESC
+  `;
+  console.log("\n=== Component diagnostic (raw shows pre-compression total) ===");
+  console.log("  name                          WQ  CP  ACT STRK GRAP peak rec tot |  raw_curr raw_at | curr  at ");
+  console.log("  " + "-".repeat(110));
+  for (const r of diag) {
+    const cur = r.curr == null ? "  — " : String(r.curr).padStart(4);
+    const at = r.at == null ? "  — " : String(r.at).padStart(4);
+    console.log(
+      `  ${r.name_en.padEnd(29)} ${String(r.wq).padStart(3)} ${String(r.cp).padStart(3)} ${String(r.act).padStart(3)} ${String(r.strk).padStart(4)} ${String(r.grap).padStart(4)} ${String(r.peak).padStart(4)} ${String(r.rec_pen).padStart(3)} ${String(r.tot_pen).padStart(3)} | ${String(r.raw_curr).padStart(8)} ${String(r.raw_at).padStart(6)} | ${cur} ${at}`,
+    );
+  }
+
   // Tier distribution (using max=100 scale).
   const tiers = await sql<Array<{ tier: string; count: number }>>`
     WITH best AS (
