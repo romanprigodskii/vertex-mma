@@ -282,6 +282,36 @@ export function isDoubleChampion(slug: string): boolean {
   return championshipDivisions(slug).length >= 2;
 }
 
+/** True iff the fighter is a "dominant former champion" — cumulative reign
+ *  length >= 2 years OR held undisputed belts in 2+ divisions. Used by the
+ *  Vertex Score view to apply a small (+3) post-cap bonus that pulls the
+ *  genuine all-time greats (Anderson, GSP, Khabib, DJ, Jones, Cain, Aldo,
+ *  Holloway, Volk) up into the Elite tier without indiscriminately boosting
+ *  anyone who once briefly held a belt. Current champions are handled
+ *  separately (their championship_pedigree = 100 triggers a +4 bonus). */
+export function isDominantChampion(slug: string): boolean {
+  if (isDoubleChampion(slug)) return true;
+  // 2 years cumulative as undisputed champion. Interim reigns are excluded
+  // from totalDaysAsChampion via the isInterim flag check below.
+  return totalDaysAsUndisputedChampion(slug) >= 730;
+}
+
+function totalDaysAsUndisputedChampion(slug: string): number {
+  const reigns = REIGNS_BY_SLUG.get(slug);
+  if (!reigns) return 0;
+  const now = Date.now();
+  let total = 0;
+  for (const r of reigns) {
+    if (r.isInterim) continue;
+    const start = new Date(r.startDate).getTime();
+    const end = r.endDate ? new Date(r.endDate).getTime() : now;
+    if (Number.isFinite(start) && Number.isFinite(end) && end > start) {
+      total += Math.floor((end - start) / 86_400_000);
+    }
+  }
+  return total;
+}
+
 /** Sum of days across every recorded reign for the fighter. Open-ended reigns
  *  use today as their effective end date. */
 export function totalDaysAsChampion(slug: string): number {

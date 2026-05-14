@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  boolean,
   char,
   date,
   index,
@@ -67,6 +68,7 @@ export const fighter = pgTable(
     //   UFC bouts; drops Activity, adds Peak, applies a flat total-loss
     //   penalty so retired legends and journeymen calibrate correctly.
     championshipPedigree: integer("championship_pedigree").default(0).notNull(),
+    isDominantChampion: boolean("is_dominant_champion").default(false).notNull(),
     peakScore: integer("peak_score"),
     vertexScore: integer("vertex_score"),
     vertexScoreAllTime: integer("vertex_score_all_time"),
