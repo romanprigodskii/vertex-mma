@@ -92,13 +92,20 @@ export interface TierStyle {
   tier: VertexTier;
   label: string;
   badgeText: string;
-  /** Solid fill behind the badge. */
+  /** Solid fill behind the legacy badge (still exported for any callers that
+   *  haven't migrated to the gradient + score representation). */
   badgeBg: string;
-  /** Foreground colour for the tier label AND the numeric score so the
-   *  score visually reinforces the tier hue. */
   badgeTextColor: string;
-  /** Subtle accent stroke around the badge. */
   badgeBorder: string;
+  /** Top-of-card tint (OKLCH with alpha). Used as the `from` stop of a
+   *  linear-gradient(180deg, ...) layered over the card background. */
+  gradientFrom: string;
+  /** Bottom stop — usually the same hue at 0 alpha so the gradient fades
+   *  to transparent ~70% down the card. */
+  gradientTo: string;
+  /** Colour for the large score number rendered bottom-right of the card.
+   *  Brighter than the gradient so the number reads against the tinted bg. */
+  scoreColor: string;
 }
 
 // Explicit per-tier OKLCH triples (no color-mix). Each tier reads as a
@@ -115,6 +122,9 @@ export const TIER_STYLES: Record<VertexTier, TierStyle> = {
     badgeBg: "oklch(0.30 0.18 295)",
     badgeTextColor: "oklch(0.92 0.10 295)",
     badgeBorder: "oklch(0.55 0.20 295)",
+    gradientFrom: "oklch(0.45 0.22 295 / 0.18)",
+    gradientTo: "oklch(0.45 0.22 295 / 0)",
+    scoreColor: "oklch(0.85 0.18 295)",
   },
   elite: {
     tier: "elite",
@@ -123,6 +133,9 @@ export const TIER_STYLES: Record<VertexTier, TierStyle> = {
     badgeBg: "oklch(0.28 0.14 235)",
     badgeTextColor: "oklch(0.88 0.10 235)",
     badgeBorder: "oklch(0.55 0.18 235)",
+    gradientFrom: "oklch(0.45 0.18 235 / 0.16)",
+    gradientTo: "oklch(0.45 0.18 235 / 0)",
+    scoreColor: "oklch(0.82 0.16 235)",
   },
   veteran: {
     tier: "veteran",
@@ -131,6 +144,9 @@ export const TIER_STYLES: Record<VertexTier, TierStyle> = {
     badgeBg: "oklch(0.28 0.05 200)",
     badgeTextColor: "oklch(0.78 0.06 200)",
     badgeBorder: "oklch(0.45 0.07 200)",
+    gradientFrom: "oklch(0.50 0.08 200 / 0.12)",
+    gradientTo: "oklch(0.50 0.08 200 / 0)",
+    scoreColor: "oklch(0.75 0.07 200)",
   },
   roster: {
     tier: "roster",
@@ -139,6 +155,9 @@ export const TIER_STYLES: Record<VertexTier, TierStyle> = {
     badgeBg: "oklch(0.22 0.01 240)",
     badgeTextColor: "oklch(0.65 0.02 240)",
     badgeBorder: "oklch(0.35 0.02 240)",
+    gradientFrom: "oklch(0.45 0.02 240 / 0.08)",
+    gradientTo: "oklch(0.45 0.02 240 / 0)",
+    scoreColor: "oklch(0.62 0.03 240)",
   },
   unranked: {
     tier: "unranked",
@@ -147,6 +166,9 @@ export const TIER_STYLES: Record<VertexTier, TierStyle> = {
     badgeBg: "transparent",
     badgeTextColor: "transparent",
     badgeBorder: "transparent",
+    gradientFrom: "transparent",
+    gradientTo: "transparent",
+    scoreColor: "transparent",
   },
 };
 

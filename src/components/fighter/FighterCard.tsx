@@ -129,8 +129,8 @@ export function FighterCard({
     <Link
       href={`/fighters/${fighter.slug}`}
       prefetch={false}
-      style={
-        isChampion
+      style={{
+        ...(isChampion
           ? {
               borderColor: championStyle.borderColor,
               borderWidth: `${championStyle.borderWidth}px`,
@@ -139,10 +139,18 @@ export function FighterCard({
                   ? `${championStyle.glowSize} ${championStyle.glowColor}`
                   : undefined,
             }
-          : undefined
-      }
+          : undefined),
+        // Tier expressed as a top→bottom gradient layered over the card
+        // base background (Tailwind class no longer sets background, so we
+        // supply both stops here). The gradient fades to transparent by
+        // ~70% of the card height so the photo + stats stay readable.
+        background:
+          tierStyle.tier === "unranked"
+            ? "oklch(0.12 0.008 240 / 0.3)"
+            : `linear-gradient(180deg, ${tierStyle.gradientFrom} 0%, ${tierStyle.gradientTo} 70%), color-mix(in oklch, var(--color-background-elevated) 30%, transparent)`,
+      }}
       className={cn(
-        "group relative flex min-h-[168px] gap-4 rounded-lg bg-background-elevated/30 p-4",
+        "group relative flex min-h-[168px] gap-4 rounded-lg p-4",
         // Champion fighters use an inline-styled border (set above). Non-champions
         // keep the standard Tailwind subtle border.
         isChampion ? "border" : "border border-foreground/10",
@@ -263,27 +271,24 @@ export function FighterCard({
             · {ncs} NC
           </span>
         ) : null}
-        {showTierBadge && displayScore != null ? (
-          <span
-            className="mt-1 inline-flex items-center gap-1.5 rounded-sm border px-1.5 py-0.5"
-            style={{
-              backgroundColor: tierStyle.badgeBg,
-              borderColor: tierStyle.badgeBorder,
-              color: tierStyle.badgeTextColor,
-            }}
-          >
-            <span className="font-mono text-[9px] uppercase tracking-[0.16em]">
-              {tierStyle.badgeText}
-            </span>
-            <span
-              className="font-display text-sm leading-none tabular"
-              style={{ color: tierStyle.badgeTextColor }}
-            >
-              {displayScore}
-            </span>
-          </span>
-        ) : null}
       </div>
+
+      {/* Large tier-coloured score, bottom-right of the card. Replaces the
+          small badge (Wave 3.5 step 6A.2) — the tier gradient + this number
+          carry the tier signal together. Hidden for unranked fighters. */}
+      {showTierBadge && displayScore != null ? (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute bottom-3 right-4 select-none font-display tabular leading-none"
+          style={{
+            fontSize: 32,
+            color: tierStyle.scoreColor,
+            textShadow: "0 1px 8px oklch(0 0 0 / 0.55)",
+          }}
+        >
+          {displayScore}
+        </span>
+      ) : null}
     </Link>
   );
 }
