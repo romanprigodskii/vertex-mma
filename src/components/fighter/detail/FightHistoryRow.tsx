@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import type { FightHistoryEntry } from "@/lib/fighter-detail";
 import { abbreviateMethod } from "@/lib/method";
+import { isCuratedTitleFight } from "@/lib/title-fights";
 import { cn } from "@/lib/utils";
 
 function formatRoundTime(sec: number | null): string {
@@ -37,6 +38,9 @@ export function FightHistoryRow({ entry }: FightHistoryRowProps) {
   const finishDetail = entry.round_finished
     ? `R${entry.round_finished}${time ? ` · ${time}` : ""}`
     : null;
+  // Source of truth: curated list, not `bout.is_title_fight` (scraper flags
+  // entire main cards — see src/lib/title-fights.ts).
+  const isTitle = isCuratedTitleFight(entry.bout_id);
 
   return (
     <li
@@ -76,6 +80,14 @@ export function FightHistoryRow({ entry }: FightHistoryRowProps) {
         >
           {entry.opponent_name}
         </Link>
+        {isTitle ? (
+          <span
+            className="shrink-0 rounded-sm border border-primary/35 bg-primary/10 px-1.5 py-0.5 font-sans text-[9px] uppercase tracking-widest text-primary"
+            aria-label="Title fight"
+          >
+            Title
+          </span>
+        ) : null}
       </div>
 
       {/* Result · method · round/time */}

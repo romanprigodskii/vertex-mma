@@ -144,19 +144,19 @@ export default async function ComparePage({ searchParams }: PageProps) {
           </Container>
         </div>
 
-        <section className="py-8 md:py-10">
+        <section className="pt-6 pb-4 md:pt-8 md:pb-6">
           <Container size="xl">
             <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground-subtle">
               Side-by-side
             </p>
             <h1
-              className="mt-3 font-display uppercase tracking-tight text-foreground leading-[0.9]"
+              className="mt-2 font-display uppercase tracking-tight text-foreground leading-[0.9]"
               style={{ fontSize: "clamp(36px, 5vw, 72px)" }}
             >
               Compare fighters
             </h1>
 
-            <div className="mt-6 md:mt-8">
+            <div className="mt-5 md:mt-6">
               <CompareHero
                 a={fighterA}
                 b={fighterB}

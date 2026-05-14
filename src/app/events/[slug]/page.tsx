@@ -15,6 +15,7 @@ import {
   getEventBySlug,
 } from "@/lib/event-detail";
 import { getCountryFlag } from "@/lib/fighter-helpers";
+import { isCuratedTitleFight } from "@/lib/title-fights";
 import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -137,9 +138,17 @@ function BoutCard({ bout }: { bout: EventBout }) {
           <span>{weightLabel}</span>
           <span className="mx-1.5 text-foreground-subtle/40">·</span>
           <span>{bout.scheduled_rounds} rounds</span>
-          {/* TITLE chip suppressed — `bout.is_title_fight` is event-level in
-              the scraper data, so it lights up on every bout of a title-headlined
-              card. Re-enable after Wave 3.5 data backfill. */}
+          {isCuratedTitleFight(bout.id) ? (
+            <>
+              <span className="mx-1.5 text-foreground-subtle/40">·</span>
+              <span
+                className="rounded-sm border border-primary/35 bg-primary/10 px-1.5 py-0.5 text-primary"
+                aria-label="Title fight"
+              >
+                Title
+              </span>
+            </>
+          ) : null}
         </p>
         {finishDetail ? (
           <p className="font-mono text-[11px] tabular text-foreground-subtle">

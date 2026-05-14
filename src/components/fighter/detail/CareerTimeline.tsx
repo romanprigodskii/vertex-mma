@@ -3,6 +3,7 @@
 import * as React from "react";
 
 import type { TimelineBout } from "@/lib/fighter-detail";
+import { isCuratedTitleFight } from "@/lib/title-fights";
 import { cn } from "@/lib/utils";
 
 interface CareerTimelineProps {
@@ -293,7 +294,9 @@ export function CareerTimeline({ bouts }: CareerTimelineProps) {
           {sorted.map((b) => {
             const t = new Date(b.event_date).getTime();
             const x = PADDING_X + ((t - startMs) / span) * innerWidth;
-            const r = b.is_title_fight ? TITLE_DOT_R : DOT_R;
+            // Curated list, not bout.is_title_fight (scraper flag is unreliable).
+            const isTitle = isCuratedTitleFight(b.bout_id);
+            const r = isTitle ? TITLE_DOT_R : DOT_R;
             const isHovered = tooltip?.bout.bout_id === b.bout_id;
             return (
               <a
