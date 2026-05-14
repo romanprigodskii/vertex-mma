@@ -51,6 +51,15 @@ export const fighter = pgTable(
     photoFetchedAt: timestamp("photo_fetched_at", { withTimezone: true }),
     photoFetchStatus: text("photo_fetch_status"),
 
+    // Vertex Score system (Wave 3.5).
+    // championshipPedigree is backfilled by
+    // scripts/compute_championship_pedigree.ts from championship-history.ts
+    // (+ title-challenger-history.ts). vertexScore is materialized from the
+    // fighter_vertex_score view by scripts/materialize_vertex_score.ts and
+    // stays NULL for fighters with < 3 UFC bouts.
+    championshipPedigree: integer("championship_pedigree").default(0).notNull(),
+    vertexScore: integer("vertex_score"),
+
     ufcStatsId: text("ufc_stats_id").unique(),
     sherdogId: text("sherdog_id").unique(),
     tapologyId: text("tapology_id").unique(),
