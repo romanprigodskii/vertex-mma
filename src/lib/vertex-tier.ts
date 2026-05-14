@@ -1,16 +1,19 @@
 /**
- * Vertex Score tier classifier (Wave 3.5 step 4A).
+ * Vertex Score tier classifier (Wave 3.5 step 4A → 3.8 thresholds).
  *
- * Combines score-based tiers (Elite / Contender / Pro / Veteran / Unranked)
+ * Combines score-based tiers (Apex / Elite / Veteran / Roster / Unranked)
  * with championship-pedigree overrides (Active / Dominant / Former Champion).
  * Champion overrides supersede score-based tiers in display: a current
  * champion who happens to score 70 is still shown as "Active Champion," not
- * "Pro." Conversely a non-champion who scores 96 is "Elite."
+ * "Veteran." Conversely a non-champion who scores 82 is "Apex."
  *
- * Wave 3.5's score formula maxes out around 90 in practice (no fighter has
- * reached 95+ in the current data); the Elite breakpoint stays at 95 by
- * design so the tier is reserved for genuinely transcendent performances
- * if the formula is recalibrated in the future.
+ * Score breaks calibrated against the actual score distribution from the
+ * c09eb83 formula (Islam 89, Jon Jones 82, Shev 81, GSP all-time 80):
+ *   Apex      80+   GOAT territory (3-5 non-champion fighters)
+ *   Elite     60-79 Championship class
+ *   Veteran   40-59 UFC professional
+ *   Roster    <40   Has fought in UFC
+ *   Unranked  <3 UFC bouts OR no score
  */
 
 import {
@@ -23,10 +26,10 @@ export type VertexTier =
   | "active_champion"
   | "dominant_champion"
   | "former_champion"
+  | "apex"
   | "elite"
-  | "contender"
-  | "pro"
   | "veteran"
+  | "roster"
   | "unranked";
 
 export interface TierStyle {
@@ -70,37 +73,37 @@ export const TIER_STYLES: Record<VertexTier, TierStyle> = {
     glowColor: null,
     badgeText: "FORMER CHAMPION",
   },
+  apex: {
+    tier: "apex",
+    label: "Apex",
+    borderColor: "oklch(0.70 0.18 290)",
+    borderWidth: 2,
+    glowColor: null,
+    badgeText: "APEX",
+  },
   elite: {
     tier: "elite",
     label: "Elite",
-    borderColor: "oklch(0.70 0.18 290)",
+    borderColor: "oklch(0.65 0.12 235)",
     borderWidth: 2,
     glowColor: null,
     badgeText: "ELITE",
   },
-  contender: {
-    tier: "contender",
-    label: "Contender",
-    borderColor: "oklch(0.65 0.12 235)",
-    borderWidth: 2,
-    glowColor: null,
-    badgeText: "CONTENDER",
-  },
-  pro: {
-    tier: "pro",
-    label: "Pro",
-    borderColor: "oklch(0.55 0.06 200)",
-    borderWidth: 2,
-    glowColor: null,
-    badgeText: "PRO",
-  },
   veteran: {
     tier: "veteran",
     label: "Veteran",
+    borderColor: "oklch(0.55 0.06 200)",
+    borderWidth: 2,
+    glowColor: null,
+    badgeText: "VETERAN",
+  },
+  roster: {
+    tier: "roster",
+    label: "Roster",
     borderColor: "oklch(0.45 0.02 240)",
     borderWidth: 1,
     glowColor: null,
-    badgeText: "VETERAN",
+    badgeText: "ROSTER",
   },
   unranked: {
     tier: "unranked",
@@ -121,10 +124,10 @@ export interface ClassifyArgs {
 
 /**
  * Score-based tier breaks (used when no champion override applies):
- *   Elite      95+
- *   Contender  75-94
- *   Pro        50-74
- *   Veteran    0-49
+ *   Apex     80+
+ *   Elite    60-79
+ *   Veteran  40-59
+ *   Roster   <40
  *
  * Reference score: current if active and present, else all-time, else 0.
  */
@@ -139,10 +142,10 @@ export function classifyFighter(args: ClassifyArgs): VertexTier {
   if (isFormerChampion(args.slug)) return "former_champion";
 
   const referenceScore = args.vertexScore ?? args.vertexScoreAllTime ?? 0;
-  if (referenceScore >= 95) return "elite";
-  if (referenceScore >= 75) return "contender";
-  if (referenceScore >= 50) return "pro";
-  return "veteran";
+  if (referenceScore >= 80) return "apex";
+  if (referenceScore >= 60) return "elite";
+  if (referenceScore >= 40) return "veteran";
+  return "roster";
 }
 
 export function getTierStyle(tier: VertexTier): TierStyle {

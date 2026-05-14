@@ -22,10 +22,10 @@ const VALID_SORTS: ReadonlySet<CatalogSort> = new Set([
 const VALID_TIERS: ReadonlySet<CatalogTierFilter> = new Set([
   "all",
   "champion",
+  "apex",
   "elite",
-  "contender",
-  "pro",
   "veteran",
+  "roster",
 ]);
 
 const VALID_WEIGHTS = new Set(WEIGHT_CLASSES.map((w) => w.id as string));

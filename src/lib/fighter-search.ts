@@ -102,10 +102,10 @@ export type CatalogSort =
 export type CatalogTierFilter =
   | "all"
   | "champion"
+  | "apex"
   | "elite"
-  | "contender"
-  | "pro"
-  | "veteran";
+  | "veteran"
+  | "roster";
 
 export type FighterCatalogFilters = {
   q?: string;
@@ -234,22 +234,22 @@ function buildWhere(filters: FighterCatalogFilters): SQL {
       case "champion":
         conditions.push(sql`f.championship_pedigree >= 80`);
         break;
+      case "apex":
+        conditions.push(sql`${bestScore} >= 80 AND f.championship_pedigree < 80`);
+        break;
       case "elite":
-        conditions.push(sql`${bestScore} >= 95 AND f.championship_pedigree < 80`);
-        break;
-      case "contender":
         conditions.push(
-          sql`${bestScore} >= 75 AND ${bestScore} < 95 AND f.championship_pedigree < 80`,
-        );
-        break;
-      case "pro":
-        conditions.push(
-          sql`${bestScore} >= 50 AND ${bestScore} < 75 AND f.championship_pedigree < 80`,
+          sql`${bestScore} >= 60 AND ${bestScore} < 80 AND f.championship_pedigree < 80`,
         );
         break;
       case "veteran":
         conditions.push(
-          sql`${bestScore} IS NOT NULL AND ${bestScore} < 50 AND f.championship_pedigree < 80`,
+          sql`${bestScore} >= 40 AND ${bestScore} < 60 AND f.championship_pedigree < 80`,
+        );
+        break;
+      case "roster":
+        conditions.push(
+          sql`${bestScore} IS NOT NULL AND ${bestScore} < 40 AND f.championship_pedigree < 80`,
         );
         break;
     }
