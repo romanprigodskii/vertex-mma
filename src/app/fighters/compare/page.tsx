@@ -155,18 +155,20 @@ export default async function ComparePage({ searchParams }: PageProps) {
             >
               Compare fighters
             </h1>
-
-            {/* Tilted cards extend visually past their own box; mb-12/16 keeps
-                the next section's header clear of the rotated top corners. */}
-            <div className="mt-6 mb-4 md:mt-8 md:mb-6">
-              <CompareHero
-                a={fighterA}
-                b={fighterB}
-                championA={championA}
-                championB={championB}
-              />
-            </div>
           </Container>
+
+          {/* Cinematic banner: spans the full viewport width so the photos
+              bleed edge-to-edge. The banner has its own top + bottom fade to
+              background, so it sits flush against the next section without a
+              visible seam. */}
+          <div className="mt-6 md:mt-8">
+            <CompareHero
+              a={fighterA}
+              b={fighterB}
+              championA={championA}
+              championB={championB}
+            />
+          </div>
         </section>
 
         <CompareSection
