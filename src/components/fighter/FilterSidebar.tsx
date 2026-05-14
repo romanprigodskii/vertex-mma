@@ -6,6 +6,7 @@ import { ChevronDown, X } from "lucide-react";
 import { CountrySelect } from "@/components/fighter/CountrySelect";
 import { SortDropdown } from "@/components/fighter/SortDropdown";
 import { StanceChips } from "@/components/fighter/StanceChips";
+import { GenderToggle } from "@/components/fighter/GenderToggle";
 import { StatusRadio } from "@/components/fighter/StatusRadio";
 import { WeightClassChips } from "@/components/fighter/WeightClassChips";
 import { Button } from "@/components/ui/button";
@@ -207,6 +208,13 @@ export function FilterSidebar({
         <WeightClassChips
           selected={filters.weight}
           onToggle={(id) => toggleInArray("weight", id)}
+        />
+      </Section>
+
+      <Section title="Gender">
+        <GenderToggle
+          value={filters.gender}
+          onChange={(gender) => onChange({ gender })}
         />
       </Section>
 
