@@ -113,36 +113,37 @@ async function main() {
     console.log(`${String(i + 1).padStart(2)} | ${name} | ${cur} | ${String(r.all_time_score).padStart(3)} | ${String(r.ufc_bouts).padStart(5)} | ${wl} | ${peak} | ${String(r.total_loss_penalty).padStart(7)} | ${last}`);
   });
 
-  // Component diagnostic — verify uncap produces values > 100 for elite
-  // specialists and surface the raw (pre-compression) totals so we can see
-  // how much soft compression actually fires.
+  // Component diagnostic — Wave 3.5 step 5A formula uses opponent quality
+  // as the primary signal. This block surfaces apex/strong/solid/legacy/
+  // ranked counts alongside the score components so we can audit which
+  // wins drive each fighter's ranking.
   const diag = await sql<Array<{
     name_en: string;
-    wq: number;
+    apex: number;
+    strong: number;
+    solid: number;
+    legacy: number;
+    ranked: number;
+    qw: number;
     cp: number;
     act: number;
-    strk: number;
-    grap: number;
-    peak: number;
     rec_pen: number;
     tot_pen: number;
-    raw_curr: number;
-    raw_at: number;
     curr: number | null;
     at: number | null;
   }>>`
     SELECT
       f.name_en,
-      ROUND(vs.win_quality)::int AS wq,
+      vs.apex_wins AS apex,
+      vs.strong_wins AS strong,
+      vs.solid_wins AS solid,
+      vs.legacy_wins AS legacy,
+      vs.ranked_wins AS ranked,
+      ROUND(vs.quality_wins)::int AS qw,
       ROUND(vs.championship_pedigree)::int AS cp,
       ROUND(vs.activity)::int AS act,
-      ROUND(vs.striking_excellence)::int AS strk,
-      ROUND(vs.grappling_excellence)::int AS grap,
-      ROUND(vs.peak_score)::int AS peak,
       ROUND(vs.recent_loss_penalty)::int AS rec_pen,
       ROUND(vs.total_loss_penalty)::int AS tot_pen,
-      ROUND(vs.raw_current_total)::int AS raw_curr,
-      ROUND(vs.raw_all_time_total)::int AS raw_at,
       f.vertex_score AS curr,
       f.vertex_score_all_time AS at
     FROM fighter_vertex_score vs
@@ -160,18 +161,21 @@ async function main() {
       'demetrious-johnson-8a304b',
       'ilia-topuria-54f64b',
       'tom-aspinall-399afb',
-      'khamzat-chimaev-767755'
+      'khamzat-chimaev-767755',
+      'neil-magny-2dca84',
+      'donald-cerrone-1d0075',
+      'jim-miller-d19415'
     )
-    ORDER BY vs.raw_all_time_total DESC
+    ORDER BY vs.quality_wins DESC
   `;
-  console.log("\n=== Component diagnostic (raw shows pre-compression total) ===");
-  console.log("  name                          WQ  CP  ACT STRK GRAP peak rec tot |  raw_curr raw_at | curr  at ");
-  console.log("  " + "-".repeat(110));
+  console.log("\n=== Component diagnostic (opponent quality breakdown) ===");
+  console.log("  name                          apex strong solid leg rnk | QW  CP  ACT recPen totPen | cur  at");
+  console.log("  " + "-".repeat(102));
   for (const r of diag) {
     const cur = r.curr == null ? "  — " : String(r.curr).padStart(4);
     const at = r.at == null ? "  — " : String(r.at).padStart(4);
     console.log(
-      `  ${r.name_en.padEnd(29)} ${String(r.wq).padStart(3)} ${String(r.cp).padStart(3)} ${String(r.act).padStart(3)} ${String(r.strk).padStart(4)} ${String(r.grap).padStart(4)} ${String(r.peak).padStart(4)} ${String(r.rec_pen).padStart(3)} ${String(r.tot_pen).padStart(3)} | ${String(r.raw_curr).padStart(8)} ${String(r.raw_at).padStart(6)} | ${cur} ${at}`,
+      `  ${r.name_en.padEnd(29)} ${String(r.apex).padStart(4)} ${String(r.strong).padStart(6)} ${String(r.solid).padStart(5)} ${String(r.legacy).padStart(3)} ${String(r.ranked).padStart(3)} | ${String(r.qw).padStart(3)} ${String(r.cp).padStart(3)} ${String(r.act).padStart(3)} ${String(r.rec_pen).padStart(6)} ${String(r.tot_pen).padStart(6)} | ${cur} ${at}`,
     );
   }
 
