@@ -263,6 +263,25 @@ export function isFormerChampion(slug: string): boolean {
   return REIGNS_BY_SLUG.has(slug);
 }
 
+/** Distinct undisputed weight classes the fighter has held a UFC title in.
+ *  Interim reigns are excluded — "double champion" historically means two
+ *  undisputed belts. */
+export function championshipDivisions(slug: string): WeightClass[] {
+  const reigns = REIGNS_BY_SLUG.get(slug);
+  if (!reigns) return [];
+  const divisions = new Set<WeightClass>();
+  for (const r of reigns) {
+    if (!r.isInterim) divisions.add(r.weightClass);
+  }
+  return Array.from(divisions);
+}
+
+/** True iff the fighter held undisputed UFC titles in 2+ weight classes
+ *  (Conor, DC, Cejudo, Nunes, Jones, Islam, BJ Penn, Couture, GSP, Adesanya). */
+export function isDoubleChampion(slug: string): boolean {
+  return championshipDivisions(slug).length >= 2;
+}
+
 /** Sum of days across every recorded reign for the fighter. Open-ended reigns
  *  use today as their effective end date. */
 export function totalDaysAsChampion(slug: string): number {

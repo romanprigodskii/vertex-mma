@@ -113,6 +113,75 @@ async function main() {
     console.log(`${String(i + 1).padStart(2)} | ${name} | ${cur} | ${String(r.all_time_score).padStart(3)} | ${String(r.ufc_bouts).padStart(5)} | ${wl} | ${peak} | ${String(r.total_loss_penalty).padStart(7)} | ${last}`);
   });
 
+  // Tier distribution (using max=100 scale).
+  const tiers = await sql<Array<{ tier: string; count: number }>>`
+    WITH best AS (
+      SELECT
+        slug,
+        GREATEST(
+          COALESCE(vertex_score, 0),
+          COALESCE(vertex_score_all_time, 0)
+        ) AS best_score,
+        (vertex_score IS NULL AND vertex_score_all_time IS NULL) AS is_unranked
+      FROM fighter
+    )
+    SELECT
+      CASE
+        WHEN is_unranked THEN 'unranked (<3 UFC bouts)'
+        WHEN best_score >= 80 THEN 'elite       (80+)'
+        WHEN best_score >= 65 THEN 'contender   (65-79)'
+        WHEN best_score >= 45 THEN 'pro         (45-64)'
+        ELSE 'veteran     (<45)'
+      END AS tier,
+      COUNT(*)::int AS count
+    FROM best
+    GROUP BY 1
+    ORDER BY MIN(best_score) DESC NULLS LAST
+  `;
+  console.log("\n=== Tier distribution (best of current/all-time) ===");
+  for (const r of tiers) {
+    console.log(`  ${r.tier.padEnd(28)} ${String(r.count).padStart(5)}`);
+  }
+
+  // Double-champion sanity check.
+  const dc = await sql<Array<{
+    name_en: string;
+    current_score: number | null;
+    all_time_score: number | null;
+    ufc_wins: number;
+    ufc_losses: number;
+  }>>`
+    SELECT
+      f.name_en,
+      f.vertex_score AS current_score,
+      f.vertex_score_all_time AS all_time_score,
+      vs.ufc_wins,
+      vs.ufc_losses
+    FROM fighter f
+    JOIN fighter_vertex_score vs ON vs.id = f.id
+    WHERE f.slug IN (
+      'conor-mcgregor-f4c499',
+      'daniel-cormier-d967f0',
+      'henry-cejudo-056c49',
+      'amanda-nunes-80fa82',
+      'jon-jones-07f72a',
+      'islam-makhachev-275aca',
+      'bj-penn-73c7cf',
+      'randy-couture-0aa925',
+      'georges-st-pierre-6506c1'
+    )
+    ORDER BY all_time_score DESC NULLS LAST
+  `;
+  console.log("\n=== Double / multi-division champion sanity check ===");
+  console.log("  name                            cur   all   W-L");
+  console.log("  " + "-".repeat(58));
+  for (const r of dc) {
+    const cur = r.current_score == null ? "—   " : String(r.current_score).padStart(4);
+    const all = r.all_time_score == null ? "—   " : String(r.all_time_score).padStart(4);
+    const wl = `${r.ufc_wins}-${r.ufc_losses}`;
+    console.log(`  ${r.name_en.padEnd(32)}${cur} | ${all} | ${wl}`);
+  }
+
   // Spot-check the legends + journeymen the spec calls out, plus a couple
   // of fighters for whom the new penalty is expected to bite.
   const spot = await sql<Array<{
