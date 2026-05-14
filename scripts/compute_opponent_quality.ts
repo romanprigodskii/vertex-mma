@@ -32,6 +32,7 @@ import postgres from "postgres";
 import {
   CHAMPIONSHIP_HISTORY,
   type ChampionshipReign,
+  isFormerChampion,
 } from "../src/lib/championship-history";
 import { isCuratedTitleFight } from "../src/lib/title-fights";
 
@@ -49,6 +50,10 @@ interface BoutRecord {
   opponent_id: string;
   opponent_slug: string;
   fighter_won: boolean;
+  /** True when winner_id is the opponent (real loss, distinct from draw/NC). */
+  is_loss: boolean;
+  /** Lowercase method, NULL when scraper didn't record. */
+  method: string | null;
 }
 
 // Step 5A.1 fix 1: interim reigns count toward all tiers (Poirier's
@@ -193,7 +198,9 @@ async function main() {
       b.fighter_a_id::text AS fighter_id,
       b.fighter_b_id::text AS opponent_id,
       f_b.slug AS opponent_slug,
-      (b.winner_id = b.fighter_a_id) AS fighter_won
+      (b.winner_id = b.fighter_a_id) AS fighter_won,
+      (b.winner_id IS NOT NULL AND b.winner_id <> b.fighter_a_id) AS is_loss,
+      LOWER(b.method::text) AS method
     FROM bout b
     JOIN event e ON e.id = b.event_id
     JOIN fighter f_b ON f_b.id = b.fighter_b_id
@@ -207,7 +214,9 @@ async function main() {
       b.fighter_b_id::text AS fighter_id,
       b.fighter_a_id::text AS opponent_id,
       f_a.slug AS opponent_slug,
-      (b.winner_id = b.fighter_b_id) AS fighter_won
+      (b.winner_id = b.fighter_b_id) AS fighter_won,
+      (b.winner_id IS NOT NULL AND b.winner_id <> b.fighter_b_id) AS is_loss,
+      LOWER(b.method::text) AS method
     FROM bout b
     JOIN event e ON e.id = b.event_id
     JOIN fighter f_a ON f_a.id = b.fighter_a_id
@@ -337,12 +346,34 @@ async function main() {
     legacy: number;
     ranked: number;
     score: number;
+    undefeated: number;
   }> = [];
+  let bonusCount = 0;
   for (const [fighterId, c] of counts) {
-    const score = Math.min(
+    const baseScore = Math.min(
       100,
       c.apex * 25 + c.strong * 15 + c.solid * 8 + c.legacy * 4 + c.ranked * 3,
     );
+
+    // Wave 3.5 step 5F: undefeated champion bonus. +30 to QW (above the
+    // normal 100 cap) when a champion has 8+ UFC wins and zero real UFC
+    // losses. "Real" loss excludes DQ losses (Jon Jones's only career
+    // UFC L was a DQ vs Hamill). isFormerChampion returns true for any
+    // reign (active or ended) so the bonus targets fighters whose
+    // unbeaten record actually means something.
+    const allBouts = byFighter.get(fighterId) ?? [];
+    const wins = allBouts.filter((b) => b.fighter_won).length;
+    const realLosses = allBouts.filter((b) => {
+      if (!b.is_loss) return false;
+      const m = b.method ?? "";
+      return !m.includes("dq") && !m.includes("disqualif");
+    }).length;
+    const slug = idToSlug.get(fighterId) ?? "";
+    const eligible =
+      realLosses === 0 && wins >= 8 && isFormerChampion(slug);
+    const undefeated = eligible ? 30 : 0;
+    if (eligible) bonusCount += 1;
+
     updates.push({
       id: fighterId,
       apex: c.apex,
@@ -350,9 +381,11 @@ async function main() {
       solid: c.solid,
       legacy: c.legacy,
       ranked: c.ranked,
-      score,
+      score: baseScore + undefeated,
+      undefeated,
     });
   }
+  console.log(`Undefeated bonus awarded to ${bonusCount} fighters.`);
 
   // Single batched UPDATE via VALUES table — 2700 row roundtrip in one shot.
   // First zero everyone so fighters that disappeared from the bout table
@@ -364,7 +397,8 @@ async function main() {
       solid_wins = 0,
       legacy_wins = 0,
       ranked_wins = 0,
-      quality_wins_score = 0
+      quality_wins_score = 0,
+      undefeated_bonus = 0
   `;
 
   // Chunked UPDATEs via unnest-of-arrays so postgres-js sends typed arrays
@@ -379,6 +413,7 @@ async function main() {
     const legacy = slice.map((u) => u.legacy);
     const ranked = slice.map((u) => u.ranked);
     const score = slice.map((u) => u.score);
+    const undefeated = slice.map((u) => u.undefeated);
     await sql`
       UPDATE fighter f SET
         apex_wins = v.apex,
@@ -386,16 +421,18 @@ async function main() {
         solid_wins = v.solid,
         legacy_wins = v.legacy,
         ranked_wins = v.ranked,
-        quality_wins_score = v.score
+        quality_wins_score = v.score,
+        undefeated_bonus = v.undefeated
       FROM (
         SELECT
-          UNNEST(${ids}::uuid[])   AS id,
-          UNNEST(${apex}::int[])   AS apex,
-          UNNEST(${strong}::int[]) AS strong,
-          UNNEST(${solid}::int[])  AS solid,
-          UNNEST(${legacy}::int[]) AS legacy,
-          UNNEST(${ranked}::int[]) AS ranked,
-          UNNEST(${score}::int[])  AS score
+          UNNEST(${ids}::uuid[])        AS id,
+          UNNEST(${apex}::int[])        AS apex,
+          UNNEST(${strong}::int[])      AS strong,
+          UNNEST(${solid}::int[])       AS solid,
+          UNNEST(${legacy}::int[])      AS legacy,
+          UNNEST(${ranked}::int[])      AS ranked,
+          UNNEST(${score}::int[])       AS score,
+          UNNEST(${undefeated}::int[])  AS undefeated
       ) AS v
       WHERE f.id = v.id
     `;

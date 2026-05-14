@@ -75,6 +75,10 @@ export const fighter = pgTable(
     //   penalty so retired legends and journeymen calibrate correctly.
     championshipPedigree: integer("championship_pedigree").default(0).notNull(),
     isDominantChampion: boolean("is_dominant_champion").default(false).notNull(),
+    // Wave 3.5 step 5F: +30 added to quality_wins_score (above its 100 cap)
+    // for fighters with 0 real UFC losses (DQ excluded), 8+ wins, and any
+    // recorded championship reign. 0 for everyone else.
+    undefeatedBonus: integer("undefeated_bonus").default(0).notNull(),
     peakScore: integer("peak_score"),
     eraDominance: integer("era_dominance").default(0).notNull(),
     // Wave 3.5 step 5E: split current vs all-time so the active-champion
