@@ -1,5 +1,6 @@
 import { WEIGHT_CLASSES } from "@/lib/constants";
 import type {
+  CatalogChampionFilter,
   CatalogSort,
   CatalogTierFilter,
   FighterCatalogFilters,
@@ -21,11 +22,19 @@ const VALID_SORTS: ReadonlySet<CatalogSort> = new Set([
 
 const VALID_TIERS: ReadonlySet<CatalogTierFilter> = new Set([
   "all",
-  "champion",
   "apex",
   "elite",
   "veteran",
   "roster",
+]);
+
+const VALID_CHAMPIONS: ReadonlySet<CatalogChampionFilter> = new Set([
+  "all",
+  "any",
+  "active",
+  "dominant",
+  "former",
+  "none",
 ]);
 
 const VALID_WEIGHTS = new Set(WEIGHT_CLASSES.map((w) => w.id as string));
@@ -78,10 +87,24 @@ export function parseCatalogFilters(
       : "vertex_current";
 
   const rawTier = get("tier");
-  const tier: CatalogTierFilter =
+  let tier: CatalogTierFilter =
     rawTier && VALID_TIERS.has(rawTier as CatalogTierFilter)
       ? (rawTier as CatalogTierFilter)
       : "all";
+
+  const rawChampion = get("champion");
+  let champion: CatalogChampionFilter =
+    rawChampion && VALID_CHAMPIONS.has(rawChampion as CatalogChampionFilter)
+      ? (rawChampion as CatalogChampionFilter)
+      : "all";
+
+  // Backwards compat (Wave 3.5 step 4A→4A.2): the old combined filter
+  // value `tier=champion` is now expressed as `champion=any`. Migrate
+  // silently so existing bookmarks keep working.
+  if (rawTier === "champion") {
+    tier = "all";
+    if (champion === "all") champion = "any";
+  }
 
   const rawLimit = Number.parseInt(get("limit") ?? "", 10);
   const rawOffset = Number.parseInt(get("offset") ?? "", 10);
@@ -95,6 +118,7 @@ export function parseCatalogFilters(
     hasPhoto: parseBool(get("has_photo")),
     hallOfFame: parseBool(get("hof")),
     tier,
+    champion,
     sort,
     limit: Number.isFinite(rawLimit) ? rawLimit : undefined,
     offset: Number.isFinite(rawOffset) ? rawOffset : undefined,

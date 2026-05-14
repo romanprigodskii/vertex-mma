@@ -28,6 +28,7 @@ export type CatalogFilterState = Required<
     | "hallOfFame"
     | "sort"
     | "tier"
+    | "champion"
   >
 > & {
   q: string;
@@ -59,6 +60,7 @@ export function activeFilterCount(filters: CatalogFilterState): number {
   if (filters.hallOfFame) n += 1;
   if (filters.sort !== "vertex_current") n += 1;
   if (filters.tier !== "all") n += 1;
+  if (filters.champion !== "all") n += 1;
   return n;
 }
 

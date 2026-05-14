@@ -46,6 +46,7 @@ const DEFAULT_FILTERS: CatalogFilterState = {
   hallOfFame: false,
   sort: "vertex_current",
   tier: "all",
+  champion: "all",
 };
 
 function serializeFilters(filters: CatalogFilterState): URLSearchParams {
@@ -60,6 +61,7 @@ function serializeFilters(filters: CatalogFilterState): URLSearchParams {
   if (filters.hallOfFame) params.set("hof", "1");
   if (filters.sort !== "vertex_current") params.set("sort", filters.sort);
   if (filters.tier !== "all") params.set("tier", filters.tier);
+  if (filters.champion !== "all") params.set("champion", filters.champion);
   return params;
 }
 

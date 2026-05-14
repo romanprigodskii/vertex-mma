@@ -96,16 +96,25 @@ export type CatalogSort =
   | "name_asc"
   | "name_desc";
 
-/** Tier filter for the catalog. `'champion'` covers all three champion
- *  sub-tiers (Active / Dominant / Former) by pedigree alone — the sub-tier
- *  split is computed client-side from championship_history. */
+/** Score-based tier filter for the catalog. Tier is now independent of
+ *  championship history (Wave 3.5 step 4A.2) — a champion can also be in
+ *  any score tier. The `champion` filter is exposed separately. */
 export type CatalogTierFilter =
   | "all"
-  | "champion"
   | "apex"
   | "elite"
   | "veteran"
   | "roster";
+
+/** Champion-status filter, orthogonal to tier. `any` matches any of the
+ *  three champion variants (Active / Dominant / Former). */
+export type CatalogChampionFilter =
+  | "all"
+  | "any"
+  | "active"
+  | "dominant"
+  | "former"
+  | "none";
 
 export type FighterCatalogFilters = {
   q?: string;
@@ -115,8 +124,10 @@ export type FighterCatalogFilters = {
   status?: "all" | "active" | "retired" | "inactive";
   hasPhoto?: boolean;
   hallOfFame?: boolean;
-  /** Vertex Score tier filter. Defaults to "all". */
+  /** Vertex Score tier filter (score-based). Defaults to "all". */
   tier?: CatalogTierFilter;
+  /** Champion-status filter (history-based). Defaults to "all". */
+  champion?: CatalogChampionFilter;
   sort?: CatalogSort;
   offset?: number;
   limit?: number;
@@ -229,28 +240,50 @@ function buildWhere(filters: FighterCatalogFilters): SQL {
   // score AND exclude fighters with a champion pedigree (so a Pro who happens
   // to have been a champion doesn't appear in `tier=pro`).
   if (filters.tier && filters.tier !== "all") {
+    // Tier is purely score-based. Champion fighters in Apex / Elite / Veteran
+    // bands appear in those tier filters AND in the champion filter — by
+    // design, the two dimensions are independent.
     const bestScore = sql`COALESCE(f.vertex_score, f.vertex_score_all_time)`;
     switch (filters.tier) {
-      case "champion":
-        conditions.push(sql`f.championship_pedigree >= 80`);
-        break;
       case "apex":
-        conditions.push(sql`${bestScore} >= 80 AND f.championship_pedigree < 80`);
+        conditions.push(sql`${bestScore} >= 80`);
         break;
       case "elite":
-        conditions.push(
-          sql`${bestScore} >= 60 AND ${bestScore} < 80 AND f.championship_pedigree < 80`,
-        );
+        conditions.push(sql`${bestScore} >= 60 AND ${bestScore} < 80`);
         break;
       case "veteran":
-        conditions.push(
-          sql`${bestScore} >= 40 AND ${bestScore} < 60 AND f.championship_pedigree < 80`,
-        );
+        conditions.push(sql`${bestScore} >= 40 AND ${bestScore} < 60`);
         break;
       case "roster":
+        conditions.push(sql`${bestScore} IS NOT NULL AND ${bestScore} < 40`);
+        break;
+    }
+  }
+
+  if (filters.champion && filters.champion !== "all") {
+    switch (filters.champion) {
+      case "any":
+        conditions.push(sql`f.championship_pedigree >= 80`);
+        break;
+      case "active":
+        conditions.push(sql`f.championship_pedigree = 100`);
+        break;
+      case "dominant":
+        // Dominant flag captures fighters with >= 3 cumulative title defenses;
+        // populated by scripts/compute_championship_pedigree.ts. Excludes
+        // current champions if they happen to also qualify (no overlap by
+        // design — Active and Dominant are separate UI states).
         conditions.push(
-          sql`${bestScore} IS NOT NULL AND ${bestScore} < 40 AND f.championship_pedigree < 80`,
+          sql`f.is_dominant_champion = true AND f.championship_pedigree < 100`,
         );
+        break;
+      case "former":
+        conditions.push(
+          sql`f.championship_pedigree = 80 AND f.is_dominant_champion = false`,
+        );
+        break;
+      case "none":
+        conditions.push(sql`f.championship_pedigree < 80`);
         break;
     }
   }

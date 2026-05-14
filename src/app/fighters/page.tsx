@@ -43,6 +43,7 @@ function toClientFilters(parsed: FighterCatalogFilters): CatalogFilterState {
     hallOfFame: parsed.hallOfFame ?? false,
     sort: parsed.sort ?? "vertex_current",
     tier: parsed.tier ?? "all",
+    champion: parsed.champion ?? "all",
   };
 }
 
