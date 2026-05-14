@@ -91,41 +91,62 @@ export function classifyFighter(args: ClassifyArgs): FighterClassification {
 export interface TierStyle {
   tier: VertexTier;
   label: string;
-  /** OKLCH colour for the tier badge. `transparent` for unranked (no badge). */
-  badgeColor: string;
   badgeText: string;
+  /** Solid fill behind the badge. */
+  badgeBg: string;
+  /** Foreground colour for the tier label AND the numeric score so the
+   *  score visually reinforces the tier hue. */
+  badgeTextColor: string;
+  /** Subtle accent stroke around the badge. */
+  badgeBorder: string;
 }
 
+// Explicit per-tier OKLCH triples (no color-mix). Each tier reads as a
+// distinct hue on dark backgrounds:
+//   Apex     purple/violet  — GOAT territory
+//   Elite    blue           — championship class
+//   Veteran  teal-grey      — solid pro
+//   Roster   slate          — long-tail roster
 export const TIER_STYLES: Record<VertexTier, TierStyle> = {
   apex: {
     tier: "apex",
     label: "Apex",
-    badgeColor: "oklch(0.72 0.20 290)", // Vertex purple
     badgeText: "APEX",
+    badgeBg: "oklch(0.30 0.18 295)",
+    badgeTextColor: "oklch(0.92 0.10 295)",
+    badgeBorder: "oklch(0.55 0.20 295)",
   },
   elite: {
     tier: "elite",
     label: "Elite",
-    badgeColor: "oklch(0.65 0.12 270)", // deep purple-blue
     badgeText: "ELITE",
+    badgeBg: "oklch(0.28 0.14 235)",
+    badgeTextColor: "oklch(0.88 0.10 235)",
+    badgeBorder: "oklch(0.55 0.18 235)",
   },
   veteran: {
     tier: "veteran",
     label: "Veteran",
-    badgeColor: "oklch(0.55 0.06 240)", // teal grey
     badgeText: "VETERAN",
+    badgeBg: "oklch(0.28 0.05 200)",
+    badgeTextColor: "oklch(0.78 0.06 200)",
+    badgeBorder: "oklch(0.45 0.07 200)",
   },
   roster: {
     tier: "roster",
     label: "Roster",
-    badgeColor: "oklch(0.45 0.02 240)", // slate
     badgeText: "ROSTER",
+    badgeBg: "oklch(0.22 0.01 240)",
+    badgeTextColor: "oklch(0.65 0.02 240)",
+    badgeBorder: "oklch(0.35 0.02 240)",
   },
   unranked: {
     tier: "unranked",
     label: "Unranked",
-    badgeColor: "oklch(0 0 0 / 0)",
     badgeText: "",
+    badgeBg: "transparent",
+    badgeTextColor: "transparent",
+    badgeBorder: "transparent",
   },
 };
 
@@ -142,39 +163,52 @@ export interface ChampionStyle {
   label: string;
   borderColor: string;
   borderWidth: number;
-  /** Outer-glow colour or null. */
+  /** Outer-glow OKLCH (with alpha) or null. */
   glowColor: string | null;
+  /** Box-shadow size template, e.g. "0 0 32px". Null when no glow. */
+  glowSize: string | null;
   badgeText: string;
   hasCrown: boolean;
+  /** Crown icon fill — null when no crown. */
+  crownColor: string | null;
 }
 
+// Active vs. Dominant vs. Former: each step down one tier reduces border
+// width, glow size, and crown brightness so the visual hierarchy is
+// readable at a glance even before the user reads the score.
 export const CHAMPION_STYLES: Record<ChampionStatus, ChampionStyle> = {
   active: {
     status: "active",
     label: "Active Champion",
-    borderColor: "oklch(0.82 0.18 70)", // bright gold
+    borderColor: "oklch(0.85 0.18 75)", // bright vibrant gold
     borderWidth: 4,
-    glowColor: "oklch(0.78 0.15 70 / 0.4)",
+    glowColor: "oklch(0.82 0.18 75 / 0.5)",
+    glowSize: "0 0 32px",
     badgeText: "ACTIVE CHAMPION",
     hasCrown: true,
+    crownColor: "oklch(0.92 0.18 78)",
   },
   dominant: {
     status: "dominant",
     label: "Dominant Champion",
-    borderColor: "oklch(0.78 0.16 65)", // gold
-    borderWidth: 3,
-    glowColor: "oklch(0.75 0.14 70 / 0.3)",
+    borderColor: "oklch(0.72 0.15 70)", // standard gold
+    borderWidth: 2,
+    glowColor: "oklch(0.70 0.13 70 / 0.25)",
+    glowSize: "0 0 18px",
     badgeText: "DOMINANT CHAMPION",
     hasCrown: true,
+    crownColor: "oklch(0.78 0.15 72)",
   },
   former: {
     status: "former",
     label: "Former Champion",
-    borderColor: "oklch(0.62 0.10 75)", // antique gold
-    borderWidth: 2,
+    borderColor: "oklch(0.55 0.08 75)", // antique faded gold
+    borderWidth: 1,
     glowColor: null,
+    glowSize: null,
     badgeText: "FORMER CHAMPION",
     hasCrown: false,
+    crownColor: null,
   },
   none: {
     status: "none",
@@ -182,8 +216,10 @@ export const CHAMPION_STYLES: Record<ChampionStatus, ChampionStyle> = {
     borderColor: "transparent",
     borderWidth: 0,
     glowColor: null,
+    glowSize: null,
     badgeText: "",
     hasCrown: false,
+    crownColor: null,
   },
 };
 

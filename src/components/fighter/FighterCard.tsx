@@ -134,9 +134,10 @@ export function FighterCard({
           ? {
               borderColor: championStyle.borderColor,
               borderWidth: `${championStyle.borderWidth}px`,
-              boxShadow: championStyle.glowColor
-                ? `0 0 20px ${championStyle.glowColor}`
-                : undefined,
+              boxShadow:
+                championStyle.glowColor && championStyle.glowSize
+                  ? `${championStyle.glowSize} ${championStyle.glowColor}`
+                  : undefined,
             }
           : undefined
       }
@@ -166,10 +167,10 @@ export function FighterCard({
           priority={priority}
           imageSizes="140px"
         />
-        {championStyle.hasCrown ? (
+        {championStyle.hasCrown && championStyle.crownColor ? (
           <span
             aria-hidden
-            style={{ color: championStyle.borderColor }}
+            style={{ color: championStyle.crownColor }}
             className="absolute -right-1.5 -top-1.5 flex h-7 w-7 items-center justify-center rounded-full border border-foreground/15 bg-background-base shadow-sm"
             title={championStyle.label}
           >
@@ -180,8 +181,9 @@ export function FighterCard({
           <span
             aria-label="Two-division champion"
             style={{
-              color: championStyle.borderColor,
-              borderColor: championStyle.borderColor,
+              color: championStyle.crownColor ?? championStyle.borderColor,
+              borderColor:
+                championStyle.crownColor ?? championStyle.borderColor,
             }}
             className="absolute -bottom-1 -right-1 inline-flex items-center justify-center rounded-full border bg-background-base px-1.5 py-0.5 font-display text-[10px] tabular leading-none"
           >
@@ -265,14 +267,18 @@ export function FighterCard({
           <span
             className="mt-1 inline-flex items-center gap-1.5 rounded-sm border px-1.5 py-0.5"
             style={{
-              borderColor: tierStyle.badgeColor,
-              color: tierStyle.badgeColor,
+              backgroundColor: tierStyle.badgeBg,
+              borderColor: tierStyle.badgeBorder,
+              color: tierStyle.badgeTextColor,
             }}
           >
             <span className="font-mono text-[9px] uppercase tracking-[0.16em]">
               {tierStyle.badgeText}
             </span>
-            <span className="font-display text-sm leading-none tabular text-foreground">
+            <span
+              className="font-display text-sm leading-none tabular"
+              style={{ color: tierStyle.badgeTextColor }}
+            >
               {displayScore}
             </span>
           </span>
