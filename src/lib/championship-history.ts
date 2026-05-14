@@ -102,7 +102,8 @@ export const CHAMPIONSHIP_HISTORY: readonly ChampionshipReign[] = [
   // ============================================================
   // MIDDLEWEIGHT
   // ============================================================
-  { slug: "khamzat-chimaev-767755",   weightClass: "middleweight", startDate: "2025-08-16", endDate: null,         defenses: 0 },
+  { slug: "sean-strickland-0d8011",   weightClass: "middleweight", startDate: "2026-05-09", endDate: null,         defenses: 0 }, // reign 2 — reclaimed from Chimaev at UFC 328
+  { slug: "khamzat-chimaev-767755",   weightClass: "middleweight", startDate: "2025-08-16", endDate: "2026-05-09", defenses: 0 }, // lost to Strickland 2
   { slug: "dricus-du-plessis-0d7b51", weightClass: "middleweight", startDate: "2024-01-20", endDate: "2025-08-16", defenses: 2 }, // Adesanya, Strickland 2
   { slug: "sean-strickland-0d8011",   weightClass: "middleweight", startDate: "2023-09-09", endDate: "2024-01-20", defenses: 0 },
   { slug: "israel-adesanya-1338e2",   weightClass: "middleweight", startDate: "2023-04-08", endDate: "2023-09-09", defenses: 0 }, // reign 2
@@ -173,7 +174,8 @@ export const CHAMPIONSHIP_HISTORY: readonly ChampionshipReign[] = [
   // ============================================================
   // BANTAMWEIGHT
   // ============================================================
-  { slug: "merab-dvalishvili-c03520", weightClass: "bantamweight", startDate: "2024-09-14", endDate: null,         defenses: 3 }, // Umar, O'Malley 2, Yan 2
+  { slug: "petr-yan-d661ce",          weightClass: "bantamweight", startDate: "2025-12-06", endDate: null,         defenses: 0 }, // reign 2 — beat Merab at UFC 323
+  { slug: "merab-dvalishvili-c03520", weightClass: "bantamweight", startDate: "2024-09-14", endDate: "2025-12-06", defenses: 3 }, // Umar, O'Malley 2, Yan 2
   { slug: "sean-o-malley-b50a42",     weightClass: "bantamweight", startDate: "2023-08-19", endDate: "2024-09-14", defenses: 1 }, // Vera 2
   { slug: "aljamain-sterling-cb696e", weightClass: "bantamweight", startDate: "2021-03-06", endDate: "2023-08-19", defenses: 3 }, // Yan 2, Cejudo, Dillashaw
   { slug: "petr-yan-d661ce",          weightClass: "bantamweight", startDate: "2020-07-11", endDate: "2021-03-06", defenses: 0 }, // DQ loss first defense
@@ -188,7 +190,8 @@ export const CHAMPIONSHIP_HISTORY: readonly ChampionshipReign[] = [
   // ============================================================
   // FLYWEIGHT
   // ============================================================
-  { slug: "alexandre-pantoja-a0f000",  weightClass: "flyweight", startDate: "2023-07-08", endDate: null,         defenses: 4 }, // Royval 2, Erceg, Asakura, Van? — TODO verify
+  { slug: "joshua-van-17e976",         weightClass: "flyweight", startDate: "2025-12-06", endDate: null,         defenses: 0 }, // beat Pantoja at UFC 323
+  { slug: "alexandre-pantoja-a0f000",  weightClass: "flyweight", startDate: "2023-07-08", endDate: "2025-12-06", defenses: 4 }, // Royval 2, Erceg, Asakura, Kape
   { slug: "brandon-moreno-792be9",     weightClass: "flyweight", startDate: "2023-01-21", endDate: "2023-07-08", defenses: 0 }, // reign 3 (interim→undisputed)
   { slug: "deiveson-figueiredo-aa72b0", weightClass: "flyweight", startDate: "2022-01-22", endDate: "2023-01-21", defenses: 0 }, // reign 2 — lost rematch immediately
   { slug: "brandon-moreno-792be9",     weightClass: "flyweight", startDate: "2021-06-12", endDate: "2022-01-22", defenses: 0 }, // reign 1
@@ -199,6 +202,7 @@ export const CHAMPIONSHIP_HISTORY: readonly ChampionshipReign[] = [
   // ============================================================
   // WOMEN'S BANTAMWEIGHT (uses bantamweight enum)
   // ============================================================
+  { slug: "kayla-harrison-1af117",     weightClass: "bantamweight", startDate: "2025-06-07", endDate: null,         defenses: 0 }, // beat Pena at UFC 316
   { slug: "julianna-pena-3253b1",      weightClass: "bantamweight", startDate: "2024-10-05", endDate: "2025-06-07", defenses: 0 }, // reign 2
   { slug: "raquel-pennington-fc169c",  weightClass: "bantamweight", startDate: "2024-01-20", endDate: "2024-10-05", defenses: 0 },
   { slug: "amanda-nunes-80fa82",       weightClass: "bantamweight", startDate: "2022-07-30", endDate: "2023-06-10", defenses: 1 }, // reign 2 — Aldana; retired
@@ -226,7 +230,8 @@ export const CHAMPIONSHIP_HISTORY: readonly ChampionshipReign[] = [
   // ============================================================
   // WOMEN'S STRAWWEIGHT (uses strawweight enum)
   // ============================================================
-  { slug: "zhang-weili-1ebe20",        weightClass: "strawweight", startDate: "2022-11-12", endDate: null,         defenses: 3 }, // reign 2 — Lemos, Yan Xiaonan, Suarez
+  { slug: "mackenzie-dern-7447e9",     weightClass: "strawweight", startDate: "2025-10-25", endDate: null,         defenses: 0 }, // won vacant title vs Jandiroba at UFC 321
+  { slug: "zhang-weili-1ebe20",        weightClass: "strawweight", startDate: "2022-11-12", endDate: "2025-10-25", defenses: 3 }, // reign 2 — Lemos, Yan Xiaonan, Suarez; vacated
   { slug: "carla-esparza-d91066",      weightClass: "strawweight", startDate: "2022-05-07", endDate: "2022-11-12", defenses: 0 }, // reign 2
   { slug: "rose-namajunas-47b632",     weightClass: "strawweight", startDate: "2021-04-24", endDate: "2022-05-07", defenses: 1 }, // reign 2 — Zhang 2
   { slug: "zhang-weili-1ebe20",        weightClass: "strawweight", startDate: "2019-08-31", endDate: "2021-04-24", defenses: 1 }, // reign 1 — Joanna 1

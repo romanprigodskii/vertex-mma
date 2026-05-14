@@ -147,7 +147,7 @@ async function main() {
       vs.title_fight_count AS tf,
       ROUND(vs.quality_wins)::int AS qw,
       ROUND(vs.championship_pedigree)::int AS cp,
-      ROUND(vs.era_dominance)::int AS era,
+      ROUND(vs.era_dominance_current)::int AS era,
       ROUND(vs.performance_diff)::int AS pdiff,
       ROUND(vs.finishing_dominance_score)::int AS fin,
       ROUND(vs.activity)::int AS act,
@@ -179,7 +179,7 @@ async function main() {
       'donald-cerrone-1d0075',
       'jim-miller-d19415'
     )
-    ORDER BY vs.era_dominance DESC, vs.quality_wins DESC
+    ORDER BY vs.era_dominance_current DESC, vs.quality_wins DESC
   `;
   console.log("\n=== Component diagnostic ===");
   console.log("  name                          apex  TF | QW  CP era pdf fin act rp tp | cur  at");

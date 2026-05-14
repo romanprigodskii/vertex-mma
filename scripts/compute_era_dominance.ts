@@ -113,50 +113,54 @@ async function main() {
     }
   }
 
-  // Build update list. Every fighter in the bout set gets a row so the
-  // batched UPDATE can rezet title_fight_count + era_dominance for every
-  // fighter that has any UFC bouts.
+  // Wave 3.5 step 5E: compute TWO era_dominance values.
+  //   era_dominance          — for CURRENT score; includes active_champion
+  //                            bonus +10 alongside double-champion +5.
+  //   era_dominance_all_time — for ALL-TIME score; NO active bonus.
+  //                            Active status is transient — a career-
+  //                            independent metric shouldn't fluctuate
+  //                            when a fighter loses or regains a belt.
   const ids: string[] = [];
   const titleFights: number[] = [];
-  const eraDominance: number[] = [];
+  const eraCurrent: number[] = [];
+  const eraAllTime: number[] = [];
   for (const [fighterId, slug] of slugByFighter) {
     const tf = titleCount.get(fighterId) ?? 0;
-    // Wave 3.5 step 5C: 8 → 10 points per title fight. Long-career
-    // champions like Jon Jones (16 TF), Anderson Silva (18), DJ (14),
-    // GSP (14), Shev (14) now all max era_dominance at 100, letting the
-    // other components (Quality Wins, Performance Differential,
-    // Finishing) decide their relative order. Pre-tweak, GSP edged
-    // above Jones on perfDiff alone; post-tweak Jones's extra apex
-    // wins drive the differentiation.
-    const era = Math.min(
-      100,
-      tf * 10 +
-        (isActiveChampion(slug) ? 10 : 0) +
-        (isDoubleChampion(slug) ? 5 : 0),
-    );
+    const doubleBonus = isDoubleChampion(slug) ? 5 : 0;
+    const activeBonus = isActiveChampion(slug) ? 10 : 0;
+    const eraCur = Math.min(100, tf * 10 + activeBonus + doubleBonus);
+    const eraAt = Math.min(100, tf * 10 + doubleBonus);
     ids.push(fighterId);
     titleFights.push(tf);
-    eraDominance.push(era);
+    eraCurrent.push(eraCur);
+    eraAllTime.push(eraAt);
   }
   console.log(`Computed era_dominance for ${ids.length} fighters.`);
 
-  // Reset all fighters first, then batch-update those who have UFC bouts.
-  await sql`UPDATE fighter SET title_fight_count = 0, era_dominance = 0`;
+  await sql`
+    UPDATE fighter SET
+      title_fight_count = 0,
+      era_dominance = 0,
+      era_dominance_all_time = 0
+  `;
 
   const CHUNK = 500;
   for (let i = 0; i < ids.length; i += CHUNK) {
     const sliceIds = ids.slice(i, i + CHUNK);
     const sliceTf = titleFights.slice(i, i + CHUNK);
-    const sliceEra = eraDominance.slice(i, i + CHUNK);
+    const sliceEraCur = eraCurrent.slice(i, i + CHUNK);
+    const sliceEraAt = eraAllTime.slice(i, i + CHUNK);
     await sql`
       UPDATE fighter f SET
         title_fight_count = v.tf,
-        era_dominance = v.era
+        era_dominance = v.era_cur,
+        era_dominance_all_time = v.era_at
       FROM (
         SELECT
-          UNNEST(${sliceIds}::uuid[]) AS id,
-          UNNEST(${sliceTf}::int[])   AS tf,
-          UNNEST(${sliceEra}::int[])  AS era
+          UNNEST(${sliceIds}::uuid[])    AS id,
+          UNNEST(${sliceTf}::int[])      AS tf,
+          UNNEST(${sliceEraCur}::int[])  AS era_cur,
+          UNNEST(${sliceEraAt}::int[])   AS era_at
       ) AS v
       WHERE f.id = v.id
     `;

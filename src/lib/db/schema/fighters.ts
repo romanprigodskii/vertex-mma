@@ -76,6 +76,10 @@ export const fighter = pgTable(
     championshipPedigree: integer("championship_pedigree").default(0).notNull(),
     isDominantChampion: boolean("is_dominant_champion").default(false).notNull(),
     peakScore: integer("peak_score"),
+    eraDominance: integer("era_dominance").default(0).notNull(),
+    // Wave 3.5 step 5E: split current vs all-time so the active-champion
+    // bonus only inflates the current score.
+    eraDominanceAllTime: integer("era_dominance_all_time").default(0).notNull(),
     vertexScore: integer("vertex_score"),
     vertexScoreAllTime: integer("vertex_score_all_time"),
 
