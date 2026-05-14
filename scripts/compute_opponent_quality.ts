@@ -33,6 +33,7 @@ import {
   CHAMPIONSHIP_HISTORY,
   type ChampionshipReign,
 } from "../src/lib/championship-history";
+import { isCuratedTitleFight } from "../src/lib/title-fights";
 
 const url = process.env.DATABASE_URL;
 if (!url) throw new Error("DATABASE_URL not set");
@@ -50,10 +51,13 @@ interface BoutRecord {
   fighter_won: boolean;
 }
 
+// Step 5A.1 fix 1: interim reigns count toward all tiers (Poirier's
+// UFC 236 interim title win, Gaethje's UFC 249 interim title win, etc.
+// represent genuine "active champion" status for opponent-quality purposes
+// even though they're tracked separately for the dominant-champion flag).
 const REIGNS_BY_SLUG = (() => {
   const m = new Map<string, ChampionshipReign[]>();
   for (const r of CHAMPIONSHIP_HISTORY) {
-    if (r.isInterim) continue; // Interim doesn't count toward any tier
     const cur = m.get(r.slug) ?? [];
     cur.push(r);
     m.set(r.slug, cur);
@@ -129,14 +133,30 @@ function postReignLosses(
 }
 
 function classify(
-  opponentSlug: string,
+  fighterSlug: string,
+  boutId: string,
   boutDate: Date,
+  opponentSlug: string,
   opponentBouts: BoutRecord[],
   rankedEligibleSlugs: Set<string> | null,
 ): Tier {
-  const hasUndisputedReign = REIGNS_BY_SLUG.has(opponentSlug);
+  // Fix 2: if the winning fighter was the active UFC champion at the bout
+  // date, the win is apex. This makes every successful title defense by a
+  // champion count as an apex win — fixing the DJ/Anderson/Aldo problem
+  // where most of their 7-11 defenses were against challengers who never
+  // won belts themselves. We don't gate on isCuratedTitleFight because the
+  // curated list only covers current champions' title bouts (Wave 3C.1.2
+  // scope); a champion's UFC bouts during their reign are overwhelmingly
+  // title fights anyway, and the rare non-title catchweight defense by an
+  // active champ (Anderson vs Bonnar etc.) still represents elite-level
+  // competition because of who's involved.
+  if (isActiveAt(fighterSlug, boutDate)) {
+    return "apex";
+  }
 
-  if (hasUndisputedReign) {
+  const hasReign = REIGNS_BY_SLUG.has(opponentSlug);
+
+  if (hasReign) {
     if (isActiveAt(opponentSlug, boutDate)) return "apex";
     if (isStrongWindow(opponentSlug, boutDate, opponentBouts)) return "strong";
     const { reignEnd, lossesAfter } = postReignLosses(
@@ -153,8 +173,12 @@ function classify(
   }
 
   // Non-champion path — only resolvable after pass 1 has populated the
-  // ranked-eligible set.
+  // ranked-eligible set. Plus Fix 3: opponents who participated in any
+  // title fight count as ranked even if they have no apex/strong wins.
   if (rankedEligibleSlugs && rankedEligibleSlugs.has(opponentSlug)) {
+    return "ranked";
+  }
+  if (opponentBouts.some((b) => isCuratedTitleFight(b.bout_id))) {
     return "ranked";
   }
   return "none";
@@ -220,15 +244,17 @@ async function main() {
    *  the ranked-eligible set after we know who's classified high in pass 1. */
   const apexOrStrongBySlug = new Map<string, number>();
 
-  // First map opponent uuid -> opponent's bouts list (already in byFighter
-  // but we need quick access by slug too). slug uniquely identifies a
-  // fighter so a slug-keyed lookup of bouts is enough.
-  const slugToFighterId = new Map<string, string>();
+  // Build uuid → slug map up-front so we can pass each fighter's own slug
+  // into classify() (needed for the title-defense-by-active-champion check).
+  // Every fighter appears as an opponent in at least one UNION ALL row, so
+  // the opponent_id/opponent_slug pair covers all 2700 fighters.
+  const idToSlug = new Map<string, string>();
   for (const arr of byFighter.values()) {
-    for (const b of arr) slugToFighterId.set(b.opponent_slug, b.opponent_id);
+    for (const b of arr) idToSlug.set(b.opponent_id, b.opponent_slug);
   }
 
   for (const [fighterId, bouts] of byFighter) {
+    const fighterSlug = idToSlug.get(fighterId) ?? "";
     const c: PerFighter = {
       apex: 0,
       strong: 0,
@@ -240,7 +266,14 @@ async function main() {
     for (const b of bouts) {
       if (!b.fighter_won) continue;
       const opponentBouts = byFighter.get(b.opponent_id) ?? [];
-      const tier = classify(b.opponent_slug, b.date, opponentBouts, null);
+      const tier = classify(
+        fighterSlug,
+        b.bout_id,
+        b.date,
+        b.opponent_slug,
+        opponentBouts,
+        null,
+      );
       switch (tier) {
         case "apex":
           c.apex += 1;
@@ -263,26 +296,6 @@ async function main() {
       }
     }
     counts.set(fighterId, c);
-
-    // After classifying this fighter's wins, if they have apex/strong wins,
-    // they qualify others' wins over THEM as "ranked". Index by their slug.
-    const myWins = bouts.filter((b) => b.fighter_won);
-    if (myWins.length > 0 && (c.apex > 0 || c.strong > 0)) {
-      // We need the fighter's own slug. The fighter's slug is the opponent_slug
-      // in any other fighter's perspective row. Look it up via the reverse map.
-      // (Build a parallel uuid→slug map if not already present.)
-      // We don't currently have fighter_id -> slug, so query later or attach.
-    }
-  }
-
-  // Build uuid -> slug map by joining via opponent_slug values.
-  const idToSlug = new Map<string, string>();
-  for (const arr of byFighter.values()) {
-    for (const b of arr) {
-      // The opponent_id / opponent_slug pair is canonical regardless of
-      // which side this row represents.
-      idToSlug.set(b.opponent_id, b.opponent_slug);
-    }
   }
 
   for (const [fighterId, c] of counts) {
@@ -294,11 +307,23 @@ async function main() {
   }
   console.log(`  ${rankedEligibleSlugs.size} fighters have >= 1 apex/strong win`);
 
-  // -------- Pass 2: resolve "ranked" wins
+  // -------- Pass 2: resolve "ranked" wins. Re-runs classify() so Fix 3
+  // (title-fight-participation fallback) sees the full ranked-eligible set
+  // before deciding.
   console.log("Pass 2: resolving ranked wins...");
-  for (const [, c] of counts) {
+  for (const [fighterId, c] of counts) {
+    const fighterSlug = idToSlug.get(fighterId) ?? "";
     for (const b of c.pending) {
-      if (rankedEligibleSlugs.has(b.opponent_slug)) c.ranked += 1;
+      const opponentBouts = byFighter.get(b.opponent_id) ?? [];
+      const tier = classify(
+        fighterSlug,
+        b.bout_id,
+        b.date,
+        b.opponent_slug,
+        opponentBouts,
+        rankedEligibleSlugs,
+      );
+      if (tier === "ranked") c.ranked += 1;
     }
   }
 
