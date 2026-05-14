@@ -52,13 +52,19 @@ export const fighter = pgTable(
     photoFetchStatus: text("photo_fetch_status"),
 
     // Vertex Score system (Wave 3.5).
-    // championshipPedigree is backfilled by
-    // scripts/compute_championship_pedigree.ts from championship-history.ts
-    // (+ title-challenger-history.ts). vertexScore is materialized from the
-    // fighter_vertex_score view by scripts/materialize_vertex_score.ts and
-    // stays NULL for fighters with < 3 UFC bouts.
+    //
+    // championshipPedigree — 0-100, backfilled by
+    //   scripts/compute_championship_pedigree.ts from championship-history.ts
+    //   (+ title-challenger-history.ts).
+    // vertexScore — current score, materialized from the fighter_vertex_score
+    //   view. NULL for fighters with <3 UFC bouts OR last_fight_date older
+    //   than 36 months (we don't rank retired legends as "current").
+    // vertexScoreAllTime — same view, populated for any fighter with >= 3
+    //   UFC bouts; drops the Activity component so retired legends rank
+    //   alongside active champions.
     championshipPedigree: integer("championship_pedigree").default(0).notNull(),
     vertexScore: integer("vertex_score"),
+    vertexScoreAllTime: integer("vertex_score_all_time"),
 
     ufcStatsId: text("ufc_stats_id").unique(),
     sherdogId: text("sherdog_id").unique(),

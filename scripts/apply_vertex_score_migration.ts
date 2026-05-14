@@ -19,7 +19,9 @@ if (!url) throw new Error("DATABASE_URL not set");
 const sql = postgres(url, { prepare: false });
 
 async function main() {
-  const file = path.resolve("drizzle/migrations/0004_vertex_score.sql");
+  // Accept a migration path via CLI; default to whichever is current.
+  const arg = process.argv[2] ?? "drizzle/migrations/0005_vertex_score_dual.sql";
+  const file = path.resolve(arg);
   const ddl = readFileSync(file, "utf8");
   console.log(`Applying ${file} ...`);
   await sql.unsafe(ddl);
