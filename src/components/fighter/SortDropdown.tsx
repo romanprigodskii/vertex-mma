@@ -6,8 +6,10 @@ import type { CatalogSort } from "@/lib/fighter-search";
 import { cn } from "@/lib/utils";
 
 const SORT_OPTIONS: Array<{ id: CatalogSort; label: string }> = [
-  { id: "elite_first", label: "Top fighters now" },
-  { id: "all_time", label: "All-time greats" },
+  { id: "vertex_current", label: "Vertex Score (current form)" },
+  { id: "vertex_all_time", label: "Vertex Score (all-time)" },
+  { id: "elite_first", label: "Top fighters now (legacy)" },
+  { id: "all_time", label: "All-time greats (legacy)" },
   { id: "fights", label: "Most fights" },
   { id: "recent", label: "Recently active" },
   { id: "wins", label: "Most wins" },

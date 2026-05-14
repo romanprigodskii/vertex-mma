@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { ArrowLeftRight, ArrowRight, RotateCcw } from "lucide-react";
+import { ArrowLeftRight, ArrowRight, Crown, RotateCcw } from "lucide-react";
 
 import { FighterAvatar } from "@/components/fighter/FighterAvatar";
 import { WEIGHT_CLASSES } from "@/lib/constants";
 import { getCountryFlag } from "@/lib/fighter-helpers";
 import type { FighterCatalogRow } from "@/lib/fighter-search";
 import { cn } from "@/lib/utils";
+import { classifyAndStyle } from "@/lib/vertex-tier";
 
 const WEIGHT_LABELS: Record<string, string> = Object.fromEntries(
   WEIGHT_CLASSES.map((w) => [w.id, w.label]),
@@ -33,6 +34,9 @@ interface FighterCardProps {
   /** Eager-load avatar image (above-the-fold cards). */
   priority?: boolean;
   className?: string;
+  /** Which Vertex Score to feed the tier classifier. "current" (default)
+   *  drives the active leaderboard; "all_time" shows historical rank. */
+  scoreMode?: "current" | "all_time";
 }
 
 function StanceIcon({ stance }: { stance: string | null }) {
@@ -64,7 +68,26 @@ export function FighterCard({
   showRank = false,
   priority = false,
   className,
+  scoreMode = "current",
 }: FighterCardProps) {
+  const { classification, tierStyle, championStyle } = classifyAndStyle({
+    slug: fighter.slug,
+    vertexScore: fighter.vertex_score,
+    vertexScoreAllTime: fighter.vertex_score_all_time,
+    ufcBouts: fighter.ufc_bouts,
+    scoreMode,
+  });
+  const isChampion = championStyle.status !== "none";
+  const showTierBadge = tierStyle.tier !== "unranked";
+  const rawScore =
+    scoreMode === "all_time"
+      ? fighter.vertex_score_all_time
+      : fighter.vertex_score ?? fighter.vertex_score_all_time;
+  // Cap visible score at 100 — raw all-time values can exceed 100 for sort
+  // ordering after we lifted the LEAST(100, ...) cap in step 5E, but the UI
+  // tier breaks (Apex 80+, Elite 60-79 etc.) are calibrated against [0, 100].
+  const displayScore =
+    rawScore == null ? null : Math.min(100, Math.max(0, rawScore));
   const weightLabel = fighter.weight_class_primary
     ? WEIGHT_LABELS[fighter.weight_class_primary] ?? null
     : null;
@@ -106,20 +129,36 @@ export function FighterCard({
     <Link
       href={`/fighters/${fighter.slug}`}
       prefetch={false}
+      style={
+        isChampion
+          ? {
+              borderColor: championStyle.borderColor,
+              borderWidth: `${championStyle.borderWidth}px`,
+              boxShadow: championStyle.glowColor
+                ? `0 0 20px ${championStyle.glowColor}`
+                : undefined,
+            }
+          : undefined
+      }
       className={cn(
-        "group relative flex min-h-[168px] gap-4 rounded-lg border border-foreground/10 bg-background-elevated/30 p-4",
-        "transition-[border-color,background-color] duration-200 ease-out",
-        "hover:border-primary/40 hover:bg-foreground/[0.02]",
-        "focus-visible:outline-none focus-visible:border-primary/50 focus-visible:bg-foreground/[0.02]",
+        "group relative flex min-h-[168px] gap-4 rounded-lg bg-background-elevated/30 p-4",
+        // Champion fighters use an inline-styled border (set above). Non-champions
+        // keep the standard Tailwind subtle border.
+        isChampion ? "border" : "border border-foreground/10",
+        "transition-[background-color] duration-200 ease-out",
+        "hover:bg-foreground/[0.02]",
+        "focus-visible:outline-none focus-visible:bg-foreground/[0.02]",
         "focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background-base",
         className,
       )}
       aria-label={`${fighter.name_en}${
         hasNickname ? ` (${fighter.nickname})` : ""
-      }, record ${record}, ${streakLabel}`}
+      }, record ${record}, ${streakLabel}${
+        showTierBadge ? `, ${tierStyle.label} tier` : ""
+      }${championStyle.label ? `, ${championStyle.label}` : ""}`}
     >
-      {/* Avatar */}
-      <div className="shrink-0">
+      {/* Avatar (with optional crown / 2× champion overlays) */}
+      <div className="relative shrink-0">
         <FighterAvatar
           name={fighter.name_en}
           photoUrl={fighter.photo_url}
@@ -127,6 +166,28 @@ export function FighterCard({
           priority={priority}
           imageSizes="140px"
         />
+        {championStyle.hasCrown ? (
+          <span
+            aria-hidden
+            style={{ color: championStyle.borderColor }}
+            className="absolute -right-1.5 -top-1.5 flex h-7 w-7 items-center justify-center rounded-full border border-foreground/15 bg-background-base shadow-sm"
+            title={championStyle.label}
+          >
+            <Crown className="h-3.5 w-3.5" />
+          </span>
+        ) : null}
+        {championStyle.hasCrown && classification.isDoubleChampion ? (
+          <span
+            aria-label="Two-division champion"
+            style={{
+              color: championStyle.borderColor,
+              borderColor: championStyle.borderColor,
+            }}
+            className="absolute -bottom-1 -right-1 inline-flex items-center justify-center rounded-full border bg-background-base px-1.5 py-0.5 font-display text-[10px] tabular leading-none"
+          >
+            2×
+          </span>
+        ) : null}
       </div>
 
       {/* Identity + extras (middle column, flex-1) */}
@@ -200,7 +261,22 @@ export function FighterCard({
             · {ncs} NC
           </span>
         ) : null}
-        {/* TODO Wave 3B: champion crown / interim chip slot */}
+        {showTierBadge && displayScore != null ? (
+          <span
+            className="mt-1 inline-flex items-center gap-1.5 rounded-sm border px-1.5 py-0.5"
+            style={{
+              borderColor: tierStyle.badgeColor,
+              color: tierStyle.badgeColor,
+            }}
+          >
+            <span className="font-mono text-[9px] uppercase tracking-[0.16em]">
+              {tierStyle.badgeText}
+            </span>
+            <span className="font-display text-sm leading-none tabular text-foreground">
+              {displayScore}
+            </span>
+          </span>
+        ) : null}
       </div>
     </Link>
   );

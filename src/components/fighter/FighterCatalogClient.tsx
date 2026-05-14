@@ -372,6 +372,11 @@ export function FighterCatalogClient({
                         rank={i + 1}
                         showRank={showRank}
                         priority={i < 4}
+                        scoreMode={
+                          filters.sort === "vertex_all_time"
+                            ? "all_time"
+                            : "current"
+                        }
                       />
                     </motion.li>
                   ))}
