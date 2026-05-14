@@ -18,14 +18,22 @@ if (!url) throw new Error("DATABASE_URL not set");
 const sql = postgres(url, { prepare: false });
 
 async function main() {
-  // Reset both columns first so this run is the single source of truth.
-  await sql`UPDATE fighter SET vertex_score = NULL, vertex_score_all_time = NULL`;
+  // Reset columns first so this run is the single source of truth.
+  await sql`
+    UPDATE fighter
+    SET vertex_score = NULL,
+        vertex_score_all_time = NULL,
+        performance_differential = 0,
+        finishing_dominance = 0
+  `;
 
   const updated = await sql`
     UPDATE fighter f
     SET
       vertex_score = vs.vertex_score,
-      vertex_score_all_time = vs.vertex_score_all_time
+      vertex_score_all_time = vs.vertex_score_all_time,
+      performance_differential = vs.performance_diff::integer,
+      finishing_dominance = vs.finishing_dominance_score::integer
     FROM fighter_vertex_score vs
     WHERE vs.id = f.id
     RETURNING f.id
@@ -113,37 +121,38 @@ async function main() {
     console.log(`${String(i + 1).padStart(2)} | ${name} | ${cur} | ${String(r.all_time_score).padStart(3)} | ${String(r.ufc_bouts).padStart(5)} | ${wl} | ${peak} | ${String(r.total_loss_penalty).padStart(7)} | ${last}`);
   });
 
-  // Component diagnostic — Wave 3.5 step 5A formula uses opponent quality
-  // as the primary signal. This block surfaces apex/strong/solid/legacy/
-  // ranked counts alongside the score components so we can audit which
-  // wins drive each fighter's ranking.
+  // Component diagnostic — Wave 3.5 step 5B final formula. Surfaces QW
+  // (opponent quality), CP (pedigree), Era (era dominance), Pdiff
+  // (performance differential), Fin (finishing dominance), Act (recency),
+  // and both loss penalties so we can audit which lever drives each
+  // fighter's final score.
   const diag = await sql<Array<{
     name_en: string;
     apex: number;
-    strong: number;
-    solid: number;
-    legacy: number;
-    ranked: number;
+    tf: number;
     qw: number;
     cp: number;
+    era: number;
+    pdiff: number;
+    fin: number;
     act: number;
-    rec_pen: number;
-    tot_pen: number;
+    rp: number;
+    tp: number;
     curr: number | null;
     at: number | null;
   }>>`
     SELECT
       f.name_en,
       vs.apex_wins AS apex,
-      vs.strong_wins AS strong,
-      vs.solid_wins AS solid,
-      vs.legacy_wins AS legacy,
-      vs.ranked_wins AS ranked,
+      vs.title_fight_count AS tf,
       ROUND(vs.quality_wins)::int AS qw,
       ROUND(vs.championship_pedigree)::int AS cp,
+      ROUND(vs.era_dominance)::int AS era,
+      ROUND(vs.performance_diff)::int AS pdiff,
+      ROUND(vs.finishing_dominance_score)::int AS fin,
       ROUND(vs.activity)::int AS act,
-      ROUND(vs.recent_loss_penalty)::int AS rec_pen,
-      ROUND(vs.total_loss_penalty)::int AS tot_pen,
+      ROUND(vs.recent_loss_penalty)::int AS rp,
+      ROUND(vs.total_loss_penalty)::int AS tp,
       f.vertex_score AS curr,
       f.vertex_score_all_time AS at
     FROM fighter_vertex_score vs
@@ -162,20 +171,24 @@ async function main() {
       'ilia-topuria-54f64b',
       'tom-aspinall-399afb',
       'khamzat-chimaev-767755',
+      'merab-dvalishvili-c03520',
+      'alexandre-pantoja-a0f000',
+      'conor-mcgregor-f4c499',
+      'jose-aldo-d0f395',
       'neil-magny-2dca84',
       'donald-cerrone-1d0075',
       'jim-miller-d19415'
     )
-    ORDER BY vs.quality_wins DESC
+    ORDER BY vs.era_dominance DESC, vs.quality_wins DESC
   `;
-  console.log("\n=== Component diagnostic (opponent quality breakdown) ===");
-  console.log("  name                          apex strong solid leg rnk | QW  CP  ACT recPen totPen | cur  at");
-  console.log("  " + "-".repeat(102));
+  console.log("\n=== Component diagnostic ===");
+  console.log("  name                          apex  TF | QW  CP era pdf fin act rp tp | cur  at");
+  console.log("  " + "-".repeat(95));
   for (const r of diag) {
     const cur = r.curr == null ? "  — " : String(r.curr).padStart(4);
     const at = r.at == null ? "  — " : String(r.at).padStart(4);
     console.log(
-      `  ${r.name_en.padEnd(29)} ${String(r.apex).padStart(4)} ${String(r.strong).padStart(6)} ${String(r.solid).padStart(5)} ${String(r.legacy).padStart(3)} ${String(r.ranked).padStart(3)} | ${String(r.qw).padStart(3)} ${String(r.cp).padStart(3)} ${String(r.act).padStart(3)} ${String(r.rec_pen).padStart(6)} ${String(r.tot_pen).padStart(6)} | ${cur} ${at}`,
+      `  ${r.name_en.padEnd(29)} ${String(r.apex).padStart(4)} ${String(r.tf).padStart(3)} | ${String(r.qw).padStart(3)} ${String(r.cp).padStart(3)} ${String(r.era).padStart(3)} ${String(r.pdiff).padStart(3)} ${String(r.fin).padStart(3)} ${String(r.act).padStart(3)} ${String(r.rp).padStart(2)} ${String(r.tp).padStart(2)} | ${cur} ${at}`,
     );
   }
 
