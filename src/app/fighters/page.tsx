@@ -44,6 +44,7 @@ function toClientFilters(parsed: FighterCatalogFilters): CatalogFilterState {
     sort: parsed.sort ?? "vertex_current",
     tier: parsed.tier ?? "all",
     champion: parsed.champion ?? "all",
+    gender: parsed.gender ?? "all",
   };
 }
 

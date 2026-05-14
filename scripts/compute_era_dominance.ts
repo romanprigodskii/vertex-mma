@@ -121,9 +121,16 @@ async function main() {
   const eraDominance: number[] = [];
   for (const [fighterId, slug] of slugByFighter) {
     const tf = titleCount.get(fighterId) ?? 0;
+    // Wave 3.5 step 5C: 8 → 10 points per title fight. Long-career
+    // champions like Jon Jones (16 TF), Anderson Silva (18), DJ (14),
+    // GSP (14), Shev (14) now all max era_dominance at 100, letting the
+    // other components (Quality Wins, Performance Differential,
+    // Finishing) decide their relative order. Pre-tweak, GSP edged
+    // above Jones on perfDiff alone; post-tweak Jones's extra apex
+    // wins drive the differentiation.
     const era = Math.min(
       100,
-      tf * 8 +
+      tf * 10 +
         (isActiveChampion(slug) ? 10 : 0) +
         (isDoubleChampion(slug) ? 5 : 0),
     );

@@ -47,6 +47,7 @@ const DEFAULT_FILTERS: CatalogFilterState = {
   sort: "vertex_current",
   tier: "all",
   champion: "all",
+  gender: "all",
 };
 
 function serializeFilters(filters: CatalogFilterState): URLSearchParams {
@@ -62,6 +63,7 @@ function serializeFilters(filters: CatalogFilterState): URLSearchParams {
   if (filters.sort !== "vertex_current") params.set("sort", filters.sort);
   if (filters.tier !== "all") params.set("tier", filters.tier);
   if (filters.champion !== "all") params.set("champion", filters.champion);
+  if (filters.gender !== "all") params.set("gender", filters.gender);
   return params;
 }
 

@@ -37,6 +37,12 @@ export const fighter = pgTable(
     countryCode: char("country_code", { length: 2 }),
     fightingOutOf: text("fighting_out_of"),
 
+    // Inferred by scripts/infer_fighter_gender.ts (Wave 3.5 step 5C) since
+    // the UFCStats scrape doesn't carry gender. Defaults to 'male'; the
+    // script seeds strawweight + known women champions/challengers and
+    // expands transitively through bouts.
+    gender: text("gender").default("male").notNull(),
+
     weightClassPrimary: weightClassEnum("weight_class_primary"),
     status: fighterStatusEnum("status").default("active"),
     careerStart: date("career_start"),

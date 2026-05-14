@@ -1,6 +1,7 @@
 import { WEIGHT_CLASSES } from "@/lib/constants";
 import type {
   CatalogChampionFilter,
+  CatalogGenderFilter,
   CatalogSort,
   CatalogTierFilter,
   FighterCatalogFilters,
@@ -35,6 +36,12 @@ const VALID_CHAMPIONS: ReadonlySet<CatalogChampionFilter> = new Set([
   "dominant",
   "former",
   "none",
+]);
+
+const VALID_GENDERS: ReadonlySet<CatalogGenderFilter> = new Set([
+  "all",
+  "male",
+  "female",
 ]);
 
 const VALID_WEIGHTS = new Set(WEIGHT_CLASSES.map((w) => w.id as string));
@@ -98,6 +105,12 @@ export function parseCatalogFilters(
       ? (rawChampion as CatalogChampionFilter)
       : "all";
 
+  const rawGender = get("gender");
+  const gender: CatalogGenderFilter =
+    rawGender && VALID_GENDERS.has(rawGender as CatalogGenderFilter)
+      ? (rawGender as CatalogGenderFilter)
+      : "all";
+
   // Backwards compat (Wave 3.5 step 4A→4A.2): the old combined filter
   // value `tier=champion` is now expressed as `champion=any`. Migrate
   // silently so existing bookmarks keep working.
@@ -119,6 +132,7 @@ export function parseCatalogFilters(
     hallOfFame: parseBool(get("hof")),
     tier,
     champion,
+    gender,
     sort,
     limit: Number.isFinite(rawLimit) ? rawLimit : undefined,
     offset: Number.isFinite(rawOffset) ? rawOffset : undefined,

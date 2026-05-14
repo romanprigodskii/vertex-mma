@@ -116,6 +116,9 @@ export type CatalogChampionFilter =
   | "former"
   | "none";
 
+/** Gender filter for split leaderboards. Default is `all` (combined). */
+export type CatalogGenderFilter = "all" | "male" | "female";
+
 export type FighterCatalogFilters = {
   q?: string;
   weight?: string[];
@@ -128,6 +131,8 @@ export type FighterCatalogFilters = {
   tier?: CatalogTierFilter;
   /** Champion-status filter (history-based). Defaults to "all". */
   champion?: CatalogChampionFilter;
+  /** Gender filter for split leaderboards. Defaults to "all" (combined). */
+  gender?: CatalogGenderFilter;
   sort?: CatalogSort;
   offset?: number;
   limit?: number;
@@ -258,6 +263,10 @@ function buildWhere(filters: FighterCatalogFilters): SQL {
         conditions.push(sql`${bestScore} IS NOT NULL AND ${bestScore} < 40`);
         break;
     }
+  }
+
+  if (filters.gender && filters.gender !== "all") {
+    conditions.push(sql`f.gender = ${filters.gender}`);
   }
 
   if (filters.champion && filters.champion !== "all") {

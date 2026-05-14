@@ -29,6 +29,7 @@ export type CatalogFilterState = Required<
     | "sort"
     | "tier"
     | "champion"
+    | "gender"
   >
 > & {
   q: string;
@@ -61,6 +62,7 @@ export function activeFilterCount(filters: CatalogFilterState): number {
   if (filters.sort !== "vertex_current") n += 1;
   if (filters.tier !== "all") n += 1;
   if (filters.champion !== "all") n += 1;
+  if (filters.gender !== "all") n += 1;
   return n;
 }
 
