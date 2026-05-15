@@ -78,7 +78,8 @@ export const CHAMPIONSHIP_HISTORY: readonly ChampionshipReign[] = [
   // ============================================================
   // LIGHT HEAVYWEIGHT
   // ============================================================
-  { slug: "alex-pereira-e5549c",       weightClass: "light_heavyweight", startDate: "2025-10-04", endDate: null,         defenses: 0 }, // reign 2
+  { slug: "carlos-ulberg-9014c0",      weightClass: "light_heavyweight", startDate: "2026-04-11", endDate: null,         defenses: 0 }, // won vacant title vs Prochazka
+  { slug: "alex-pereira-e5549c",       weightClass: "light_heavyweight", startDate: "2025-10-04", endDate: "2026-02-28", defenses: 0 }, // reign 2 — vacated 2026-02-28 to move up to HW
   { slug: "magomed-ankalaev-d80217",   weightClass: "light_heavyweight", startDate: "2025-03-08", endDate: "2025-10-04", defenses: 0 },
   { slug: "alex-pereira-e5549c",       weightClass: "light_heavyweight", startDate: "2023-11-11", endDate: "2025-03-08", defenses: 3 }, // reign 1 — Hill, Prochazka 2, Rountree
   { slug: "jamahal-hill-5444c5",       weightClass: "light_heavyweight", startDate: "2023-01-21", endDate: "2023-07-01", defenses: 0 }, // vacated (injury)
