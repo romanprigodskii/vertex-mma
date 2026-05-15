@@ -5,16 +5,13 @@ import { Navbar } from "@/components/layout/navbar";
 import { Container } from "@/components/layout/container";
 import { FighterCatalogClient } from "@/components/fighter/FighterCatalogClient";
 import type { CatalogFilterState } from "@/components/fighter/FilterSidebar";
-import { CHAMPION_SLUGS } from "@/lib/champions";
 import { parseCatalogFilters } from "@/lib/fighter-filters";
 import { formatNumber } from "@/lib/format";
 import {
   CATALOG_DEFAULT_LIMIT,
   type FighterCatalogFilters,
-  type FighterCatalogRow,
   getFighterCountries,
   getFighterTotal,
-  getFightersBySlug,
   searchFightersWithFilters,
 } from "@/lib/fighter-search";
 
@@ -58,29 +55,13 @@ export default async function FightersPage({ searchParams }: PageProps) {
   filters.limit = CATALOG_DEFAULT_LIMIT;
   filters.offset = 0;
 
-  const [page, countries, totalAll, championRows] = await Promise.all([
+  const [page, countries, totalAll] = await Promise.all([
     searchFightersWithFilters(filters),
     getFighterCountries(),
     getFighterTotal(),
-    getFightersBySlug(CHAMPION_SLUGS),
   ]);
 
   const clientFilters = toClientFilters(filters);
-  const championFighters: Record<string, FighterCatalogRow> = Object.fromEntries(
-    championRows.map((f) => [f.slug, f]),
-  );
-
-  // Surface missing champion slugs in the server log so the user notices when
-  // the hardcoded champions.ts drifts from the live DB. Doesn't fail the build.
-  const missingChampions = CHAMPION_SLUGS.filter(
-    (slug) => !(slug in championFighters),
-  );
-  if (missingChampions.length > 0) {
-    console.warn(
-      "[/fighters] champion slugs not found in DB:",
-      missingChampions.join(", "),
-    );
-  }
 
   return (
     <>
@@ -95,7 +76,6 @@ export default async function FightersPage({ searchParams }: PageProps) {
             initialFilters={clientFilters}
             countries={countries}
             totalAll={totalAll}
-            championFighters={championFighters}
           />
         </Container>
       </main>

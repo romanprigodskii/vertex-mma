@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 
 import { CatalogSkeleton } from "@/components/fighter/CatalogSkeleton";
-import { ChampionStrip } from "@/components/fighter/ChampionStrip";
 import { EmptyState } from "@/components/fighter/EmptyState";
 import { FighterCard } from "@/components/fighter/FighterCard";
 import { FilterDrawer } from "@/components/fighter/FilterDrawer";
@@ -82,7 +81,6 @@ interface FighterCatalogClientProps {
   initialFilters: CatalogFilterState;
   countries: CountryAggregate[];
   totalAll: number;
-  championFighters: Record<string, FighterCatalogRow>;
 }
 
 export function FighterCatalogClient({
@@ -92,7 +90,6 @@ export function FighterCatalogClient({
   initialFilters,
   countries,
   totalAll,
-  championFighters,
 }: FighterCatalogClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -236,23 +233,8 @@ export function FighterCatalogClient({
   const showEmpty = !loading && fighters.length === 0;
   const showRank = RANKED_SORTS.has(filters.sort);
 
-  // Strip is always visible — champions are universally relevant as a
-  // navigation anchor. Dim it slightly when filters are active so the user
-  // understands the main content is what's narrowed.
-  const stripDimmed = activeCount > 0;
-
   return (
     <div className="flex flex-col gap-6">
-      <div
-        className={
-          stripDimmed
-            ? "opacity-70 transition-opacity duration-200"
-            : "opacity-100 transition-opacity duration-200"
-        }
-      >
-        <ChampionStrip fightersBySlug={championFighters} />
-      </div>
-
       {/* Sticky controls bar */}
       <div className="sticky top-16 z-30 -mx-4 border-b border-foreground/10 bg-background-base/90 px-4 py-3 backdrop-blur-md sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
@@ -333,8 +315,7 @@ export function FighterCatalogClient({
             </div>
           ) : null}
 
-          {/* Header above the list — mirrors the champion strip's
-              "CURRENT CHAMPIONS / 12 BELTS" pair for visual symmetry. */}
+          {/* Roster header above the catalog list. */}
           <div className="mb-3 mt-2 flex items-baseline justify-between gap-3 border-b border-foreground/10 px-1 pb-3 sm:mt-4 sm:px-2">
             <p className="font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
               Roster

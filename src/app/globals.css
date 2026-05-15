@@ -26,8 +26,8 @@
   --color-red-accent-hover: oklch(0.55 0.22 27);
 
   /* Gold alias kept for back-compat with components that still spell it out
-     (Badge/Button gold variant, ChampionCard label, navbar coin icon).
-     Same oklch as primary by design. */
+     (Badge/Button gold variant, navbar coin icon). Same oklch as primary
+     by design. */
   --color-gold: oklch(0.78 0.15 70);
   --color-gold-foreground: oklch(0.15 0.05 70);
 
@@ -122,33 +122,6 @@
 @utility tabular {
   font-feature-settings: "tnum";
   font-variant-numeric: tabular-nums;
-}
-
-/* ============================================================
-   Marquee — used by ChampionStrip for the seamless auto-scroll loop.
-   The track contains two consecutive copies of the carousel; sliding
-   by exactly -50% lands at the start of the second copy, which is
-   pixel-identical to the start of the first copy → no visible seam.
-   Animation is paused on hover (`group:hover` on the wrapper) and
-   honors prefers-reduced-motion.
-   ============================================================ */
-@keyframes marquee-left {
-  from {
-    transform: translateX(0);
-  }
-  to {
-    transform: translateX(-50%);
-  }
-}
-
-@utility animate-marquee {
-  animation: marquee-left 50s linear infinite;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .animate-marquee {
-    animation: none;
-  }
 }
 
 /* ============================================================

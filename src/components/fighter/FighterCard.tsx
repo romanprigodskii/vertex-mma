@@ -6,7 +6,7 @@ import { WEIGHT_CLASSES } from "@/lib/constants";
 import { getCountryFlag } from "@/lib/fighter-helpers";
 import type { FighterCatalogRow } from "@/lib/fighter-search";
 import { cn } from "@/lib/utils";
-import { classifyAndStyle } from "@/lib/vertex-tier";
+import { boostAlpha, classifyAndStyle } from "@/lib/vertex-tier";
 
 const WEIGHT_LABELS: Record<string, string> = Object.fromEntries(
   WEIGHT_CLASSES.map((w) => [w.id, w.label]),
@@ -125,35 +125,34 @@ export function FighterCard({
       : `Last: ${fighter.last_fight_result}`
     : "Last: —";
 
+  // Wave 6F: champions get a denser tier gradient (alpha boost + extended
+  // stop) plus a subtle warm gold tint at the bottom 25% of the card —
+  // replacing the previous yellow border + glow. Conveys "champion" via
+  // fill intensity (FIFA/EA UFC convention) rather than a competing border.
+  const gradientFrom = isChampion
+    ? boostAlpha(tierStyle.gradientFrom, 2.2)
+    : tierStyle.gradientFrom;
+  const gradientStop = isChampion ? "90%" : "70%";
+  const tierGradient = `linear-gradient(180deg, ${gradientFrom} 0%, ${tierStyle.gradientTo} ${gradientStop})`;
+  const cardBase =
+    "color-mix(in oklch, var(--color-background-elevated) 30%, transparent)";
+  const goldTint =
+    "linear-gradient(0deg, oklch(0.7 0.15 80 / 0.12) 0%, oklch(0.7 0.15 80 / 0) 25%)";
+
   return (
     <Link
       href={`/fighters/${fighter.slug}`}
       prefetch={false}
       style={{
-        ...(isChampion
-          ? {
-              borderColor: championStyle.borderColor,
-              borderWidth: `${championStyle.borderWidth}px`,
-              boxShadow:
-                championStyle.glowColor && championStyle.glowSize
-                  ? `${championStyle.glowSize} ${championStyle.glowColor}`
-                  : undefined,
-            }
-          : undefined),
-        // Tier expressed as a top→bottom gradient layered over the card
-        // base background (Tailwind class no longer sets background, so we
-        // supply both stops here). The gradient fades to transparent by
-        // ~70% of the card height so the photo + stats stay readable.
         background:
           tierStyle.tier === "unranked"
             ? "oklch(0.12 0.008 240 / 0.3)"
-            : `linear-gradient(180deg, ${tierStyle.gradientFrom} 0%, ${tierStyle.gradientTo} 70%), color-mix(in oklch, var(--color-background-elevated) 30%, transparent)`,
+            : isChampion
+              ? `${tierGradient}, ${goldTint}, ${cardBase}`
+              : `${tierGradient}, ${cardBase}`,
       }}
       className={cn(
-        "group relative flex min-h-[168px] gap-4 rounded-lg p-4",
-        // Champion fighters use an inline-styled border (set above). Non-champions
-        // keep the standard Tailwind subtle border.
-        isChampion ? "border" : "border border-foreground/10",
+        "group relative flex min-h-[168px] gap-4 rounded-lg border border-foreground/10 p-4",
         "transition-[background-color] duration-200 ease-out",
         "hover:bg-foreground/[0.02]",
         "focus-visible:outline-none focus-visible:bg-foreground/[0.02]",
@@ -179,10 +178,20 @@ export function FighterCard({
           <span
             aria-hidden
             style={{ color: championStyle.crownColor }}
-            className="absolute -right-1.5 -top-1.5 flex h-7 w-7 items-center justify-center rounded-full border border-foreground/15 bg-background-base shadow-sm"
+            // Wave 6F: smaller crown (20px container vs 28px, 10px icon vs
+            // 14px) sits at the avatar's bottom-right so it sits diagonally
+            // opposite the tier-score number in the card's bottom-right.
+            // For double champions the 2× badge needs that corner; the
+            // crown shifts back up to top-right to make room.
+            className={cn(
+              "absolute flex h-5 w-5 items-center justify-center rounded-full border border-foreground/15 bg-background-base shadow-sm",
+              classification.isDoubleChampion
+                ? "-right-1 -top-1"
+                : "-bottom-1 -right-1",
+            )}
             title={championStyle.label}
           >
-            <Crown className="h-3.5 w-3.5" />
+            <Crown className="h-2.5 w-2.5" />
           </span>
         ) : null}
         {championStyle.hasCrown && classification.isDoubleChampion ? (
