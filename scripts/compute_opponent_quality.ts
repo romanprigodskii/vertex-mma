@@ -53,10 +53,15 @@ const sql = postgres(url, { prepare: false });
 type Tier = "apex" | "strong" | "solid" | "legacy" | "ranked" | "none";
 type RankTier = "top5" | "top10" | "top15" | "none";
 
+// Wave 6C.3: rank-tier weights bumped (top5 15→22, top10 8→14, top15 4→8)
+// to reflect the project principle that wins over actively-top contenders
+// at bout date weigh more than wins over ex-champions long past their reign.
+// Champion-tier weights (apex 25 / strong 15 / solid 8 / legacy 4 / ranked 3)
+// remain locked.
 const RANK_TIER_WEIGHT: Record<RankTier, number> = {
-  top5: 15,
-  top10: 8,
-  top15: 4,
+  top5: 22,
+  top10: 14,
+  top15: 8,
   none: 0,
 };
 
@@ -510,7 +515,7 @@ async function main() {
     const baseScore = Math.min(
       100,
       c.apex * 25 + c.strong * 15 + c.solid * 8 + c.legacy * 4 + c.ranked * 3
-        + c.top5 * 15 + c.top10 * 8 + c.top15 * 4,
+        + c.top5 * 22 + c.top10 * 14 + c.top15 * 8,
     );
 
     // Wave 3.5 step 5F: undefeated champion bonus. +30 to QW (above the
