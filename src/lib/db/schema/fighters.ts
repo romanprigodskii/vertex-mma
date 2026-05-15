@@ -113,6 +113,14 @@ export const fighter = pgTable(
     peakP4p: smallint("peak_p4p"),
     currentStreak: smallint("current_streak"),
 
+    // Wave 6C.2: rank-tier win counters from compute_opponent_quality.ts.
+    // Top-5/10/15 wins where the opponent's UFC.com rank (within 4 weeks
+    // of bout date) outranked the champion-tier classification. Feed into
+    // quality_wins_score as +15/+8/+4 each.
+    top5Wins: integer("top5_wins").default(0).notNull(),
+    top10Wins: integer("top10_wins").default(0).notNull(),
+    top15Wins: integer("top15_wins").default(0).notNull(),
+
     ufcStatsId: text("ufc_stats_id").unique(),
     sherdogId: text("sherdog_id").unique(),
     tapologyId: text("tapology_id").unique(),

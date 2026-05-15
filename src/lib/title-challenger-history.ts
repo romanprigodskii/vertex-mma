@@ -38,15 +38,40 @@ export const TITLE_CHALLENGES: readonly TitleChallenge[] = [
   { slug: "colby-covington-dc9572",   weightClass: "welterweight", date: "2023-12-16", result: "lost" }, // UFC 296 vs Edwards
   { slug: "jorge-masvidal-47b9e0",    weightClass: "welterweight", date: "2020-07-11", result: "lost" }, // UFC 251 vs Usman
   { slug: "jorge-masvidal-47b9e0",    weightClass: "welterweight", date: "2021-04-24", result: "lost" }, // UFC 261 vs Usman
+  // Wave 6C.2 backfill (multi-fight bucket from CP audit)
+  { slug: "frank-trigg-d2d37e",       weightClass: "welterweight", date: "2003-11-21", result: "lost" }, // UFC 45 vs Hughes
+  { slug: "frank-trigg-d2d37e",       weightClass: "welterweight", date: "2005-04-16", result: "lost" }, // UFC 52 vs Hughes 2
+  { slug: "carlos-condit-f9f07b",     weightClass: "welterweight", date: "2012-11-17", result: "lost" }, // UFC 154 vs GSP
+  { slug: "carlos-condit-f9f07b",     weightClass: "welterweight", date: "2016-01-02", result: "lost" }, // UFC 195 vs Lawler
+  { slug: "darren-till-9ce6d5",       weightClass: "welterweight", date: "2018-09-08", result: "lost" }, // UFC 228 vs Woodley
+  { slug: "stephen-thompson-4a28cb",  weightClass: "welterweight", date: "2017-03-04", result: "lost" }, // UFC 209 vs Woodley 2 (UFC 205 was a draw, omitted)
 
   // ===== Middleweight =====
   { slug: "demian-maia-427b59",       weightClass: "middleweight", date: "2010-04-10", result: "lost" }, // UFC 112 vs Anderson
   { slug: "kelvin-gastelum-8c0580",   weightClass: "middleweight", date: "2019-04-13", result: "lost" }, // UFC 236 (interim) vs Adesanya
+  // Wave 6C.2 backfill
+  { slug: "chael-sonnen-48d1f6",      weightClass: "middleweight", date: "2010-08-07", result: "lost" }, // UFC 117 vs Anderson
+  { slug: "chael-sonnen-48d1f6",      weightClass: "middleweight", date: "2012-07-07", result: "lost" }, // UFC 148 vs Anderson 2
+  { slug: "dan-henderson-1ccf4e",     weightClass: "middleweight", date: "2008-03-01", result: "lost" }, // UFC 82 vs Anderson
+  { slug: "dan-henderson-1ccf4e",     weightClass: "middleweight", date: "2016-10-08", result: "lost" }, // UFC 204 vs Bisping
+  { slug: "yoel-romero-f77c68",       weightClass: "middleweight", date: "2017-07-08", result: "lost" }, // UFC 213 (interim) vs Whittaker
+  { slug: "yoel-romero-f77c68",       weightClass: "middleweight", date: "2020-03-07", result: "lost" }, // UFC 248 vs Adesanya
+  // (UFC 225 2018-06-09 vs Whittaker 2: Romero missed weight → non-title; omitted)
+  { slug: "marvin-vettori-7acbb0",    weightClass: "middleweight", date: "2021-06-12", result: "lost" }, // UFC 263 vs Adesanya
 
   // ===== Light Heavyweight =====
   { slug: "anthony-johnson-365fee",   weightClass: "light_heavyweight", date: "2015-05-23", result: "lost" }, // UFC 187 vs DC
   { slug: "anthony-johnson-365fee",   weightClass: "light_heavyweight", date: "2017-04-08", result: "lost" }, // UFC 210 vs DC
   { slug: "aleksandar-rakic-333b9e",  weightClass: "light_heavyweight", date: "2022-05-07", result: "lost" }, // UFC 274 vs Blachowicz — actually #1 contender, not title. Trimmed.
+  // Wave 6C.2 backfill
+  { slug: "chael-sonnen-48d1f6",         weightClass: "light_heavyweight", date: "2013-04-27", result: "lost" }, // UFC 159 vs Jones
+  { slug: "dan-henderson-1ccf4e",        weightClass: "light_heavyweight", date: "2007-09-08", result: "lost" }, // UFC 75 vs Rampage Jackson
+  { slug: "alexander-gustafsson-3c6976", weightClass: "light_heavyweight", date: "2013-09-21", result: "lost" }, // UFC 165 vs Jones
+  { slug: "alexander-gustafsson-3c6976", weightClass: "light_heavyweight", date: "2015-10-03", result: "lost" }, // UFC 192 vs Cormier
+  { slug: "alexander-gustafsson-3c6976", weightClass: "light_heavyweight", date: "2018-12-29", result: "lost" }, // UFC 232 vs Jones 2 (vacant)
+  { slug: "dominick-reyes-2e1938",       weightClass: "light_heavyweight", date: "2020-02-08", result: "lost" }, // UFC 247 vs Jones
+  { slug: "dominick-reyes-2e1938",       weightClass: "light_heavyweight", date: "2020-09-26", result: "lost" }, // UFC 253 vs Blachowicz (vacant)
+  { slug: "thiago-santos-dea070",        weightClass: "light_heavyweight", date: "2019-07-06", result: "lost" }, // UFC 239 vs Jones
 
   // ===== Heavyweight =====
   { slug: "ciryl-gane-787bb1",        weightClass: "heavyweight", date: "2022-01-22", result: "lost" }, // UFC 270 vs Ngannou
@@ -56,6 +81,13 @@ export const TITLE_CHALLENGES: readonly TitleChallenge[] = [
   // ===== Lightweight =====
   { slug: "donald-cerrone-1d0075",    weightClass: "lightweight", date: "2015-12-19", result: "lost" }, // UFC FN 80 vs RDA
   { slug: "renato-moicano-b64527",    weightClass: "lightweight", date: "2025-01-18", result: "lost" }, // UFC 311 vs Makhachev
+  // Wave 6C.2 backfill
+  { slug: "kenny-florian-cb1391",     weightClass: "lightweight", date: "2006-10-14", result: "lost" }, // UFC 64 vs Sherk (vacant)
+  { slug: "kenny-florian-cb1391",     weightClass: "lightweight", date: "2009-08-08", result: "lost" }, // UFC 101 vs BJ Penn
+  { slug: "gilbert-melendez-aa5b4e",  weightClass: "lightweight", date: "2013-04-20", result: "lost" }, // UFC on Fox 7 vs Bendo
+  { slug: "gilbert-melendez-aa5b4e",  weightClass: "lightweight", date: "2014-12-06", result: "lost" }, // UFC 181 vs Pettis
+  { slug: "gray-maynard-7d96bc",      weightClass: "lightweight", date: "2011-10-08", result: "lost" }, // UFC 136 vs Edgar 3 (UFC 125 was a draw, omitted)
+  { slug: "nate-diaz-835592",         weightClass: "lightweight", date: "2012-12-08", result: "lost" }, // UFC on Fox 5 vs Bendo (catchweight rematches w/ Conor were not title bouts)
 
   // ===== Featherweight =====
   { slug: "chad-mendes-b5b684",       weightClass: "featherweight", date: "2012-01-14", result: "lost" }, // UFC 142 vs Aldo
@@ -66,10 +98,19 @@ export const TITLE_CHALLENGES: readonly TitleChallenge[] = [
   { slug: "yair-rodriguez-cbf5e6",    weightClass: "featherweight", date: "2023-07-08", result: "lost" }, // UFC 290 vs Volk
   { slug: "diego-lopes-f166e9",       weightClass: "featherweight", date: "2025-04-12", result: "lost" }, // UFC 314 vs Volk
   { slug: "diego-lopes-f166e9",       weightClass: "featherweight", date: "2026-01-31", result: "lost" }, // UFC 325 vs Volk
+  // Wave 6C.2 backfill
+  { slug: "kenny-florian-cb1391",     weightClass: "featherweight", date: "2011-10-08", result: "lost" }, // UFC 136 vs Aldo
+  { slug: "chan-sung-jung-c451d6",    weightClass: "featherweight", date: "2013-08-03", result: "lost" }, // UFC 163 vs Aldo
+  { slug: "chan-sung-jung-c451d6",    weightClass: "featherweight", date: "2022-04-09", result: "lost" }, // UFC 273 vs Volkanovski
 
   // ===== Bantamweight =====
   { slug: "marlon-vera-7c7332",       weightClass: "bantamweight", date: "2024-03-09", result: "lost" }, // UFC 299 vs O'Malley
   { slug: "cory-sandhagen-65f09b",    weightClass: "bantamweight", date: "2021-10-30", result: "lost" }, // UFC 267 (interim) vs Yan
+  // Wave 6C.2 backfill
+  { slug: "urijah-faber-78114b",      weightClass: "bantamweight", date: "2011-07-02", result: "lost" }, // UFC 132 vs Cruz
+  { slug: "urijah-faber-78114b",      weightClass: "bantamweight", date: "2012-07-21", result: "lost" }, // UFC 149 (interim) vs Barao
+  { slug: "urijah-faber-78114b",      weightClass: "bantamweight", date: "2014-02-01", result: "lost" }, // UFC 169 vs Barao
+  { slug: "urijah-faber-78114b",      weightClass: "bantamweight", date: "2016-06-04", result: "lost" }, // UFC 199 vs Cruz
 
   // ===== Flyweight =====
   { slug: "joseph-benavidez-80eacd",  weightClass: "flyweight", date: "2012-09-22", result: "lost" }, // UFC 152 (inaugural) vs DJ
@@ -78,6 +119,9 @@ export const TITLE_CHALLENGES: readonly TitleChallenge[] = [
   { slug: "joseph-benavidez-80eacd",  weightClass: "flyweight", date: "2020-07-18", result: "lost" }, // UFC FN 172 vs Figgy 2
   { slug: "taila-santos-f74671",      weightClass: "flyweight", date: "2022-06-11", result: "lost" }, // UFC 275 vs Shevchenko
   { slug: "manon-fiorot-34ff30",      weightClass: "flyweight", date: "2025-05-10", result: "lost" }, // UFC 315 vs Shevchenko
+  // Wave 6C.2 backfill (men's FlyW)
+  { slug: "john-dodson-99506d",       weightClass: "flyweight", date: "2013-01-26", result: "lost" }, // UFC on Fox 6 vs DJ
+  { slug: "john-dodson-99506d",       weightClass: "flyweight", date: "2015-09-05", result: "lost" }, // UFC 191 vs DJ 2
 
   // ===== Strawweight =====
   { slug: "tatiana-suarez-b08012",    weightClass: "strawweight", date: "2025-02-08", result: "lost" }, // UFC 312 vs Zhang

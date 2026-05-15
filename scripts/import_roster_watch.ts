@@ -120,6 +120,22 @@ function formerStatus(row: Record<string, string>): "retired" | "released" {
   return row.hof === "TRUE" ? "retired" : "released";
 }
 
+/** Pull peak_rank / peak_p4p / streak from a roster CSV row. Both the
+ *  current-roster and former-roster CSVs use the same column names for
+ *  these. roster.watch encodes "was champion" as -1 in peak_rank/peak_p4p
+ *  and signed integers for streak (positive = win streak). */
+function extractRankFields(row: Record<string, string>): {
+  peak_rank: number | null;
+  peak_p4p: number | null;
+  current_streak: number | null;
+} {
+  return {
+    peak_rank: parseIntOrNull(row.peak_rank ?? ""),
+    peak_p4p: parseIntOrNull(row.peak_p4p ?? ""),
+    current_streak: parseIntOrNull(row.streak ?? ""),
+  };
+}
+
 // DB-name → CSV-name aliases for fighters whose roster.watch entry uses a
 // fight-name pseudonym instead of their legal name. Add new aliases here
 // as we discover them in the post-import "Unmatched" log. Keys AND values
@@ -151,11 +167,17 @@ function parseIntOrNull(v: string): number | null {
 // to 'retired' before the matched updates run.
 interface UpdateRow {
   slug: string;
-  roster_status: "active" | "retired";
+  roster_status: "active" | "retired" | "released";
   has_upcoming_bout: boolean;
   next_event_date: string | null;
   next_opponent_name: string | null;
   elo_roster_watch: number | null;
+  // Wave 6C.2: roster.watch's "rank" / "peak_rank" / "streak" columns,
+  // surfaced for the rank-at-bout pre-2017 fallback (peak_rank) and the
+  // current_streak_bonus in fighter_vertex_score.
+  peak_rank: number | null;
+  peak_p4p: number | null;
+  current_streak: number | null;
 }
 
 async function main() {
@@ -229,6 +251,7 @@ async function main() {
           ? currentMatch.next_opp
           : null,
         elo_roster_watch: parseIntOrNull(currentMatch.elo),
+        ...extractRankFields(currentMatch),
       });
     } else if (formerMatch) {
       matchedFormer++;
@@ -239,6 +262,7 @@ async function main() {
         next_event_date: null,
         next_opponent_name: null,
         elo_roster_watch: parseIntOrNull(formerMatch.elo),
+        ...extractRankFields(formerMatch),
       });
     } else {
       unmatched.push(f.name_en);
@@ -265,6 +289,7 @@ async function main() {
         next_event_date: hasUpcoming ? c.next_date : null,
         next_opponent_name: hasUpcoming ? c.next_opp : null,
         elo_roster_watch: parseIntOrNull(c.elo),
+        ...extractRankFields(c),
       });
       updatedSlugs.add(a.slug);
     } else if (fr) {
@@ -277,6 +302,7 @@ async function main() {
         next_event_date: null,
         next_opponent_name: null,
         elo_roster_watch: parseIntOrNull(fr.elo),
+        ...extractRankFields(fr),
       });
       updatedSlugs.add(a.slug);
     }
@@ -296,6 +322,9 @@ async function main() {
       next_event_date: null,
       next_opponent_name: null,
       elo_roster_watch: null,
+      peak_rank: null,
+      peak_p4p: null,
+      current_streak: null,
     });
   }
 
@@ -320,7 +349,10 @@ async function main() {
         has_upcoming_bout boolean NOT NULL,
         next_event_date date,
         next_opponent_name text,
-        elo_roster_watch integer
+        elo_roster_watch integer,
+        peak_rank smallint,
+        peak_p4p smallint,
+        current_streak smallint
       ) ON COMMIT DROP
     `;
 
@@ -334,6 +366,9 @@ async function main() {
         "next_event_date",
         "next_opponent_name",
         "elo_roster_watch",
+        "peak_rank",
+        "peak_p4p",
+        "current_streak",
       )}
     `;
 
@@ -344,7 +379,10 @@ async function main() {
           has_upcoming_bout = u.has_upcoming_bout,
           next_event_date = u.next_event_date,
           next_opponent_name = u.next_opponent_name,
-          elo_roster_watch = u.elo_roster_watch
+          elo_roster_watch = u.elo_roster_watch,
+          peak_rank = u.peak_rank,
+          peak_p4p = u.peak_p4p,
+          current_streak = u.current_streak
       FROM _roster_updates u
       WHERE f.slug = u.slug
     `;

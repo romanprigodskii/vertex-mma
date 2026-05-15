@@ -24,6 +24,15 @@
  *
  * Writes apex_wins / strong_wins / solid_wins / legacy_wins / ranked_wins
  * / quality_wins_score on the fighter row in a single batched UPDATE.
+ *
+ * Wave 6C.2: rank-at-bout-time added as a parallel tier source. For each
+ * win we also look up the opponent's UFC.com/rankings rank at bout date
+ * (within 4 weeks before) from ranking_snapshot. That yields a rank-tier
+ * — top5_rank / top10_rank / top15_rank / none — which is compared to the
+ * champion-tier and the higher-multiplier one wins. Pre-2017 bouts (no
+ * snapshot data) fall back to fighter.peak_rank. Rank=0 (champion slot)
+ * is intentionally ignored on the rank path so the champion-tier remains
+ * the authoritative apex signal.
  */
 import { config } from "dotenv";
 config({ path: ".env.local" });
@@ -42,6 +51,87 @@ if (!url) throw new Error("DATABASE_URL not set");
 const sql = postgres(url, { prepare: false });
 
 type Tier = "apex" | "strong" | "solid" | "legacy" | "ranked" | "none";
+type RankTier = "top5" | "top10" | "top15" | "none";
+
+const RANK_TIER_WEIGHT: Record<RankTier, number> = {
+  top5: 15,
+  top10: 8,
+  top15: 4,
+  none: 0,
+};
+
+const CHAMP_TIER_WEIGHT: Record<Tier, number> = {
+  apex: 25,
+  strong: 15,
+  solid: 8,
+  legacy: 4,
+  ranked: 3,
+  none: 0,
+};
+
+const RANKING_LOOKBACK_DAYS = 28;
+const PRE_SNAPSHOT_CUTOFF = new Date("2017-01-01");
+
+/** Sorted-descending-by-date ranking snapshots per fighter_id. */
+const rankByFighter = new Map<string, Array<{ date: Date; rank: number }>>();
+/** opponent_id → { gender, peak_rank } from fighter table. */
+const fighterMeta = new Map<
+  string,
+  { gender: "male" | "female"; peakRank: number | null }
+>();
+
+/** rank-at-bout lookup. Returns null when no snapshot in window. */
+function rankAtBout(opponentId: string, boutDate: Date): number | null {
+  const snaps = rankByFighter.get(opponentId);
+  if (!snaps) return null;
+  const earliest = new Date(boutDate);
+  earliest.setDate(earliest.getDate() - RANKING_LOOKBACK_DAYS);
+  // snaps is sorted DESC by date, so the first entry with date <= boutDate
+  // AND >= earliest is the answer.
+  for (const s of snaps) {
+    if (s.date > boutDate) continue;
+    if (s.date < earliest) return null;
+    return s.rank;
+  }
+  return null;
+}
+
+function rankToTier(rank: number | null): RankTier {
+  if (rank === null) return "none";
+  if (rank === 0) return "none"; // champion slot — defer to champion-tier
+  if (rank <= 5) return "top5";
+  if (rank <= 10) return "top10";
+  if (rank <= 15) return "top15";
+  return "none";
+}
+
+/** Pre-2017 fallback: map opponent.peak_rank to a rank-tier. */
+function peakRankToTier(peakRank: number | null): RankTier {
+  if (peakRank === null) return "none";
+  if (peakRank === -1) return "none"; // ex-champion — champion-tier handles
+  if (peakRank >= 1 && peakRank <= 5) return "top5";
+  if (peakRank <= 10) return "top10";
+  if (peakRank <= 15) return "top15";
+  return "none";
+}
+
+/** Returns (rankTier, source) for a given opponent at a given bout date. */
+function classifyByRank(
+  opponentId: string,
+  boutDate: Date,
+): { tier: RankTier; source: "snapshot" | "peak_fallback" | "none" } {
+  const snapRank = rankAtBout(opponentId, boutDate);
+  if (snapRank !== null) {
+    return { tier: rankToTier(snapRank), source: "snapshot" };
+  }
+  if (boutDate < PRE_SNAPSHOT_CUTOFF) {
+    const meta = fighterMeta.get(opponentId);
+    if (meta?.peakRank !== undefined) {
+      return { tier: peakRankToTier(meta.peakRank), source: "peak_fallback" };
+    }
+  }
+  return { tier: "none", source: "none" };
+}
 
 interface BoutRecord {
   bout_id: string;
@@ -137,9 +227,8 @@ function postReignLosses(
   return { reignEnd, lossesAfter: losses };
 }
 
-function classify(
+function classifyChampion(
   fighterSlug: string,
-  boutId: string,
   boutDate: Date,
   opponentSlug: string,
   opponentBouts: BoutRecord[],
@@ -189,7 +278,69 @@ function classify(
   return "none";
 }
 
+/** Combined classifier: returns the winning tier plus the rank-tier
+ *  separately (so we can count top5/top10/top15 wins as a distinct
+ *  signal even when champion-tier wins the multiplier comparison). */
+function classify(
+  fighterSlug: string,
+  boutDate: Date,
+  opponentId: string,
+  opponentSlug: string,
+  opponentBouts: BoutRecord[],
+  rankedEligibleSlugs: Set<string> | null,
+): { champ: Tier; rank: RankTier; effective: Tier | RankTier } {
+  const champ = classifyChampion(
+    fighterSlug,
+    boutDate,
+    opponentSlug,
+    opponentBouts,
+    rankedEligibleSlugs,
+  );
+  const { tier: rank } = classifyByRank(opponentId, boutDate);
+  // Higher multiplier wins; ties favour champion-tier (higher-confidence).
+  const effective =
+    RANK_TIER_WEIGHT[rank] > CHAMP_TIER_WEIGHT[champ] ? rank : champ;
+  return { champ, rank, effective };
+}
+
 async function main() {
+  console.log("Loading ranking snapshots + fighter meta...");
+  // ranking_snapshot grouped by fighter_id, sorted DESC by date for the
+  // window-walk in rankAtBout. is_women filter is folded in via the
+  // gender check on the corresponding fighter — we only keep rows where
+  // is_women matches the fighter's recorded gender. (Cross-gender
+  // mismatches are zero in practice for ranking_snapshot since the
+  // importer's gender filter prevents it, but we guard defensively.)
+  const snapRows = await sql<
+    { fighter_id: string; date: Date; rank: number; is_women: boolean }[]
+  >`
+    SELECT fighter_id::text AS fighter_id,
+           snapshot_date AS date,
+           rank,
+           is_women
+    FROM ranking_snapshot
+    WHERE fighter_id IS NOT NULL
+    ORDER BY fighter_id, snapshot_date DESC
+  `;
+  console.log(`  ${snapRows.length} ranking_snapshot rows with fighter_id`);
+  for (const r of snapRows) {
+    const arr = rankByFighter.get(r.fighter_id) ?? [];
+    arr.push({ date: r.date, rank: r.rank });
+    rankByFighter.set(r.fighter_id, arr);
+  }
+  console.log(`  ${rankByFighter.size} fighters have ranking history`);
+
+  const metaRows = await sql<
+    { id: string; gender: "male" | "female"; peak_rank: number | null }[]
+  >`
+    SELECT id::text AS id, gender::text AS gender, peak_rank
+    FROM fighter
+  `;
+  for (const m of metaRows) {
+    fighterMeta.set(m.id, { gender: m.gender, peakRank: m.peak_rank });
+  }
+  console.log(`  ${fighterMeta.size} fighter meta rows`);
+
   console.log("Loading bouts...");
   const rows = await sql<BoutRecord[]>`
     SELECT
@@ -237,13 +388,18 @@ async function main() {
   }
 
   // -------- Pass 1: classify wins against champions; collect apex/strong slugs
-  console.log("Pass 1: classifying wins against champions...");
+  console.log("Pass 1: classifying wins against champions + rank-tier...");
   type PerFighter = {
     apex: number;
     strong: number;
     solid: number;
     legacy: number;
     ranked: number;
+    /** Wave 6C.2 rank-tier counters, tracked independently of the
+     *  champion-tier counter even when the effective tier is champion. */
+    top5: number;
+    top10: number;
+    top15: number;
     /** Wins still pending tier (against non-champions). */
     pending: BoutRecord[];
   };
@@ -265,42 +421,39 @@ async function main() {
   for (const [fighterId, bouts] of byFighter) {
     const fighterSlug = idToSlug.get(fighterId) ?? "";
     const c: PerFighter = {
-      apex: 0,
-      strong: 0,
-      solid: 0,
-      legacy: 0,
-      ranked: 0,
+      apex: 0, strong: 0, solid: 0, legacy: 0, ranked: 0,
+      top5: 0, top10: 0, top15: 0,
       pending: [],
     };
     for (const b of bouts) {
       if (!b.fighter_won) continue;
       const opponentBouts = byFighter.get(b.opponent_id) ?? [];
-      const tier = classify(
+      const { champ, rank, effective } = classify(
         fighterSlug,
-        b.bout_id,
         b.date,
+        b.opponent_id,
         b.opponent_slug,
         opponentBouts,
         null,
       );
-      switch (tier) {
-        case "apex":
-          c.apex += 1;
-          break;
-        case "strong":
-          c.strong += 1;
-          break;
-        case "solid":
-          c.solid += 1;
-          break;
-        case "legacy":
-          c.legacy += 1;
-          break;
-        case "ranked": // never returned in pass 1 (set is null)
-          c.ranked += 1;
-          break;
+      // Champion-tier counter — uses the *effective* tier so a rank-tier
+      // win doesn't double-count when it beats the champion-tier.
+      switch (effective) {
+        case "apex":   c.apex   += 1; break;
+        case "strong": c.strong += 1; break;
+        case "solid":  c.solid  += 1; break;
+        case "legacy": c.legacy += 1; break;
+        case "ranked": c.ranked += 1; break; // never in pass 1 (set null)
+        case "top5":   c.top5   += 1; break;
+        case "top10":  c.top10  += 1; break;
+        case "top15":  c.top15  += 1; break;
         case "none":
-          c.pending.push(b);
+          // Defer to pass 2 only when the champion-tier path was "none"
+          // (rank-tier already had its shot above). If rank was also
+          // none, the opponent is a non-champion non-ranked fighter who
+          // may still resolve to "ranked" via the apex/strong-eligible
+          // ledger in pass 2.
+          if (champ === "none" && rank === "none") c.pending.push(b);
           break;
       }
     }
@@ -318,21 +471,22 @@ async function main() {
 
   // -------- Pass 2: resolve "ranked" wins. Re-runs classify() so Fix 3
   // (title-fight-participation fallback) sees the full ranked-eligible set
-  // before deciding.
+  // before deciding. Rank-tier was already counted in pass 1 — we only
+  // upgrade pending "none" → "ranked" here.
   console.log("Pass 2: resolving ranked wins...");
   for (const [fighterId, c] of counts) {
     const fighterSlug = idToSlug.get(fighterId) ?? "";
     for (const b of c.pending) {
       const opponentBouts = byFighter.get(b.opponent_id) ?? [];
-      const tier = classify(
+      const { effective } = classify(
         fighterSlug,
-        b.bout_id,
         b.date,
+        b.opponent_id,
         b.opponent_slug,
         opponentBouts,
         rankedEligibleSlugs,
       );
-      if (tier === "ranked") c.ranked += 1;
+      if (effective === "ranked") c.ranked += 1;
     }
   }
 
@@ -345,6 +499,9 @@ async function main() {
     solid: number;
     legacy: number;
     ranked: number;
+    top5: number;
+    top10: number;
+    top15: number;
     score: number;
     undefeated: number;
   }> = [];
@@ -352,7 +509,8 @@ async function main() {
   for (const [fighterId, c] of counts) {
     const baseScore = Math.min(
       100,
-      c.apex * 25 + c.strong * 15 + c.solid * 8 + c.legacy * 4 + c.ranked * 3,
+      c.apex * 25 + c.strong * 15 + c.solid * 8 + c.legacy * 4 + c.ranked * 3
+        + c.top5 * 15 + c.top10 * 8 + c.top15 * 4,
     );
 
     // Wave 3.5 step 5F: undefeated champion bonus. +30 to QW (above the
@@ -381,6 +539,9 @@ async function main() {
       solid: c.solid,
       legacy: c.legacy,
       ranked: c.ranked,
+      top5: c.top5,
+      top10: c.top10,
+      top15: c.top15,
       score: baseScore + undefeated,
       undefeated,
     });
@@ -397,6 +558,9 @@ async function main() {
       solid_wins = 0,
       legacy_wins = 0,
       ranked_wins = 0,
+      top5_wins = 0,
+      top10_wins = 0,
+      top15_wins = 0,
       quality_wins_score = 0,
       undefeated_bonus = 0
   `;
@@ -412,6 +576,9 @@ async function main() {
     const solid = slice.map((u) => u.solid);
     const legacy = slice.map((u) => u.legacy);
     const ranked = slice.map((u) => u.ranked);
+    const top5 = slice.map((u) => u.top5);
+    const top10 = slice.map((u) => u.top10);
+    const top15 = slice.map((u) => u.top15);
     const score = slice.map((u) => u.score);
     const undefeated = slice.map((u) => u.undefeated);
     await sql`
@@ -421,6 +588,9 @@ async function main() {
         solid_wins = v.solid,
         legacy_wins = v.legacy,
         ranked_wins = v.ranked,
+        top5_wins = v.top5,
+        top10_wins = v.top10,
+        top15_wins = v.top15,
         quality_wins_score = v.score,
         undefeated_bonus = v.undefeated
       FROM (
@@ -431,6 +601,9 @@ async function main() {
           UNNEST(${solid}::int[])       AS solid,
           UNNEST(${legacy}::int[])      AS legacy,
           UNNEST(${ranked}::int[])      AS ranked,
+          UNNEST(${top5}::int[])        AS top5,
+          UNNEST(${top10}::int[])       AS top10,
+          UNNEST(${top15}::int[])       AS top15,
           UNNEST(${score}::int[])       AS score,
           UNNEST(${undefeated}::int[])  AS undefeated
       ) AS v
