@@ -54,3 +54,6 @@ scripts/photo_scraper/venv/
 scripts/photo_scraper/.errors.jsonl
 scripts/photo_scraper/.cache/
 scripts/photo_scraper/**/__pycache__/
+
+# Python bytecode anywhere under scripts/
+scripts/**/__pycache__/

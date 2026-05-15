@@ -14,6 +14,7 @@ import {
 
 import {
   fighterStatusEnum,
+  rosterStatusEnum,
   stanceEnum,
   weightClassEnum,
 } from "./enums";
@@ -48,6 +49,19 @@ export const fighter = pgTable(
     careerStart: date("career_start"),
     careerEnd: date("career_end"),
     hallOfFameYear: integer("hall_of_fame_year"),
+
+    // Wave 3.5 step 6A.5: UFC roster membership tracked via roster.watch
+    // imports (scripts/import_roster_watch.ts). 'active' = currently on UFC
+    // contract; 'released' = ex-UFC found in roster.watch former roster;
+    // 'retired' = ex-UFC + HoF flag; 'inactive' = legacy fighter not in either
+    // roster.watch CSV; 'unknown' = never matched. Drives is_active and
+    // activity inputs in fighter_vertex_score view (Wave 3.5 step 6A.5.4).
+    rosterStatus: rosterStatusEnum("roster_status").default("unknown").notNull(),
+    rosterStatusUpdatedAt: timestamp("roster_status_updated_at", { withTimezone: true }),
+    hasUpcomingBout: boolean("has_upcoming_bout").default(false).notNull(),
+    nextEventDate: date("next_event_date"),
+    nextOpponentName: text("next_opponent_name"),
+    eloRosterWatch: integer("elo_roster_watch"),
 
     photoUrl: text("photo_url"),
     photoSilhouetteUrl: text("photo_silhouette_url"),
@@ -105,6 +119,8 @@ export const fighter = pgTable(
     index("fighter_name_en_idx").on(table.nameEn),
     index("fighter_weight_class_idx").on(table.weightClassPrimary),
     index("fighter_status_idx").on(table.status),
+    index("fighter_roster_status_idx").on(table.rosterStatus),
+    index("fighter_has_upcoming_bout_idx").on(table.hasUpcomingBout),
     index("fighter_name_en_trgm_idx").using(
       "gin",
       sql`${table.nameEn} gin_trgm_ops`,

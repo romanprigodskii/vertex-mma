@@ -29,6 +29,14 @@ export const fighterStatusEnum = pgEnum("fighter_status", [
   "suspended",
 ]);
 
+export const rosterStatusEnum = pgEnum("roster_status", [
+  "active",
+  "released",
+  "retired",
+  "inactive",
+  "unknown",
+]);
+
 export const promotionEnum = pgEnum("promotion", [
   "ufc",
   "bellator",

@@ -26,7 +26,8 @@
     "scrape:country:dry": "cd scripts/scraper && ./venv/bin/python scripts/06_backfill_country.py --dry-run --limit 5 --workers 1",
     "photos:setup": "cd scripts/photo_scraper && python3 -m venv venv && ./venv/bin/pip install -r requirements.txt",
     "photos:dry": "cd scripts/photo_scraper && ./venv/bin/python scripts/fetch_photos.py --limit 5 --dry-run",
-    "photos:fetch": "cd scripts/photo_scraper && ./venv/bin/python scripts/fetch_photos.py --workers 4"
+    "photos:fetch": "cd scripts/photo_scraper && ./venv/bin/python scripts/fetch_photos.py --workers 4",
+    "roster:import": "tsx scripts/import_roster_watch.ts"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.11",
