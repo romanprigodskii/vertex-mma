@@ -255,9 +255,20 @@ LEGACY_BLOCK_RE = re.compile(
     r'weight-class-name[^>]*>\s*([^<]+?)\s*<(.*?)(?=weight-class-name|</body)',
     re.DOTALL,
 )
+# The 2017-2018 legacy markup nests the champion's <a> two divs deep:
+#   <div class="rankings-champions">
+#     <div id="champion-fighter">
+#       Champion: <span id="champion-fighter-name"><a>NAME</a></span>
+#     </div>
+#   </div>
+# A lazy ".rankings-champions.*?<a" would falsely match the first contender
+# anchor in P4P (where rankings-champions is empty), so we anchor on the
+# more specific "champion-fighter-name" span — that string is only present
+# when the division has a real champion. UFC.com's 2017-2018 rankings page
+# didn't visually distinguish interim from undisputed champions; whoever
+# held the belt got the "Champion" label, which matches our rank=0 slot.
 LEGACY_CHAMPION_RE = re.compile(
-    r'rankings-champions[^>]*>\s*'
-    r'<a[^>]*>\s*([^<]+?)\s*</a>',
+    r'champion-fighter-name[^>]*>\s*<a[^>]*>\s*([^<]+?)\s*</a>',
     re.DOTALL,
 )
 LEGACY_ROW_RE = re.compile(
