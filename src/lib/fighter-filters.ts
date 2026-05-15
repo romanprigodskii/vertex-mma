@@ -46,14 +46,10 @@ const VALID_GENDERS: ReadonlySet<CatalogGenderFilter> = new Set([
 
 const VALID_WEIGHTS = new Set(WEIGHT_CLASSES.map((w) => w.id as string));
 const VALID_STANCES = new Set(["orthodox", "southpaw", "switch", "unknown"]);
-const VALID_STATUSES = new Set([
-  "all",
-  "active",
-  "released",
-  "retired",
-  "inactive",
-  "unknown",
-]);
+// Wave 6A.5b: import_roster_watch.ts now emits only 'active' or 'retired'.
+// URLs with status=released | inactive | unknown silently fall through to
+// the 'active' default.
+const VALID_STATUSES = new Set(["all", "active", "retired"]);
 
 function parseList(raw: string | null | undefined): string[] {
   if (!raw) return [];

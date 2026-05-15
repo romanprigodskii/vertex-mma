@@ -5,9 +5,17 @@
  *   imports/roster_current.csv  (data.csv from roster.watch — current UFC roster)
  *   imports/roster_former.csv   (former_data.csv — ex-UFC fighters)
  *
- * Updates per fighter (matched by normalized name_en):
- *   - roster_status: 'active' (in current), 'released' (in former, no hof),
- *     'retired' (in former with hof=TRUE), or left as 'unknown' if no match.
+ * Wave 6A.5b emits a binary roster_status (active or retired). The granular
+ * enum (released / inactive / unknown) stays in the DB schema so a future
+ * UI can reintroduce sub-states without a migration, but the importer no
+ * longer writes those values:
+ *   - 'active'  for fighters matched against roster_current.csv
+ *   - 'retired' for fighters matched against roster_former.csv (HoF or not)
+ *                AND for fighters not found in either CSV (the binary
+ *                default — better to under-feature an obscure ancient
+ *                fighter than to surface him on the active leaderboard).
+ *
+ * Other fields touched per fighter:
  *   - roster_status_updated_at = NOW()
  *   - has_upcoming_bout, next_event_date, next_opponent_name (current only)
  *   - elo_roster_watch (cross-reference ELO, not used in Vertex Score)
@@ -84,11 +92,34 @@ function normalizeName(name: string): string {
     .toLowerCase()
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
-    .replace(/[''`]/g, "")
-    .replace(/[.,]/g, "")
+    // Treat -, ', ', `, ., , and _ as word separators so "Cortes-Acosta"
+    // matches "Cortes Acosta" and "O'Malley" matches "OMalley".
+    .replace(/[-''`._,]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
+
+/** Surname-first ↔ given-first retry. Two-word names only — for longer
+ *  names the orderings diverge too quickly for a simple swap to help. */
+function reversedName(normalized: string): string {
+  const parts = normalized.split(" ").filter(Boolean);
+  if (parts.length !== 2) return normalized;
+  return `${parts[1]} ${parts[0]}`;
+}
+
+// DB-name → CSV-name aliases for fighters whose roster.watch entry uses a
+// fight-name pseudonym instead of their legal name. Add new aliases here
+// as we discover them in the post-import "Unmatched" log. Keys AND values
+// are normalised (lowercase, no punctuation) — match the output of
+// normalizeName above. Intentionally small; fuzzy matching is the wrong
+// escape hatch on 2700×2700.
+const NAME_ALIASES: Record<string, string> = {
+  "patricio pitbull": "patricio freire",
+  "cristiane justino": "cris cyborg",
+  "jacare souza": "ronaldo souza",
+  "zach reese": "zachary reese",
+  "xiong jingnan": "jingnan xiong",
+};
 
 function isNA(v: string | undefined | null): boolean {
   return !v || v === "NA" || v === "";
@@ -100,9 +131,14 @@ function parseIntOrNull(v: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+// Wave 6A.5b: roster_status emitted by this importer collapses to a
+// binary active/retired view. The granular enum (released/inactive/
+// unknown) stays in the DB for future use; the importer just no longer
+// writes those values. Anything not on the current roster bulk-resets
+// to 'retired' before the matched updates run.
 interface UpdateRow {
   slug: string;
-  roster_status: "active" | "released" | "retired";
+  roster_status: "active" | "retired";
   has_upcoming_bout: boolean;
   next_event_date: string | null;
   next_opponent_name: string | null;
@@ -154,15 +190,18 @@ async function main() {
 
   for (const f of dbFighters) {
     const norm = normalizeName(f.name_en);
-    let currentMatch = currentByName.get(norm);
-    let formerMatch = formerByName.get(norm);
-
-    if (!currentMatch && !formerMatch) {
-      // Try alias-based match if our DB has alternate spellings.
-      // This is a one-way map from alias -> slug; we already have the
-      // slug, so the only useful direction here is checking if our
-      // fighter has an alias that exists as a CSV name.
-      // (We iterate the alias list lazily below.)
+    // Try the normalized name, then a manual pseudonym alias, then a
+    // surname-first swap. dedupe so a 1-word name doesn't probe the
+    // map three times for the same key.
+    const tries = [norm, NAME_ALIASES[norm], reversedName(norm)].filter(
+      (s, i, arr): s is string => Boolean(s) && arr.indexOf(s) === i,
+    );
+    let currentMatch: Record<string, string> | undefined;
+    let formerMatch: Record<string, string> | undefined;
+    for (const candidate of tries) {
+      if (!currentMatch) currentMatch = currentByName.get(candidate);
+      if (!formerMatch) formerMatch = formerByName.get(candidate);
+      if (currentMatch || formerMatch) break;
     }
 
     if (currentMatch) {
@@ -180,10 +219,12 @@ async function main() {
       });
     } else if (formerMatch) {
       matchedFormer++;
-      const isRetired = formerMatch.hof === "TRUE";
+      // Binary status — released and HoF-retired blur together in the UI.
+      // ELO is preserved separately so future "show me genuine HoF
+      // retirees" filtering can still query championship_pedigree etc.
       updates.push({
         slug: f.slug,
-        roster_status: isRetired ? "retired" : "released",
+        roster_status: "retired",
         has_upcoming_bout: false,
         next_event_date: null,
         next_opponent_name: null,
@@ -219,10 +260,9 @@ async function main() {
     } else if (fr) {
       matchedFormer++;
       matchedViaAlias++;
-      const isRetired = fr.hof === "TRUE";
       updates.push({
         slug: a.slug,
-        roster_status: isRetired ? "retired" : "released",
+        roster_status: "retired",
         has_upcoming_bout: false,
         next_event_date: null,
         next_opponent_name: null,
@@ -232,43 +272,74 @@ async function main() {
     }
   }
 
+  // Add unmatched DB fighters to the updates list as explicit 'retired'.
+  // This way every fighter gets its row in the temp table and the bulk
+  // UPDATE touches all 2697 rows in one statement — no separate reset
+  // query (which itself hit statement_timeout on the pooler).
+  const updatedSlugs2 = new Set(updates.map((u) => u.slug));
+  for (const f of dbFighters) {
+    if (updatedSlugs2.has(f.slug)) continue;
+    updates.push({
+      slug: f.slug,
+      roster_status: "retired",
+      has_upcoming_bout: false,
+      next_event_date: null,
+      next_opponent_name: null,
+      elo_roster_watch: null,
+    });
+  }
+
   console.log(`\nMatch results:`);
   console.log(`  current (active):   ${matchedCurrent}`);
-  console.log(`  former (released/retired): ${matchedFormer}`);
+  console.log(`  former (retired):   ${matchedFormer}`);
   console.log(`  via alias:          ${matchedViaAlias}`);
   console.log(`  unmatched:          ${unmatched.length}`);
+  console.log(`  total updates:      ${updates.length}`);
 
-  // One transaction: reset everyone to 'unknown', then update matched
-  // fighters. Atomic + keeps the pooler connection alive throughout.
-  console.log(`\nApplying ${updates.length} updates in single transaction...`);
+  // Bulk update via a temp table. Row-by-row UPDATE through the Supabase
+  // session pooler exceeded statement_timeout at ~1400 rows, and even a
+  // single "UPDATE fighter SET roster_status='retired'" reset hit the
+  // same limit. The temp-table-and-join pattern stays well under the
+  // server timeout because each individual statement is fast.
+  console.log(`\nApplying ${updates.length} updates via temp table...`);
   await sql.begin(async (tx) => {
     await tx`
-      UPDATE fighter
-      SET roster_status = 'unknown',
-          has_upcoming_bout = false,
-          next_event_date = NULL,
-          next_opponent_name = NULL,
-          elo_roster_watch = NULL
+      CREATE TEMP TABLE _roster_updates (
+        slug text PRIMARY KEY,
+        roster_status text NOT NULL,
+        has_upcoming_bout boolean NOT NULL,
+        next_event_date date,
+        next_opponent_name text,
+        elo_roster_watch integer
+      ) ON COMMIT DROP
     `;
-    let done = 0;
-    for (const u of updates) {
-      await tx`
-        UPDATE fighter
-        SET roster_status = ${u.roster_status}::roster_status,
-            roster_status_updated_at = NOW(),
-            has_upcoming_bout = ${u.has_upcoming_bout},
-            next_event_date = ${u.next_event_date},
-            next_opponent_name = ${u.next_opponent_name},
-            elo_roster_watch = ${u.elo_roster_watch}
-        WHERE slug = ${u.slug}
-      `;
-      done++;
-      if (done % 250 === 0) {
-        process.stdout.write(`  ${done}/${updates.length}\r`);
-      }
-    }
+
+    // postgres-js bulk-insert helper: sql(rows, ...columnNames).
+    await tx`
+      INSERT INTO _roster_updates ${tx(
+        updates,
+        "slug",
+        "roster_status",
+        "has_upcoming_bout",
+        "next_event_date",
+        "next_opponent_name",
+        "elo_roster_watch",
+      )}
+    `;
+
+    await tx`
+      UPDATE fighter AS f
+      SET roster_status = u.roster_status::roster_status,
+          roster_status_updated_at = NOW(),
+          has_upcoming_bout = u.has_upcoming_bout,
+          next_event_date = u.next_event_date,
+          next_opponent_name = u.next_opponent_name,
+          elo_roster_watch = u.elo_roster_watch
+      FROM _roster_updates u
+      WHERE f.slug = u.slug
+    `;
   });
-  console.log(`\nUpdates applied.`);
+  console.log(`Updates applied.`);
 
   // Verification
   const counts = await sql<{ roster_status: string; n: number }[]>`

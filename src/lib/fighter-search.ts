@@ -125,9 +125,11 @@ export type FighterCatalogFilters = {
   country?: string[];
   stance?: string[];
   /** UFC roster membership from roster.watch (Wave 6A.5). Defaults to
-   *  "active" in the UI so the catalog opens with the ~600 currently-
-   *  rostered fighters instead of the full ~2700 historical archive. */
-  status?: "all" | "active" | "released" | "retired" | "inactive" | "unknown";
+   *  "active" in the UI so the catalog opens with the ~614 currently-
+   *  rostered fighters instead of the full ~2697 historical archive.
+   *  As of Wave 6A.5b the import emits a binary active/retired view
+   *  (released/inactive/unknown still in the enum but no longer written). */
+  status?: "all" | "active" | "retired";
   hasPhoto?: boolean;
   hallOfFame?: boolean;
   /** Vertex Score tier filter (score-based). Defaults to "all". */

@@ -222,9 +222,7 @@ export function FilterSidebar({
 
       <Section title="Status">
         <StatusRadio
-          value={
-            filters.status as "all" | "active" | "released" | "retired"
-          }
+          value={filters.status as "all" | "active" | "retired"}
           onChange={(status) => onChange({ status })}
         />
       </Section>
