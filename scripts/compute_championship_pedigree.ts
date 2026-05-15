@@ -3,7 +3,13 @@
  *
  * Pedigree mapping:
  *   - 100 if the fighter currently holds a UFC belt (any reign with endDate=null)
- *   -  80 if the fighter ever held a UFC belt but none currently
+ *   - 100 STICKY (Wave 6E.2) when the most recent closed reign ended via
+ *         `vacated` or `stripped` AND the fighter has not fought since the
+ *         vacate/strip date. Vacating/being stripped is a career decision,
+ *         not a result on the canvas, so CP doesn't drop until the next bout.
+ *   -  80 if the fighter ever held a UFC belt and (lost the most recent reign
+ *         in a bout, retired with it, or has already fought since vacating/
+ *         being stripped).
  *   -  40 if the fighter lost a UFC title fight without ever winning one
  *   -   0 otherwise (default, already in place from the column DEFAULT)
  *
@@ -19,6 +25,7 @@ import {
   isCurrentChampion,
   isDominantChampion,
   isFormerChampion,
+  mostRecentClosedReign,
 } from "../src/lib/championship-history";
 import {
   TITLE_CHALLENGES,
@@ -30,9 +37,21 @@ if (!url) throw new Error("DATABASE_URL not set");
 
 const sql = postgres(url, { prepare: false });
 
-function pedigreeFor(slug: string): number {
+/** Sticky CP rule (Wave 6E.2): a vacated or stripped reign keeps CP=100 only
+ *  until the fighter's next bout. `nextBoutDate` should be the slug's most
+ *  recent completed bout date (or null if they haven't fought since). */
+function pedigreeFor(slug: string, lastBoutDate: string | null): number {
   if (isCurrentChampion(slug)) return 100;
-  if (isFormerChampion(slug)) return 80;
+  if (isFormerChampion(slug)) {
+    const reign = mostRecentClosedReign(slug);
+    if (reign && (reign.endReason === "vacated" || reign.endReason === "stripped")) {
+      // Strictly greater — same-day bouts don't break stickiness, but anything
+      // after the vacate/strip date does. If lastBoutDate is null the fighter
+      // never fought since (rare), keep them at 100.
+      if (lastBoutDate == null || lastBoutDate <= reign.endDate!) return 100;
+    }
+    return 80;
+  }
   if (lostTitleChallenges(slug) > 0) return 40;
   return 0;
 }
@@ -49,12 +68,31 @@ async function main() {
   for (const r of CHAMPIONSHIP_HISTORY) slugs.add(r.slug);
   for (const c of TITLE_CHALLENGES) slugs.add(c.slug);
 
+  // Wave 6E.2: pre-fetch the most recent completed bout date per slug so we
+  // can apply the sticky-CP rule without a per-slug round-trip below.
+  const slugList = Array.from(slugs);
+  const boutDates = await sql<Array<{ slug: string; last_bout_date: string | null }>>`
+    SELECT
+      f.slug,
+      MAX(e.date)::text AS last_bout_date
+    FROM fighter f
+    LEFT JOIN bout b
+      ON (b.fighter_a_id = f.id OR b.fighter_b_id = f.id)
+     AND b.status = 'completed'
+    LEFT JOIN event e ON e.id = b.event_id
+    WHERE f.slug = ANY(${slugList})
+    GROUP BY f.slug
+  `;
+  const lastBoutBySlug = new Map<string, string | null>();
+  for (const r of boutDates) lastBoutBySlug.set(r.slug, r.last_bout_date);
+
   let updated = 0;
   let missing = 0;
   let dominantCount = 0;
+  let stickyCount = 0;
   const buckets = { 100: 0, 80: 0, 40: 0, 0: 0 };
   for (const slug of slugs) {
-    const ped = pedigreeFor(slug);
+    const ped = pedigreeFor(slug, lastBoutBySlug.get(slug) ?? null);
     if (ped === 0) continue; // shouldn't happen — every entry in either list yields ≥40
     const dominant = isDominantChampion(slug);
     const rows = await sql`
@@ -71,11 +109,14 @@ async function main() {
       updated += 1;
       buckets[ped as keyof typeof buckets] += 1;
       if (dominant) dominantCount += 1;
+      // Sticky-100 audit: former champ rendered as 100 means the rule fired.
+      if (ped === 100 && !isCurrentChampion(slug)) stickyCount += 1;
     }
   }
 
   console.log(`Updated ${updated} fighters; missing ${missing} slugs.`);
   console.log(`Buckets — current champ (100): ${buckets[100]}, former champ (80): ${buckets[80]}, lost challenger (40): ${buckets[40]}`);
+  console.log(`Sticky-100 (vacated/stripped, no bouts since): ${stickyCount}`);
   console.log(`Dominant champion flag set on ${dominantCount} fighters.`);
 
   await sql.end();
