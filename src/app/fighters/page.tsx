@@ -38,7 +38,7 @@ function toClientFilters(parsed: FighterCatalogFilters): CatalogFilterState {
     weight: parsed.weight ?? [],
     country: parsed.country ?? [],
     stance: parsed.stance ?? [],
-    status: parsed.status ?? "all",
+    status: parsed.status ?? "active",
     hasPhoto: parsed.hasPhoto ?? false,
     hallOfFame: parsed.hallOfFame ?? false,
     sort: parsed.sort ?? "vertex_current",

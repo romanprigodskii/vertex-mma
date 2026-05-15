@@ -124,7 +124,10 @@ export type FighterCatalogFilters = {
   weight?: string[];
   country?: string[];
   stance?: string[];
-  status?: "all" | "active" | "retired" | "inactive";
+  /** UFC roster membership from roster.watch (Wave 6A.5). Defaults to
+   *  "active" in the UI so the catalog opens with the ~600 currently-
+   *  rostered fighters instead of the full ~2700 historical archive. */
+  status?: "all" | "active" | "released" | "retired" | "inactive" | "unknown";
   hasPhoto?: boolean;
   hallOfFame?: boolean;
   /** Vertex Score tier filter (score-based). Defaults to "all". */
@@ -151,6 +154,13 @@ export type FighterCatalogRow = {
   country_code: string | null;
   stance: string | null;
   status: string | null;
+  /** roster.watch membership populated by scripts/import_roster_watch.ts:
+   *  active | released | retired | inactive | unknown. Drives the default
+   *  catalog filter so /fighters opens on the live UFC roster. */
+  roster_status: string;
+  has_upcoming_bout: boolean;
+  next_event_date: string | null;
+  next_opponent_name: string | null;
   hall_of_fame_year: number | null;
   wins_total: number;
   losses_total: number;
@@ -229,7 +239,10 @@ function buildWhere(filters: FighterCatalogFilters): SQL {
   }
 
   if (filters.status && filters.status !== "all") {
-    conditions.push(sql`f.status::text = ${filters.status}`);
+    // Wave 6C: status filter targets the roster_status column (populated
+    // by scripts/import_roster_watch.ts), not the legacy fighter.status
+    // enum which is defaulted to 'active' for nearly every fighter.
+    conditions.push(sql`f.roster_status::text = ${filters.status}`);
   }
 
   if (filters.hasPhoto) {
@@ -443,6 +456,10 @@ export async function searchFightersWithFilters(
       f.country_code,
       f.stance::text AS stance,
       f.status::text AS status,
+      f.roster_status::text AS roster_status,
+      f.has_upcoming_bout,
+      f.next_event_date,
+      f.next_opponent_name,
       f.hall_of_fame_year,
       COALESCE(f.wins_total, 0) AS wins_total,
       COALESCE(f.losses_total, 0) AS losses_total,
@@ -546,6 +563,10 @@ export async function getFightersBySlug(
       f.country_code,
       f.stance::text AS stance,
       f.status::text AS status,
+      f.roster_status::text AS roster_status,
+      f.has_upcoming_bout,
+      f.next_event_date,
+      f.next_opponent_name,
       f.hall_of_fame_year,
       COALESCE(f.wins_total, 0) AS wins_total,
       COALESCE(f.losses_total, 0) AS losses_total,

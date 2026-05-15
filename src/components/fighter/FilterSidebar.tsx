@@ -6,8 +6,10 @@ import { ChevronDown, X } from "lucide-react";
 import { CountrySelect } from "@/components/fighter/CountrySelect";
 import { SortDropdown } from "@/components/fighter/SortDropdown";
 import { StanceChips } from "@/components/fighter/StanceChips";
+import { ChampionRadio } from "@/components/fighter/ChampionRadio";
 import { GenderToggle } from "@/components/fighter/GenderToggle";
 import { StatusRadio } from "@/components/fighter/StatusRadio";
+import { TierRadio } from "@/components/fighter/TierRadio";
 import { WeightClassChips } from "@/components/fighter/WeightClassChips";
 import { Button } from "@/components/ui/button";
 import type {
@@ -57,7 +59,7 @@ export function activeFilterCount(filters: CatalogFilterState): number {
   if (filters.weight.length) n += 1;
   if (filters.country.length) n += 1;
   if (filters.stance.length) n += 1;
-  if (filters.status !== "all") n += 1;
+  if (filters.status !== "active") n += 1;
   if (filters.hasPhoto) n += 1;
   if (filters.hallOfFame) n += 1;
   if (filters.sort !== "vertex_current") n += 1;
@@ -220,8 +222,24 @@ export function FilterSidebar({
 
       <Section title="Status">
         <StatusRadio
-          value={filters.status}
+          value={
+            filters.status as "all" | "active" | "released" | "retired"
+          }
           onChange={(status) => onChange({ status })}
+        />
+      </Section>
+
+      <Section title="Tier">
+        <TierRadio
+          value={filters.tier}
+          onChange={(tier) => onChange({ tier })}
+        />
+      </Section>
+
+      <Section title="Champion">
+        <ChampionRadio
+          value={filters.champion}
+          onChange={(champion) => onChange({ champion })}
         />
       </Section>
 

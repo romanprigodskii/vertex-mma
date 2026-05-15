@@ -46,7 +46,14 @@ const VALID_GENDERS: ReadonlySet<CatalogGenderFilter> = new Set([
 
 const VALID_WEIGHTS = new Set(WEIGHT_CLASSES.map((w) => w.id as string));
 const VALID_STANCES = new Set(["orthodox", "southpaw", "switch", "unknown"]);
-const VALID_STATUSES = new Set(["all", "active", "retired", "inactive"]);
+const VALID_STATUSES = new Set([
+  "all",
+  "active",
+  "released",
+  "retired",
+  "inactive",
+  "unknown",
+]);
 
 function parseList(raw: string | null | undefined): string[] {
   if (!raw) return [];
@@ -80,10 +87,14 @@ export function parseCatalogFilters(
     .map((c) => c.toUpperCase())
     .filter((c) => c.length === 2);
 
+  // Wave 6C: default status is "active" (live UFC roster from roster.watch)
+  // so /fighters opens on the ~611 currently-rostered fighters instead of
+  // the full ~2697 historical archive. URLs without ?status= still resolve
+  // to active; pass `?status=all` for the legacy "everyone" view.
   const rawStatus = get("status");
   const status = rawStatus && VALID_STATUSES.has(rawStatus)
     ? (rawStatus as FighterCatalogFilters["status"])
-    : "all";
+    : "active";
 
   const rawSort = get("sort");
   // Default sort is Vertex Score (current) as of Wave 3.5 step 4A. Old URLs

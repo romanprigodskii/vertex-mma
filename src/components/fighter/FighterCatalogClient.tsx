@@ -41,7 +41,9 @@ const DEFAULT_FILTERS: CatalogFilterState = {
   weight: [],
   country: [],
   stance: [],
-  status: "all",
+  // Wave 6C: catalog default is the live UFC roster (~611 fighters).
+  // "Clear filters" returns here, not to the legacy "everyone" view.
+  status: "active",
   hasPhoto: false,
   hallOfFame: false,
   sort: "vertex_current",
@@ -57,7 +59,9 @@ function serializeFilters(filters: CatalogFilterState): URLSearchParams {
   if (filters.weight.length) params.set("weight", filters.weight.join(","));
   if (filters.country.length) params.set("country", filters.country.join(","));
   if (filters.stance.length) params.set("stance", filters.stance.join(","));
-  if (filters.status !== "all") params.set("status", filters.status);
+  // Status only enters the URL when it differs from the new default ("active").
+  // ?status=all is now an explicit opt-in to the historical archive.
+  if (filters.status !== "active") params.set("status", filters.status);
   if (filters.hasPhoto) params.set("has_photo", "1");
   if (filters.hallOfFame) params.set("hof", "1");
   if (filters.sort !== "vertex_current") params.set("sort", filters.sort);
