@@ -57,3 +57,10 @@ scripts/photo_scraper/**/__pycache__/
 
 # Python bytecode anywhere under scripts/
 scripts/**/__pycache__/
+
+# Wave 6C.1 — raw Wayback HTML corpus (~53 MB, regenerable from
+# scripts/scrape_ufc_rankings.py + backfill_rankings_gaps.py)
+imports/ufc_rankings_raw/
+
+# One-off importer/scraper logs land alongside their script
+scripts/*.log

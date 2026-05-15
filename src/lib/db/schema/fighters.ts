@@ -7,8 +7,10 @@ import {
   integer,
   pgTable,
   real,
+  smallint,
   text,
   timestamp,
+  unique,
   uuid,
 } from "drizzle-orm/pg-core";
 
@@ -101,6 +103,16 @@ export const fighter = pgTable(
     vertexScore: integer("vertex_score"),
     vertexScoreAllTime: integer("vertex_score_all_time"),
 
+    // Wave 6C.1: roster.watch extension fields. peak_rank uses -1 for
+    // "was champion", 1..15 for "peaked at that contender slot", NULL
+    // for "never ranked". Same shape for peak_p4p. current_streak is
+    // the W/L counter from roster.watch (positive = win streak, negative
+    // = losing). Wave 6C.2 reads peak_rank as a fallback when a bout
+    // pre-dates 2017 and ranking_snapshot has no row.
+    peakRank: smallint("peak_rank"),
+    peakP4p: smallint("peak_p4p"),
+    currentStreak: smallint("current_streak"),
+
     ufcStatsId: text("ufc_stats_id").unique(),
     sherdogId: text("sherdog_id").unique(),
     tapologyId: text("tapology_id").unique(),
@@ -189,5 +201,55 @@ export const fighterStatsAggregate = pgTable("fighter_stats_aggregate", {
     .notNull(),
 });
 
+// Wave 6C.1: historical UFC.com/rankings snapshots from Wayback Machine.
+// One row per (snapshot_date, division, rank, fighter_name_raw, is_women).
+// rank=0 is the champion slot (interim listed in the same slot per UFC's
+// page); rank=1..15 are contenders. fighter_id is nullable because
+// fuzzy-matching can fail — we keep fighter_name_raw and let a future
+// re-match pass resolve it. is_women disambiguates men's vs women's
+// flyweight/bantamweight (the weight_class enum is gender-agnostic).
+// fighter_name_raw is part of the unique key so genuine UFC tied-rank
+// publications (~406 of 38,490 source rows) round-trip without conflict.
+export const rankingSnapshot = pgTable(
+  "ranking_snapshot",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    snapshotDate: date("snapshot_date").notNull(),
+    division: weightClassEnum("division").notNull(),
+    isWomen: boolean("is_women").default(false).notNull(),
+    rank: smallint("rank").notNull(),
+    fighterId: uuid("fighter_id").references(() => fighter.id, {
+      onDelete: "set null",
+    }),
+    fighterNameRaw: text("fighter_name_raw").notNull(),
+    sourceUrl: text("source_url").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    unique("ranking_snapshot_unique").on(
+      table.snapshotDate,
+      table.division,
+      table.rank,
+      table.fighterNameRaw,
+      table.isWomen,
+    ),
+    index("ranking_snapshot_date_idx").on(table.snapshotDate),
+    index("ranking_snapshot_fighter_idx").on(table.fighterId),
+    index("ranking_snapshot_div_date_idx").on(
+      table.division,
+      sql`${table.snapshotDate} DESC`,
+    ),
+    index("ranking_snapshot_gender_div_date_idx").on(
+      table.division,
+      table.isWomen,
+      sql`${table.snapshotDate} DESC`,
+    ),
+  ],
+);
+
 export type Fighter = typeof fighter.$inferSelect;
 export type NewFighter = typeof fighter.$inferInsert;
+export type RankingSnapshot = typeof rankingSnapshot.$inferSelect;
+export type NewRankingSnapshot = typeof rankingSnapshot.$inferInsert;

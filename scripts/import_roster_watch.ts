@@ -5,15 +5,21 @@
  *   imports/roster_current.csv  (data.csv from roster.watch — current UFC roster)
  *   imports/roster_former.csv   (former_data.csv — ex-UFC fighters)
  *
- * Wave 6A.5b emits a binary roster_status (active or retired). The granular
- * enum (released / inactive / unknown) stays in the DB schema so a future
- * UI can reintroduce sub-states without a migration, but the importer no
- * longer writes those values:
- *   - 'active'  for fighters matched against roster_current.csv
- *   - 'retired' for fighters matched against roster_former.csv (HoF or not)
- *                AND for fighters not found in either CSV (the binary
- *                default — better to under-feature an obscure ancient
- *                fighter than to surface him on the active leaderboard).
+ * Roster status, derived per fighter:
+ *   - 'active'   for fighters in roster_current.csv
+ *   - 'retired'  for fighters in roster_former.csv with hof='TRUE'
+ *                (Hall of Famers and other genuine retirees — ~40 of 2078)
+ *                AND for fighters not found in either CSV (older / obscure
+ *                ancient fighters; safer to keep them off the active
+ *                leaderboard than to surface them as released).
+ *   - 'released' for fighters in roster_former.csv with hof='NA'
+ *                (the bulk of former_data.csv — fighters cut from the roster
+ *                without a HoF or formal-retirement classification).
+ *
+ * The split was added in Wave 6C.1 task 5. Before then the importer
+ * collapsed all of former_data.csv into 'retired', leaving the 'released'
+ * enum value unused (0 rows). The 'inactive' / 'unknown' enum values
+ * remain reserved for a future UI without requiring a schema change.
  *
  * Other fields touched per fighter:
  *   - roster_status_updated_at = NOW()
@@ -105,6 +111,13 @@ function reversedName(normalized: string): string {
   const parts = normalized.split(" ").filter(Boolean);
   if (parts.length !== 2) return normalized;
   return `${parts[1]} ${parts[0]}`;
+}
+
+/** Map a former_data.csv row's hof column to a roster_status. The column
+ *  is "TRUE" for Hall-of-Famers and other genuine retirees and "NA" for
+ *  released-but-not-retired fighters. */
+function formerStatus(row: Record<string, string>): "retired" | "released" {
+  return row.hof === "TRUE" ? "retired" : "released";
 }
 
 // DB-name → CSV-name aliases for fighters whose roster.watch entry uses a
@@ -219,12 +232,9 @@ async function main() {
       });
     } else if (formerMatch) {
       matchedFormer++;
-      // Binary status — released and HoF-retired blur together in the UI.
-      // ELO is preserved separately so future "show me genuine HoF
-      // retirees" filtering can still query championship_pedigree etc.
       updates.push({
         slug: f.slug,
-        roster_status: "retired",
+        roster_status: formerStatus(formerMatch),
         has_upcoming_bout: false,
         next_event_date: null,
         next_opponent_name: null,
@@ -262,7 +272,7 @@ async function main() {
       matchedViaAlias++;
       updates.push({
         slug: a.slug,
-        roster_status: "retired",
+        roster_status: formerStatus(fr),
         has_upcoming_bout: false,
         next_event_date: null,
         next_opponent_name: null,
@@ -291,7 +301,7 @@ async function main() {
 
   console.log(`\nMatch results:`);
   console.log(`  current (active):   ${matchedCurrent}`);
-  console.log(`  former (retired):   ${matchedFormer}`);
+  console.log(`  former (split):     ${matchedFormer}`);
   console.log(`  via alias:          ${matchedViaAlias}`);
   console.log(`  unmatched:          ${unmatched.length}`);
   console.log(`  total updates:      ${updates.length}`);

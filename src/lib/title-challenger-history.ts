@@ -49,6 +49,8 @@ export const TITLE_CHALLENGES: readonly TitleChallenge[] = [
   { slug: "aleksandar-rakic-333b9e",  weightClass: "light_heavyweight", date: "2022-05-07", result: "lost" }, // UFC 274 vs Blachowicz — actually #1 contender, not title. Trimmed.
 
   // ===== Heavyweight =====
+  { slug: "ciryl-gane-787bb1",        weightClass: "heavyweight", date: "2022-01-22", result: "lost" }, // UFC 270 vs Ngannou
+  { slug: "ciryl-gane-787bb1",        weightClass: "heavyweight", date: "2023-03-04", result: "lost" }, // UFC 285 vs Jones (vacant)
   { slug: "travis-browne-3236bf",     weightClass: "heavyweight", date: "2015-09-05", result: "lost" }, // UFC 191? Browne never had a HW title shot. Trimmed below.
 
   // ===== Lightweight =====
