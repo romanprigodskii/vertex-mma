@@ -61,10 +61,14 @@ type FighterRow = {
 
 // Letters that don't decompose under NFKD (so the combining-diacritic
 // strip below can't reach them). Keep this list minimal and additive —
-// only entries we've actually observed failing in the unmatched report.
+// only entries we've actually observed failing OR that are commonly
+// seen in MMA roster names (Polish, Czech/Croatian/Vietnamese).
 //   ł / Ł — UFC.com uses Polish "Jan Błachowicz"; UFCStats has plain l.
+//   đ / Đ — Vietnamese/Croatian (e.g. "Đặng", "Marko Nikolić-Đorđević")
+//           appear in roster.watch occasionally; defensive add.
 const PRECOMPOSED_LATIN_MAP: Record<string, string> = {
   "ł": "l", "Ł": "L",
+  "đ": "d", "Đ": "D",
 };
 
 function normalizeName(name: string): string {
