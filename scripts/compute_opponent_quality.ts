@@ -495,6 +495,51 @@ async function main() {
     }
   }
 
+  // -------- Pass 3 (Wave 6E.4 Part A): persist per-bout opp_tier into the
+  // bout_opponent_tier table for ALL completed bouts (wins AND losses). The
+  // recent_bouts_window CTE in fighter_vertex_score (Part B) consumes this
+  // to opp-adjust the last-5-bouts performance signals.
+  //
+  // We pass an empty fighter slug into classifyChampion so the "fighter is
+  // active champion ⇒ apex" path (which credits champion title-defense
+  // wins as apex regardless of challenger pedigree) does NOT fire here.
+  // bout_opponent_tier is an opp-quality measure, not a bout-prestige one
+  // — a champion's title defense vs an unranked challenger should record
+  // the challenger's actual tier, not apex.
+  console.log("Pass 3: computing per-bout opp_tier_value for bout_opponent_tier...");
+  type BoutTierRow = {
+    bout_id: string;
+    fighter_id: string;
+    value: number;
+    label: string;
+  };
+  const boutTierRows: BoutTierRow[] = [];
+
+  for (const [fighterId, bouts] of byFighter) {
+    for (const b of bouts) {
+      const opponentBouts = byFighter.get(b.opponent_id) ?? [];
+      const champ = classifyChampion(
+        "",
+        b.date,
+        b.opponent_slug,
+        opponentBouts,
+        rankedEligibleSlugs,
+      );
+      const { tier: rank } = classifyByRank(b.opponent_id, b.date);
+      const champW = CHAMP_TIER_WEIGHT[champ];
+      const rankW = RANK_TIER_WEIGHT[rank];
+      const value = rankW > champW ? rankW : champW;
+      const label = rankW > champW ? rank : champ;
+      boutTierRows.push({
+        bout_id: b.bout_id,
+        fighter_id: fighterId,
+        value,
+        label,
+      });
+    }
+  }
+  console.log(`  ${boutTierRows.length} (bout, fighter) tier rows prepared`);
+
   // -------- Write back
   console.log("Writing fighter rows...");
   const updates: Array<{
@@ -617,6 +662,35 @@ async function main() {
   }
 
   console.log(`Updated ${updates.length} fighters.`);
+
+  // Wave 6E.4 Part A: batched UPSERT into bout_opponent_tier. Truncate first
+  // so a re-run with adjusted classification rules can't leave orphan rows
+  // from bouts removed upstream. Same idempotency contract as the fighter
+  // counter update above.
+  await sql`TRUNCATE TABLE bout_opponent_tier`;
+  const TIER_CHUNK = 1000;
+  for (let i = 0; i < boutTierRows.length; i += TIER_CHUNK) {
+    const slice = boutTierRows.slice(i, i + TIER_CHUNK);
+    const boutIds = slice.map((r) => r.bout_id);
+    const fighterIds = slice.map((r) => r.fighter_id);
+    const values = slice.map((r) => r.value);
+    const labels = slice.map((r) => r.label);
+    await sql`
+      INSERT INTO bout_opponent_tier (bout_id, fighter_id, opp_tier_value, opp_tier_label)
+      SELECT
+        UNNEST(${boutIds}::uuid[])    AS bout_id,
+        UNNEST(${fighterIds}::uuid[]) AS fighter_id,
+        UNNEST(${values}::int[])      AS opp_tier_value,
+        UNNEST(${labels}::text[])     AS opp_tier_label
+      ON CONFLICT (bout_id, fighter_id) DO UPDATE
+        SET opp_tier_value = EXCLUDED.opp_tier_value,
+            opp_tier_label = EXCLUDED.opp_tier_label
+    `;
+  }
+  const [{ count: tierRowCount }] = await sql<{ count: number }[]>`
+    SELECT COUNT(*)::int AS count FROM bout_opponent_tier
+  `;
+  console.log(`bout_opponent_tier now has ${tierRowCount} rows.`);
 
   // Quick sanity print
   const sanity = await sql<Array<{
