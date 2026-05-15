@@ -66,8 +66,13 @@ export const CHAMPIONSHIP_HISTORY: readonly ChampionshipReign[] = [
   // ============================================================
   // HEAVYWEIGHT
   // ============================================================
-  { slug: "tom-aspinall-399afb",     weightClass: "heavyweight", startDate: "2025-10-25", endDate: null,         defenses: 0 },
-  { slug: "tom-aspinall-399afb",     weightClass: "heavyweight", startDate: "2023-11-11", endDate: "2025-10-25", defenses: 1, isInterim: true }, // vs Blaydes (UFC 304); unified at 321
+  // Wave 7B: merged into one continuous reign per dev's correction.
+  // Aspinall won the interim title at UFC 295 (2023-11-11 vs Pavlovich)
+  // and was elevated to undisputed on 2025-06-21 when Jon Jones retired
+  // (status change within the reign, not a new reign). UFC 321 (2025-10-25)
+  // vs Gane was a no-contest (eye poke R1) — not a successful title defense.
+  // defenses: 1 = Blaydes KO at UFC 304.
+  { slug: "tom-aspinall-399afb",     weightClass: "heavyweight", startDate: "2023-11-11", endDate: null,         defenses: 1 },
   { slug: "jon-jones-07f72a",        weightClass: "heavyweight", startDate: "2023-03-04", endDate: "2025-06-21", defenses: 1, endReason: "retired" }, // vs Stipe; then retired holding the belt
   { slug: "francis-ngannou-8d03ce",  weightClass: "heavyweight", startDate: "2021-03-27", endDate: "2023-01-14", defenses: 1, endReason: "vacated" }, // vs Gane; vacated, left UFC
   { slug: "stipe-miocic-d28dee",     weightClass: "heavyweight", startDate: "2019-08-17", endDate: "2021-03-27", defenses: 1 }, // reign 2 — vs DC 3
@@ -157,7 +162,7 @@ export const CHAMPIONSHIP_HISTORY: readonly ChampionshipReign[] = [
   // LIGHTWEIGHT
   // ============================================================
   { slug: "ilia-topuria-54f64b",          weightClass: "lightweight", startDate: "2025-06-28", endDate: null,         defenses: 0 },
-  { slug: "islam-makhachev-275aca",       weightClass: "lightweight", startDate: "2022-10-22", endDate: "2025-02-21", defenses: 4, endReason: "vacated" }, // Volkanovski 1, Volkanovski 2, Poirier, Moicano; vacated to WW
+  { slug: "islam-makhachev-275aca",       weightClass: "lightweight", startDate: "2022-10-22", endDate: "2025-05-13", defenses: 4, endReason: "vacated" }, // Volkanovski 1, Volkanovski 2, Poirier, Moicano; vacated to WW (Dana White announcement)
   { slug: "charles-oliveira-07225b",      weightClass: "lightweight", startDate: "2021-05-15", endDate: "2022-05-06", defenses: 1, endReason: "stripped" }, // Poirier — stripped at weigh-ins
   { slug: "khabib-nurmagomedov-032cc3",   weightClass: "lightweight", startDate: "2018-04-07", endDate: "2021-03-19", defenses: 3, endReason: "retired" }, // Conor, Poirier, Gaethje; retired holding the belt
   { slug: "conor-mcgregor-f4c499",        weightClass: "lightweight", startDate: "2016-11-12", endDate: "2018-04-07", defenses: 0, endReason: "stripped" }, // stripped (inactivity)
@@ -179,7 +184,7 @@ export const CHAMPIONSHIP_HISTORY: readonly ChampionshipReign[] = [
   // FEATHERWEIGHT
   // ============================================================
   { slug: "alexander-volkanovski-e12489", weightClass: "featherweight", startDate: "2025-04-12", endDate: null,         defenses: 1 }, // reign 2 — Lopes 2
-  { slug: "ilia-topuria-54f64b",          weightClass: "featherweight", startDate: "2024-02-17", endDate: "2025-02-21", defenses: 1, endReason: "vacated" }, // Holloway; vacated to LW
+  { slug: "ilia-topuria-54f64b",          weightClass: "featherweight", startDate: "2024-02-17", endDate: "2025-02-19", defenses: 1, endReason: "vacated" }, // Holloway; vacated to LW (announcement)
   { slug: "alexander-volkanovski-e12489", weightClass: "featherweight", startDate: "2019-12-14", endDate: "2024-02-17", defenses: 4 }, // reign 1 — Holloway 2, Ortega, Korean Zombie, Rodriguez
   { slug: "max-holloway-150ff4",          weightClass: "featherweight", startDate: "2017-06-03", endDate: "2019-12-14", defenses: 2 }, // Aldo 3, Ortega
   { slug: "jose-aldo-d0f395",             weightClass: "featherweight", startDate: "2010-11-20", endDate: "2015-12-12", defenses: 7 }, // WEC→UFC merger; Hominick, Florian, Mendes 1, Edgar 1, Korean Zombie, Lamas, Mendes 2

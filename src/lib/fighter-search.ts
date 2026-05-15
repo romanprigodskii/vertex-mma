@@ -221,7 +221,14 @@ function buildWhere(filters: FighterCatalogFilters): SQL {
       filters.weight.map((v) => sql`${v}`),
       sql`, `,
     );
-    conditions.push(sql`f.weight_class_primary::text IN (${values})`);
+    // Wave 7A: prefer the division of the last completed UFC bout
+    // (populated by scripts/compute_current_division.ts). Falls back
+    // to weight_class_primary for fighters with no completed bouts so
+    // signed-but-unfought prospects still show under their assigned
+    // class.
+    conditions.push(
+      sql`COALESCE(f.current_division, f.weight_class_primary::text) IN (${values})`,
+    );
   }
 
   if (filters.country && filters.country.length > 0) {
