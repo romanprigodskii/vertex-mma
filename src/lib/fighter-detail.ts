@@ -176,6 +176,11 @@ export type FighterBoutRound = {
   kd_landed: number;
   kd_absorbed: number;
   control_seconds: number;
+  /** Wave 6E: bout-level fields exposed per row so the UI can pro-rate the
+   *  finishing round to a 5-minute equivalent. Both NULL when the scraper
+   *  didn't record the finish meta. */
+  round_finished: number | null;
+  time_finished_seconds: number | null;
 };
 
 /** Fetch a fighter row by slug or return null. Uses the catalog view so the
@@ -282,7 +287,9 @@ export async function getFighterBoutRounds(
       brs.sub_attempts,
       brs.knockdowns AS kd_landed,
       COALESCE(opp.knockdowns, 0) AS kd_absorbed,
-      brs.control_time_seconds AS control_seconds
+      brs.control_time_seconds AS control_seconds,
+      b.round_finished,
+      b.time_finished_seconds
     FROM bout_round_stats brs
     JOIN bout b ON b.id = brs.bout_id
     JOIN event e ON e.id = b.event_id

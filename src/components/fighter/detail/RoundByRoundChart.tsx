@@ -3,6 +3,7 @@
 import * as React from "react";
 
 import type { FighterBoutRound } from "@/lib/fighter-detail";
+import { proRateToFullRound } from "@/lib/round-stats";
 import { cn } from "@/lib/utils";
 
 interface RoundByRoundChartProps {
@@ -188,8 +189,20 @@ function aggregateByRound(entries: FighterBoutRound[]): RoundAggregate[] {
     (a, b) => a[0] - b[0],
   )) {
     const n = items.length;
+    // Wave 6E: bouts that ended in this exact round contributed a *partial*
+    // round; pro-rate that entry's stat up to a 5-minute equivalent so a
+    // finisher's last-round line reflects per-round pace, not a short window.
+    // Rounds that were full 5 minutes pass through unchanged.
     const avg = (col: keyof FighterBoutRound) =>
-      items.reduce((acc, it) => acc + Number(it[col] ?? 0), 0) / n;
+      items.reduce((acc, it) => {
+        const raw = Number(it[col] ?? 0);
+        return acc + proRateToFullRound(
+          raw,
+          it.round,
+          it.round_finished,
+          it.time_finished_seconds,
+        );
+      }, 0) / n;
     const values = {} as Record<MetricKey, number>;
     for (const m of METRICS) values[m.key] = avg(m.column);
     rounds.push({ round, sample_size: n, values });
