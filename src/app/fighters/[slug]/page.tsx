@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeftRight, ChevronLeft, ChevronRight } from "lucide-react";
 
+import { CircleScore, OctagonScore } from "@/components/fighter/ScoreShapes";
 import { CareerOverview } from "@/components/fighter/detail/CareerOverview";
 import { CareerTimeline } from "@/components/fighter/detail/CareerTimeline";
 import { FightHistoryList } from "@/components/fighter/detail/FightHistoryList";
@@ -117,6 +118,33 @@ export default async function FighterDetailPage({ params }: PageProps) {
         </div>
 
         <FighterHero fighter={fighter} championEntry={championEntry} />
+
+        <Container size="xl" className="pt-8">
+          <div className="flex items-center justify-center gap-3 sm:gap-6">
+            <OctagonScore
+              score={fighter.vertex_score}
+              scoreMode="current"
+              fighter={{
+                slug: fighter.slug,
+                vertexScore: fighter.vertex_score,
+                vertexScoreAllTime: fighter.vertex_score_all_time,
+                ufcBouts: fighter.ufc_total,
+              }}
+              label="Current Vertex Score"
+            />
+            <CircleScore
+              score={fighter.vertex_score_all_time}
+              scoreMode="all_time"
+              fighter={{
+                slug: fighter.slug,
+                vertexScore: fighter.vertex_score,
+                vertexScoreAllTime: fighter.vertex_score_all_time,
+                ufcBouts: fighter.ufc_total,
+              }}
+              label="All-Time Vertex Score"
+            />
+          </div>
+        </Container>
 
         {/* Quick-action CTAs */}
         <Container size="xl" className="pt-6">

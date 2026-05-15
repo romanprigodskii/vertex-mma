@@ -61,6 +61,8 @@ export type FighterDetail = {
   current_streak_type: "W" | "L" | null;
   current_streak_count: number;
   bout_count: number;
+  vertex_score: number | null;
+  vertex_score_all_time: number | null;
 };
 
 export type FightHistoryEntry = {
@@ -232,7 +234,9 @@ export async function getFighterBySlug(
       f.last_fight_method,
       f.current_streak_type,
       f.current_streak_count,
-      f.bout_count::int AS bout_count
+      f.bout_count::int AS bout_count,
+      f.vertex_score,
+      f.vertex_score_all_time
     FROM fighter_with_stats f
     WHERE f.slug = ${slug}
     LIMIT 1
