@@ -291,6 +291,14 @@ export function isFormerChampion(slug: string): boolean {
   return REIGNS_BY_SLUG.has(slug);
 }
 
+/** True iff the fighter held UFC titles but every reign was interim.
+ *  Wave 10B uses this to cap CP at 70 instead of the undisputed-former 80. */
+export function hasOnlyInterimReigns(slug: string): boolean {
+  const reigns = REIGNS_BY_SLUG.get(slug);
+  if (!reigns || reigns.length === 0) return false;
+  return reigns.every((r) => r.isInterim === true);
+}
+
 /** Distinct undisputed weight classes the fighter has held a UFC title in.
  *  Interim reigns are excluded — "double champion" historically means two
  *  undisputed belts. */

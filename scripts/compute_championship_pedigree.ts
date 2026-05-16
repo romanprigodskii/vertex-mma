@@ -2,14 +2,13 @@
  * Backfills fighter.championship_pedigree from the curated TS data files.
  *
  * Pedigree mapping:
- *   - 100 if the fighter currently holds a UFC belt (any reign with endDate=null)
- *   - 100 STICKY (Wave 6E.2) when the most recent closed reign ended via
- *         `vacated` or `stripped` AND the fighter has not fought since the
- *         vacate/strip date. Vacating/being stripped is a career decision,
- *         not a result on the canvas, so CP doesn't drop until the next bout.
- *   -  80 if the fighter ever held a UFC belt and (lost the most recent reign
- *         in a bout, retired with it, or has already fought since vacating/
- *         being stripped).
+ *   - 100 if the fighter currently holds a UFC undisputed belt
+ *   - 100 STICKY (Wave 6E.2) for vacated/stripped undisputed reigns where the
+ *         fighter hasn't fought since (Wave 10B: rule does NOT apply to
+ *         interim-only fighters)
+ *   -  80 if the fighter held a UFC undisputed belt (former champion via bout
+ *         loss, retirement, or already-fought-since-vacate)
+ *   -  70 if the fighter has held only INTERIM UFC titles (Wave 10B)
  *   -  40 if the fighter lost a UFC title fight without ever winning one
  *   -   0 otherwise (default, already in place from the column DEFAULT)
  *
@@ -22,6 +21,7 @@ import postgres from "postgres";
 
 import {
   CHAMPIONSHIP_HISTORY,
+  hasOnlyInterimReigns,
   isCurrentChampion,
   isDominantChampion,
   isFormerChampion,
@@ -39,10 +39,21 @@ const sql = postgres(url, { prepare: false });
 
 /** Sticky CP rule (Wave 6E.2): a vacated or stripped reign keeps CP=100 only
  *  until the fighter's next bout. `nextBoutDate` should be the slug's most
- *  recent completed bout date (or null if they haven't fought since). */
+ *  recent completed bout date (or null if they haven't fought since).
+ *
+ *  Wave 10B: fighters whose only reigns are interim cap at 70 (not 80) and
+ *  the sticky rule does not apply to them — interim is a procedural sub-title,
+ *  not an undisputed claim. */
 function pedigreeFor(slug: string, lastBoutDate: string | null): number {
-  if (isCurrentChampion(slug)) return 100;
+  const interimOnly = hasOnlyInterimReigns(slug);
+  if (isCurrentChampion(slug)) {
+    // Edge case: someone currently holds ONLY an interim belt → cap at 70.
+    // No fighter matches today, but be defensive.
+    return interimOnly ? 70 : 100;
+  }
   if (isFormerChampion(slug)) {
+    // Wave 10B: interim-only fighters max at 70, sticky rule skipped.
+    if (interimOnly) return 70;
     const reign = mostRecentClosedReign(slug);
     if (reign && (reign.endReason === "vacated" || reign.endReason === "stripped")) {
       // Strictly greater — same-day bouts don't break stickiness, but anything
@@ -90,7 +101,7 @@ async function main() {
   let missing = 0;
   let dominantCount = 0;
   let stickyCount = 0;
-  const buckets = { 100: 0, 80: 0, 40: 0, 0: 0 };
+  const buckets = { 100: 0, 80: 0, 70: 0, 40: 0, 0: 0 };
   for (const slug of slugs) {
     const ped = pedigreeFor(slug, lastBoutBySlug.get(slug) ?? null);
     if (ped === 0) continue; // shouldn't happen — every entry in either list yields ≥40
@@ -115,7 +126,7 @@ async function main() {
   }
 
   console.log(`Updated ${updated} fighters; missing ${missing} slugs.`);
-  console.log(`Buckets — current champ (100): ${buckets[100]}, former champ (80): ${buckets[80]}, lost challenger (40): ${buckets[40]}`);
+  console.log(`Buckets — current champ (100): ${buckets[100]}, former champ (80): ${buckets[80]}, interim-only (70): ${buckets[70]}, lost challenger (40): ${buckets[40]}`);
   console.log(`Sticky-100 (vacated/stripped, no bouts since): ${stickyCount}`);
   console.log(`Dominant champion flag set on ${dominantCount} fighters.`);
 
