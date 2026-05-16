@@ -90,6 +90,14 @@ export const fighter = pgTable(
     //   UFC bouts; drops Activity, adds Peak, applies a flat total-loss
     //   penalty so retired legends and journeymen calibrate correctly.
     championshipPedigree: integer("championship_pedigree").default(0).notNull(),
+    // Wave 12: derived bucket used in current_score formula in place of
+    // championship_pedigree. Populated by scripts/compute_current_cp.ts
+    // after compute_championship_pedigree.ts. Applies time-decay +
+    // recent-opp-quality bonus to former-champion buckets (80/70); other
+    // buckets (100/90/40/0) pass through unchanged. championship_pedigree
+    // itself remains the eternal-legacy value used by all_time_score and
+    // UI tier classification.
+    currentCp: smallint("current_cp").default(0).notNull(),
     isDominantChampion: boolean("is_dominant_champion").default(false).notNull(),
     // Wave 3.5 step 5F: +30 added to quality_wins_score (above its 100 cap)
     // for fighters with 0 real UFC losses (DQ excluded), 8+ wins, and any
