@@ -6,9 +6,10 @@
  *   - 100 STICKY (Wave 6E.2) for vacated/stripped undisputed reigns where the
  *         fighter hasn't fought since (Wave 10B: rule does NOT apply to
  *         interim-only fighters)
+ *   -  90 if the fighter currently holds ONLY a UFC interim belt (Wave 10B.1)
  *   -  80 if the fighter held a UFC undisputed belt (former champion via bout
  *         loss, retirement, or already-fought-since-vacate)
- *   -  70 if the fighter has held only INTERIM UFC titles (Wave 10B)
+ *   -  70 if the fighter has held only FORMER interim UFC titles (Wave 10B)
  *   -  40 if the fighter lost a UFC title fight without ever winning one
  *   -   0 otherwise (default, already in place from the column DEFAULT)
  *
@@ -47,9 +48,10 @@ const sql = postgres(url, { prepare: false });
 function pedigreeFor(slug: string, lastBoutDate: string | null): number {
   const interimOnly = hasOnlyInterimReigns(slug);
   if (isCurrentChampion(slug)) {
-    // Edge case: someone currently holds ONLY an interim belt → cap at 70.
-    // No fighter matches today, but be defensive.
-    return interimOnly ? 70 : 100;
+    // Currently holds only an interim belt — CP=90 (between former-undisputed 80
+    // and current undisputed 100). Wave 10B.1. No fighter matches today;
+    // forward-defensive for next interim crowning.
+    return interimOnly ? 90 : 100;
   }
   if (isFormerChampion(slug)) {
     // Wave 10B: interim-only fighters max at 70, sticky rule skipped.
@@ -101,7 +103,7 @@ async function main() {
   let missing = 0;
   let dominantCount = 0;
   let stickyCount = 0;
-  const buckets = { 100: 0, 80: 0, 70: 0, 40: 0, 0: 0 };
+  const buckets = { 100: 0, 90: 0, 80: 0, 70: 0, 40: 0, 0: 0 };
   for (const slug of slugs) {
     const ped = pedigreeFor(slug, lastBoutBySlug.get(slug) ?? null);
     if (ped === 0) continue; // shouldn't happen — every entry in either list yields ≥40
@@ -126,7 +128,7 @@ async function main() {
   }
 
   console.log(`Updated ${updated} fighters; missing ${missing} slugs.`);
-  console.log(`Buckets — current champ (100): ${buckets[100]}, former champ (80): ${buckets[80]}, interim-only (70): ${buckets[70]}, lost challenger (40): ${buckets[40]}`);
+  console.log(`Buckets — current champ (100): ${buckets[100]}, current interim (90): ${buckets[90]}, former champ (80): ${buckets[80]}, interim-only former (70): ${buckets[70]}, lost challenger (40): ${buckets[40]}`);
   console.log(`Sticky-100 (vacated/stripped, no bouts since): ${stickyCount}`);
   console.log(`Dominant champion flag set on ${dominantCount} fighters.`);
 
