@@ -66,26 +66,31 @@ export const CHAMPIONSHIP_HISTORY: readonly ChampionshipReign[] = [
   // ============================================================
   // HEAVYWEIGHT
   // ============================================================
-  // Wave 7B: merged into one continuous reign per dev's correction.
-  // Aspinall won the interim title at UFC 295 (2023-11-11 vs Pavlovich)
-  // and was elevated to undisputed on 2025-06-21 when Jon Jones retired
-  // (status change within the reign, not a new reign). UFC 321 (2025-10-25)
-  // vs Gane was a no-contest (eye poke R1) — not a successful title defense.
-  // defenses: 1 = Blaydes KO at UFC 304.
-  { slug: "tom-aspinall-399afb",     weightClass: "heavyweight", startDate: "2023-11-11", endDate: null,         defenses: 1 },
+  // Wave 11: full interim sync. Aspinall split back into interim (UFC 295
+  // 2023-11-11 vs Pavlovich) and undisputed (elevated 2025-06-21 when Jones
+  // retired). Blaydes KO at UFC 304 (2024-07-27) was during the interim
+  // phase. UFC 321 (2025-10-25) vs Gane was a NC, not a defense.
+  { slug: "tom-aspinall-399afb",     weightClass: "heavyweight", startDate: "2025-06-21", endDate: null,         defenses: 0 }, // undisputed phase
+  { slug: "tom-aspinall-399afb",     weightClass: "heavyweight", startDate: "2023-11-11", endDate: "2025-06-21", defenses: 1, isInterim: true }, // interim — Blaydes UFC 304; elevated when Jones retired
   { slug: "jon-jones-07f72a",        weightClass: "heavyweight", startDate: "2023-03-04", endDate: "2025-06-21", defenses: 1, endReason: "retired" }, // vs Stipe; then retired holding the belt
+  { slug: "ciryl-gane-787bb1",       weightClass: "heavyweight", startDate: "2021-08-07", endDate: "2022-01-22", defenses: 0, isInterim: true }, // UFC 265 vs Lewis; lost unification vs Ngannou at UFC 270
   { slug: "francis-ngannou-8d03ce",  weightClass: "heavyweight", startDate: "2021-03-27", endDate: "2023-01-14", defenses: 1, endReason: "vacated" }, // vs Gane; vacated, left UFC
   { slug: "stipe-miocic-d28dee",     weightClass: "heavyweight", startDate: "2019-08-17", endDate: "2021-03-27", defenses: 1 }, // reign 2 — vs DC 3
   { slug: "daniel-cormier-d967f0",   weightClass: "heavyweight", startDate: "2018-07-07", endDate: "2019-08-17", defenses: 1 }, // vs Lewis
   { slug: "stipe-miocic-d28dee",     weightClass: "heavyweight", startDate: "2016-05-14", endDate: "2018-07-07", defenses: 3 }, // reign 1 — Overeem, JDS 2, Ngannou
-  { slug: "fabricio-werdum-492b20",  weightClass: "heavyweight", startDate: "2015-06-13", endDate: "2016-05-14", defenses: 0 },
+  { slug: "fabricio-werdum-492b20",  weightClass: "heavyweight", startDate: "2015-06-13", endDate: "2016-05-14", defenses: 0 }, // undisputed (def. Velasquez UFC 188)
+  { slug: "fabricio-werdum-492b20",  weightClass: "heavyweight", startDate: "2014-11-15", endDate: "2015-06-13", defenses: 0, isInterim: true }, // UFC 180 vs Hunt; unified at UFC 188
   { slug: "cain-velasquez-0ff11c",   weightClass: "heavyweight", startDate: "2012-12-29", endDate: "2015-06-13", defenses: 2 }, // reign 2 — Bigfoot 2, JDS 3
   { slug: "junior-dos-santos-63def5", weightClass: "heavyweight", startDate: "2011-11-12", endDate: "2012-12-29", defenses: 1 }, // vs Mir
   { slug: "cain-velasquez-0ff11c",   weightClass: "heavyweight", startDate: "2010-10-23", endDate: "2011-11-12", defenses: 0 }, // reign 1 — lost first to JDS
+  { slug: "shane-carwin-68dd7b",     weightClass: "heavyweight", startDate: "2010-03-27", endDate: "2010-07-03", defenses: 0, isInterim: true }, // UFC 111 vs Mir; lost unification vs Lesnar at UFC 116
+  { slug: "frank-mir-1ff958",        weightClass: "heavyweight", startDate: "2008-12-27", endDate: "2009-07-11", defenses: 0, isInterim: true }, // UFC 92 vs Nogueira; lost unification vs Lesnar at UFC 100
+  { slug: "antonio-rodrigo-nogueira-ee9d73", weightClass: "heavyweight", startDate: "2008-02-02", endDate: "2008-12-27", defenses: 0, isInterim: true }, // UFC 81 vs Sylvia; lost to Mir at UFC 92
   { slug: "brock-lesnar-513c6f",     weightClass: "heavyweight", startDate: "2008-11-15", endDate: "2010-10-23", defenses: 2 }, // Mir 2, Carwin
   { slug: "randy-couture-0aa925",    weightClass: "heavyweight", startDate: "2007-03-03", endDate: "2008-11-15", defenses: 1 }, // last HW reign — Gabriel Gonzaga
   { slug: "tim-sylvia-2a542e",       weightClass: "heavyweight", startDate: "2006-04-15", endDate: "2007-03-03", defenses: 2 }, // Monson, Mercer? — TODO verify
-  { slug: "andrei-arlovski-3738e6",  weightClass: "heavyweight", startDate: "2005-02-05", endDate: "2006-04-15", defenses: 2 }, // Buentello, Werdum (interim→undisputed)
+  { slug: "andrei-arlovski-3738e6",  weightClass: "heavyweight", startDate: "2005-08-12", endDate: "2006-04-15", defenses: 2 }, // undisputed — promoted when Mir stripped; Buentello + lost unification
+  { slug: "andrei-arlovski-3738e6",  weightClass: "heavyweight", startDate: "2005-02-05", endDate: "2005-08-12", defenses: 0, isInterim: true }, // UFC 51 vs Sylvia; promoted when Mir stripped
   { slug: "frank-mir-1ff958",        weightClass: "heavyweight", startDate: "2004-06-19", endDate: "2005-02-05", defenses: 0, endReason: "stripped" }, // stripped (motorcycle injury)
   { slug: "ricco-rodriguez-50cc91",  weightClass: "heavyweight", startDate: "2002-09-27", endDate: "2003-02-28", defenses: 0 },
   { slug: "kevin-randleman-6859f6",  weightClass: "heavyweight", startDate: "1999-11-19", endDate: "2000-11-17", defenses: 0 },
@@ -105,6 +110,7 @@ export const CHAMPIONSHIP_HISTORY: readonly ChampionshipReign[] = [
   { slug: "glover-teixeira-7ff978",    weightClass: "light_heavyweight", startDate: "2021-10-30", endDate: "2022-06-11", defenses: 0 },
   { slug: "jan-blachowicz-99df7d",     weightClass: "light_heavyweight", startDate: "2020-09-26", endDate: "2021-10-30", defenses: 1 }, // vs Adesanya
   { slug: "jon-jones-07f72a",          weightClass: "light_heavyweight", startDate: "2018-12-29", endDate: "2020-08-17", defenses: 3 }, // reign 2 — Smith, Santos, Reyes
+  { slug: "jon-jones-07f72a",          weightClass: "light_heavyweight", startDate: "2016-04-23", endDate: "2016-11-09", defenses: 0, isInterim: true, endReason: "stripped" }, // UFC 197 vs OSP; stripped (USADA suspension)
   { slug: "daniel-cormier-d967f0",     weightClass: "light_heavyweight", startDate: "2015-05-23", endDate: "2018-12-29", defenses: 4 }, // Gustafsson, Johnson 2 x2 (UFC 200/210), Volkan; reinstated after Jones PED
   { slug: "jon-jones-07f72a",          weightClass: "light_heavyweight", startDate: "2011-03-19", endDate: "2015-04-28", defenses: 8, endReason: "stripped" }, // reign 1 — Rampage, Machida, Rashad, Belfort, Sonnen, Gus, Teixeira, DC; stripped (hit-and-run)
   { slug: "mauricio-rua-140745",       weightClass: "light_heavyweight", startDate: "2010-05-08", endDate: "2011-03-19", defenses: 0 },
@@ -115,7 +121,8 @@ export const CHAMPIONSHIP_HISTORY: readonly ChampionshipReign[] = [
   { slug: "chuck-liddell-a390eb",      weightClass: "light_heavyweight", startDate: "2005-04-16", endDate: "2007-05-26", defenses: 4 }, // Couture 2, Sobral, Tito, Babalu — TODO recount
   { slug: "randy-couture-0aa925",      weightClass: "light_heavyweight", startDate: "2004-08-21", endDate: "2005-04-16", defenses: 0 }, // LHW reign 2
   { slug: "vitor-belfort-0ee783",      weightClass: "light_heavyweight", startDate: "2004-01-31", endDate: "2004-08-21", defenses: 0 },
-  { slug: "randy-couture-0aa925",      weightClass: "light_heavyweight", startDate: "2003-06-06", endDate: "2004-01-31", defenses: 1 }, // LHW reign 1 — vs Tito
+  { slug: "randy-couture-0aa925",      weightClass: "light_heavyweight", startDate: "2003-09-26", endDate: "2004-01-31", defenses: 1 }, // LHW reign 1 — undisputed (def. Tito at UFC 44)
+  { slug: "randy-couture-0aa925",      weightClass: "light_heavyweight", startDate: "2003-06-06", endDate: "2003-09-26", defenses: 0, isInterim: true }, // UFC 43 vs Liddell; promoted to undisputed at UFC 44
   { slug: "tito-ortiz-2f732d",         weightClass: "light_heavyweight", startDate: "2000-04-14", endDate: "2003-09-26", defenses: 5 }, // Kondo, Tanner, Sinosic, Matyushenko, Shamrock
 
   // ============================================================
@@ -128,7 +135,9 @@ export const CHAMPIONSHIP_HISTORY: readonly ChampionshipReign[] = [
   { slug: "israel-adesanya-1338e2",   weightClass: "middleweight", startDate: "2023-04-08", endDate: "2023-09-09", defenses: 0 }, // reign 2
   { slug: "alex-pereira-e5549c",      weightClass: "middleweight", startDate: "2022-11-12", endDate: "2023-04-08", defenses: 0 },
   { slug: "israel-adesanya-1338e2",   weightClass: "middleweight", startDate: "2019-10-05", endDate: "2022-11-12", defenses: 5 }, // reign 1 — Romero, Costa, Vettori 2, Whittaker 2, Cannonier
-  { slug: "robert-whittaker-e1147d",  weightClass: "middleweight", startDate: "2017-07-08", endDate: "2019-10-05", defenses: 1 }, // Romero 2
+  { slug: "israel-adesanya-1338e2",   weightClass: "middleweight", startDate: "2019-04-13", endDate: "2019-10-05", defenses: 0, isInterim: true }, // UFC 236 vs Gastelum; unified vs Whittaker at UFC 243
+  { slug: "robert-whittaker-e1147d",  weightClass: "middleweight", startDate: "2017-12-07", endDate: "2019-10-05", defenses: 1 }, // undisputed — promoted when GSP vacated; Romero 2
+  { slug: "robert-whittaker-e1147d",  weightClass: "middleweight", startDate: "2017-07-08", endDate: "2017-12-07", defenses: 0, isInterim: true }, // UFC 213 vs Romero; promoted when GSP vacated
   { slug: "georges-st-pierre-6506c1", weightClass: "middleweight", startDate: "2017-11-04", endDate: "2017-12-07", defenses: 0, endReason: "vacated" }, // won, vacated
   { slug: "michael-bisping-2b93eb",   weightClass: "middleweight", startDate: "2016-06-04", endDate: "2017-11-04", defenses: 1 }, // Henderson 2
   { slug: "luke-rockhold-00e11b",     weightClass: "middleweight", startDate: "2015-12-12", endDate: "2016-06-04", defenses: 0 },
@@ -145,11 +154,14 @@ export const CHAMPIONSHIP_HISTORY: readonly ChampionshipReign[] = [
   { slug: "jack-della-maddalena-6b453b", weightClass: "welterweight", startDate: "2025-05-10", endDate: "2025-11-15", defenses: 0 },
   { slug: "belal-muhammad-b1b072",       weightClass: "welterweight", startDate: "2024-07-27", endDate: "2025-05-10", defenses: 0 },
   { slug: "leon-edwards-f1fac9",         weightClass: "welterweight", startDate: "2022-08-20", endDate: "2024-07-27", defenses: 2 }, // Usman 3, Covington
+  { slug: "colby-covington-dc9572",      weightClass: "welterweight", startDate: "2018-06-09", endDate: "2018-09-08", defenses: 0, isInterim: true, endReason: "stripped" }, // UFC 225 vs RDA; stripped (sinus surgery)
   { slug: "kamaru-usman-f1b2aa",         weightClass: "welterweight", startDate: "2019-03-02", endDate: "2022-08-20", defenses: 5 }, // Covington 1, Burns, Masvidal 1, Masvidal 2, Covington 2
   { slug: "tyron-woodley-effd9d",        weightClass: "welterweight", startDate: "2016-07-30", endDate: "2019-03-02", defenses: 4 }, // Wonderboy 1, Wonderboy 2, Maia, Till
   { slug: "robbie-lawler-f2925e",        weightClass: "welterweight", startDate: "2014-12-06", endDate: "2016-07-30", defenses: 2 }, // MacDonald, Condit
   { slug: "johny-hendricks-0941df",      weightClass: "welterweight", startDate: "2014-03-15", endDate: "2014-12-06", defenses: 0 },
+  { slug: "carlos-condit-f9f07b",        weightClass: "welterweight", startDate: "2012-02-04", endDate: "2012-11-17", defenses: 0, isInterim: true }, // UFC 143 vs Nick Diaz; lost unification vs GSP at UFC 154
   { slug: "georges-st-pierre-6506c1",    weightClass: "welterweight", startDate: "2008-04-19", endDate: "2013-12-13", defenses: 9 }, // WW reign 2 — Fitch, Penn 2, Alves, Hardy, Koscheck 2, Shields, Diaz, Condit, Hendricks
+  { slug: "georges-st-pierre-6506c1",    weightClass: "welterweight", startDate: "2007-12-29", endDate: "2008-04-19", defenses: 0, isInterim: true }, // UFC 79 vs Hughes; became undisputed at UFC 83 (def. Serra)
   { slug: "matt-serra-86dfed",           weightClass: "welterweight", startDate: "2007-04-07", endDate: "2008-04-19", defenses: 0 },
   { slug: "georges-st-pierre-6506c1",    weightClass: "welterweight", startDate: "2006-11-18", endDate: "2007-04-07", defenses: 0 }, // WW reign 1 — lost first
   { slug: "matt-hughes-621a6c",          weightClass: "welterweight", startDate: "2004-10-22", endDate: "2006-11-18", defenses: 4 }, // WW reign 2 — Trigg 2, Riggs, Royce, BJ Penn 2
@@ -176,19 +188,24 @@ export const CHAMPIONSHIP_HISTORY: readonly ChampionshipReign[] = [
   { slug: "jens-pulver-442601",           weightClass: "lightweight", startDate: "2001-02-23", endDate: "2002-04-01", defenses: 2, endReason: "vacated" }, // Uno, BJ Penn (draw retained); vacated
 
   // Interim LW belts that never converted to undisputed
-  { slug: "justin-gaethje-9e8f6c",        weightClass: "lightweight", startDate: "2020-05-09", endDate: "2020-10-24", defenses: 0, isInterim: true },
-  { slug: "dustin-poirier-029eaf",        weightClass: "lightweight", startDate: "2019-04-13", endDate: "2019-09-07", defenses: 0, isInterim: true },
-  { slug: "tony-ferguson-22a92d",         weightClass: "lightweight", startDate: "2017-10-07", endDate: "2018-04-07", defenses: 0, isInterim: true, endReason: "stripped" }, // stripped (injury)
+  { slug: "justin-gaethje-9e8f6c",        weightClass: "lightweight", startDate: "2026-01-24", endDate: null,         defenses: 0, isInterim: true }, // UFC 324 — current interim alongside Topuria undisputed
+  { slug: "justin-gaethje-9e8f6c",        weightClass: "lightweight", startDate: "2020-05-09", endDate: "2020-10-24", defenses: 0, isInterim: true }, // UFC 249 vs Ferguson; lost unification vs Khabib at UFC 254
+  { slug: "dustin-poirier-029eaf",        weightClass: "lightweight", startDate: "2019-04-13", endDate: "2019-09-07", defenses: 0, isInterim: true }, // UFC 236 vs Holloway; lost unification vs Khabib at UFC 242
+  { slug: "tony-ferguson-22a92d",         weightClass: "lightweight", startDate: "2017-10-07", endDate: "2018-04-07", defenses: 0, isInterim: true, endReason: "stripped" }, // UFC 216; stripped (injury)
 
   // ============================================================
   // FEATHERWEIGHT
   // ============================================================
   { slug: "alexander-volkanovski-e12489", weightClass: "featherweight", startDate: "2025-04-12", endDate: null,         defenses: 1 }, // reign 2 — Lopes 2
   { slug: "ilia-topuria-54f64b",          weightClass: "featherweight", startDate: "2024-02-17", endDate: "2025-02-19", defenses: 1, endReason: "vacated" }, // Holloway; vacated to LW (announcement)
+  { slug: "yair-rodriguez-cbf5e6",        weightClass: "featherweight", startDate: "2023-02-12", endDate: "2023-07-08", defenses: 0, isInterim: true }, // UFC 284 vs Emmett; lost unification vs Volk at UFC 290
   { slug: "alexander-volkanovski-e12489", weightClass: "featherweight", startDate: "2019-12-14", endDate: "2024-02-17", defenses: 4 }, // reign 1 — Holloway 2, Ortega, Korean Zombie, Rodriguez
   { slug: "max-holloway-150ff4",          weightClass: "featherweight", startDate: "2017-06-03", endDate: "2019-12-14", defenses: 2 }, // Aldo 3, Ortega
-  { slug: "jose-aldo-d0f395",             weightClass: "featherweight", startDate: "2010-11-20", endDate: "2015-12-12", defenses: 7 }, // WEC→UFC merger; Hominick, Florian, Mendes 1, Edgar 1, Korean Zombie, Lamas, Mendes 2
+  { slug: "max-holloway-150ff4",          weightClass: "featherweight", startDate: "2016-12-10", endDate: "2017-06-03", defenses: 0, isInterim: true }, // UFC 206 vs Pettis; unified at UFC 212 (def. Aldo)
+  { slug: "jose-aldo-d0f395",             weightClass: "featherweight", startDate: "2016-07-09", endDate: "2016-11-26", defenses: 0, isInterim: true }, // UFC 200 vs Edgar 2; promoted when Conor stripped
   { slug: "conor-mcgregor-f4c499",        weightClass: "featherweight", startDate: "2015-12-12", endDate: "2016-11-26", defenses: 0, endReason: "stripped" }, // stripped after winning LW
+  { slug: "conor-mcgregor-f4c499",        weightClass: "featherweight", startDate: "2015-07-11", endDate: "2015-12-12", defenses: 0, isInterim: true }, // UFC 189 vs Mendes; unified at UFC 194 (def. Aldo)
+  { slug: "jose-aldo-d0f395",             weightClass: "featherweight", startDate: "2010-11-20", endDate: "2015-12-12", defenses: 7 }, // WEC→UFC merger; Hominick, Florian, Mendes 1, Edgar 1, Korean Zombie, Lamas, Mendes 2
 
   // ============================================================
   // BANTAMWEIGHT
@@ -197,13 +214,15 @@ export const CHAMPIONSHIP_HISTORY: readonly ChampionshipReign[] = [
   { slug: "merab-dvalishvili-c03520", weightClass: "bantamweight", startDate: "2024-09-14", endDate: "2025-12-06", defenses: 3 }, // Umar, O'Malley 2, Yan 2
   { slug: "sean-o-malley-b50a42",     weightClass: "bantamweight", startDate: "2023-08-19", endDate: "2024-09-14", defenses: 1 }, // Vera 2
   { slug: "aljamain-sterling-cb696e", weightClass: "bantamweight", startDate: "2021-03-06", endDate: "2023-08-19", defenses: 3 }, // Yan 2, Cejudo, Dillashaw
-  { slug: "petr-yan-d661ce",          weightClass: "bantamweight", startDate: "2020-07-11", endDate: "2021-03-06", defenses: 0 }, // DQ loss first defense
+  { slug: "petr-yan-d661ce",          weightClass: "bantamweight", startDate: "2021-10-30", endDate: "2022-04-09", defenses: 0, isInterim: true }, // UFC 267 vs Sandhagen; lost unification vs Sterling at UFC 273
+  { slug: "petr-yan-d661ce",          weightClass: "bantamweight", startDate: "2020-07-11", endDate: "2021-03-06", defenses: 0 }, // undisputed reign 1 — DQ loss first defense
   { slug: "henry-cejudo-056c49",      weightClass: "bantamweight", startDate: "2019-06-08", endDate: "2020-05-19", defenses: 1, endReason: "vacated" }, // Cruz; vacated (initial retirement)
   { slug: "tj-dillashaw-c84974",      weightClass: "bantamweight", startDate: "2017-11-04", endDate: "2019-03-20", defenses: 1, endReason: "stripped" }, // Garbrandt 2; stripped PED
   { slug: "cody-garbrandt-d8c7c6",    weightClass: "bantamweight", startDate: "2016-12-30", endDate: "2017-11-04", defenses: 0 },
   { slug: "dominick-cruz-10f3ba",     weightClass: "bantamweight", startDate: "2016-01-17", endDate: "2016-12-30", defenses: 1 }, // reign 2 — Faber 4
   { slug: "tj-dillashaw-c84974",      weightClass: "bantamweight", startDate: "2014-05-24", endDate: "2016-01-17", defenses: 1 }, // reign 1 — Soto
-  { slug: "renan-barao-2c9957",       weightClass: "bantamweight", startDate: "2012-07-21", endDate: "2014-05-24", defenses: 1 }, // interim→undisputed; Faber 3 as undisputed
+  { slug: "renan-barao-2c9957",       weightClass: "bantamweight", startDate: "2014-01-06", endDate: "2014-05-24", defenses: 1 }, // undisputed — promoted when Cruz vacated; Faber 3
+  { slug: "renan-barao-2c9957",       weightClass: "bantamweight", startDate: "2012-07-21", endDate: "2014-01-06", defenses: 0, isInterim: true }, // UFC 149 vs Faber 2; promoted when Cruz vacated (injury)
   { slug: "dominick-cruz-10f3ba",     weightClass: "bantamweight", startDate: "2010-12-16", endDate: "2014-01-06", defenses: 3, endReason: "vacated" }, // reign 1 — Benavidez 2, DJ, Faber 2; vacated injury
 
   // ============================================================
@@ -211,7 +230,8 @@ export const CHAMPIONSHIP_HISTORY: readonly ChampionshipReign[] = [
   // ============================================================
   { slug: "joshua-van-17e976",         weightClass: "flyweight", startDate: "2025-12-06", endDate: null,         defenses: 0 }, // beat Pantoja at UFC 323
   { slug: "alexandre-pantoja-a0f000",  weightClass: "flyweight", startDate: "2023-07-08", endDate: "2025-12-06", defenses: 4 }, // Royval 2, Erceg, Asakura, Kape
-  { slug: "brandon-moreno-792be9",     weightClass: "flyweight", startDate: "2023-01-21", endDate: "2023-07-08", defenses: 0 }, // reign 3 (interim→undisputed)
+  { slug: "brandon-moreno-792be9",     weightClass: "flyweight", startDate: "2023-01-21", endDate: "2023-07-08", defenses: 0 }, // reign 3 undisputed — unified vs Figueiredo at UFC 283
+  { slug: "brandon-moreno-792be9",     weightClass: "flyweight", startDate: "2022-07-30", endDate: "2023-01-21", defenses: 0, isInterim: true }, // UFC 277 vs Kara-France; unified at UFC 283 (def. Figueiredo)
   { slug: "deiveson-figueiredo-aa72b0", weightClass: "flyweight", startDate: "2022-01-22", endDate: "2023-01-21", defenses: 0 }, // reign 2 — lost rematch immediately
   { slug: "brandon-moreno-792be9",     weightClass: "flyweight", startDate: "2021-06-12", endDate: "2022-01-22", defenses: 0 }, // reign 1
   { slug: "deiveson-figueiredo-aa72b0", weightClass: "flyweight", startDate: "2020-07-18", endDate: "2021-06-12", defenses: 1 }, // reign 1 — Perez; Moreno draw retained
