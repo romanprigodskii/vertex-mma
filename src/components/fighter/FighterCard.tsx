@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowLeftRight, ArrowRight, Crown, RotateCcw } from "lucide-react";
 
+import { BmfBadge } from "@/components/fighter/detail/BmfBadge";
 import { FighterAvatar } from "@/components/fighter/FighterAvatar";
 import { WEIGHT_CLASSES } from "@/lib/constants";
 import { getCountryFlag } from "@/lib/fighter-helpers";
@@ -225,6 +226,12 @@ export function FighterCard({
               &ldquo;{fighter.nickname}&rdquo;
             </p>
           ) : null}
+          {/* Wave 10A: BMF chip — current BMF champion only (rare, ~1 fighter
+              at a time). Sits in the identity column away from the crown /
+              2× double-champion avatar overlays so it can't visually collide. */}
+          <div className="mt-1">
+            <BmfBadge slug={fighter.slug} variant="card" />
+          </div>
         </div>
 
         <div className="mt-2 flex flex-col gap-1.5">

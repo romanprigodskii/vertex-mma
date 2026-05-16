@@ -1,5 +1,6 @@
 import Image from "next/image";
 
+import { BmfBadge } from "@/components/fighter/detail/BmfBadge";
 import { TrophyBadge } from "@/components/fighter/detail/TrophyBadge";
 import { type ChampionEntry } from "@/lib/champions";
 import type { FighterDetail } from "@/lib/fighter-detail";
@@ -151,6 +152,15 @@ export function FighterHero({ fighter, championEntry }: FighterHeroProps) {
               />
             </div>
           ) : null}
+          {/* Wave 10A: BMF badge sits below the divisional TrophyBadge.
+              Distinct gold pill so it doesn't read as another divisional belt. */}
+          <div
+            className={
+              championEntry ? "absolute right-2 top-14" : "absolute right-2 top-2"
+            }
+          >
+            <BmfBadge slug={fighter.slug} variant="hero" />
+          </div>
         </div>
 
         {/* Identity column */}
