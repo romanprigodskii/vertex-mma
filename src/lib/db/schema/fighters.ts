@@ -97,7 +97,11 @@ export const fighter = pgTable(
     // buckets (100/90/40/0) pass through unchanged. championship_pedigree
     // itself remains the eternal-legacy value used by all_time_score and
     // UI tier classification.
-    currentCp: smallint("current_cp").default(0).notNull(),
+    //
+    // Wave 13.1: nullable. NULL for non-active (retired/released) fighters —
+    // current_cp is a "current relevance" signal, undefined for fighters
+    // who aren't in the current roster.
+    currentCp: smallint("current_cp"),
     isDominantChampion: boolean("is_dominant_champion").default(false).notNull(),
     // Wave 3.5 step 5F: +30 added to quality_wins_score (above its 100 cap)
     // for fighters with 0 real UFC losses (DQ excluded), 8+ wins, and any

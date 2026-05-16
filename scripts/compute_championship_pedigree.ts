@@ -3,12 +3,15 @@
  *
  * Pedigree mapping:
  *   - 100 if the fighter currently holds a UFC undisputed belt
- *   - 100 STICKY (Wave 6E.2) for vacated/stripped undisputed reigns where the
- *         fighter hasn't fought since (Wave 10B: rule does NOT apply to
- *         interim-only fighters)
+ *   - 100 STICKY (Wave 6E.2) for vacated/stripped undisputed reigns where
+ *         the fighter hasn't fought since AND vacate/strip date is within
+ *         the last 36 months (Wave 13.1 bound — outside that window the
+ *         sticky expires and the fighter falls into the 80 bucket; rule
+ *         does NOT apply to interim-only fighters per Wave 10B)
  *   -  90 if the fighter currently holds ONLY a UFC interim belt (Wave 10B.1)
  *   -  80 if the fighter held a UFC undisputed belt (former champion via bout
- *         loss, retirement, or already-fought-since-vacate)
+ *         loss, retirement, already-fought-since-vacate, or sticky-window
+ *         expired per Wave 13.1)
  *   -  70 if the fighter has held only FORMER interim UFC titles (Wave 10B)
  *   -  40 if the fighter lost a UFC title fight without ever winning one
  *   -   0 otherwise (default, already in place from the column DEFAULT)
@@ -38,13 +41,21 @@ if (!url) throw new Error("DATABASE_URL not set");
 
 const sql = postgres(url, { prepare: false });
 
+const TODAY = process.env.TODAY ? new Date(process.env.TODAY) : new Date();
+const STICKY_BOUND_MONTHS = 36;
+
 /** Sticky CP rule (Wave 6E.2): a vacated or stripped reign keeps CP=100 only
  *  until the fighter's next bout. `nextBoutDate` should be the slug's most
  *  recent completed bout date (or null if they haven't fought since).
  *
  *  Wave 10B: fighters whose only reigns are interim cap at 70 (not 80) and
  *  the sticky rule does not apply to them — interim is a procedural sub-title,
- *  not an undisputed claim. */
+ *  not an undisputed claim.
+ *
+ *  Wave 13.1: sticky-100 also has a 36-month time bound. After 36mo from
+ *  the vacate/strip date the sticky expires even if the fighter never
+ *  returned — protects against historical ex-champs (e.g., Frank Shamrock
+ *  vacated 1999, 26 years ago) reading as "still sticky champion." */
 function pedigreeFor(slug: string, lastBoutDate: string | null): number {
   const interimOnly = hasOnlyInterimReigns(slug);
   if (isCurrentChampion(slug)) {
@@ -58,10 +69,20 @@ function pedigreeFor(slug: string, lastBoutDate: string | null): number {
     if (interimOnly) return 70;
     const reign = mostRecentClosedReign(slug);
     if (reign && (reign.endReason === "vacated" || reign.endReason === "stripped")) {
+      const monthsSince =
+        (TODAY.getTime() - new Date(reign.endDate!).getTime()) /
+        (30.44 * 86_400_000);
+      const stickyInWindow = monthsSince <= STICKY_BOUND_MONTHS;
       // Strictly greater — same-day bouts don't break stickiness, but anything
       // after the vacate/strip date does. If lastBoutDate is null the fighter
-      // never fought since (rare), keep them at 100.
-      if (lastBoutDate == null || lastBoutDate <= reign.endDate!) return 100;
+      // never fought since (rare), keep them at 100 PROVIDED the 36mo window
+      // hasn't elapsed (Wave 13.1).
+      if (
+        stickyInWindow &&
+        (lastBoutDate == null || lastBoutDate <= reign.endDate!)
+      ) {
+        return 100;
+      }
     }
     return 80;
   }

@@ -2,6 +2,13 @@
  * Wave 12: derives fighter.current_cp from championship_pedigree by applying
  * time-decay + recent-opp-quality bonus to the former-champion buckets only.
  *
+ * Wave 13.1: gate on roster_status='active'. Retired/released fighters get
+ * current_cp = NULL (the column is nullable as of migration 0044) — they're
+ * not in the current rating pool, so "what they contribute to current_score"
+ * is undefined. The fighter_vertex_score view's COALESCE(current_cp, 0)::float
+ * still handles NULL safely if a non-active fighter passes the view's
+ * is_active OR-condition (last fight in 24mo).
+ *
  * Pipeline order: run AFTER compute_championship_pedigree.ts (which sets the
  * base bucket: 100 / 90 / 80 / 70 / 40 / 0). Then materialize_vertex_score.ts
  * picks up current_cp via the fighter_vertex_score view (migration 0043).
@@ -83,8 +90,12 @@ interface FighterRow {
 }
 
 async function main() {
-  // Single query pulling base CP + last-5-bouts opp tier average per fighter.
-  // The recency_rank lets us cap at 5 most-recent bouts; LEFT JOIN keeps
+  // Wave 13.1: reset everyone to NULL first. compute_current_cp then only
+  // populates rows for active fighters; retired/released stay NULL.
+  await sql`UPDATE fighter SET current_cp = NULL`;
+
+  // Pull base CP + last-5-bouts opp tier average — only for active fighters.
+  // The recency_rank caps at 5 most-recent bouts; LEFT JOIN keeps active
   // fighters with no bouts (their avg ends up NULL → bonus = 0).
   const fighters = await sql<FighterRow[]>`
     WITH ranked_bouts AS (
@@ -115,6 +126,7 @@ async function main() {
       ao.avg_opp_tier_last_5
     FROM fighter f
     LEFT JOIN avg_opp ao ON ao.fighter_id = f.id
+    WHERE f.roster_status = 'active'
   `;
 
   let updated = 0;
