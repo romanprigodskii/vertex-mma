@@ -25,6 +25,12 @@ class BoutRow:
     winner_side: str | None  # 'a', 'b', None (draw/nc)
     weight_class: str | None
     method: str | None
+    # Wave 16: raw text from UFCStats' method column (e.g. "Submission -
+    # Rear Naked Choke", "KO/TKO - Punches"). Persisted into
+    # bout.method_detail so callers have an audit trail when map_method
+    # returns None — a future iteration of the mapper can backfill from
+    # this column without re-scraping the source page.
+    method_detail: str | None
     is_title_bout: bool
     round_finished: int | None
     time_finished_seconds: int | None
@@ -129,9 +135,13 @@ def parse_event_details(html: str) -> EventDetails:
         weight_class = map_weight_class(wc_text)
         title = is_title_bout(wc_text, has_belt)
 
-        # Method (index 7).
+        # Method (index 7). Wave 16: keep the raw text alongside the
+        # mapped enum value so persistence can populate method_detail —
+        # used as a backfill source if the mapper later learns to handle
+        # a previously-unrecognised variant.
         method_text = cells[7].text(strip=True)
         method = map_method(method_text)
+        method_detail = method_text.strip() or None
 
         # Round (index 8), Time (index 9).
         round_text = cells[8].text(strip=True)
@@ -156,6 +166,7 @@ def parse_event_details(html: str) -> EventDetails:
                 winner_side=winner_side,
                 weight_class=weight_class,
                 method=method,
+                method_detail=method_detail,
                 is_title_bout=title,
                 round_finished=round_finished,
                 time_finished_seconds=time_finished_seconds,

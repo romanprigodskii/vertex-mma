@@ -194,13 +194,13 @@ def upsert_bouts(
                     event_id, fighter_a_id, fighter_b_id,
                     weight_class, is_title_fight, is_main_event, is_co_main_event,
                     scheduled_rounds, bout_order,
-                    status, winner_id, method, round_finished, time_finished_seconds,
+                    status, winner_id, method, method_detail, round_finished, time_finished_seconds,
                     ufc_stats_id
                 ) VALUES (
                     %s, %s, %s,
                     %s::weight_class, %s, %s, %s,
                     %s, %s,
-                    %s::bout_status, %s, %s::bout_method, %s, %s,
+                    %s::bout_status, %s, %s::bout_method, %s, %s, %s,
                     %s
                 )
                 ON CONFLICT (ufc_stats_id) DO UPDATE SET
@@ -212,6 +212,10 @@ def upsert_bouts(
                     status = EXCLUDED.status,
                     winner_id = COALESCE(EXCLUDED.winner_id, bout.winner_id),
                     method = COALESCE(EXCLUDED.method, bout.method),
+                    -- Wave 16: always refresh method_detail from the
+                    -- scrape so a future fix to map_method can iterate
+                    -- from the raw text without needing a re-scrape.
+                    method_detail = COALESCE(EXCLUDED.method_detail, bout.method_detail),
                     round_finished = COALESCE(EXCLUDED.round_finished, bout.round_finished),
                     time_finished_seconds = COALESCE(EXCLUDED.time_finished_seconds, bout.time_finished_seconds),
                     updated_at = now()
@@ -230,6 +234,7 @@ def upsert_bouts(
                     status,
                     winner_id,
                     b.method,
+                    b.method_detail,
                     b.round_finished,
                     b.time_finished_seconds,
                     b.ufc_stats_id,
