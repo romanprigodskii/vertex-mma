@@ -300,6 +300,45 @@ async function main() {
   }
   console.log(`  ${oppRows.length} (fighter, division) opp-tier rows`);
 
+  // Wave 14B.1: scheduled bouts per fighter, used by inActiveRanking.
+  // A fighter with a scheduled bout in division X is treated as
+  // "ranking-eligible" in X even if their stored current_division
+  // is something else (handles cases where current_division was set
+  // from the previous bout and the upcoming bout is in a new division).
+  console.log("Loading scheduled bouts...");
+  const scheduledBouts = await sql<
+    Array<{ fighter_id: string; weight_class: string }>
+  >`
+    SELECT fighter_a_id::text AS fighter_id, weight_class::text
+    FROM bout WHERE status = 'scheduled' AND fighter_a_id IS NOT NULL
+    UNION ALL
+    SELECT fighter_b_id::text AS fighter_id, weight_class::text
+    FROM bout WHERE status = 'scheduled' AND fighter_b_id IS NOT NULL
+  `;
+  const scheduledSet = new Set(
+    scheduledBouts.map((b) => `${b.fighter_id}:${b.weight_class}`),
+  );
+  console.log(`  ${scheduledBouts.length} (fighter, division) scheduled-bout entries`);
+
+  // Wave 14B.1: primary current division per fighter. Falls back to
+  // weight_class_primary when current_division is NULL (Wave 7A
+  // compute_current_division.ts populates current_division from the
+  // last bout's weight_class).
+  console.log("Loading primary divisions...");
+  const primaryDivisions = await sql<
+    Array<{ id: string; primary_division: string | null }>
+  >`
+    SELECT
+      id::text AS id,
+      COALESCE(current_division::text, weight_class_primary::text) AS primary_division
+    FROM fighter
+  `;
+  const primaryDivByFighterId = new Map<string, string | null>();
+  for (const f of primaryDivisions) {
+    primaryDivByFighterId.set(f.id, f.primary_division);
+  }
+  console.log(`  ${primaryDivisions.length} fighter primary-division entries`);
+
   type UpsertRow = {
     fighter_id: string;
     division: string;
@@ -318,6 +357,7 @@ async function main() {
     activity: number;
     recent_form_score: number;
     recent_loss_penalty: number;
+    in_active_ranking: boolean;
   };
   const upserts: UpsertRow[] = [];
 
@@ -359,6 +399,34 @@ async function main() {
       status = "former";
     }
 
+    // Wave 14B.1: ranking-display eligibility.
+    //
+    //   (roster_status='active' AND primaryDiv === division)
+    //                                  → fighter is currently competing
+    //                                    in this division per stored
+    //                                    current_division / weight_class
+    //                                    fallback AND is on the UFC
+    //                                    active roster. The roster gate
+    //                                    is required because
+    //                                    compute_current_division.ts
+    //                                    populates current_division from
+    //                                    each fighter's most recent bout
+    //                                    regardless of roster_status, so
+    //                                    retired/released fighters would
+    //                                    otherwise carry a stale "primary
+    //                                    division" forward into active
+    //                                    rankings.
+    //   scheduledSet has (fighter, div) → upcoming bout overrides
+    //                                    stored primary_division
+    //                                    (cross-division move signal).
+    //                                    Implies the bout is on the
+    //                                    schedule, so no separate
+    //                                    roster gate needed.
+    const primaryDiv = primaryDivByFighterId.get(r.fighter_id) ?? null;
+    const inActiveRanking =
+      (r.roster_status === "active" && primaryDiv === r.division) ||
+      scheduledSet.has(`${r.fighter_id}:${r.division}`);
+
     upserts.push({
       fighter_id: r.fighter_id,
       division: r.division,
@@ -377,6 +445,7 @@ async function main() {
       activity: Number(r.activity),
       recent_form_score: r.recent_form_score,
       recent_loss_penalty: Number(r.recent_loss_penalty),
+      in_active_ranking: inActiveRanking,
     });
   }
 
@@ -394,7 +463,7 @@ async function main() {
         quality_wins_decayed, divisional_cp, divisional_current_cp,
         era_dominance_current, performance_diff_current,
         finishing_dominance_decayed, activity, recent_form_score,
-        recent_loss_penalty
+        recent_loss_penalty, in_active_ranking
       )
       SELECT
         UNNEST(${slice.map((u) => u.fighter_id)}::uuid[]),
@@ -413,7 +482,8 @@ async function main() {
         UNNEST(${slice.map((u) => u.finishing_dominance_decayed)}::float8[]),
         UNNEST(${slice.map((u) => u.activity)}::float8[]),
         UNNEST(${slice.map((u) => u.recent_form_score)}::int[]),
-        UNNEST(${slice.map((u) => u.recent_loss_penalty)}::float8[])
+        UNNEST(${slice.map((u) => u.recent_loss_penalty)}::float8[]),
+        UNNEST(${slice.map((u) => (u.in_active_ranking ? "t" : "f"))}::text[])::boolean
     `;
   }
 
@@ -427,6 +497,22 @@ async function main() {
   console.log("\nStatus distribution:");
   for (const r of statusDist) {
     console.log(`  ${r.s.padEnd(12)} ${String(r.c).padStart(5)}`);
+  }
+
+  // Wave 14B.1: ranking-eligibility distribution by status.
+  const rankingDist = await sql<
+    Array<{ s: string; iar: boolean; c: number }>
+  >`
+    SELECT divisional_status AS s, in_active_ranking AS iar, COUNT(*)::int AS c
+    FROM fighter_divisional_score
+    GROUP BY divisional_status, in_active_ranking
+    ORDER BY in_active_ranking DESC, divisional_status
+  `;
+  console.log("\nin_active_ranking by status:");
+  for (const r of rankingDist) {
+    console.log(
+      `  ${r.iar ? "TRUE " : "FALSE"}  ${r.s.padEnd(12)} ${String(r.c).padStart(5)}`,
+    );
   }
 
   // Spot-check Pereira, Holloway, Sterling.

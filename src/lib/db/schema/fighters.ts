@@ -311,6 +311,14 @@ export const fighterDivisionalScore = pgTable(
     lastBoutDateInDivision: date("last_bout_date_in_division"),
     divisionalStatus: text("divisional_status").notNull(),
 
+    // Wave 14B.1: eligibility for active-division ranking display.
+    // TRUE iff the fighter's primary current division (current_division ??
+    // weight_class_primary) matches this row's division, OR they have a
+    // scheduled bout in this division. FALSE-rows stay in the table for
+    // fighter-profile history but are filtered out of ranking queries
+    // downstream.
+    inActiveRanking: boolean("in_active_ranking").notNull().default(false),
+
     // Sub-metric audit trail — mirrors fighter_vertex_score columns.
     qualityWinsDecayed: doublePrecision("quality_wins_decayed"),
     divisionalCp: smallint("divisional_cp"),
