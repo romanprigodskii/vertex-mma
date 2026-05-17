@@ -8,6 +8,7 @@ import { CareerOverview } from "@/components/fighter/detail/CareerOverview";
 import { CareerTimeline } from "@/components/fighter/detail/CareerTimeline";
 import { FightHistoryList } from "@/components/fighter/detail/FightHistoryList";
 import { FighterHero } from "@/components/fighter/detail/FighterHero";
+import { OtherDivisions } from "@/components/fighter/detail/OtherDivisions";
 import { PhysicalInfo } from "@/components/fighter/detail/PhysicalInfo";
 import { RadarChart } from "@/components/fighter/detail/RadarChart";
 import { RoundByRoundChart } from "@/components/fighter/detail/RoundByRoundChart";
@@ -21,6 +22,7 @@ import { CHAMPION_BY_SLUG } from "@/lib/champions";
 import { computeAttributes } from "@/lib/fighter-attributes";
 import {
   buildTimelineBouts,
+  getDivisionalScores,
   getFightHistory,
   getFighterBoutRounds,
   getFighterBySlug,
@@ -90,15 +92,38 @@ export default async function FighterDetailPage({ params }: PageProps) {
   const fighter = await getFighterBySlug(slug);
   if (!fighter) notFound();
 
-  const [boutRounds, history, similar] = await Promise.all([
+  const [boutRounds, history, similar, divisionalScores] = await Promise.all([
     getFighterBoutRounds(fighter.id),
     getFightHistory(fighter.id),
     getSimilarFighters(fighter),
+    getDivisionalScores(fighter.id),
   ]);
 
   const championEntry = CHAMPION_BY_SLUG.get(slug) ?? null;
   const attributes = computeAttributes(fighter);
   const timelineBouts = buildTimelineBouts(history, boutRounds);
+
+  // Wave 14B.2: hero score uses the per-division score when the fighter
+  // has an in_active_ranking row for their current_division. Falls back
+  // to the global vertex_score when no such row exists (e.g., <3 bouts
+  // in the new division after a move) so freshly promoted champions and
+  // un-divisional rows still see their global rating up top.
+  const activeDivisionalRow = fighter.current_division
+    ? divisionalScores.find(
+        (d) =>
+          d.division === fighter.current_division && d.in_active_ranking,
+      ) ?? null
+    : null;
+  const heroCurrentScore =
+    activeDivisionalRow?.vertex_score ?? fighter.vertex_score;
+  // Sidebar list — every divisional row OTHER than the one driving the
+  // hero. When activeDivisionalRow is null (fallback case) we include
+  // all divisional rows.
+  const otherDivisionRows = activeDivisionalRow
+    ? divisionalScores.filter(
+        (d) => d.division !== activeDivisionalRow.division,
+      )
+    : divisionalScores;
 
   return (
     <>
@@ -122,11 +147,14 @@ export default async function FighterDetailPage({ params }: PageProps) {
         <Container size="xl" className="pt-8">
           <div className="flex items-center justify-center gap-3 sm:gap-6">
             <OctagonScore
-              score={fighter.vertex_score}
+              score={heroCurrentScore}
               scoreMode="current"
               fighter={{
                 slug: fighter.slug,
-                vertexScore: fighter.vertex_score,
+                // Wave 14B.2: classify the hero tier using the
+                // divisional score (when available) so the colour ring
+                // and number always agree. all_time stays global.
+                vertexScore: heroCurrentScore,
                 vertexScoreAllTime: fighter.vertex_score_all_time,
                 ufcBouts: fighter.ufc_total,
               }}
@@ -144,6 +172,14 @@ export default async function FighterDetailPage({ params }: PageProps) {
               label="All-Time Vertex Score"
             />
           </div>
+          {otherDivisionRows.length > 0 ? (
+            <div className="mt-6">
+              <OtherDivisions
+                rows={otherDivisionRows}
+                currentDivision={fighter.current_division}
+              />
+            </div>
+          ) : null}
         </Container>
 
         {/* Quick-action CTAs */}

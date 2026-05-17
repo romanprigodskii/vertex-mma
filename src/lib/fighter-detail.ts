@@ -63,6 +63,24 @@ export type FighterDetail = {
   bout_count: number;
   vertex_score: number | null;
   vertex_score_all_time: number | null;
+  /** Wave 7A: division of the fighter's most recent completed UFC bout
+   *  (NULL for prospects who haven't fought). Wave 14B.2 reads this to
+   *  pick which divisional row to surface in the hero. */
+  current_division: string | null;
+};
+
+/** Wave 14B.2: per-(fighter, division) score row for the profile sidebar
+ *  and hero. Mirrors the fighter_divisional_score columns the UI cares
+ *  about. */
+export type FighterDivisionalScoreRow = {
+  division: string;
+  vertex_score: number | null;
+  divisional_status: "current" | "provisional" | "former";
+  in_active_ranking: boolean;
+  bouts_in_division: number;
+  last_bout_date_in_division: string | null;
+  divisional_cp: number;
+  divisional_current_cp: number | null;
 };
 
 export type FightHistoryEntry = {
@@ -241,13 +259,44 @@ export async function getFighterBySlug(
       f.current_streak_count,
       f.bout_count::int AS bout_count,
       f.vertex_score,
-      f.vertex_score_all_time
+      f.vertex_score_all_time,
+      f.current_division
     FROM fighter_with_stats f
     WHERE f.slug = ${slug}
     LIMIT 1
   `);
   const rows = result as unknown as FighterDetail[];
   return rows[0] ?? null;
+}
+
+/**
+ * Wave 14B.2: per-(fighter, division) current_score rows from
+ * fighter_divisional_score (Wave 14A table + Wave 14B.1 eligibility
+ * flag). Returns one row per division where the fighter has ≥3
+ * completed UFC bouts. Ordered with in_active_ranking=TRUE rows first
+ * so the profile sidebar can render the active division up top.
+ */
+export async function getDivisionalScores(
+  fighterId: string,
+): Promise<FighterDivisionalScoreRow[]> {
+  const result = await db.execute<FighterDivisionalScoreRow>(sql`
+    SELECT
+      division::text AS division,
+      vertex_score,
+      divisional_status,
+      in_active_ranking,
+      bouts_in_division,
+      last_bout_date_in_division::text AS last_bout_date_in_division,
+      divisional_cp,
+      divisional_current_cp
+    FROM fighter_divisional_score
+    WHERE fighter_id = ${fighterId}::uuid
+    ORDER BY
+      in_active_ranking DESC,
+      vertex_score DESC NULLS LAST,
+      bouts_in_division DESC
+  `);
+  return [...(result as unknown as FighterDivisionalScoreRow[])];
 }
 
 /**

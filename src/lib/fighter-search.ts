@@ -184,6 +184,17 @@ export type FighterCatalogRow = {
   championship_pedigree: number;
   is_dominant_champion: boolean;
   ufc_bouts: number;
+  /** Wave 14B.2: per-division current score for the single active weight
+   *  filter. NULL when (a) no weight filter, (b) multiple weight filters
+   *  (cross-division comparison is meaningless), or (c) the fighter has
+   *  no fighter_divisional_score row for the filtered division
+   *  (insufficient bouts; their global vertex_score remains the
+   *  fallback). When non-null, callers should prefer this over
+   *  vertex_score for display + tier classification. */
+  divisional_score: number | null;
+  /** Wave 14B.2: same single-weight gate as divisional_score. One of
+   *  'current' | 'provisional' | 'former' when a divisional row exists. */
+  divisional_status: "current" | "provisional" | "former" | null;
 };
 
 export type FighterCatalogResponse = {
@@ -217,18 +228,45 @@ function buildWhere(filters: FighterCatalogFilters): SQL {
   }
 
   if (filters.weight && filters.weight.length > 0) {
-    const values = sql.join(
-      filters.weight.map((v) => sql`${v}`),
-      sql`, `,
-    );
-    // Wave 7A: prefer the division of the last completed UFC bout
-    // (populated by scripts/compute_current_division.ts). Falls back
-    // to weight_class_primary for fighters with no completed bouts so
-    // signed-but-unfought prospects still show under their assigned
-    // class.
-    conditions.push(
-      sql`COALESCE(f.current_division, f.weight_class_primary::text) IN (${values})`,
-    );
+    if (filters.weight.length === 1) {
+      // Wave 14B.2: single-weight filter switches to the divisional
+      // ranking pool — only fighters with an in_active_ranking=TRUE row
+      // for this division (active rostered + primary_division=$weight,
+      // OR scheduled bout in $weight) AND, as a fallback for fighters
+      // with <3 bouts in the division (no fighter_divisional_score row
+      // at all), the legacy primary-division match path so a freshly
+      // promoted champion like Islam in WW still appears even before
+      // they have 3 WW bouts. The LEFT JOIN below feeds the same
+      // predicate via fds.fighter_id IS NOT NULL — see rowsQuery.
+      const w = filters.weight[0];
+      conditions.push(sql`(
+        EXISTS (
+          SELECT 1 FROM fighter_divisional_score fds_x
+          WHERE fds_x.fighter_id = f.id
+            AND fds_x.division::text = ${w}
+            AND fds_x.in_active_ranking = TRUE
+        )
+        OR (
+          COALESCE(f.current_division, f.weight_class_primary::text) = ${w}
+          AND NOT EXISTS (
+            SELECT 1 FROM fighter_divisional_score fds_y
+            WHERE fds_y.fighter_id = f.id
+              AND fds_y.division::text = ${w}
+          )
+        )
+      )`);
+    } else {
+      const values = sql.join(
+        filters.weight.map((v) => sql`${v}`),
+        sql`, `,
+      );
+      // Wave 7A: multi-weight comparison stays on the legacy
+      // current_division → weight_class_primary fallback. Divisional
+      // scores aren't meaningful when comparing across divisions.
+      conditions.push(
+        sql`COALESCE(f.current_division, f.weight_class_primary::text) IN (${values})`,
+      );
+    }
   }
 
   if (filters.country && filters.country.length > 0) {
@@ -325,8 +363,18 @@ function buildWhere(filters: FighterCatalogFilters): SQL {
 
 function buildOrderBy(filters: FighterCatalogFilters): SQL {
   const hasQuery = Boolean(filters.q?.trim());
+  // Wave 14B.2: when filtering to a single weight class, sort by the
+  // divisional score (alias `divisional_sort_score` in rowsQuery) which
+  // falls back to global vertex_score for fighters without an FDS row
+  // (<3 bouts in division). Multi/no-weight keeps the global sort.
+  const singleWeight = filters.weight?.length === 1;
   switch (filters.sort) {
     case "vertex_current":
+      if (singleWeight) {
+        return hasQuery
+          ? sql`match_score DESC, divisional_sort_score DESC NULLS LAST`
+          : sql`divisional_sort_score DESC NULLS LAST, f.vertex_score_all_time DESC NULLS LAST, f.bout_count DESC`;
+      }
       // Active fighters' current Vertex Score, falling back to all-time so
       // retired legends still rank somewhere. NULL scores (<3 UFC bouts)
       // sink to the bottom.
@@ -451,6 +499,26 @@ export async function searchFightersWithFilters(
       )::float AS match_score`
     : sql``;
 
+  // Wave 14B.2: single-weight filter joins fighter_divisional_score so the
+  // catalog can show + sort by the per-division score. Multi/no-weight
+  // path keeps the unchanged shape so cross-division catalogs continue
+  // to use the global vertex_score.
+  const singleWeight = filters.weight?.length === 1;
+  const divisionalJoin = singleWeight
+    ? sql`LEFT JOIN fighter_divisional_score fds
+            ON fds.fighter_id = f.id
+           AND fds.division::text = ${filters.weight![0]}
+           AND fds.in_active_ranking = TRUE`
+    : sql``;
+  const divisionalSelect = singleWeight
+    ? sql`,
+      fds.vertex_score AS divisional_score,
+      fds.divisional_status,
+      COALESCE(fds.vertex_score, f.vertex_score) AS divisional_sort_score`
+    : sql`,
+      NULL::int AS divisional_score,
+      NULL::text AS divisional_status`;
+
   const rowsQuery = sql`
     SELECT
       f.id::text AS id,
@@ -485,8 +553,10 @@ export async function searchFightersWithFilters(
       COALESCE(f.championship_pedigree, 0)::int AS championship_pedigree,
       COALESCE(f.is_dominant_champion, false) AS is_dominant_champion,
       COALESCE(f.ufc_total, 0)::int AS ufc_bouts
+      ${divisionalSelect}
       ${matchScoreSelect}
     FROM fighter_with_stats f
+    ${divisionalJoin}
     ${where}
     ORDER BY ${orderBy}
     OFFSET ${offset}
@@ -591,7 +661,9 @@ export async function getFightersBySlug(
       f.vertex_score_all_time,
       COALESCE(f.championship_pedigree, 0)::int AS championship_pedigree,
       COALESCE(f.is_dominant_champion, false) AS is_dominant_champion,
-      COALESCE(f.ufc_total, 0)::int AS ufc_bouts
+      COALESCE(f.ufc_total, 0)::int AS ufc_bouts,
+      NULL::int AS divisional_score,
+      NULL::text AS divisional_status
     FROM fighter_with_stats f
     WHERE f.slug IN (${values})
   `);

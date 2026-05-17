@@ -71,9 +71,16 @@ export function FighterCard({
   className,
   scoreMode = "current",
 }: FighterCardProps) {
+  // Wave 14B.2: when the catalog query joined a divisional row (single-
+  // weight filter), prefer the per-division score for "current"
+  // classification. all_time always stays global. divisional_score is
+  // NULL outside the single-weight-filter path, so this is a no-op for
+  // multi-/no-weight catalogs and for callers like the champion strip.
+  const effectiveCurrent =
+    fighter.divisional_score ?? fighter.vertex_score;
   const { classification, tierStyle, championStyle } = classifyAndStyle({
     slug: fighter.slug,
-    vertexScore: fighter.vertex_score,
+    vertexScore: effectiveCurrent,
     vertexScoreAllTime: fighter.vertex_score_all_time,
     ufcBouts: fighter.ufc_bouts,
     scoreMode,
@@ -83,7 +90,9 @@ export function FighterCard({
   const rawScore =
     scoreMode === "all_time"
       ? fighter.vertex_score_all_time
-      : fighter.vertex_score ?? fighter.vertex_score_all_time;
+      : effectiveCurrent ?? fighter.vertex_score_all_time;
+  const isProvisional =
+    scoreMode === "current" && fighter.divisional_status === "provisional";
   // Cap visible score at 100 — raw all-time values can exceed 100 for sort
   // ordering after we lifted the LEAST(100, ...) cap in step 5E, but the UI
   // tier breaks (Apex 80+, Elite 60-79 etc.) are calibrated against [0, 100].
@@ -303,6 +312,18 @@ export function FighterCard({
           }}
         >
           {displayScore}
+        </span>
+      ) : null}
+      {/* Wave 14B.2: provisional badge — surfaces "≤4 bouts in this
+          division" for divisional rating display. Anchored just above the
+          large score so it reads as a qualifier on that number. Hidden in
+          all_time mode and when the active catalog isn't divisional. */}
+      {isProvisional ? (
+        <span
+          aria-label="Provisional rating — fewer than 5 bouts in this division"
+          className="pointer-events-none absolute bottom-12 right-4 select-none rounded-sm border border-foreground/15 bg-background-elevated/85 px-1.5 py-0.5 font-sans text-[9px] uppercase tracking-widest text-foreground-muted"
+        >
+          Prov
         </span>
       ) : null}
     </Link>
