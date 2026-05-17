@@ -34,17 +34,22 @@ METHOD_MAP: dict[str, str] = EXACT_MAP
 def map_method(value: str | None) -> str | None:
     """Normalise a UFCStats method label to the bout_method enum.
 
-    UFCStats reports the method column in several shapes:
-      - "KO/TKO" (bare)                → "ko"
-      - "KO/TKO - Punches" (suffixed)  → "ko"
-      - "Submission" (bare)            → "submission"
-      - "Submission - Rear Naked Choke" (suffixed) → "submission"
-      - "Decision - Unanimous"         → "decision_unanimous"
-      - "U-DEC" (legacy short form)    → "decision_unanimous"
+    UFCStats reports the method column in several shapes — and the
+    detail page version concatenates the bucket label directly with the
+    technique name with no separator (Wave 16.2 finding):
+      - "KO/TKO" (bare)                       → "ko"
+      - "KO/TKOPunches" (no-space concat)     → "ko"
+      - "Submission" (bare)                   → "submission"
+      - "SUBRear Naked Choke" (no-space concat) → "submission"
+      - "Decision - Unanimous"                → "decision_unanimous"
+      - "U-DEC" (legacy short form)           → "decision_unanimous"
+      - "CNC"                                 → "tko" (could-not-continue)
+      - "OverturnedGuillotine Choke"          → "no_contest"
 
     Returns None when no rule applies — callers persist NULL in that
-    case. The raw text should also be written to bout.method_detail so a
-    future fix can backfill from that audit trail without re-scraping.
+    case. The raw text is also written to bout.method_detail so a
+    future iteration can backfill from that audit trail without
+    re-scraping.
     """
     if not value:
         return None
@@ -56,22 +61,36 @@ def map_method(value: str | None) -> str | None:
     if cleaned in EXACT_MAP:
         return EXACT_MAP[cleaned]
 
-    # 2) Prefix / contains fallback. Per the existing convention we map
-    # all "KO/TKO ..." variations to "ko" rather than splitting them
-    # between ko and tko — the enum still has a "tko" value reserved
-    # for the rare bare "TKO" exact match above, but the suffixed
-    # combined-bucket variants all flow to "ko".
+    # 2) Prefix / contains fallback. UFCStats' detail-page method
+    # column concatenates the bucket label directly with the technique
+    # description (no space), so the SUB/KO/TKO prefix checks must NOT
+    # require a trailing space. Per project convention all KO/TKO
+    # variants flow to "ko"; the enum's bare "tko" is reserved for the
+    # exact-match path above.
     upper = cleaned.upper()
 
     if (
         upper.startswith("KO/TKO")
-        or upper.startswith("TKO ")
-        or upper.startswith("KO ")
+        or upper.startswith("TKO")
+        or upper.startswith("KO")
     ):
         return "ko"
 
-    if upper.startswith("SUBMISSION") or upper.startswith("SUB "):
+    if upper.startswith("SUB"):
         return "submission"
+
+    # Wave 16.2: "Overturned<technique>" appears as a no-space concat
+    # on overturned bouts (commission ruling after the fact). Map to
+    # no_contest since the result was vacated.
+    if upper.startswith("OVERTURNED"):
+        return "no_contest"
+
+    # Wave 16.2: "CNC" is UFCStats' abbreviation for "Could Not
+    # Continue" — usually a doctor stoppage / accidental headbutt
+    # cutting the bout short. Treat as TKO (matches the existing
+    # "Could Not Continue" exact-match → tko).
+    if upper.startswith("CNC"):
+        return "tko"
 
     # Decision variants come in both "Decision - X" and "X-DEC" forms.
     if "UNANIMOUS" in upper or upper.startswith("U-DEC"):
@@ -89,7 +108,5 @@ def map_method(value: str | None) -> str | None:
         return "dq"
     if "COULD NOT CONTINUE" in upper:
         return "tko"
-    if "OVERTURNED" in upper:
-        return "no_contest"
 
     return None
