@@ -3,10 +3,12 @@ import {
   boolean,
   char,
   date,
+  doublePrecision,
   index,
   integer,
   pgTable,
   real,
+  serial,
   smallint,
   text,
   timestamp,
@@ -269,7 +271,75 @@ export const rankingSnapshot = pgTable(
   ],
 );
 
+// Wave 14A: per-(fighter, division) current_score. Backend foundation —
+// UI continues to read fighter.vertex_score (global) in Wave 14A; a
+// later wave wires the divisional values into the UI.
+//
+// One row per (fighter_id, division) pair where the fighter has ≥3
+// completed UFC bouts in that division. Populated by
+// scripts/materialize_divisional_score.ts, which reads
+// fighter_divisional_vertex_score (migration 0047), injects a divisional
+// championship-pedigree value (championship-history.ts scoped to the
+// division), and recomputes raw_current + curve + skid using the locked
+// Wave 15.1 formula.
+//
+// All-time is intentionally not represented here — all_time stays
+// global. divisional_status takes one of:
+//   'current'     — roster_status='active', current_division=division,
+//                   last bout in division within 24mo, ≥5 bouts in
+//                   division
+//   'provisional' — same active criteria but only 3-4 bouts in division
+//                   (sample size too small for full confidence)
+//   'former'      — ≥3 bouts in division but no longer in it (retired,
+//                   released, moved up/down, or lapsed >24mo)
+export const fighterDivisionalScore = pgTable(
+  "fighter_divisional_score",
+  {
+    id: serial("id").primaryKey(),
+    fighterId: uuid("fighter_id")
+      .notNull()
+      .references(() => fighter.id, { onDelete: "cascade" }),
+    division: weightClassEnum("division").notNull(),
+
+    // Headline divisional score.
+    rawCurrent: doublePrecision("raw_current"),
+    multipliedCurrent: smallint("multiplied_current"),
+    vertexScore: smallint("vertex_score"),
+
+    // Activity / status.
+    boutsInDivision: smallint("bouts_in_division").notNull(),
+    lastBoutDateInDivision: date("last_bout_date_in_division"),
+    divisionalStatus: text("divisional_status").notNull(),
+
+    // Sub-metric audit trail — mirrors fighter_vertex_score columns.
+    qualityWinsDecayed: doublePrecision("quality_wins_decayed"),
+    divisionalCp: smallint("divisional_cp"),
+    divisionalCurrentCp: smallint("divisional_current_cp"),
+    eraDominanceCurrent: doublePrecision("era_dominance_current"),
+    performanceDiffCurrent: doublePrecision("performance_diff_current"),
+    finishingDominanceDecayed: doublePrecision("finishing_dominance_decayed"),
+    activity: doublePrecision("activity"),
+    recentFormScore: smallint("recent_form_score"),
+    recentLossPenalty: doublePrecision("recent_loss_penalty"),
+
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    unique("fighter_divisional_unique").on(table.fighterId, table.division),
+    index("fighter_divisional_fighter_idx").on(table.fighterId),
+    index("fighter_divisional_division_idx").on(table.division),
+    index("fighter_divisional_score_idx").on(
+      table.division,
+      sql`${table.vertexScore} DESC NULLS LAST`,
+    ),
+  ],
+);
+
 export type Fighter = typeof fighter.$inferSelect;
 export type NewFighter = typeof fighter.$inferInsert;
 export type RankingSnapshot = typeof rankingSnapshot.$inferSelect;
 export type NewRankingSnapshot = typeof rankingSnapshot.$inferInsert;
+export type FighterDivisionalScore = typeof fighterDivisionalScore.$inferSelect;
+export type NewFighterDivisionalScore = typeof fighterDivisionalScore.$inferInsert;
