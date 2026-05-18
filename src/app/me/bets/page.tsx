@@ -81,9 +81,17 @@ export default async function MyBetsPage() {
                         {b.shares_bought.toFixed(1)} shares
                       </p>
                       {b.resolved_at ? (
-                        b.is_winning ? (
+                        // Refund check comes BEFORE is_winning: a cancelled
+                        // market leaves is_winning NULL so the previous
+                        // ternary would have shown "Lost" incorrectly.
+                        b.market_status === "cancelled" ? (
+                          <p className="font-mono text-xs tabular text-foreground-muted">
+                            Refunded · {(b.payout ?? 0).toLocaleString()}c
+                            returned
+                          </p>
+                        ) : b.is_winning ? (
                           <p className="font-mono text-xs tabular text-streak-win">
-                            +{(b.payout ?? 0).toLocaleString()}c paid out
+                            Won · +{(b.payout ?? 0).toLocaleString()}c
                           </p>
                         ) : (
                           <p className="font-mono text-xs tabular text-streak-loss">

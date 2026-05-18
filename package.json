@@ -32,7 +32,8 @@
     "roster:import": "tsx scripts/import_roster_watch.ts",
     "markets:generate": "tsx scripts/generate_markets.ts",
     "markets:generate:dry": "tsx scripts/generate_markets.ts --limit=5",
-    "markets:settle": "tsx scripts/settle_market.ts"
+    "markets:settle": "tsx scripts/settle_market.ts",
+    "markets:refund": "tsx scripts/refund_market.ts"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.11",
