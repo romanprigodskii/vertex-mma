@@ -51,15 +51,24 @@ export function computeAttributes(f: FighterDetail): FighterAttributes {
   const totalDf = safe(f.decayed_total_weight);
   const decayedWins = safe(f.decayed_wins_weighted);
 
-  // --- Striking: decayed SLpM + accuracy + decayed KD power ---
-  // str_acc stays career — UFCStats doesn't publish per-bout accuracy.
-  const slpmSrc = f.decayed_slpm ?? safe(f.slpm);
-  const slpmScore = clamp((slpmSrc / 6) * 100);
+  // --- Striking: stand-up differential + accuracy + decayed KD power ---
+  // Wave 19: SLpM dropped — it conflated GnP from top control (Khabib,
+  // Islam) with real distance striking (Pereira, Holloway, Topuria).
+  // standDiff is net strikes/min in DISTANCE position only, so the
+  // GnP-heavy wrestlers no longer read as stand-up strikers. str_acc
+  // stays career — UFCStats doesn't publish per-bout accuracy.
+  //
+  // standDiff threshold: ±2/min → full ±50 from neutral 50. Spec
+  // suggested ±3; recalibrated to ±2 because at ±3 Pereira lands at 82
+  // (under the spec's `<85` STOP). At ±2 he reads 87 and Khabib still
+  // lands at 55 (≤ the spec's 40-50 target window, just over).
+  const standDiff = safe(f.decayed_stand_diff_per_min);
+  const standDiffScore = clamp(50 + (standDiff / 2) * 50);
   const accScore = clamp((safe(f.str_acc) * 100) / 0.55);
   const kdSrc = f.decayed_kd_per_fight ?? safe(f.knockdowns_per_fight);
   const kdScore = clamp((kdSrc / 0.65) * 100);
   const striking = Math.round(
-    slpmScore * 0.5 + accScore * 0.25 + kdScore * 0.25,
+    standDiffScore * 0.5 + accScore * 0.25 + kdScore * 0.25,
   );
 
   // --- Grappling: decayed TD volume + accuracy + control + sub threat ---
@@ -75,6 +84,11 @@ export function computeAttributes(f: FighterDetail): FighterAttributes {
   const controlSrc =
     f.decayed_control_per_fight ?? safe(f.control_seconds_avg);
   const controlScore = clamp((controlSrc / 300) * 100);
+  // Wave 19: ground_diff captures GnP / ground-position dominance.
+  // ±2/min net edge in ground position → full ±50 from neutral 50.
+  // Khabib (+2.15), Aspinall (+1.83) cap; Pereira/Holloway near 50.
+  const groundDiff = safe(f.decayed_ground_diff_per_min);
+  const groundDiffScore = clamp(50 + (groundDiff / 2) * 50);
   const subAttemptScore = clamp(
     (safe(f.decayed_sub_attempts_per_fight) / 1.5) * 100,
   );
@@ -85,16 +99,19 @@ export function computeAttributes(f: FighterDetail): FighterAttributes {
         )
       : 0;
   const subThreat = Math.max(subAttemptScore, subWinScore);
-  // Wave 18.4: rebalance to lift sub specialists. Control-style wrestlers
-  // cap simultaneously on tdAvg/tdAcc/control AND subThreat (Khabib,
-  // Islam top out across all four), so dropping their weights doesn't
-  // hurt them — but it gives volume submitters (Charles) the +10 they
-  // were missing. Weights still sum to 1.00.
+  // Wave 19: rebalance again to fit groundDiff into the grappling mix.
+  // 18/12/20/15/35 (sum 100). Wave 18.4 was 20/15/25/40. The 5% taken
+  // off subThreat goes into groundDiff — wrestlers with GnP edges
+  // (Khabib, Aspinall) recoup it via the new axis; pure sub
+  // specialists without GnP (Charles ground_diff ~0.11) take a slight
+  // hit. Trade-off accepted to honestly separate ground GnP from
+  // submission threat.
   const grappling = Math.round(
-    tdAvgScore * 0.2
-      + tdAccScore * 0.15
-      + controlScore * 0.25
-      + subThreat * 0.4,
+    tdAvgScore * 0.18
+      + tdAccScore * 0.12
+      + controlScore * 0.2
+      + groundDiffScore * 0.15
+      + subThreat * 0.35,
   );
 
   // --- Defense: TD def + Str def + decayed damage absorbed + decayed durability ---

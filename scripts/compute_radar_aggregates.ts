@@ -76,12 +76,15 @@ async function main() {
       SELECT
         brs.bout_id,
         brs.fighter_id,
-        SUM(brs.knockdowns)::int           AS kd_landed,
-        SUM(brs.control_time_seconds)::int AS control_sec,
-        SUM(brs.takedowns_landed)::int     AS td_landed,
-        SUM(brs.takedowns_attempted)::int  AS td_attempted,
-        SUM(brs.sub_attempts)::int         AS sub_attempts,
-        SUM(brs.sig_str_landed)::int       AS sig_str_landed
+        SUM(brs.knockdowns)::int                AS kd_landed,
+        SUM(brs.control_time_seconds)::int      AS control_sec,
+        SUM(brs.takedowns_landed)::int          AS td_landed,
+        SUM(brs.takedowns_attempted)::int       AS td_attempted,
+        SUM(brs.sub_attempts)::int              AS sub_attempts,
+        SUM(brs.sig_str_landed)::int            AS sig_str_landed,
+        SUM(brs.sig_str_distance_landed)::int   AS stand_landed,
+        SUM(brs.sig_str_clinch_landed)::int     AS clinch_landed,
+        SUM(brs.sig_str_ground_landed)::int     AS ground_landed
       FROM bout_round_stats brs
       GROUP BY brs.bout_id, brs.fighter_id
     ),
@@ -89,7 +92,10 @@ async function main() {
       SELECT
         brs.bout_id,
         brs.fighter_id AS opp_id,
-        SUM(brs.sig_str_landed)::int       AS opp_sig_str_landed
+        SUM(brs.sig_str_landed)::int            AS opp_sig_str_landed,
+        SUM(brs.sig_str_distance_landed)::int   AS opp_stand_landed,
+        SUM(brs.sig_str_clinch_landed)::int     AS opp_clinch_landed,
+        SUM(brs.sig_str_ground_landed)::int     AS opp_ground_landed
       FROM bout_round_stats brs
       GROUP BY brs.bout_id, brs.fighter_id
     ),
@@ -108,13 +114,11 @@ async function main() {
         COALESCE(ps.td_attempted, 0)   AS td_attempted,
         COALESCE(ps.sub_attempts, 0)   AS sub_attempts,
         COALESCE(ps.sig_str_landed, 0) AS sig_str_landed,
-        COALESCE(
-          (SELECT SUM(opp_sig_str_landed)
-             FROM per_bout_opp po
-            WHERE po.bout_id = bd.bout_id
-              AND po.opp_id  <> bd.fighter_id),
-          0
-        ) AS sig_str_absorbed,
+        COALESCE(opp.sig_str_absorbed, 0) AS sig_str_absorbed,
+        -- Wave 19: position-broken landed - absorbed per bout
+        COALESCE(ps.stand_landed, 0)  - COALESCE(opp.stand_absorbed, 0)  AS stand_diff_bout,
+        COALESCE(ps.clinch_landed, 0) - COALESCE(opp.clinch_absorbed, 0) AS clinch_diff_bout,
+        COALESCE(ps.ground_landed, 0) - COALESCE(opp.ground_absorbed, 0) AS ground_diff_bout,
         CASE
           WHEN bd.round_finished IS NOT NULL AND bd.time_finished_seconds IS NOT NULL
             THEN (bd.round_finished - 1) * 5.0 + bd.time_finished_seconds / 60.0
@@ -123,6 +127,16 @@ async function main() {
       FROM bout_decay bd
       LEFT JOIN per_bout_self ps
         ON ps.bout_id = bd.bout_id AND ps.fighter_id = bd.fighter_id
+      LEFT JOIN LATERAL (
+        SELECT
+          SUM(po.opp_sig_str_landed)::int AS sig_str_absorbed,
+          SUM(po.opp_stand_landed)::int   AS stand_absorbed,
+          SUM(po.opp_clinch_landed)::int  AS clinch_absorbed,
+          SUM(po.opp_ground_landed)::int  AS ground_absorbed
+        FROM per_bout_opp po
+        WHERE po.bout_id = bd.bout_id
+          AND po.opp_id  <> bd.fighter_id
+      ) opp ON TRUE
     ),
     aggs AS (
       SELECT
@@ -155,7 +169,14 @@ async function main() {
         (SUM(df * sig_str_landed)
           / NULLIF(SUM(df * minutes_fought), 0))::float           AS decayed_slpm,
         (SUM(df * sig_str_absorbed)
-          / NULLIF(SUM(df * minutes_fought), 0))::float           AS decayed_sapm
+          / NULLIF(SUM(df * minutes_fought), 0))::float           AS decayed_sapm,
+        -- Wave 19: per-minute, decay-weighted position-broken diffs
+        (SUM(df * stand_diff_bout)
+          / NULLIF(SUM(df * minutes_fought), 0))::float           AS decayed_stand_diff_per_min,
+        (SUM(df * clinch_diff_bout)
+          / NULLIF(SUM(df * minutes_fought), 0))::float           AS decayed_clinch_diff_per_min,
+        (SUM(df * ground_diff_bout)
+          / NULLIF(SUM(df * minutes_fought), 0))::float           AS decayed_ground_diff_per_min
       FROM per_bout
       GROUP BY fighter_id
     )
@@ -177,7 +198,10 @@ async function main() {
       decayed_late_reach_rate        = a.decayed_late_reach_rate,
       decayed_finish_losses_weighted = a.decayed_finish_losses_weighted,
       decayed_slpm                   = a.decayed_slpm,
-      decayed_sapm                   = a.decayed_sapm
+      decayed_sapm                   = a.decayed_sapm,
+      decayed_stand_diff_per_min     = a.decayed_stand_diff_per_min,
+      decayed_clinch_diff_per_min    = a.decayed_clinch_diff_per_min,
+      decayed_ground_diff_per_min    = a.decayed_ground_diff_per_min
     FROM aggs a
     WHERE f.id = a.fighter_id
     RETURNING f.id

@@ -187,6 +187,17 @@ export const fighter = pgTable(
     decayedSlpm: doublePrecision("decayed_slpm"),
     decayedSapm: doublePrecision("decayed_sapm"),
 
+    // Wave 19: per-minute, decay-weighted position-broken strike
+    // differentials (landed - absorbed). Stand-up isolates true
+    // distance striking (Pereira, Holloway, Topuria); ground isolates
+    // GnP / position dominance (Khabib top, Islam top control). Powers
+    // the new striking & grappling formulas that fixed the
+    // SLpM-conflation issue (Khabib's GnP volume was reading as
+    // generic "striking" pre-Wave-19).
+    decayedStandDiffPerMin: doublePrecision("decayed_stand_diff_per_min"),
+    decayedClinchDiffPerMin: doublePrecision("decayed_clinch_diff_per_min"),
+    decayedGroundDiffPerMin: doublePrecision("decayed_ground_diff_per_min"),
+
     ufcStatsId: text("ufc_stats_id").unique(),
     sherdogId: text("sherdog_id").unique(),
     tapologyId: text("tapology_id").unique(),

@@ -92,6 +92,14 @@ export type FighterDetail = {
   decayed_finish_losses_weighted: number | null;
   decayed_slpm: number | null;
   decayed_sapm: number | null;
+  /** Wave 19: position-broken landed-vs-absorbed differential per
+   *  minute, decay-weighted. stand isolates true distance striking
+   *  (Pereira/Holloway/Topuria), ground isolates GnP / ground control
+   *  (Khabib/Islam/Aspinall). clinch is broken out for completeness but
+   *  not currently consumed by computeAttributes. */
+  decayed_stand_diff_per_min: number | null;
+  decayed_clinch_diff_per_min: number | null;
+  decayed_ground_diff_per_min: number | null;
 };
 
 /** Wave 17: weights powering ScoreBreakdown's contribution math. These
@@ -539,7 +547,10 @@ export async function getFighterBySlug(
       f.decayed_late_reach_rate,
       f.decayed_finish_losses_weighted,
       f.decayed_slpm,
-      f.decayed_sapm
+      f.decayed_sapm,
+      f.decayed_stand_diff_per_min,
+      f.decayed_clinch_diff_per_min,
+      f.decayed_ground_diff_per_min
     FROM fighter_with_stats f
     WHERE f.slug = ${slug}
     LIMIT 1
