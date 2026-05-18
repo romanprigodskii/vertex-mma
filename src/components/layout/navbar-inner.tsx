@@ -2,7 +2,16 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Coins, LogOut, Menu, Search, User, X } from "lucide-react";
+import {
+  Coins,
+  LogOut,
+  Menu,
+  Search,
+  Settings as SettingsIcon,
+  User,
+  UserCircle,
+  X,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Container } from "@/components/layout/container";
@@ -88,6 +97,23 @@ function UserMenu({ user }: { user: CurrentUser }) {
               {user.tier}
             </span>
           </div>
+          <Link
+            href="/me"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-2 rounded-sm px-2 py-1.5 font-sans text-sm text-foreground hover:bg-foreground/[0.05]"
+          >
+            <UserCircle className="h-4 w-4" />
+            Profile
+          </Link>
+          <Link
+            href="/settings"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-2 rounded-sm px-2 py-1.5 font-sans text-sm text-foreground hover:bg-foreground/[0.05]"
+          >
+            <SettingsIcon className="h-4 w-4" />
+            Settings
+          </Link>
+          <hr className="my-1 border-foreground/10" />
           <form action="/auth/signout" method="post">
             <button
               type="submit"
