@@ -1,33 +1,52 @@
 import type {
   BoutDetailFighter,
-  BoutRoundStatsRow,
   FighterStrikeMap,
 } from "@/lib/bout-detail";
-import { computeFighterStrikeMap } from "@/lib/bout-detail";
+import { cn } from "@/lib/utils";
 
 interface BoutHeatmapProps {
-  rounds: BoutRoundStatsRow[];
   fighterA: BoutDetailFighter;
   fighterB: BoutDetailFighter;
+  mapA: FighterStrikeMap;
+  mapB: FighterStrikeMap;
+  /** Tailwind color class applied to the SVG silhouette via currentColor.
+      Wave 32 uses red ("text-streak-loss") for landed and muted gray
+      ("text-foreground-muted") for absorbed. */
+  colorClass?: string;
 }
 
-export function BoutHeatmap({ rounds, fighterA, fighterB }: BoutHeatmapProps) {
-  if (rounds.length === 0) return null;
-  const a = computeFighterStrikeMap(rounds, fighterA.id);
-  const b = computeFighterStrikeMap(rounds, fighterB.id);
-  // Universal max so both silhouettes share scale — easier visual compare.
-  const maxStrike = Math.max(a.head, a.body, a.legs, b.head, b.body, b.legs, 1);
+export function BoutHeatmap({
+  fighterA,
+  fighterB,
+  mapA,
+  mapB,
+  colorClass = "text-streak-loss",
+}: BoutHeatmapProps) {
+  const maxStrike = Math.max(
+    mapA.head,
+    mapA.body,
+    mapA.legs,
+    mapB.head,
+    mapB.body,
+    mapB.legs,
+    1,
+  );
 
   return (
-    <section aria-label="Strike map">
-      <h2 className="mb-5 font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
-        Strike map · totals
-      </h2>
-      <div className="mx-auto grid max-w-2xl grid-cols-2 gap-4 sm:gap-8">
-        <FighterSilhouette name={fighterA.name_en} map={a} max={maxStrike} />
-        <FighterSilhouette name={fighterB.name_en} map={b} max={maxStrike} />
-      </div>
-    </section>
+    <div className="mx-auto grid max-w-2xl grid-cols-2 gap-4 sm:gap-8">
+      <FighterSilhouette
+        name={fighterA.name_en}
+        map={mapA}
+        max={maxStrike}
+        colorClass={colorClass}
+      />
+      <FighterSilhouette
+        name={fighterB.name_en}
+        map={mapB}
+        max={maxStrike}
+        colorClass={colorClass}
+      />
+    </div>
   );
 }
 
@@ -35,10 +54,12 @@ function FighterSilhouette({
   name,
   map,
   max,
+  colorClass,
 }: {
   name: string;
   map: FighterStrikeMap;
   max: number;
+  colorClass: string;
 }) {
   // Opacity ramp: zone with 0 strikes → 0.10 (barely visible outline),
   // zone with `max` strikes → 1.0. Min floor 0.10 keeps silhouette readable
@@ -55,7 +76,7 @@ function FighterSilhouette({
       </p>
       <svg
         viewBox="0 0 80 200"
-        className="w-full max-w-[140px] text-streak-loss"
+        className={cn("w-full max-w-[140px]", colorClass)}
         aria-hidden
       >
         <circle cx="40" cy="22" r="16" fill="currentColor" opacity={headO} />

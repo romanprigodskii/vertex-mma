@@ -4,15 +4,19 @@ import { notFound } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 
 import { BoutDecisionBanner } from "@/components/bout/BoutDecisionBanner";
-import { BoutHeatmap } from "@/components/bout/BoutHeatmap";
 import { BoutHero } from "@/components/bout/BoutHero";
 import { BoutRoundBreakdown } from "@/components/bout/BoutRoundBreakdown";
 import { BoutScorecards } from "@/components/bout/BoutScorecards";
+import { BoutStrikeAnalysis } from "@/components/bout/BoutStrikeAnalysis";
 import { BoutTotals } from "@/components/bout/BoutTotals";
 import { Container } from "@/components/layout/container";
 import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
-import { getBoutById } from "@/lib/bout-detail";
+import {
+  computeFighterPositionMap,
+  computeFighterStrikeMap,
+  getBoutById,
+} from "@/lib/bout-detail";
 import { WEIGHT_CLASSES } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
@@ -49,6 +53,16 @@ export default async function BoutDetailPage({ params }: PageProps) {
     WEIGHT_LABEL[bout.weight_class] ?? bout.weight_class;
   const backHref = `/events/${bout.event.slug}#bout-${bout.id}`;
 
+  // Wave 32: pre-compute every map server-side so the client tabs only
+  // toggle visibility — no re-fetch on switch.
+  const landedA = computeFighterStrikeMap(bout.rounds, bout.fighter_a.id);
+  const landedB = computeFighterStrikeMap(bout.rounds, bout.fighter_b.id);
+  // Absorbed by A = strikes LANDED by B against A (and vice versa).
+  const absorbedA = computeFighterStrikeMap(bout.rounds, bout.fighter_b.id);
+  const absorbedB = computeFighterStrikeMap(bout.rounds, bout.fighter_a.id);
+  const positionA = computeFighterPositionMap(bout.rounds, bout.fighter_a.id);
+  const positionB = computeFighterPositionMap(bout.rounds, bout.fighter_b.id);
+
   return (
     <>
       <Navbar />
@@ -72,15 +86,16 @@ export default async function BoutDetailPage({ params }: PageProps) {
         <BoutDecisionBanner bout={bout} />
 
         {bout.rounds.length > 0 ? (
-          <section className="border-t border-foreground/[0.06] py-10 md:py-14">
-            <Container size="xl">
-              <BoutHeatmap
-                rounds={bout.rounds}
-                fighterA={bout.fighter_a}
-                fighterB={bout.fighter_b}
-              />
-            </Container>
-          </section>
+          <BoutStrikeAnalysis
+            fighterA={bout.fighter_a}
+            fighterB={bout.fighter_b}
+            landedA={landedA}
+            landedB={landedB}
+            absorbedA={absorbedA}
+            absorbedB={absorbedB}
+            positionA={positionA}
+            positionB={positionB}
+          />
         ) : null}
 
         <section className="border-t border-foreground/10 py-10 md:py-12">

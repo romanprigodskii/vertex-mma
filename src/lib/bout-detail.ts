@@ -316,6 +316,28 @@ export function computeFighterStrikeMap(
   return { head, body, legs };
 }
 
+export type FighterPositionMap = {
+  distance: number;
+  clinch: number;
+  ground: number;
+};
+
+export function computeFighterPositionMap(
+  rounds: BoutRoundStatsRow[],
+  fighterId: string,
+): FighterPositionMap {
+  let distance = 0;
+  let clinch = 0;
+  let ground = 0;
+  for (const r of rounds) {
+    if (r.fighter_id !== fighterId) continue;
+    distance += r.sig_str_distance_landed;
+    clinch += r.sig_str_clinch_landed;
+    ground += r.sig_str_ground_landed;
+  }
+  return { distance, clinch, ground };
+}
+
 const DECISION_METHODS = new Set([
   "decision_unanimous",
   "decision_split",
