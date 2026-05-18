@@ -73,3 +73,52 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
     joinedAt: row.joinedAt.toISOString(),
   };
 }
+
+// Public-safe shape: same fields as CurrentUser minus auth identifiers and
+// balanceCoins (private). Used by /profile/[username] and any future
+// leaderboard / @username link.
+export type PublicProfile = {
+  userProfileId: string;
+  username: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+  bio: string | null;
+  countryCode: string | null;
+  tier: string;
+  simulationCount: number;
+  predictionCount: number;
+  betCount: number;
+  currentStreak: number;
+  bestStreak: number;
+  joinedAt: string;
+};
+
+export async function getUserProfileByUsername(
+  username: string,
+): Promise<PublicProfile | null> {
+  const rows = await db
+    .select({
+      userProfileId: userProfile.id,
+      username: userProfile.username,
+      displayName: userProfile.displayName,
+      avatarUrl: userProfile.avatarUrl,
+      bio: userProfile.bio,
+      countryCode: userProfile.countryCode,
+      tier: userProfile.tier,
+      simulationCount: userProfile.simulationCount,
+      predictionCount: userProfile.predictionCount,
+      betCount: userProfile.betCount,
+      currentStreak: userProfile.currentStreak,
+      bestStreak: userProfile.bestStreak,
+      joinedAt: userProfile.joinedAt,
+    })
+    .from(userProfile)
+    .where(eq(userProfile.username, username))
+    .limit(1);
+  const row = rows[0];
+  if (!row) return null;
+  return {
+    ...row,
+    joinedAt: row.joinedAt.toISOString(),
+  };
+}

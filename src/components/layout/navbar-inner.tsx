@@ -98,7 +98,7 @@ function UserMenu({ user }: { user: CurrentUser }) {
             </span>
           </div>
           <Link
-            href="/me"
+            href={`/profile/${user.username}`}
             onClick={() => setOpen(false)}
             className="flex items-center gap-2 rounded-sm px-2 py-1.5 font-sans text-sm text-foreground hover:bg-foreground/[0.05]"
           >

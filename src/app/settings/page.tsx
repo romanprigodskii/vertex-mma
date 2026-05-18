@@ -6,7 +6,9 @@ import { Container } from "@/components/layout/container";
 import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
 import { AvatarUpload } from "@/components/settings/avatar-upload";
+import { ChangeEmailForm } from "@/components/settings/change-email-form";
 import { ChangePasswordForm } from "@/components/settings/change-password-form";
+import { DeleteAccountSection } from "@/components/settings/delete-account-section";
 import { ProfileEditForm } from "@/components/settings/profile-edit-form";
 import { getCurrentUser } from "@/lib/auth";
 
@@ -41,8 +43,8 @@ export default async function SettingsPage() {
               Settings
             </h1>
             <p className="mt-2 font-sans text-sm text-foreground-muted">
-              Update your profile. Username and email changes are not
-              supported yet — coming in a later wave.
+              Update your profile, change your email or password, or delete
+              your account. Username changes are not supported yet.
             </p>
           </header>
 
@@ -70,9 +72,23 @@ export default async function SettingsPage() {
 
           <section>
             <h2 className="mb-4 font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
+              Email
+            </h2>
+            <ChangeEmailForm currentEmail={user.email ?? ""} />
+          </section>
+
+          <section>
+            <h2 className="mb-4 font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
               Password
             </h2>
             <ChangePasswordForm />
+          </section>
+
+          <section>
+            <h2 className="mb-4 font-sans text-[11px] font-medium uppercase tracking-widest text-streak-loss">
+              Danger zone
+            </h2>
+            <DeleteAccountSection />
           </section>
         </Container>
       </main>
