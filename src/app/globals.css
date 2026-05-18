@@ -95,6 +95,18 @@
   --text-9xl: 8rem;
   --text-9xl--line-height: 1;
 
+  /* Wave 43: fluid hero/heading sizes used across page-level h1's and
+     section h2's so typography matches between home, fighters, rankings,
+     markets, leaderboard, etc. clamp(min, viewport, max). */
+  --text-hero: clamp(2.5rem, 7vw, 6rem);
+  --text-hero--line-height: 0.95;
+  --text-h1: clamp(2rem, 5vw, 4.5rem);
+  --text-h1--line-height: 1;
+  --text-h2: clamp(1.5rem, 3.5vw, 3rem);
+  --text-h2--line-height: 1.05;
+  --text-h3: clamp(1.25rem, 2.5vw, 2rem);
+  --text-h3--line-height: 1.1;
+
   /* ============================================================
      Radius
      ============================================================ */

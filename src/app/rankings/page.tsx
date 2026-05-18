@@ -30,7 +30,7 @@ export default async function RankingsListPage() {
               <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground-subtle">
                 Community
               </p>
-              <h1 className="mt-2 font-display text-4xl uppercase tracking-tight text-foreground sm:text-5xl">
+              <h1 className="mt-2 font-display uppercase tracking-tight text-foreground text-h1">
                 Rankings
               </h1>
               <p className="mt-2 max-w-xl font-sans text-sm text-foreground-muted">

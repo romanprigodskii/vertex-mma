@@ -2,6 +2,104 @@ import { sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 
+export type EventListItem = {
+  id: string;
+  slug: string;
+  name: string;
+  short_name: string | null;
+  date: string;
+  location_city: string | null;
+  location_country: string | null;
+  venue: string | null;
+  poster_url: string | null;
+  status: string;
+  promotion: string;
+  bout_count: number;
+};
+
+export type EventListFilter = "upcoming" | "past" | "all";
+
+/**
+ * Listing for /events. Three filters:
+ *   upcoming  — status in (upcoming, in_progress) AND date >= yesterday;
+ *               ASC by date so the next card sits first.
+ *   past      — status = completed OR date < yesterday; DESC so the most
+ *               recent event is first.
+ *   all       — everything, DESC.
+ *
+ * `bout_count` is a subselect on bout.event_id (indexed) so each card
+ * gets its count in one round-trip.
+ */
+export async function listEvents(
+  filter: EventListFilter = "all",
+  limit = 60,
+): Promise<EventListItem[]> {
+  if (filter === "upcoming") {
+    const rows = await db.execute<EventListItem>(sql`
+      SELECT
+        e.id::text AS id,
+        e.slug,
+        e.name,
+        e.short_name,
+        e.date::text AS date,
+        e.location_city,
+        e.location_country,
+        e.venue,
+        e.poster_url,
+        e.status::text AS status,
+        e.promotion::text AS promotion,
+        (SELECT COUNT(*)::int FROM bout WHERE event_id = e.id) AS bout_count
+      FROM event e
+      WHERE e.status IN ('upcoming', 'in_progress')
+        AND e.date >= NOW() - INTERVAL '1 day'
+      ORDER BY e.date ASC
+      LIMIT ${limit}
+    `);
+    return rows as unknown as EventListItem[];
+  }
+  if (filter === "past") {
+    const rows = await db.execute<EventListItem>(sql`
+      SELECT
+        e.id::text AS id,
+        e.slug,
+        e.name,
+        e.short_name,
+        e.date::text AS date,
+        e.location_city,
+        e.location_country,
+        e.venue,
+        e.poster_url,
+        e.status::text AS status,
+        e.promotion::text AS promotion,
+        (SELECT COUNT(*)::int FROM bout WHERE event_id = e.id) AS bout_count
+      FROM event e
+      WHERE e.status = 'completed' OR e.date < NOW() - INTERVAL '1 day'
+      ORDER BY e.date DESC
+      LIMIT ${limit}
+    `);
+    return rows as unknown as EventListItem[];
+  }
+  const rows = await db.execute<EventListItem>(sql`
+    SELECT
+      e.id::text AS id,
+      e.slug,
+      e.name,
+      e.short_name,
+      e.date::text AS date,
+      e.location_city,
+      e.location_country,
+      e.venue,
+      e.poster_url,
+      e.status::text AS status,
+      e.promotion::text AS promotion,
+      (SELECT COUNT(*)::int FROM bout WHERE event_id = e.id) AS bout_count
+    FROM event e
+    ORDER BY e.date DESC
+    LIMIT ${limit}
+  `);
+  return rows as unknown as EventListItem[];
+}
+
 export type EventFighterRef = {
   id: string;
   slug: string;

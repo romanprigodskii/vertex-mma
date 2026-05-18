@@ -91,10 +91,7 @@ function CatalogHero({ totalAll }: { totalAll: number }) {
         <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground-subtle">
           The roster
         </p>
-        <h1
-          className="mt-3 font-display tracking-[-0.01em] text-foreground leading-[0.85]"
-          style={{ fontSize: "clamp(64px, 8vw, 144px)" }}
-        >
+        <h1 className="mt-3 font-display uppercase tracking-[-0.01em] text-foreground text-hero">
           FIGHTERS
         </h1>
         <div className="mt-6 flex flex-wrap items-baseline gap-x-3 gap-y-1">

@@ -298,10 +298,7 @@ export default async function EventDetailPage({ params }: PageProps) {
             <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground-subtle">
               Event · {event.promotion.toUpperCase()}
             </p>
-            <h1
-              className="mt-3 font-display uppercase tracking-tight text-foreground leading-[0.9]"
-              style={{ fontSize: "clamp(40px, 6vw, 96px)" }}
-            >
+            <h1 className="mt-3 font-display uppercase tracking-tight text-foreground text-hero">
               {event.short_name || event.name}
             </h1>
             <p className="mt-4 font-sans text-[11px] uppercase tracking-[0.22em] text-foreground-muted">
