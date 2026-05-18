@@ -14,12 +14,20 @@ PHASES = {
     "bouts": "03_scrape_bouts.py",
     "enrich-fighters": "04_enrich_fighters.py",
     "enrich-bouts": "05_enrich_bouts.py",
+    "scorecards": "07_scrape_scorecards.py",
 }
 
 PHASE_GROUPS = {
     "quick": ["events", "fighters", "bouts"],
     "enrich": ["enrich-fighters", "enrich-bouts"],
-    "all": ["events", "fighters", "bouts", "enrich-fighters", "enrich-bouts"],
+    "all": [
+        "events",
+        "fighters",
+        "bouts",
+        "enrich-fighters",
+        "enrich-bouts",
+        "scorecards",
+    ],
 }
 
 

@@ -24,6 +24,8 @@
     "scrape:all": "cd scripts/scraper && ./venv/bin/python scripts/run_all.py --phase all",
     "scrape:country": "cd scripts/scraper && ./venv/bin/python scripts/06_backfill_country.py",
     "scrape:country:dry": "cd scripts/scraper && ./venv/bin/python scripts/06_backfill_country.py --dry-run --limit 5 --workers 1",
+    "scrape:scorecards": "cd scripts/scraper && ./venv/bin/python scripts/07_scrape_scorecards.py",
+    "scrape:scorecards:dry": "cd scripts/scraper && ./venv/bin/python scripts/07_scrape_scorecards.py --dry-run --limit 5",
     "photos:setup": "cd scripts/photo_scraper && python3 -m venv venv && ./venv/bin/pip install -r requirements.txt",
     "photos:dry": "cd scripts/photo_scraper && ./venv/bin/python scripts/fetch_photos.py --limit 5 --dry-run",
     "photos:fetch": "cd scripts/photo_scraper && ./venv/bin/python scripts/fetch_photos.py --workers 4",

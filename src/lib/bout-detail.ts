@@ -36,6 +36,17 @@ export type BoutRoundStatsRow = {
   knockdowns: number;
 };
 
+export type BoutScorecardJudge = {
+  judge_name: string;
+  rounds: Array<{
+    round: number;
+    fighter_a_score: number;
+    fighter_b_score: number;
+  }>;
+  total_a: number;
+  total_b: number;
+};
+
 export type BoutDetail = {
   id: string;
   event: {
@@ -62,6 +73,7 @@ export type BoutDetail = {
   round_finished: number | null;
   time_finished_seconds: number | null;
   rounds: BoutRoundStatsRow[];
+  scorecards: BoutScorecardJudge[];
 };
 
 type BoutHeaderRow = {
@@ -183,6 +195,26 @@ export async function getBoutById(id: string): Promise<BoutDetail | null> {
   `);
   const rounds = [...(roundsResult as unknown as BoutRoundStatsRow[])];
 
+  const scorecardResult = await db.execute<{
+    judge_name: string;
+    round: number;
+    fighter_a_score: number;
+    fighter_b_score: number;
+  }>(sql`
+    SELECT judge_name, round, fighter_a_score, fighter_b_score
+    FROM bout_scorecard
+    WHERE bout_id = ${id}::uuid
+    ORDER BY judge_name ASC, round ASC
+  `);
+  const scorecards = groupScorecardsByJudge(
+    [...(scorecardResult as unknown as Array<{
+      judge_name: string;
+      round: number;
+      fighter_a_score: number;
+      fighter_b_score: number;
+    }>)],
+  );
+
   return {
     id: r.id,
     event: {
@@ -225,7 +257,41 @@ export async function getBoutById(id: string): Promise<BoutDetail | null> {
     round_finished: r.round_finished,
     time_finished_seconds: r.time_finished_seconds,
     rounds,
+    scorecards,
   };
+}
+
+export function groupScorecardsByJudge(
+  rows: Array<{
+    judge_name: string;
+    round: number;
+    fighter_a_score: number;
+    fighter_b_score: number;
+  }>,
+): BoutScorecardJudge[] {
+  const map = new Map<string, BoutScorecardJudge>();
+  for (const r of rows) {
+    let judge = map.get(r.judge_name);
+    if (!judge) {
+      judge = {
+        judge_name: r.judge_name,
+        rounds: [],
+        total_a: 0,
+        total_b: 0,
+      };
+      map.set(r.judge_name, judge);
+    }
+    judge.rounds.push({
+      round: r.round,
+      fighter_a_score: r.fighter_a_score,
+      fighter_b_score: r.fighter_b_score,
+    });
+    judge.total_a += r.fighter_a_score;
+    judge.total_b += r.fighter_b_score;
+  }
+  return Array.from(map.values()).sort((a, b) =>
+    a.judge_name.localeCompare(b.judge_name),
+  );
 }
 
 export type RoundPair = {

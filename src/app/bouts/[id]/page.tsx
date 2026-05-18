@@ -5,6 +5,7 @@ import { ChevronLeft } from "lucide-react";
 
 import { BoutHero } from "@/components/bout/BoutHero";
 import { BoutRoundBreakdown } from "@/components/bout/BoutRoundBreakdown";
+import { BoutScorecards } from "@/components/bout/BoutScorecards";
 import { BoutTotals } from "@/components/bout/BoutTotals";
 import { Container } from "@/components/layout/container";
 import { Footer } from "@/components/layout/footer";
@@ -82,6 +83,20 @@ export default async function BoutDetailPage({ params }: PageProps) {
                 Totals
               </h2>
               <BoutTotals bout={bout} />
+            </Container>
+          </section>
+        ) : null}
+
+        {bout.scorecards.length > 0 ? (
+          <section className="border-t border-foreground/10 py-10 md:py-12">
+            <Container size="xl">
+              <BoutScorecards
+                scorecards={bout.scorecards}
+                fighterAName={bout.fighter_a.name_en}
+                fighterBName={bout.fighter_b.name_en}
+                fighterAId={bout.fighter_a.id}
+                winnerId={bout.winner_id}
+              />
             </Container>
           </section>
         ) : null}

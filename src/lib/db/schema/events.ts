@@ -86,6 +86,7 @@ export const bout = pgTable(
 
     ufcStatsId: text("ufc_stats_id").unique(),
     sherdogId: text("sherdog_id").unique(),
+    mmadecisionsId: text("mmadecisions_id").unique(),
 
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
@@ -152,7 +153,35 @@ export const boutRoundStats = pgTable(
   ],
 );
 
+export const boutScorecard = pgTable(
+  "bout_scorecard",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    boutId: uuid("bout_id")
+      .notNull()
+      .references(() => bout.id, { onDelete: "cascade" }),
+    judgeName: text("judge_name").notNull(),
+    round: integer("round").notNull(),
+    fighterAScore: integer("fighter_a_score").notNull(),
+    fighterBScore: integer("fighter_b_score").notNull(),
+    sourceUrl: text("source_url"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("bout_scorecard_bout_idx").on(table.boutId),
+    unique("bout_scorecard_unique").on(
+      table.boutId,
+      table.judgeName,
+      table.round,
+    ),
+  ],
+);
+
 export type Event = typeof event.$inferSelect;
 export type NewEvent = typeof event.$inferInsert;
 export type Bout = typeof bout.$inferSelect;
 export type NewBout = typeof bout.$inferInsert;
+export type BoutScorecard = typeof boutScorecard.$inferSelect;
+export type NewBoutScorecard = typeof boutScorecard.$inferInsert;
