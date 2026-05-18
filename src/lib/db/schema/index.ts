@@ -7,3 +7,4 @@ export * from "./predictions";
 export * from "./cards";
 export * from "./simulations";
 export * from "./news";
+export * from "./rankings";

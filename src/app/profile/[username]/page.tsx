@@ -5,7 +5,9 @@ import { ChevronLeft } from "lucide-react";
 import { Container } from "@/components/layout/container";
 import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
+import { RankingCard } from "@/components/rankings/ranking-card";
 import { getCurrentUser, getUserProfileByUsername } from "@/lib/auth";
+import { listRankingsByUser } from "@/lib/rankings";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +34,7 @@ export default async function PublicProfilePage({ params }: PageProps) {
   if (!profile) notFound();
 
   const isOwner = currentUser?.username === profile.username;
+  const rankings = await listRankingsByUser(profile.userProfileId);
   const joined = new Date(profile.joinedAt);
   const joinedLabel = joined.toLocaleDateString("en-US", {
     year: "numeric",
@@ -104,6 +107,21 @@ export default async function PublicProfilePage({ params }: PageProps) {
             <Stat label="Current streak" value={profile.currentStreak} />
             <Stat label="Best streak" value={profile.bestStreak} />
           </dl>
+
+          {rankings.length > 0 ? (
+            <section className="mt-12">
+              <h2 className="mb-5 font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
+                Rankings by @{profile.username}
+              </h2>
+              <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                {rankings.map((r) => (
+                  <li key={r.id}>
+                    <RankingCard ranking={r} />
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
         </Container>
       </main>
       <Footer />
