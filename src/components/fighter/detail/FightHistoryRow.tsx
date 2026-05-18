@@ -90,10 +90,15 @@ export function FightHistoryRow({ entry }: FightHistoryRowProps) {
         ) : null}
       </div>
 
-      {/* Result · method · round/time */}
-      <div
+      {/* Result · method · round/time → links to /bouts/{id} for the
+          per-round detail page (Wave 25). */}
+      <Link
+        href={`/bouts/${entry.bout_id}`}
+        prefetch={false}
+        title="View bout detail"
         className={cn(
           "col-span-2 flex shrink-0 items-baseline justify-end gap-1.5 font-sans text-sm tabular sm:col-span-1",
+          "transition-colors hover:opacity-80",
           resultClass(entry.result),
         )}
       >
@@ -116,7 +121,7 @@ export function FightHistoryRow({ entry }: FightHistoryRowProps) {
             <span className="text-foreground-muted">{finishDetail}</span>
           </>
         ) : null}
-      </div>
+      </Link>
     </li>
   );
 }

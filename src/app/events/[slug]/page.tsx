@@ -182,6 +182,13 @@ function BoutCard({ bout }: { bout: EventBout }) {
               {bout.status}
             </p>
           )}
+          <Link
+            href={`/bouts/${bout.id}`}
+            prefetch={false}
+            className="mt-1 inline-flex font-sans text-[10px] uppercase tracking-widest text-primary/80 hover:text-primary"
+          >
+            View details
+          </Link>
         </div>
         <FighterSide
           fighter={bout.fighter_b}
