@@ -69,9 +69,212 @@ export type FighterDetail = {
   current_division: string | null;
 };
 
+/** Wave 17: weights powering ScoreBreakdown's contribution math. These
+ *  mirror the locked Wave 15.1 current formula (migration 0046) and the
+ *  all-time formula (migration 0017 / 0045). They are presentation-only
+ *  constants — the database is still the source of truth for the
+ *  scores themselves (raw_current / multiplied_current / vertex_score
+ *  in fighter_vertex_score and fighter_divisional_score). Updating a
+ *  weight here without the matching migration will desync the UI from
+ *  the actual score. */
+export const CURRENT_SCORE_WEIGHTS = {
+  quality_wins: 0.16,
+  current_cp: 0.10,
+  era_dominance: 0.06,
+  performance_diff: 0.16,
+  finishing_dominance: 0.10,
+  activity: 0.12,
+  recent_form: 0.18,
+  recent_loss_penalty: -0.20,
+} as const;
+
+export const ALL_TIME_SCORE_WEIGHTS = {
+  quality_wins: 0.28,
+  championship_pedigree: 0.22,
+  era_dominance: 0.22,
+  performance_diff: 0.12,
+  finishing_dominance: 0.16,
+  total_loss_penalty: -0.10,
+} as const;
+
+export type ScoreComponentRow = {
+  label: string;
+  raw: number | null;
+  weight: number;
+};
+
+export type ScoreBreakdownData = {
+  source: "divisional" | "global";
+  divisionLabel: string | null;
+  current: {
+    rows: ScoreComponentRow[];
+    rawTotal: number | null;
+    curveMultiplier: number | null;
+    finalScore: number | null;
+  };
+  allTime: {
+    rows: ScoreComponentRow[];
+    finalScore: number | null;
+  };
+};
+
+/**
+ * Wave 17: project a fighter's divisional row (if it drives the hero)
+ * and global components into the row/total shapes the ScoreBreakdown
+ * component renders. The Current tab follows the hero: when the fighter
+ * has an in_active_ranking divisional row, that row's components feed
+ * the table; otherwise the global view fills it. The All-Time tab is
+ * always global.
+ *
+ * The Current `rawTotal` is the stored raw_current (which already
+ * includes the current_cp injection from materialize_divisional_score.ts
+ * for divisional rows). The curve multiplier is multiplied_current /
+ * raw_current. `finalScore` is the post-curve, post-skid_penalty,
+ * 0..100-clamped vertex_score — i.e., what the hero displays.
+ */
+export function buildScoreBreakdown(
+  divisional: FighterDivisionalScoreRow | null,
+  global: GlobalScoreComponents | null,
+): ScoreBreakdownData | null {
+  if (divisional === null && global === null) return null;
+
+  const source: "divisional" | "global" =
+    divisional !== null ? "divisional" : "global";
+
+  const currentRows: ScoreComponentRow[] = [
+    {
+      label: "Quality wins (decayed)",
+      raw:
+        divisional !== null
+          ? divisional.quality_wins
+          : global?.quality_wins_decayed ?? null,
+      weight: CURRENT_SCORE_WEIGHTS.quality_wins,
+    },
+    {
+      label: "Champion pedigree (current)",
+      raw:
+        divisional !== null
+          ? divisional.divisional_current_cp
+          : global?.current_cp ?? null,
+      weight: CURRENT_SCORE_WEIGHTS.current_cp,
+    },
+    {
+      label: "Era dominance (recent)",
+      raw:
+        divisional !== null
+          ? divisional.era_dominance
+          : global?.era_dominance_current ?? null,
+      weight: CURRENT_SCORE_WEIGHTS.era_dominance,
+    },
+    {
+      label: "Performance diff (recent)",
+      raw:
+        divisional !== null
+          ? divisional.performance_diff
+          : global?.performance_diff_current ?? null,
+      weight: CURRENT_SCORE_WEIGHTS.performance_diff,
+    },
+    {
+      label: "Finishing dom (decayed)",
+      raw:
+        divisional !== null
+          ? divisional.finishing_dominance
+          : global?.finishing_dominance_decayed ?? null,
+      weight: CURRENT_SCORE_WEIGHTS.finishing_dominance,
+    },
+    {
+      label: "Activity",
+      raw:
+        divisional !== null
+          ? divisional.activity_score
+          : global?.activity ?? null,
+      weight: CURRENT_SCORE_WEIGHTS.activity,
+    },
+    {
+      label: "Recent form (last 5)",
+      raw:
+        divisional !== null
+          ? divisional.recent_form_score
+          : global?.recent_form_score ?? null,
+      weight: CURRENT_SCORE_WEIGHTS.recent_form,
+    },
+    {
+      label: "Recent loss penalty",
+      raw:
+        divisional !== null
+          ? divisional.recent_loss_penalty
+          : global?.recent_loss_penalty ?? null,
+      weight: CURRENT_SCORE_WEIGHTS.recent_loss_penalty,
+    },
+  ];
+
+  const currentRaw =
+    divisional !== null ? divisional.raw_current : global?.raw_current ?? null;
+  const currentMultiplied =
+    divisional !== null
+      ? divisional.multiplied_current
+      : global?.multiplied_current ?? null;
+  const currentFinal =
+    divisional !== null ? divisional.vertex_score : global?.vertex_score ?? null;
+
+  const curveMultiplier =
+    currentRaw != null && currentMultiplied != null && currentRaw > 0
+      ? currentMultiplied / currentRaw
+      : null;
+
+  const allTimeRows: ScoreComponentRow[] = [
+    {
+      label: "Quality wins (career)",
+      raw: global?.quality_wins ?? null,
+      weight: ALL_TIME_SCORE_WEIGHTS.quality_wins,
+    },
+    {
+      label: "Champion pedigree",
+      raw: global?.championship_pedigree ?? null,
+      weight: ALL_TIME_SCORE_WEIGHTS.championship_pedigree,
+    },
+    {
+      label: "Era dominance (all-time)",
+      raw: global?.era_dominance_all_time ?? null,
+      weight: ALL_TIME_SCORE_WEIGHTS.era_dominance,
+    },
+    {
+      label: "Performance diff (career)",
+      raw: global?.performance_diff ?? null,
+      weight: ALL_TIME_SCORE_WEIGHTS.performance_diff,
+    },
+    {
+      label: "Finishing dom (career)",
+      raw: global?.finishing_dominance_score ?? null,
+      weight: ALL_TIME_SCORE_WEIGHTS.finishing_dominance,
+    },
+    {
+      label: "Total loss penalty",
+      raw: global?.total_loss_penalty ?? null,
+      weight: ALL_TIME_SCORE_WEIGHTS.total_loss_penalty,
+    },
+  ];
+
+  return {
+    source,
+    divisionLabel: divisional?.division ?? null,
+    current: {
+      rows: currentRows,
+      rawTotal: currentRaw,
+      curveMultiplier,
+      finalScore: currentFinal,
+    },
+    allTime: {
+      rows: allTimeRows,
+      finalScore: global?.vertex_score_all_time ?? null,
+    },
+  };
+}
+
 /** Wave 14B.2: per-(fighter, division) score row for the profile sidebar
  *  and hero. Mirrors the fighter_divisional_score columns the UI cares
- *  about. */
+ *  about. Wave 17 added the sub-metric columns powering ScoreBreakdown's
+ *  Current tab when the row drives the hero. */
 export type FighterDivisionalScoreRow = {
   division: string;
   vertex_score: number | null;
@@ -81,6 +284,40 @@ export type FighterDivisionalScoreRow = {
   last_bout_date_in_division: string | null;
   divisional_cp: number;
   divisional_current_cp: number | null;
+  quality_wins: number | null;
+  performance_diff: number | null;
+  finishing_dominance: number | null;
+  recent_form_score: number | null;
+  activity_score: number | null;
+  recent_loss_penalty: number | null;
+  era_dominance: number | null;
+  raw_current: number | null;
+  multiplied_current: number | null;
+};
+
+/** Wave 17: the slice of `fighter_vertex_score` columns ScoreBreakdown
+ *  reads. Sourced directly from the view (which materialises both the
+ *  current-branch and all-time-branch component inputs); the view is
+ *  read-only here. */
+export type GlobalScoreComponents = {
+  quality_wins_decayed: number | null;
+  current_cp: number | null;
+  era_dominance_current: number | null;
+  performance_diff_current: number | null;
+  finishing_dominance_decayed: number | null;
+  activity: number | null;
+  recent_form_score: number | null;
+  recent_loss_penalty: number | null;
+  raw_current: number | null;
+  multiplied_current: number | null;
+  quality_wins: number | null;
+  championship_pedigree: number | null;
+  era_dominance_all_time: number | null;
+  performance_diff: number | null;
+  finishing_dominance_score: number | null;
+  total_loss_penalty: number | null;
+  vertex_score: number | null;
+  vertex_score_all_time: number | null;
 };
 
 export type FightHistoryEntry = {
@@ -288,7 +525,16 @@ export async function getDivisionalScores(
       bouts_in_division,
       last_bout_date_in_division::text AS last_bout_date_in_division,
       divisional_cp,
-      divisional_current_cp
+      divisional_current_cp,
+      quality_wins_decayed AS quality_wins,
+      performance_diff_current AS performance_diff,
+      finishing_dominance_decayed AS finishing_dominance,
+      recent_form_score,
+      activity AS activity_score,
+      recent_loss_penalty,
+      era_dominance_current AS era_dominance,
+      raw_current,
+      multiplied_current
     FROM fighter_divisional_score
     WHERE fighter_id = ${fighterId}::uuid
     ORDER BY
@@ -297,6 +543,44 @@ export async function getDivisionalScores(
       bouts_in_division DESC
   `);
   return [...(result as unknown as FighterDivisionalScoreRow[])];
+}
+
+/**
+ * Wave 17: per-fighter component inputs to ScoreBreakdown's Current
+ * (when no divisional row drives the hero) and All-Time tabs. Reads
+ * directly from `fighter_vertex_score`; columns mirror the view's
+ * SELECT list verbatim. Returns null when the fighter has no row in the
+ * view (≤2 UFC bouts → the view's bouts gate kicks in and excludes them).
+ */
+export async function getGlobalScoreComponents(
+  fighterId: string,
+): Promise<GlobalScoreComponents | null> {
+  const result = await db.execute<GlobalScoreComponents>(sql`
+    SELECT
+      quality_wins_decayed,
+      current_cp,
+      era_dominance_current,
+      performance_diff_current,
+      finishing_dominance_decayed,
+      activity,
+      recent_form_score,
+      recent_loss_penalty,
+      raw_current,
+      multiplied_current,
+      quality_wins,
+      championship_pedigree,
+      era_dominance_all_time,
+      performance_diff,
+      finishing_dominance_score,
+      total_loss_penalty,
+      vertex_score,
+      vertex_score_all_time
+    FROM fighter_vertex_score
+    WHERE id = ${fighterId}::uuid
+    LIMIT 1
+  `);
+  const rows = result as unknown as GlobalScoreComponents[];
+  return rows[0] ?? null;
 }
 
 /**

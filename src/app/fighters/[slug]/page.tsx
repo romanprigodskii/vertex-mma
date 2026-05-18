@@ -12,6 +12,7 @@ import { OtherDivisions } from "@/components/fighter/detail/OtherDivisions";
 import { PhysicalInfo } from "@/components/fighter/detail/PhysicalInfo";
 import { RadarChart } from "@/components/fighter/detail/RadarChart";
 import { RoundByRoundChart } from "@/components/fighter/detail/RoundByRoundChart";
+import { ScoreBreakdown } from "@/components/fighter/detail/ScoreBreakdown";
 import { SectionHeader } from "@/components/fighter/detail/SectionHeader";
 import { SimilarFighters } from "@/components/fighter/detail/SimilarFighters";
 import { StrikingHeatmap } from "@/components/fighter/detail/StrikingHeatmap";
@@ -21,11 +22,13 @@ import { Navbar } from "@/components/layout/navbar";
 import { CHAMPION_BY_SLUG } from "@/lib/champions";
 import { computeAttributes } from "@/lib/fighter-attributes";
 import {
+  buildScoreBreakdown,
   buildTimelineBouts,
   getDivisionalScores,
   getFightHistory,
   getFighterBoutRounds,
   getFighterBySlug,
+  getGlobalScoreComponents,
 } from "@/lib/fighter-detail";
 import { getSimilarFighters } from "@/lib/similar-fighters";
 
@@ -92,12 +95,14 @@ export default async function FighterDetailPage({ params }: PageProps) {
   const fighter = await getFighterBySlug(slug);
   if (!fighter) notFound();
 
-  const [boutRounds, history, similar, divisionalScores] = await Promise.all([
-    getFighterBoutRounds(fighter.id),
-    getFightHistory(fighter.id),
-    getSimilarFighters(fighter),
-    getDivisionalScores(fighter.id),
-  ]);
+  const [boutRounds, history, similar, divisionalScores, globalComponents] =
+    await Promise.all([
+      getFighterBoutRounds(fighter.id),
+      getFightHistory(fighter.id),
+      getSimilarFighters(fighter),
+      getDivisionalScores(fighter.id),
+      getGlobalScoreComponents(fighter.id),
+    ]);
 
   const championEntry = CHAMPION_BY_SLUG.get(slug) ?? null;
   const attributes = computeAttributes(fighter);
@@ -124,6 +129,11 @@ export default async function FighterDetailPage({ params }: PageProps) {
         (d) => d.division !== activeDivisionalRow.division,
       )
     : divisionalScores;
+
+  // Wave 17: breakdown follows the hero — divisional row when one drives
+  // the hero, global otherwise. Returns null when both inputs are null
+  // (≤2 UFC bouts → fighter has no row in either source).
+  const breakdown = buildScoreBreakdown(activeDivisionalRow, globalComponents);
 
   return (
     <>
@@ -251,6 +261,12 @@ export default async function FighterDetailPage({ params }: PageProps) {
               </div>
             </div>
           </div>
+          {breakdown ? (
+            <ScoreBreakdown
+              data={breakdown}
+              divisionalStatus={activeDivisionalRow?.divisional_status ?? null}
+            />
+          ) : null}
         </Section>
 
         <Section
