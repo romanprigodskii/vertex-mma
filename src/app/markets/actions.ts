@@ -3,6 +3,7 @@
 import { eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
+import { checkAndUnlockAchievements } from "@/lib/achievements";
 import { db } from "@/lib/db";
 import { userProfile } from "@/lib/db/schema/users";
 import { lmsrBuyCost, lmsrPrices, lmsrSharesForCoins } from "@/lib/lmsr";
@@ -19,6 +20,7 @@ export async function placeBetAction(
   error?: string;
   sharesBought?: number;
   coinsSpent?: number;
+  newlyUnlocked?: string[];
 }> {
   const supabase = await createClient();
   const {
@@ -169,10 +171,15 @@ export async function placeBetAction(
       return { sharesBought, coinsSpent: actualCost };
     });
 
+    // After the bet posts, first_bet / balance thresholds may unlock.
+    // Settlement-time achievements (bet_10_wins, big_win) fire on payout,
+    // not at placement — those need a separate hook in Wave 41+.
+    const newlyUnlocked = await checkAndUnlockAchievements(profile.id);
+
     revalidatePath(`/markets/${marketId}`);
     revalidatePath("/markets");
     revalidatePath("/me/bets");
-    return result;
+    return { ...result, newlyUnlocked };
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Bet failed.";
     return { error: msg };

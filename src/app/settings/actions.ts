@@ -3,6 +3,7 @@
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
+import { checkAndUnlockAchievements } from "@/lib/achievements";
 import { db } from "@/lib/db";
 import { userProfile } from "@/lib/db/schema/users";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -34,14 +35,20 @@ export async function updateProfileAction(
     return { error: "Country code must be two letters (e.g. BR, US)." };
   }
 
-  await db
+  const updated = await db
     .update(userProfile)
     .set({
       displayName: displayName || null,
       bio: bio || null,
       countryCode: countryCodeRaw || null,
     })
-    .where(eq(userProfile.authUserId, user.id));
+    .where(eq(userProfile.authUserId, user.id))
+    .returning({ id: userProfile.id });
+
+  // profile_complete may unlock now that display name / bio / country are set.
+  if (updated[0]?.id) {
+    await checkAndUnlockAchievements(updated[0].id);
+  }
 
   revalidatePath("/me");
   revalidatePath("/settings");
@@ -75,10 +82,16 @@ export async function updateAvatarUrlAction(
     return { error: "Avatar URL must be a Supabase storage URL." };
   }
 
-  await db
+  const updated = await db
     .update(userProfile)
     .set({ avatarUrl: publicUrl })
-    .where(eq(userProfile.authUserId, user.id));
+    .where(eq(userProfile.authUserId, user.id))
+    .returning({ id: userProfile.id });
+
+  // profile_complete may unlock once an avatar lands.
+  if (updated[0]?.id) {
+    await checkAndUnlockAchievements(updated[0].id);
+  }
 
   revalidatePath("/me");
   revalidatePath("/settings");

@@ -2,10 +2,16 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 
+import { AchievementsGrid } from "@/components/achievements/achievements-grid";
 import { Container } from "@/components/layout/container";
 import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
+import { DailyBonusButton } from "@/components/me/daily-bonus-button";
 import { RankingCard } from "@/components/rankings/ranking-card";
+import {
+  listAchievements,
+  listUserAchievements,
+} from "@/lib/achievements";
 import { getCurrentUser, getUserProfileByUsername } from "@/lib/auth";
 import { listRankingsByUser } from "@/lib/rankings";
 
@@ -34,7 +40,11 @@ export default async function PublicProfilePage({ params }: PageProps) {
   if (!profile) notFound();
 
   const isOwner = currentUser?.username === profile.username;
-  const rankings = await listRankingsByUser(profile.userProfileId);
+  const [rankings, userAchievements, allAchievements] = await Promise.all([
+    listRankingsByUser(profile.userProfileId),
+    listUserAchievements(profile.userProfileId),
+    isOwner ? listAchievements() : Promise.resolve(undefined),
+  ]);
   const joined = new Date(profile.joinedAt);
   const joinedLabel = joined.toLocaleDateString("en-US", {
     year: "numeric",
@@ -107,6 +117,28 @@ export default async function PublicProfilePage({ params }: PageProps) {
             <Stat label="Current streak" value={profile.currentStreak} />
             <Stat label="Best streak" value={profile.bestStreak} />
           </dl>
+
+          {isOwner ? (
+            <section className="mt-10">
+              <h2 className="mb-4 font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
+                Daily bonus
+              </h2>
+              <DailyBonusButton
+                lastDailyBonusAt={profile.lastDailyBonusAt}
+              />
+            </section>
+          ) : null}
+
+          <section className="mt-10">
+            <h2 className="mb-4 font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
+              Achievements · {userAchievements.length}
+              {isOwner && allAchievements ? `/${allAchievements.length}` : ""}
+            </h2>
+            <AchievementsGrid
+              unlocked={userAchievements}
+              allAchievements={allAchievements}
+            />
+          </section>
 
           {rankings.length > 0 ? (
             <section className="mt-12">

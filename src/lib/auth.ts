@@ -21,6 +21,7 @@ export type CurrentUser = {
   currentStreak: number;
   bestStreak: number;
   joinedAt: string;
+  lastDailyBonusAt: string | null;
 };
 
 export async function getCurrentUser(): Promise<CurrentUser | null> {
@@ -47,6 +48,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
       currentStreak: userProfile.currentStreak,
       bestStreak: userProfile.bestStreak,
       joinedAt: userProfile.joinedAt,
+      lastDailyBonusAt: userProfile.lastDailyBonusAt,
     })
     .from(userProfile)
     .where(eq(userProfile.authUserId, user.id))
@@ -71,6 +73,9 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
     currentStreak: row.currentStreak,
     bestStreak: row.bestStreak,
     joinedAt: row.joinedAt.toISOString(),
+    lastDailyBonusAt: row.lastDailyBonusAt
+      ? row.lastDailyBonusAt.toISOString()
+      : null,
   };
 }
 
@@ -91,6 +96,7 @@ export type PublicProfile = {
   currentStreak: number;
   bestStreak: number;
   joinedAt: string;
+  lastDailyBonusAt: string | null;
 };
 
 export async function getUserProfileByUsername(
@@ -111,6 +117,7 @@ export async function getUserProfileByUsername(
       currentStreak: userProfile.currentStreak,
       bestStreak: userProfile.bestStreak,
       joinedAt: userProfile.joinedAt,
+      lastDailyBonusAt: userProfile.lastDailyBonusAt,
     })
     .from(userProfile)
     .where(eq(userProfile.username, username))
@@ -120,5 +127,8 @@ export async function getUserProfileByUsername(
   return {
     ...row,
     joinedAt: row.joinedAt.toISOString(),
+    lastDailyBonusAt: row.lastDailyBonusAt
+      ? row.lastDailyBonusAt.toISOString()
+      : null,
   };
 }

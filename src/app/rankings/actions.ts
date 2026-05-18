@@ -3,6 +3,7 @@
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
+import { checkAndUnlockAchievements } from "@/lib/achievements";
 import { db } from "@/lib/db";
 import {
   customRanking,
@@ -104,7 +105,7 @@ function validateEntries(
 
 export async function createRankingAction(
   formData: FormData,
-): Promise<{ error?: string; rankingId?: string }> {
+): Promise<{ error?: string; rankingId?: string; newlyUnlocked?: string[] }> {
   const myId = await getMyProfileId();
   if (!myId) return { error: "Not signed in." };
 
@@ -140,8 +141,12 @@ export async function createRankingAction(
     })),
   );
 
+  // Newly possible: first_ranking. Other slugs are no-ops here but the
+  // helper is cheap and idempotent.
+  const newlyUnlocked = await checkAndUnlockAchievements(myId);
+
   revalidatePath("/rankings");
-  return { rankingId: created.id };
+  return { rankingId: created.id, newlyUnlocked };
 }
 
 export async function updateRankingAction(
