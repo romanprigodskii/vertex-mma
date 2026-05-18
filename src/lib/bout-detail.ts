@@ -294,6 +294,69 @@ export function groupScorecardsByJudge(
   );
 }
 
+export type FighterStrikeMap = {
+  head: number;
+  body: number;
+  legs: number;
+};
+
+export function computeFighterStrikeMap(
+  rounds: BoutRoundStatsRow[],
+  fighterId: string,
+): FighterStrikeMap {
+  let head = 0;
+  let body = 0;
+  let legs = 0;
+  for (const r of rounds) {
+    if (r.fighter_id !== fighterId) continue;
+    head += r.sig_str_head_landed;
+    body += r.sig_str_body_landed;
+    legs += r.sig_str_legs_landed;
+  }
+  return { head, body, legs };
+}
+
+const DECISION_METHODS = new Set([
+  "decision_unanimous",
+  "decision_split",
+  "decision_majority",
+]);
+
+export function isDecisionMethod(method: string | null): boolean {
+  return method != null && DECISION_METHODS.has(method);
+}
+
+const DECISION_LABEL: Record<string, string> = {
+  decision_unanimous: "Unanimous Decision",
+  decision_split: "Split Decision",
+  decision_majority: "Majority Decision",
+};
+
+export function formatDecisionLabel(method: string | null): string | null {
+  if (method == null) return null;
+  return DECISION_LABEL[method] ?? null;
+}
+
+export type JudgeAgreement = {
+  judgesForA: number;
+  judgesForB: number;
+  judgesDraw: number;
+};
+
+export function computeJudgeAgreement(
+  scorecards: BoutScorecardJudge[],
+): JudgeAgreement {
+  let forA = 0;
+  let forB = 0;
+  let draw = 0;
+  for (const j of scorecards) {
+    if (j.total_a > j.total_b) forA++;
+    else if (j.total_b > j.total_a) forB++;
+    else draw++;
+  }
+  return { judgesForA: forA, judgesForB: forB, judgesDraw: draw };
+}
+
 export type RoundPair = {
   round: number;
   a: BoutRoundStatsRow | null;

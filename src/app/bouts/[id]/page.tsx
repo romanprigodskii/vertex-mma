@@ -3,6 +3,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 
+import { BoutDecisionBanner } from "@/components/bout/BoutDecisionBanner";
+import { BoutHeatmap } from "@/components/bout/BoutHeatmap";
 import { BoutHero } from "@/components/bout/BoutHero";
 import { BoutRoundBreakdown } from "@/components/bout/BoutRoundBreakdown";
 import { BoutScorecards } from "@/components/bout/BoutScorecards";
@@ -67,7 +69,21 @@ export default async function BoutDetailPage({ params }: PageProps) {
           <BoutHero bout={bout} weightLabel={weightLabel} />
         </Container>
 
-        <section className="py-10 md:py-12">
+        <BoutDecisionBanner bout={bout} />
+
+        {bout.rounds.length > 0 ? (
+          <section className="border-t border-foreground/[0.06] py-10 md:py-14">
+            <Container size="xl">
+              <BoutHeatmap
+                rounds={bout.rounds}
+                fighterA={bout.fighter_a}
+                fighterB={bout.fighter_b}
+              />
+            </Container>
+          </section>
+        ) : null}
+
+        <section className="border-t border-foreground/10 py-10 md:py-12">
           <Container size="xl">
             <h2 className="mb-4 font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
               Round-by-round
