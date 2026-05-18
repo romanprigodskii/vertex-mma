@@ -19,9 +19,30 @@ export async function generateMetadata({ params }: PageProps) {
   const { id } = await params;
   const m = await getMarketById(id);
   if (!m) return { title: "Market not found" };
+  const title = `${m.fighter_a_name} vs ${m.fighter_b_name}`;
+  const desc = `${m.event_name} · betting market on Vertex MMA`;
+  const ogImage = `/api/og/markets/${m.id}`;
   return {
-    title: `${m.fighter_a_name} vs ${m.fighter_b_name}`,
-    description: `${m.event_name} · ${m.question}`,
+    title,
+    description: desc,
+    openGraph: {
+      title,
+      description: `Live odds at Vertex MMA · ${m.event_name}`,
+      siteName: "Vertex MMA",
+      type: "website",
+      images: [
+        {
+          url: ogImage,
+          width: 1200,
+          height: 630,
+          alt: `${title} — betting market`,
+        },
+      ],
+    },
+    twitter: {
+      card: "summary_large_image",
+      images: [ogImage],
+    },
   };
 }
 

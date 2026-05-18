@@ -22,6 +22,7 @@ export async function generateMetadata({ params }: PageProps) {
   const desc = r.description
     ? `${r.description.slice(0, 140)}${r.description.length > 140 ? "…" : ""}`
     : `${r.entry_count} fighter${r.entry_count === 1 ? "" : "s"} ranked by @${r.author_username}.`;
+  const ogImage = `/api/og/rankings/${r.id}`;
   return {
     title: `${r.title} · by @${r.author_username}`,
     description: desc,
@@ -30,6 +31,18 @@ export async function generateMetadata({ params }: PageProps) {
       description: desc,
       siteName: "Vertex MMA",
       type: "article",
+      images: [
+        {
+          url: ogImage,
+          width: 1200,
+          height: 630,
+          alt: `${r.title} — Vertex MMA ranking`,
+        },
+      ],
+    },
+    twitter: {
+      card: "summary_large_image",
+      images: [ogImage],
     },
   };
 }

@@ -25,9 +25,29 @@ export async function generateMetadata({ params }: PageProps) {
   const { username } = await params;
   const profile = await getUserProfileByUsername(username);
   if (!profile) return { title: "User not found" };
+  const desc = `${profile.displayName || profile.username}'s Vertex MMA profile · ${profile.tier} tier.`;
+  const ogImage = `/api/og/profile/${profile.username}`;
   return {
     title: `@${profile.username}`,
-    description: `${profile.displayName || profile.username}'s Vertex MMA profile · ${profile.tier} tier.`,
+    description: desc,
+    openGraph: {
+      title: `@${profile.username} · Vertex MMA`,
+      description: desc,
+      siteName: "Vertex MMA",
+      type: "profile",
+      images: [
+        {
+          url: ogImage,
+          width: 1200,
+          height: 630,
+          alt: `${profile.username}'s Vertex MMA profile`,
+        },
+      ],
+    },
+    twitter: {
+      card: "summary_large_image",
+      images: [ogImage],
+    },
   };
 }
 

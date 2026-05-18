@@ -38,9 +38,30 @@ export async function generateMetadata({
   const bout = await getBoutById(id);
   if (!bout) return { title: "Bout not found" };
   const title = `${bout.fighter_a.name_en} vs ${bout.fighter_b.name_en}`;
+  const eventLabel = bout.event.short_name || bout.event.name;
+  const desc = `${title} — ${eventLabel}.`;
+  const ogImage = `/api/og/bouts/${bout.id}`;
   return {
     title,
-    description: `${title} — ${bout.event.short_name || bout.event.name}.`,
+    description: desc,
+    openGraph: {
+      title,
+      description: eventLabel,
+      siteName: "Vertex MMA",
+      type: "article",
+      images: [
+        {
+          url: ogImage,
+          width: 1200,
+          height: 630,
+          alt: `${title} — fight details`,
+        },
+      ],
+    },
+    twitter: {
+      card: "summary_large_image",
+      images: [ogImage],
+    },
   };
 }
 
