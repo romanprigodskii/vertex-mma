@@ -92,33 +92,54 @@ export default async function MarketDetailPage({ params }: PageProps) {
             className="mt-3 font-display uppercase tracking-tight text-foreground"
             style={{ fontSize: "clamp(32px, 4vw, 56px)" }}
           >
-            {market.fighter_a_name}{" "}
-            <span className="text-foreground-subtle">vs</span>{" "}
-            {market.fighter_b_name}
+            {market.type === "method" ? (
+              "How will it end?"
+            ) : (
+              <>
+                {market.fighter_a_name}{" "}
+                <span className="text-foreground-subtle">vs</span>{" "}
+                {market.fighter_b_name}
+              </>
+            )}
           </h1>
           <p className="mt-3 font-sans text-sm text-foreground-muted">
-            {market.question}
+            {market.type === "method"
+              ? `${market.fighter_a_name} vs ${market.fighter_b_name}`
+              : market.question}
           </p>
 
-          <div className="mt-8 grid grid-cols-2 gap-3">
-            {market.outcomes.map((o) => (
-              <div
-                key={o.id}
-                className="rounded-md border border-foreground/10 bg-background-elevated/30 p-4"
-              >
-                <p className="font-sans text-[11px] uppercase tracking-widest text-foreground-muted">
-                  {o.label}
-                </p>
-                <p className="mt-2 font-display text-3xl tabular text-foreground">
-                  {(o.current_price * 100).toFixed(1)}
-                  <span className="text-base text-foreground-muted">%</span>
-                </p>
-                <p className="mt-1 font-mono text-[10px] tabular text-foreground-subtle">
-                  {o.current_shares.toFixed(1)} shares outstanding
-                </p>
-              </div>
-            ))}
-          </div>
+          {market.type === "method" ? (
+            <div className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <FighterOutcomesPanel
+                fighterName={market.fighter_a_name}
+                outcomes={market.outcomes.filter((o) => o.order_index < 3)}
+              />
+              <FighterOutcomesPanel
+                fighterName={market.fighter_b_name}
+                outcomes={market.outcomes.filter((o) => o.order_index >= 3)}
+              />
+            </div>
+          ) : (
+            <div className="mt-8 grid grid-cols-2 gap-3">
+              {market.outcomes.map((o) => (
+                <div
+                  key={o.id}
+                  className="rounded-md border border-foreground/10 bg-background-elevated/30 p-4"
+                >
+                  <p className="font-sans text-[11px] uppercase tracking-widest text-foreground-muted">
+                    {o.label}
+                  </p>
+                  <p className="mt-2 font-display text-3xl tabular text-foreground">
+                    {(o.current_price * 100).toFixed(1)}
+                    <span className="text-base text-foreground-muted">%</span>
+                  </p>
+                  <p className="mt-1 font-mono text-[10px] tabular text-foreground-subtle">
+                    {o.current_shares.toFixed(1)} shares outstanding
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
 
           <div className="mt-8">
             {closed ? (
@@ -172,5 +193,50 @@ export default async function MarketDetailPage({ params }: PageProps) {
       </main>
       <Footer />
     </>
+  );
+}
+
+const METHOD_SUB_LABELS = ["by KO/TKO", "by Submission", "by Decision"];
+
+function FighterOutcomesPanel({
+  fighterName,
+  outcomes,
+}: {
+  fighterName: string;
+  outcomes: Array<{
+    id: string;
+    label: string;
+    order_index: number;
+    current_price: number;
+    current_shares: number;
+  }>;
+}) {
+  return (
+    <div className="rounded-md border border-foreground/10 bg-background-elevated/30 p-4">
+      <p className="font-display text-lg uppercase tracking-tight text-foreground">
+        {fighterName}
+      </p>
+      <div className="mt-3 flex flex-col gap-3">
+        {outcomes.map((o, i) => (
+          <div
+            key={o.id}
+            className="rounded-sm border border-foreground/10 bg-foreground/[0.04] px-3 py-2"
+          >
+            <p className="font-sans text-[10px] uppercase tracking-widest text-foreground-subtle">
+              {METHOD_SUB_LABELS[i] ?? o.label}
+            </p>
+            <div className="mt-1 flex items-baseline justify-between gap-2">
+              <p className="font-display text-2xl tabular text-foreground">
+                {(o.current_price * 100).toFixed(1)}
+                <span className="text-xs text-foreground-muted">%</span>
+              </p>
+              <p className="font-mono text-[10px] tabular text-foreground-subtle">
+                {o.current_shares.toFixed(1)} sh
+              </p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }

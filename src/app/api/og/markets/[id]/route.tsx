@@ -41,10 +41,18 @@ export async function GET(_req: Request, ctx: RouteContext) {
     );
   }
 
-  const priceA = m.outcome_a_price;
-  const priceB = m.outcome_b_price;
-  const aPct = Math.round(priceA * 100);
-  const bPct = Math.round(priceB * 100);
+  const isMethod = m.type === "method";
+
+  const outcomeA = m.outcomes.find((o) => o.order_index === 0);
+  const outcomeB = m.outcomes.find((o) => o.order_index === 1);
+  const priceA = outcomeA?.current_price ?? 0.5;
+  const priceB = outcomeB?.current_price ?? 0.5;
+
+  // For method markets, "top 2" means the two leading outcomes regardless
+  // of fighter — that's what the preview should advertise.
+  const topMethodOutcomes = isMethod
+    ? [...m.outcomes].sort((a, b) => b.current_price - a.current_price).slice(0, 2)
+    : [];
 
   return new ImageResponse(
     (
@@ -80,7 +88,7 @@ export async function GET(_req: Request, ctx: RouteContext) {
               textTransform: "uppercase",
             }}
           >
-            Betting Market
+            {isMethod ? "Method Market" : "Betting Market"}
           </span>
         </div>
 
@@ -102,7 +110,7 @@ export async function GET(_req: Request, ctx: RouteContext) {
           style={{
             display: "flex",
             marginTop: 24,
-            fontSize: 72,
+            fontSize: isMethod ? 64 : 72,
             fontWeight: 800,
             color: OG_COLORS.text,
             textTransform: "uppercase",
@@ -111,22 +119,56 @@ export async function GET(_req: Request, ctx: RouteContext) {
             maxWidth: 1080,
           }}
         >
-          {m.fighter_a_name}
-          <span style={{ color: OG_COLORS.subtle }}>&nbsp;vs&nbsp;</span>
-          {m.fighter_b_name}
+          {isMethod ? (
+            "How will it end?"
+          ) : (
+            <>
+              {m.fighter_a_name}
+              <span style={{ color: OG_COLORS.subtle }}>&nbsp;vs&nbsp;</span>
+              {m.fighter_b_name}
+            </>
+          )}
         </div>
 
-        <div style={{ display: "flex", gap: 24, marginTop: 50, flex: 1 }}>
-          <PriceCard
-            label={lastName(m.fighter_a_name)}
-            pct={aPct}
-            winning={priceA >= priceB}
-          />
-          <PriceCard
-            label={lastName(m.fighter_b_name)}
-            pct={bPct}
-            winning={priceB > priceA}
-          />
+        {isMethod ? (
+          <div
+            style={{
+              display: "flex",
+              marginTop: 12,
+              color: OG_COLORS.muted,
+              fontSize: 28,
+              fontFamily: OG_FONTS.mono,
+            }}
+          >
+            {m.fighter_a_name} vs {m.fighter_b_name}
+          </div>
+        ) : null}
+
+        <div style={{ display: "flex", gap: 24, marginTop: isMethod ? 32 : 50, flex: 1 }}>
+          {isMethod ? (
+            topMethodOutcomes.map((o, i) => (
+              <PriceCard
+                key={o.order_index}
+                label={o.label}
+                pct={Math.round(o.current_price * 100)}
+                winning={i === 0}
+                compact
+              />
+            ))
+          ) : (
+            <>
+              <PriceCard
+                label={lastName(m.fighter_a_name)}
+                pct={Math.round(priceA * 100)}
+                winning={priceA >= priceB}
+              />
+              <PriceCard
+                label={lastName(m.fighter_b_name)}
+                pct={Math.round(priceB * 100)}
+                winning={priceB > priceA}
+              />
+            </>
+          )}
         </div>
 
         <div
@@ -152,10 +194,12 @@ function PriceCard({
   label,
   pct,
   winning,
+  compact,
 }: {
   label: string;
   pct: number;
   winning: boolean;
+  compact?: boolean;
 }) {
   return (
     <div
@@ -163,7 +207,7 @@ function PriceCard({
         display: "flex",
         flexDirection: "column",
         flex: 1,
-        padding: 30,
+        padding: compact ? 24 : 30,
         backgroundColor: OG_COLORS.bgElev,
         border: `2px solid ${winning ? OG_COLORS.primary : OG_COLORS.border}`,
         borderRadius: 12,
@@ -173,7 +217,7 @@ function PriceCard({
         style={{
           display: "flex",
           color: OG_COLORS.muted,
-          fontSize: 22,
+          fontSize: compact ? 18 : 22,
           letterSpacing: 4,
           textTransform: "uppercase",
           fontFamily: OG_FONTS.mono,
@@ -185,14 +229,14 @@ function PriceCard({
         style={{
           display: "flex",
           color: OG_COLORS.text,
-          fontSize: 96,
+          fontSize: compact ? 72 : 96,
           fontWeight: 800,
           lineHeight: 1,
           marginTop: 8,
         }}
       >
         {pct}
-        <span style={{ fontSize: 48, color: OG_COLORS.muted }}>%</span>
+        <span style={{ fontSize: compact ? 36 : 48, color: OG_COLORS.muted }}>%</span>
       </div>
     </div>
   );

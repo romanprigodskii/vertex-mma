@@ -5,8 +5,15 @@ import { db } from "@/lib/db";
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+export type MarketCardOutcome = {
+  label: string;
+  order_index: number;
+  current_price: number;
+};
+
 export type MarketListItem = {
   id: string;
+  type: string; // 'winner' | 'method' | future variants
   bout_id: string;
   question: string;
   status: string;
@@ -20,14 +27,14 @@ export type MarketListItem = {
   fighter_a_slug: string;
   fighter_b_name: string;
   fighter_b_slug: string;
-  outcome_a_price: number;
-  outcome_b_price: number;
+  outcomes: MarketCardOutcome[];
 };
 
 export async function listOpenMarkets(limit = 50): Promise<MarketListItem[]> {
   const rows = await db.execute<MarketListItem>(sql`
     SELECT
       m.id::text AS id,
+      m.type::text AS type,
       m.bout_id::text AS bout_id,
       m.question,
       m.status::text AS status,
@@ -42,20 +49,26 @@ export async function listOpenMarkets(limit = 50): Promise<MarketListItem[]> {
       fb.name_en AS fighter_b_name,
       fb.slug AS fighter_b_slug,
       COALESCE(
-        (SELECT current_price FROM market_outcome WHERE market_id = m.id AND order_index = 0),
-        0.5
-      )::float AS outcome_a_price,
-      COALESCE(
-        (SELECT current_price FROM market_outcome WHERE market_id = m.id AND order_index = 1),
-        0.5
-      )::float AS outcome_b_price
+        (
+          SELECT json_agg(
+            json_build_object(
+              'label', label,
+              'order_index', order_index,
+              'current_price', current_price::float
+            ) ORDER BY order_index
+          )
+          FROM market_outcome
+          WHERE market_id = m.id
+        ),
+        '[]'::json
+      ) AS outcomes
     FROM market m
     JOIN bout b ON b.id = m.bout_id
     JOIN event e ON e.id = b.event_id
     JOIN fighter fa ON fa.id = b.fighter_a_id
     JOIN fighter fb ON fb.id = b.fighter_b_id
     WHERE m.status = 'open' AND m.closes_at > NOW()
-    ORDER BY m.closes_at ASC
+    ORDER BY m.closes_at ASC, m.type ASC
     LIMIT ${limit}
   `);
   return rows as unknown as MarketListItem[];
@@ -69,7 +82,7 @@ export type MarketOutcomeRow = {
   current_price: number;
 };
 
-export type MarketDetail = MarketListItem & {
+export type MarketDetail = Omit<MarketListItem, "outcomes"> & {
   b_parameter: number;
   outcomes: MarketOutcomeRow[];
 };
@@ -79,6 +92,7 @@ export async function getMarketById(id: string): Promise<MarketDetail | null> {
 
   const marketRows = await db.execute<{
     id: string;
+    type: string;
     bout_id: string;
     question: string;
     status: string;
@@ -96,6 +110,7 @@ export async function getMarketById(id: string): Promise<MarketDetail | null> {
   }>(sql`
     SELECT
       m.id::text AS id,
+      m.type::text AS type,
       m.bout_id::text AS bout_id,
       m.question,
       m.status::text AS status,
@@ -120,6 +135,7 @@ export async function getMarketById(id: string): Promise<MarketDetail | null> {
   `);
   const arr = marketRows as unknown as Array<{
     id: string;
+    type: string;
     bout_id: string;
     question: string;
     status: string;
@@ -153,10 +169,6 @@ export async function getMarketById(id: string): Promise<MarketDetail | null> {
 
   return {
     ...m,
-    outcome_a_price:
-      outcomes.find((o) => o.order_index === 0)?.current_price ?? 0.5,
-    outcome_b_price:
-      outcomes.find((o) => o.order_index === 1)?.current_price ?? 0.5,
     outcomes,
   };
 }
@@ -165,6 +177,7 @@ export type MyBetRow = {
   bet_id: string;
   market_id: string;
   market_question: string;
+  market_type: string;
   outcome_label: string;
   shares_bought: number;
   coins_spent: number;
@@ -185,6 +198,7 @@ export async function listMyBets(userProfileId: string): Promise<MyBetRow[]> {
       bt.id::text AS bet_id,
       bt.market_id::text AS market_id,
       m.question AS market_question,
+      m.type::text AS market_type,
       mo.label AS outcome_label,
       bt.shares_bought::float AS shares_bought,
       bt.coins_spent,
