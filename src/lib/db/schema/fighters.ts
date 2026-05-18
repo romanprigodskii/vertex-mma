@@ -204,6 +204,33 @@ export const fighter = pgTable(
     // is modest.
     decayedStandLandedPerMin: doublePrecision("decayed_stand_landed_per_min"),
 
+    // Wave 20: opp-tier-weighted variants of the volume metrics. Each
+    // bout's df is multiplied by bout_opponent_tier.opp_tier_value (1
+    // = prospect floor via COALESCE, 25 = champion-tier apex) so wins
+    // and dominant moments against ranked opponents count more than
+    // wins against journeymen. Powers the new quality_style branch
+    // added to striking/grappling/defense/cardio plus the full
+    // 4-style power redesign (volume / quality / finisher / kd).
+    decayedKoQuality: doublePrecision("decayed_ko_quality"),
+    decayedAvgKoFinishSeconds: doublePrecision("decayed_avg_ko_finish_seconds"),
+    decayedKdQuality: doublePrecision("decayed_kd_quality"),
+    decayedStandLandedQualityPerMin: doublePrecision("decayed_stand_landed_quality_per_min"),
+    decayedTdLandedQuality: doublePrecision("decayed_td_landed_quality"),
+    decayedControlQuality: doublePrecision("decayed_control_quality"),
+    decayedLateReachQuality: doublePrecision("decayed_late_reach_quality"),
+    decayedDamageQuality: doublePrecision("decayed_damage_quality"),
+
+    // Wave 20: layered activity windows (count + avg opp_tier within
+    // each lookback window). The activity formula reads max(layer_12,
+    // layer_24, layer_36) so a fighter who's had a slow recent year
+    // but a great 36mo span doesn't read as inactive. fights_24mo is
+    // reused from Wave 18 (same semantic).
+    fightsLast12mo: smallint("fights_last_12mo"),
+    avgOppTierLast12mo: doublePrecision("avg_opp_tier_last_12mo"),
+    avgOppTierLast24mo: doublePrecision("avg_opp_tier_last_24mo"),
+    fightsLast36mo: smallint("fights_last_36mo"),
+    avgOppTierLast36mo: doublePrecision("avg_opp_tier_last_36mo"),
+
     ufcStatsId: text("ufc_stats_id").unique(),
     sherdogId: text("sherdog_id").unique(),
     tapologyId: text("tapology_id").unique(),

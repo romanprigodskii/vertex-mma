@@ -71,8 +71,14 @@ export function computeAttributes(f: FighterDetail): FighterAttributes {
   const strVolumeStyle = standLandedScore * 0.7 + accScore * 0.3;
   const strPowerStyle = kdScore * 0.6 + standDiffScore * 0.4;
   const strTechnicalStyle = accScore * 0.5 + standDiffScore * 0.5;
+  // Wave 20: quality style — stand-up output weighted by opp tier. A
+  // fighter who lands the same volume but vs ranked opponents scores
+  // higher here than vs prospects.
+  const standLandedQuality = safe(f.decayed_stand_landed_quality_per_min);
+  const standQualityScore = clamp((standLandedQuality / 5) * 100);
+  const strQualityStyle = standQualityScore * 0.7 + accScore * 0.3;
   const striking = Math.round(
-    Math.max(strVolumeStyle, strPowerStyle, strTechnicalStyle),
+    Math.max(strVolumeStyle, strPowerStyle, strTechnicalStyle, strQualityStyle),
   );
 
   // --- Grappling: max of 3 styles (control / wrestler / submission) ---
@@ -102,8 +108,22 @@ export function computeAttributes(f: FighterDetail): FighterAttributes {
   const grpControlStyle = controlScore * 0.6 + tdAvgScore * 0.4;
   const grpWrestlerStyle = tdAvgScore * 0.6 + tdAccScore * 0.4;
   const grpSubmissionStyle = subThreat * 0.8 + tdAvgScore * 0.2;
+  // Wave 20: quality style — takedowns/control weighted by opp tier.
+  // Uses max(td_quality, control_quality) so the dominant signal
+  // drives the branch; subThreat adds residual sub credit.
+  const tdQuality = safe(f.decayed_td_landed_quality);
+  const controlQuality = safe(f.decayed_control_quality);
+  const grpTdQualityScore = clamp((tdQuality / 2.5) * 100);
+  const grpCtrlQualityScore = clamp((controlQuality / 300) * 100);
+  const grpQualityStyle =
+    Math.max(grpTdQualityScore, grpCtrlQualityScore) * 0.7 + subThreat * 0.3;
   const grappling = Math.round(
-    Math.max(grpControlStyle, grpWrestlerStyle, grpSubmissionStyle),
+    Math.max(
+      grpControlStyle,
+      grpWrestlerStyle,
+      grpSubmissionStyle,
+      grpQualityStyle,
+    ),
   );
 
   // --- Defense: max of 3 styles (wrestler / striker / iron-chin) ---
@@ -122,8 +142,20 @@ export function computeAttributes(f: FighterDetail): FighterAttributes {
   const defWrestlerStyle = tdDefScore * 0.7 + strDefScore * 0.3;
   const defStrikerStyle = strDefScore * 0.6 + damageScore * 0.4;
   const defIronChinStyle = durabilityScore * 0.8 + damageScore * 0.2;
+  // Wave 20: quality style — damage absorbed per minute vs ranked
+  // opponents (lower = better). Threshold 4/min (tighter than career
+  // damageScore's 5/min) because elite fighters are expected to absorb
+  // less when facing ranked competition.
+  const damageQualityPerMin = safe(f.decayed_damage_quality);
+  const damageQualityScore = clamp(100 - (damageQualityPerMin / 4) * 100);
+  const defQualityStyle = damageQualityScore * 0.6 + tdDefScore * 0.4;
   const defense = Math.round(
-    Math.max(defWrestlerStyle, defStrikerStyle, defIronChinStyle),
+    Math.max(
+      defWrestlerStyle,
+      defStrikerStyle,
+      defIronChinStyle,
+      defQualityStyle,
+    ),
   );
 
   // --- Cardio: decayed late-round reach + Wave 18.1 confidence blend ---
@@ -143,23 +175,73 @@ export function computeAttributes(f: FighterDetail): FighterAttributes {
     safe(f.ufc_wins) > 0 ? safe(f.ufc_wins_dec) / safe(f.ufc_wins) : 0;
   const decBonus = clamp(decRate * 60);
   const rawCardio = lateReachScore * 0.7 + decBonus * 0.3;
-  const cardio = clamp(
+  const cardioBlended = clamp(
     Math.round(rawCardio * cardioConfidence + 50 * (1 - cardioConfidence)),
   );
+  // Wave 20: cardio quality bypass — if a fighter has reached late
+  // rounds vs ranked opponents, the data is enough to declare cardio
+  // regardless of overall sample. Max with the blended score so the
+  // baseline-50 floor stays in place for finishers who haven't been
+  // tested against ranked competition.
+  const lateQuality = safe(f.decayed_late_reach_quality);
+  const cardioQualityScore = clamp(lateQuality * 100);
+  const cardio = Math.round(Math.max(cardioBlended, cardioQualityScore));
 
-  // --- Power: decayed KO rate + decayed KD volume ---
-  // koRate is decayed KO wins / decayed wins, calibrated to 70% = max.
-  // kdScoreP rewards recent knockdowns even when the bout didn't end in
-  // a clean KO (Pereira drops opponents often; Topuria's KO finishes
-  // top out via decayed_ko_wins_weighted).
+  // --- Power: max of 4 styles (volume / quality / finisher / kd) ---
+  // Wave 20: separated style branches so KO specialists with different
+  // signatures don't blur. Volume = high KO rate (Khabib lacks),
+  // quality = KOs vs ranked opponents (Pereira/Topuria), finisher =
+  // fast finish time (Aspinall 72s avg), kd = decayed knockdown volume.
+  // koRate falls back to the Wave 18 career rate when the fighter has
+  // no decayed wins (zero UFC fights or all bouts pre-decay floor).
+  const totalUfcWins = Math.max(1, safe(f.ufc_wins));
   const koRate =
-    decayedWins > 0 ? safe(f.decayed_ko_wins_weighted) / decayedWins : 0;
+    decayedWins > 0
+      ? safe(f.decayed_ko_wins_weighted) / decayedWins
+      : safe(f.ufc_wins_ko) / totalUfcWins;
   const koRateScore = clamp((koRate / 0.7) * 100);
-  const kdScoreP = clamp((kdSrc / 0.6) * 100);
-  const power = Math.round(koRateScore * 0.65 + kdScoreP * 0.35);
+  const kdScoreP = clamp((kdSrc / 0.65) * 100);
+  const koQualityScore = clamp((safe(f.decayed_ko_quality) / 0.5) * 100);
+  const koFinishSec = safe(f.decayed_avg_ko_finish_seconds);
+  // 0s → 100, 600s (≈10 min total fight time) → 0. Aspinall 72s caps;
+  // fighters with no KO wins (koFinishSec=0 from NULLIF→0) get 0 here
+  // and rely on the volume/kd branches.
+  const speedScoreRaw =
+    koFinishSec > 0 ? clamp(100 - (koFinishSec / 600) * 100) : 0;
+  // Gate the finisher branch by KO frequency so low-KO fighters can't
+  // accidentally max speed via their handful of fast finishes (Khabib's
+  // 2 KO wins happened to land at 317s avg; without this gate his
+  // finisher_style would read 37). koRate ≥ 0.3 unlocks full speed; at
+  // 0.15 (Khabib) the gate halves the contribution.
+  const speedScore = speedScoreRaw * Math.min(1, koRate / 0.3);
+  const kdQualityScore = clamp((safe(f.decayed_kd_quality) / 0.5) * 100);
 
-  // --- Activity: fights in the last 24 months (already recent) ---
-  const activity = clamp(Math.round((safe(f.fights_last_24mo) / 4) * 100));
+  const powVolumeStyle = koRateScore * 0.7 + kdScoreP * 0.3;
+  const powQualityStyle = koQualityScore * 0.6 + koRateScore * 0.4;
+  const powFinisherStyle = speedScore * 0.6 + koRateScore * 0.4;
+  const powKdStyle = kdScoreP * 0.8 + kdQualityScore * 0.2;
+  const power = Math.round(
+    Math.max(powVolumeStyle, powQualityStyle, powFinisherStyle, powKdStyle),
+  );
+
+  // --- Activity: max of 3 layered windows (12mo / 24mo / 36mo) ---
+  // Wave 20: each layer scores (fight_count × avg_opp_tier) normalised
+  // to a target band. 12mo cap at ~3 fights × 20 tier = 60. 24mo doubles
+  // the cadence (6 × 20 = 120). 36mo triples (9 × 20 = 180). Max picks
+  // the best window so a fighter who had a great 36mo span but a quiet
+  // 12mo doesn't read as inactive.
+  const fights12 = safe(f.fights_last_12mo);
+  const tier12 = safe(f.avg_opp_tier_last_12mo);
+  const fights24 = safe(f.fights_last_24mo);
+  const tier24 = safe(f.avg_opp_tier_last_24mo);
+  const fights36 = safe(f.fights_last_36mo);
+  const tier36 = safe(f.avg_opp_tier_last_36mo);
+
+  const layer12 = clamp(((fights12 * tier12) / 60) * 100);
+  const layer24 = clamp(((fights24 * tier24) / 120) * 100);
+  const layer36 = clamp(((fights36 * tier36) / 180) * 100);
+
+  const activity = Math.round(Math.max(layer12, layer24, layer36));
 
   return { striking, grappling, defense, cardio, power, activity };
 }

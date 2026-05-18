@@ -108,6 +108,11 @@ async function main() {
         bd.is_win,
         bd.method,
         bd.round_finished,
+        -- Wave 20: opp tier from bout_opponent_tier. COALESCE to 1 so
+        -- prospect-tier bouts (default 0) still contribute weight in
+        -- opp-weighted averages (otherwise denominator collapses for
+        -- fighters who've only faced prospects).
+        GREATEST(COALESCE(bot.opp_tier_value, 0), 1)::float AS opp_tier,
         COALESCE(ps.kd_landed, 0)      AS kd_landed,
         COALESCE(ps.control_sec, 0)    AS control_sec,
         COALESCE(ps.td_landed, 0)      AS td_landed,
@@ -129,6 +134,8 @@ async function main() {
       FROM bout_decay bd
       LEFT JOIN per_bout_self ps
         ON ps.bout_id = bd.bout_id AND ps.fighter_id = bd.fighter_id
+      LEFT JOIN bout_opponent_tier bot
+        ON bot.bout_id = bd.bout_id AND bot.fighter_id = bd.fighter_id
       LEFT JOIN LATERAL (
         SELECT
           SUM(po.opp_sig_str_landed)::int AS sig_str_absorbed,
@@ -183,9 +190,65 @@ async function main() {
         -- Powers the volume-style striking branch — Holloway maxes here
         -- even when his stand_diff (1.8) caps below the highest threshold.
         (SUM(df * COALESCE(stand_landed_bout, 0))
-          / NULLIF(SUM(df * minutes_fought), 0))::float           AS decayed_stand_landed_per_min
+          / NULLIF(SUM(df * minutes_fought), 0))::float           AS decayed_stand_landed_per_min,
+        -- Wave 20: opp-tier-weighted variants. Numerator is Σ(df × tier ×
+        -- metric); denominator is Σ(df × tier) (or Σ(df × tier × minutes)
+        -- for per-min rates). A fighter who lands a lot vs ranked opponents
+        -- scores higher than one who lands the same volume vs prospects.
+        (SUM(df * opp_tier * CASE WHEN is_win AND method IN ('ko','tko')
+                                  THEN 1 ELSE 0 END)
+          / NULLIF(SUM(df * opp_tier * CASE WHEN is_win THEN 1 ELSE 0 END), 0))::float
+                                                                  AS decayed_ko_quality,
+        -- Total finish time in seconds for KO/TKO wins, decay-averaged.
+        -- Speed style inverts this: 0s = 100, 600s (R2 midway, total) = 0.
+        (SUM(df * CASE WHEN is_win AND method IN ('ko','tko')
+                       THEN minutes_fought * 60.0 ELSE 0 END)
+          / NULLIF(SUM(df * CASE WHEN is_win AND method IN ('ko','tko')
+                                  THEN 1 ELSE 0 END), 0))::float  AS decayed_avg_ko_finish_seconds,
+        (SUM(df * opp_tier * kd_landed)
+          / NULLIF(SUM(df * opp_tier), 0))::float                 AS decayed_kd_quality,
+        (SUM(df * opp_tier * stand_landed_bout)
+          / NULLIF(SUM(df * opp_tier * minutes_fought), 0))::float
+                                                                  AS decayed_stand_landed_quality_per_min,
+        (SUM(df * opp_tier * td_landed)
+          / NULLIF(SUM(df * opp_tier), 0))::float                 AS decayed_td_landed_quality,
+        (SUM(df * opp_tier * control_sec)
+          / NULLIF(SUM(df * opp_tier), 0))::float                 AS decayed_control_quality,
+        (SUM(df * opp_tier * CASE WHEN round_finished IS NULL OR round_finished >= 2
+                                  THEN 1.0 ELSE 0.0 END)
+          / NULLIF(SUM(df * opp_tier), 0))::float                 AS decayed_late_reach_quality,
+        (SUM(df * opp_tier * sig_str_absorbed)
+          / NULLIF(SUM(df * opp_tier * minutes_fought), 0))::float
+                                                                  AS decayed_damage_quality
       FROM per_bout
       GROUP BY fighter_id
+    ),
+    -- Wave 20: layered activity windows. Period-based (not decay-weighted)
+    -- — recency is already in the lookback bound. avg opp_tier uses 1
+    -- floor too so prospect bouts still register but don't max the layer.
+    activity_layers AS (
+      SELECT
+        f.id AS fighter_id,
+        COUNT(*) FILTER (WHERE e.date >= NOW() - INTERVAL '12 months')::int
+          AS fights_12mo,
+        AVG(GREATEST(COALESCE(bot.opp_tier_value, 0), 1)::float)
+          FILTER (WHERE e.date >= NOW() - INTERVAL '12 months')
+          AS avg_tier_12mo,
+        AVG(GREATEST(COALESCE(bot.opp_tier_value, 0), 1)::float)
+          FILTER (WHERE e.date >= NOW() - INTERVAL '24 months')
+          AS avg_tier_24mo,
+        COUNT(*) FILTER (WHERE e.date >= NOW() - INTERVAL '36 months')::int
+          AS fights_36mo,
+        AVG(GREATEST(COALESCE(bot.opp_tier_value, 0), 1)::float)
+          FILTER (WHERE e.date >= NOW() - INTERVAL '36 months')
+          AS avg_tier_36mo
+      FROM fighter f
+      JOIN bout b ON (b.fighter_a_id = f.id OR b.fighter_b_id = f.id)
+                 AND b.status = 'completed'
+      JOIN event e ON e.id = b.event_id
+      LEFT JOIN bout_opponent_tier bot
+        ON bot.bout_id = b.id AND bot.fighter_id = f.id
+      GROUP BY f.id
     )
     UPDATE fighter f
     SET
@@ -209,8 +272,22 @@ async function main() {
       decayed_stand_diff_per_min     = a.decayed_stand_diff_per_min,
       decayed_clinch_diff_per_min    = a.decayed_clinch_diff_per_min,
       decayed_ground_diff_per_min    = a.decayed_ground_diff_per_min,
-      decayed_stand_landed_per_min   = a.decayed_stand_landed_per_min
+      decayed_stand_landed_per_min   = a.decayed_stand_landed_per_min,
+      decayed_ko_quality                   = a.decayed_ko_quality,
+      decayed_avg_ko_finish_seconds        = a.decayed_avg_ko_finish_seconds,
+      decayed_kd_quality                   = a.decayed_kd_quality,
+      decayed_stand_landed_quality_per_min = a.decayed_stand_landed_quality_per_min,
+      decayed_td_landed_quality            = a.decayed_td_landed_quality,
+      decayed_control_quality              = a.decayed_control_quality,
+      decayed_late_reach_quality           = a.decayed_late_reach_quality,
+      decayed_damage_quality               = a.decayed_damage_quality,
+      fights_last_12mo                     = al.fights_12mo,
+      avg_opp_tier_last_12mo               = al.avg_tier_12mo,
+      avg_opp_tier_last_24mo               = al.avg_tier_24mo,
+      fights_last_36mo                     = al.fights_36mo,
+      avg_opp_tier_last_36mo               = al.avg_tier_36mo
     FROM aggs a
+    LEFT JOIN activity_layers al ON al.fighter_id = a.fighter_id
     WHERE f.id = a.fighter_id
     RETURNING f.id
   `;

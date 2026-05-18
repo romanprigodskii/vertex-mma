@@ -103,6 +103,24 @@ export type FighterDetail = {
   /** Wave 19.1: stand-up landed per minute (no opp subtraction).
    *  Powers volume-style striking branch in max-of-styles formula. */
   decayed_stand_landed_per_min: number | null;
+  /** Wave 20: opp-tier-weighted variants of the volume metrics, plus
+   *  layered activity windows. Each fighter gets a quality_style branch
+   *  added to striking/grappling/defense/cardio, plus a full 4-style
+   *  power redesign. activity reads max over 12/24/36 month layers so
+   *  a slow recent year doesn't erase a busy 36-month span. */
+  decayed_ko_quality: number | null;
+  decayed_avg_ko_finish_seconds: number | null;
+  decayed_kd_quality: number | null;
+  decayed_stand_landed_quality_per_min: number | null;
+  decayed_td_landed_quality: number | null;
+  decayed_control_quality: number | null;
+  decayed_late_reach_quality: number | null;
+  decayed_damage_quality: number | null;
+  fights_last_12mo: number | null;
+  avg_opp_tier_last_12mo: number | null;
+  avg_opp_tier_last_24mo: number | null;
+  fights_last_36mo: number | null;
+  avg_opp_tier_last_36mo: number | null;
 };
 
 /** Wave 17: weights powering ScoreBreakdown's contribution math. These
@@ -554,7 +572,20 @@ export async function getFighterBySlug(
       f.decayed_stand_diff_per_min,
       f.decayed_clinch_diff_per_min,
       f.decayed_ground_diff_per_min,
-      f.decayed_stand_landed_per_min
+      f.decayed_stand_landed_per_min,
+      f.decayed_ko_quality,
+      f.decayed_avg_ko_finish_seconds,
+      f.decayed_kd_quality,
+      f.decayed_stand_landed_quality_per_min,
+      f.decayed_td_landed_quality,
+      f.decayed_control_quality,
+      f.decayed_late_reach_quality,
+      f.decayed_damage_quality,
+      f.fights_last_12mo,
+      f.avg_opp_tier_last_12mo,
+      f.avg_opp_tier_last_24mo,
+      f.fights_last_36mo,
+      f.avg_opp_tier_last_36mo
     FROM fighter_with_stats f
     WHERE f.slug = ${slug}
     LIMIT 1
