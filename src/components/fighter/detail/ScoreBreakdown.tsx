@@ -39,7 +39,12 @@ interface ScoreBreakdownProps {
  */
 export function ScoreBreakdown({ data, divisionalStatus }: ScoreBreakdownProps) {
   const [open, setOpen] = React.useState(false);
-  const [tab, setTab] = React.useState<"current" | "all-time">("current");
+  // Wave 29: retired fighters have no Current score — default the tab to
+  // All-Time so the breakdown lands on a populated view. User can still
+  // switch to the (empty) Current tab manually.
+  const [tab, setTab] = React.useState<"current" | "all-time">(
+    data.current.finalScore == null ? "all-time" : "current",
+  );
 
   const sourceLabel =
     data.source === "divisional" && data.divisionLabel

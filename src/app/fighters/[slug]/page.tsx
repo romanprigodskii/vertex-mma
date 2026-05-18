@@ -155,33 +155,51 @@ export default async function FighterDetailPage({ params }: PageProps) {
         <FighterHero fighter={fighter} championEntry={championEntry} />
 
         <Container size="xl" className="pt-8">
-          <div className="flex items-center justify-center gap-3 sm:gap-6">
-            <OctagonScore
-              score={heroCurrentScore}
-              scoreMode="current"
-              fighter={{
-                slug: fighter.slug,
-                // Wave 14B.2: classify the hero tier using the
-                // divisional score (when available) so the colour ring
-                // and number always agree. all_time stays global.
-                vertexScore: heroCurrentScore,
-                vertexScoreAllTime: fighter.vertex_score_all_time,
-                ufcBouts: fighter.ufc_total,
-              }}
-              label="Current Vertex Score"
-            />
-            <CircleScore
-              score={fighter.vertex_score_all_time}
-              scoreMode="all_time"
-              fighter={{
-                slug: fighter.slug,
-                vertexScore: fighter.vertex_score,
-                vertexScoreAllTime: fighter.vertex_score_all_time,
-                ufcBouts: fighter.ufc_total,
-              }}
-              label="All-Time Vertex Score"
-            />
-          </div>
+          {heroCurrentScore != null ? (
+            <div className="flex items-center justify-center gap-3 sm:gap-6">
+              <OctagonScore
+                score={heroCurrentScore}
+                scoreMode="current"
+                fighter={{
+                  slug: fighter.slug,
+                  // Wave 14B.2: classify the hero tier using the
+                  // divisional score (when available) so the colour ring
+                  // and number always agree. all_time stays global.
+                  vertexScore: heroCurrentScore,
+                  vertexScoreAllTime: fighter.vertex_score_all_time,
+                  ufcBouts: fighter.ufc_total,
+                }}
+                label="Current Vertex Score"
+              />
+              <CircleScore
+                score={fighter.vertex_score_all_time}
+                scoreMode="all_time"
+                fighter={{
+                  slug: fighter.slug,
+                  vertexScore: fighter.vertex_score,
+                  vertexScoreAllTime: fighter.vertex_score_all_time,
+                  ufcBouts: fighter.ufc_total,
+                }}
+                label="All-Time Vertex Score"
+              />
+            </div>
+          ) : (
+            // Wave 29: retired (or <5-bout) fighter — All-Time is the
+            // primary identity; skip the empty Current octagon entirely.
+            <div className="flex items-center justify-center">
+              <CircleScore
+                score={fighter.vertex_score_all_time}
+                scoreMode="all_time"
+                fighter={{
+                  slug: fighter.slug,
+                  vertexScore: fighter.vertex_score,
+                  vertexScoreAllTime: fighter.vertex_score_all_time,
+                  ufcBouts: fighter.ufc_total,
+                }}
+                label="Vertex Score · All-Time"
+              />
+            </div>
+          )}
           {otherDivisionRows.length > 0 ? (
             <div className="mt-6">
               <OtherDivisions
