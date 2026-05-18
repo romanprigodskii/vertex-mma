@@ -1,0 +1,155 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { ChevronLeft } from "lucide-react";
+
+import { Container } from "@/components/layout/container";
+import { Footer } from "@/components/layout/footer";
+import { Navbar } from "@/components/layout/navbar";
+import { BetForm } from "@/components/markets/bet-form";
+import { getCurrentUser } from "@/lib/auth";
+import { getMarketById } from "@/lib/markets";
+
+export const dynamic = "force-dynamic";
+
+interface PageProps {
+  params: Promise<{ id: string }>;
+}
+
+export async function generateMetadata({ params }: PageProps) {
+  const { id } = await params;
+  const m = await getMarketById(id);
+  if (!m) return { title: "Market not found" };
+  return {
+    title: `${m.fighter_a_name} vs ${m.fighter_b_name}`,
+    description: `${m.event_name} · ${m.question}`,
+  };
+}
+
+export default async function MarketDetailPage({ params }: PageProps) {
+  const { id } = await params;
+  const [market, user] = await Promise.all([
+    getMarketById(id),
+    getCurrentUser(),
+  ]);
+  if (!market) notFound();
+
+  const closed =
+    market.status !== "open" ||
+    new Date(market.closes_at).getTime() <= Date.now();
+
+  return (
+    <>
+      <Navbar />
+      <main className="flex-1">
+        <div className="border-b border-foreground/[0.06]">
+          <Container size="xl" className="py-3">
+            <Link
+              href="/markets"
+              className="inline-flex items-center gap-1.5 font-sans text-sm text-foreground-muted hover:text-primary"
+            >
+              <ChevronLeft className="h-4 w-4" aria-hidden /> All markets
+            </Link>
+          </Container>
+        </div>
+
+        <Container size="lg" className="py-10 md:py-14">
+          <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground-subtle">
+            <Link
+              href={`/events/${market.event_slug}`}
+              className="hover:text-foreground"
+            >
+              {market.event_name}
+            </Link>
+            {" · "}
+            {new Date(market.event_date).toLocaleDateString("en-US", {
+              month: "long",
+              day: "numeric",
+              year: "numeric",
+            })}
+          </p>
+          <h1
+            className="mt-3 font-display uppercase tracking-tight text-foreground"
+            style={{ fontSize: "clamp(32px, 4vw, 56px)" }}
+          >
+            {market.fighter_a_name}{" "}
+            <span className="text-foreground-subtle">vs</span>{" "}
+            {market.fighter_b_name}
+          </h1>
+          <p className="mt-3 font-sans text-sm text-foreground-muted">
+            {market.question}
+          </p>
+
+          <div className="mt-8 grid grid-cols-2 gap-3">
+            {market.outcomes.map((o) => (
+              <div
+                key={o.id}
+                className="rounded-md border border-foreground/10 bg-background-elevated/30 p-4"
+              >
+                <p className="font-sans text-[11px] uppercase tracking-widest text-foreground-muted">
+                  {o.label}
+                </p>
+                <p className="mt-2 font-display text-3xl tabular text-foreground">
+                  {(o.current_price * 100).toFixed(1)}
+                  <span className="text-base text-foreground-muted">%</span>
+                </p>
+                <p className="mt-1 font-mono text-[10px] tabular text-foreground-subtle">
+                  {o.current_shares.toFixed(1)} shares outstanding
+                </p>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-8">
+            {closed ? (
+              <p className="rounded-md border border-foreground/10 bg-background-elevated/30 px-4 py-6 text-center font-sans text-sm text-foreground-muted">
+                Market is closed.
+              </p>
+            ) : user ? (
+              <BetForm market={market} userBalance={user.balanceCoins} />
+            ) : (
+              <Link
+                href={`/signin?next=/markets/${market.id}`}
+                className="inline-block rounded-sm bg-primary px-4 py-2.5 font-display text-sm uppercase tracking-widest text-background-base hover:opacity-90"
+              >
+                Sign in to bet
+              </Link>
+            )}
+          </div>
+
+          <dl className="mt-10 grid grid-cols-3 gap-4">
+            <div className="rounded-md border border-foreground/10 bg-background-elevated/30 px-4 py-3">
+              <dt className="font-sans text-[10px] uppercase tracking-widest text-foreground-subtle">
+                Volume
+              </dt>
+              <dd className="mt-1 font-display text-xl tabular text-foreground">
+                {market.total_volume.toLocaleString()}
+              </dd>
+            </div>
+            <div className="rounded-md border border-foreground/10 bg-background-elevated/30 px-4 py-3">
+              <dt className="font-sans text-[10px] uppercase tracking-widest text-foreground-subtle">
+                Traders
+              </dt>
+              <dd className="mt-1 font-display text-xl tabular text-foreground">
+                {market.unique_traders}
+              </dd>
+            </div>
+            <div className="rounded-md border border-foreground/10 bg-background-elevated/30 px-4 py-3">
+              <dt className="font-sans text-[10px] uppercase tracking-widest text-foreground-subtle">
+                Closes
+              </dt>
+              <dd className="mt-1 font-mono text-xs tabular text-foreground">
+                {new Date(market.closes_at).toLocaleString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  hour: "numeric",
+                  minute: "2-digit",
+                })}
+              </dd>
+            </div>
+          </dl>
+        </Container>
+      </main>
+      <Footer />
+    </>
+  );
+}
