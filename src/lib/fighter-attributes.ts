@@ -85,11 +85,16 @@ export function computeAttributes(f: FighterDetail): FighterAttributes {
         )
       : 0;
   const subThreat = Math.max(subAttemptScore, subWinScore);
+  // Wave 18.4: rebalance to lift sub specialists. Control-style wrestlers
+  // cap simultaneously on tdAvg/tdAcc/control AND subThreat (Khabib,
+  // Islam top out across all four), so dropping their weights doesn't
+  // hurt them — but it gives volume submitters (Charles) the +10 they
+  // were missing. Weights still sum to 1.00.
   const grappling = Math.round(
-    tdAvgScore * 0.25
+    tdAvgScore * 0.2
       + tdAccScore * 0.15
-      + controlScore * 0.3
-      + subThreat * 0.3,
+      + controlScore * 0.25
+      + subThreat * 0.4,
   );
 
   // --- Defense: TD def + Str def + decayed damage absorbed + decayed durability ---
