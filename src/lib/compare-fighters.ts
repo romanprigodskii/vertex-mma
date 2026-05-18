@@ -175,3 +175,90 @@ export async function getCommonOpponents(
     },
   }));
 }
+
+export type HeadToHeadBout = {
+  bout_id: string;
+  event_name: string;
+  event_slug: string;
+  event_date: string;
+  /** Result from fighter A's perspective. */
+  a_result: "W" | "L" | "D" | "NC";
+  method: string | null;
+  round_finished: number | null;
+  time_finished_seconds: number | null;
+  is_title_fight: boolean;
+};
+
+export async function getHeadToHeadBouts(
+  fighterAId: string,
+  fighterBId: string,
+): Promise<HeadToHeadBout[]> {
+  if (fighterAId === fighterBId) return [];
+
+  const result = await db.execute<HeadToHeadBout>(sql`
+    SELECT
+      b.id::text AS bout_id,
+      COALESCE(e.short_name, e.name) AS event_name,
+      e.slug AS event_slug,
+      e.date::text AS event_date,
+      CASE
+        WHEN b.method::text = 'no_contest' THEN 'NC'
+        WHEN b.winner_id = ${fighterAId}::uuid THEN 'W'
+        WHEN b.winner_id = ${fighterBId}::uuid THEN 'L'
+        ELSE 'D'
+      END AS a_result,
+      b.method::text AS method,
+      b.round_finished,
+      b.time_finished_seconds,
+      b.is_title_fight
+    FROM bout b
+    JOIN event e ON e.id = b.event_id
+    WHERE b.status = 'completed'
+      AND (
+        (b.fighter_a_id = ${fighterAId}::uuid AND b.fighter_b_id = ${fighterBId}::uuid)
+        OR (b.fighter_a_id = ${fighterBId}::uuid AND b.fighter_b_id = ${fighterAId}::uuid)
+      )
+    ORDER BY e.date DESC
+  `);
+  return [...(result as unknown as HeadToHeadBout[])];
+}
+
+export type RecentFormEntry = {
+  bout_id: string;
+  result: "W" | "L" | "D" | "NC";
+  opponent_name: string;
+  opponent_slug: string;
+  event_date: string;
+  method: string | null;
+};
+
+export async function getRecentForm(
+  fighterId: string,
+  limit = 5,
+): Promise<RecentFormEntry[]> {
+  const result = await db.execute<RecentFormEntry>(sql`
+    SELECT
+      b.id::text AS bout_id,
+      CASE
+        WHEN b.method::text = 'no_contest' THEN 'NC'
+        WHEN b.winner_id = ${fighterId}::uuid THEN 'W'
+        WHEN b.winner_id IS NOT NULL THEN 'L'
+        ELSE 'D'
+      END AS result,
+      f_opp.name_en AS opponent_name,
+      f_opp.slug AS opponent_slug,
+      e.date::text AS event_date,
+      b.method::text AS method
+    FROM bout b
+    JOIN event e ON e.id = b.event_id
+    JOIN fighter f_opp ON f_opp.id = CASE
+      WHEN b.fighter_a_id = ${fighterId}::uuid THEN b.fighter_b_id
+      ELSE b.fighter_a_id
+    END
+    WHERE b.status = 'completed'
+      AND (b.fighter_a_id = ${fighterId}::uuid OR b.fighter_b_id = ${fighterId}::uuid)
+    ORDER BY e.date DESC, b.id DESC
+    LIMIT ${limit}
+  `);
+  return [...(result as unknown as RecentFormEntry[])];
+}

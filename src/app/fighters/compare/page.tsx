@@ -12,15 +12,26 @@ import {
   StrikingCompare,
 } from "@/components/compare/CompareStatGroups";
 import { FighterPicker } from "@/components/compare/FighterPicker";
+import { HeadToHead } from "@/components/compare/HeadToHead";
 import { OverlapRadar } from "@/components/compare/OverlapRadar";
+import { RecentForm } from "@/components/compare/RecentForm";
+import { ScoreCompare } from "@/components/compare/ScoreCompare";
 import { TaleOfTheTape } from "@/components/compare/TaleOfTheTape";
 import { Container } from "@/components/layout/container";
 import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
 import { CHAMPION_BY_SLUG } from "@/lib/champions";
-import { getCommonOpponents } from "@/lib/compare-fighters";
+import {
+  getCommonOpponents,
+  getHeadToHeadBouts,
+  getRecentForm,
+} from "@/lib/compare-fighters";
 import { computeAttributes } from "@/lib/fighter-attributes";
-import { getFighterBySlug } from "@/lib/fighter-detail";
+import {
+  buildScoreBreakdown,
+  getFighterBySlug,
+  getGlobalScoreComponents,
+} from "@/lib/fighter-detail";
 
 export const dynamic = "force-dynamic";
 
@@ -126,7 +137,19 @@ export default async function ComparePage({ searchParams }: PageProps) {
   const championB = CHAMPION_BY_SLUG.get(fighterB.slug) ?? null;
   const attributesA = computeAttributes(fighterA);
   const attributesB = computeAttributes(fighterB);
-  const common = await getCommonOpponents(fighterA.id, fighterB.id);
+
+  const [common, headToHead, recentA, recentB, globalA, globalB] =
+    await Promise.all([
+      getCommonOpponents(fighterA.id, fighterB.id),
+      getHeadToHeadBouts(fighterA.id, fighterB.id),
+      getRecentForm(fighterA.id, 5),
+      getRecentForm(fighterB.id, 5),
+      getGlobalScoreComponents(fighterA.id),
+      getGlobalScoreComponents(fighterB.id),
+    ]);
+
+  const breakdownA = buildScoreBreakdown(null, globalA);
+  const breakdownB = buildScoreBreakdown(null, globalB);
 
   return (
     <>
@@ -193,6 +216,34 @@ export default async function ComparePage({ searchParams }: PageProps) {
         </CompareSection>
 
         <CompareSection
+          label="Score breakdown"
+          explainer="Vertex current-score components — leader per row in bold. Negative-weight rows reward smaller raw values."
+        >
+          <ScoreCompare
+            fighterAName={fighterA.name_en}
+            fighterBName={fighterB.name_en}
+            breakdownA={breakdownA}
+            breakdownB={breakdownB}
+            vertexA={fighterA.vertex_score}
+            vertexB={fighterB.vertex_score}
+            vertexAllTimeA={fighterA.vertex_score_all_time}
+            vertexAllTimeB={fighterB.vertex_score_all_time}
+          />
+        </CompareSection>
+
+        <CompareSection
+          label="Recent form"
+          explainer="Last five completed UFC bouts — click any cell to open the bout detail."
+        >
+          <RecentForm
+            fighterAName={fighterA.name_en}
+            fighterBName={fighterB.name_en}
+            recentA={recentA}
+            recentB={recentB}
+          />
+        </CompareSection>
+
+        <CompareSection
           label="Striking"
           explainer="Per-minute output, accuracy, and defense from UFCStats."
         >
@@ -221,10 +272,21 @@ export default async function ComparePage({ searchParams }: PageProps) {
               ? `${common.length} shared opponent${common.length === 1 ? "" : "s"}`
               : null
           }
-          className="pb-16 sm:pb-20"
         >
           <CommonOpponents
             entries={common}
+            fighterAName={fighterA.name_en}
+            fighterBName={fighterB.name_en}
+          />
+        </CompareSection>
+
+        <CompareSection
+          label="Head-to-head"
+          explainer="UFC bouts where these two have faced each other directly."
+          className="pb-16 sm:pb-20"
+        >
+          <HeadToHead
+            bouts={headToHead}
             fighterAName={fighterA.name_en}
             fighterBName={fighterB.name_en}
           />
