@@ -140,6 +140,7 @@ export const CURRENT_SCORE_WEIGHTS = {
   activity: 0.12,
   recent_form: 0.18,
   recent_loss_penalty: -0.20,
+  defensive_vulnerability: -0.10,
 } as const;
 
 export const ALL_TIME_SCORE_WEIGHTS = {
@@ -260,6 +261,14 @@ export function buildScoreBreakdown(
           : global?.recent_loss_penalty ?? null,
       weight: CURRENT_SCORE_WEIGHTS.recent_loss_penalty,
     },
+    {
+      // Computed from career-aggregate fsa stats (slpm/td_avg/td_def/
+      // str_def/sapm), so it's fighter-level, not division-specific.
+      // Always read from global, even when divisional drives the hero.
+      label: "Defensive vulnerability",
+      raw: global?.defensive_vulnerability ?? null,
+      weight: CURRENT_SCORE_WEIGHTS.defensive_vulnerability,
+    },
   ];
 
   const currentRaw =
@@ -362,6 +371,7 @@ export type GlobalScoreComponents = {
   activity: number | null;
   recent_form_score: number | null;
   recent_loss_penalty: number | null;
+  defensive_vulnerability: number | null;
   raw_current: number | null;
   multiplied_current: number | null;
   quality_wins: number | null;
@@ -653,6 +663,7 @@ export async function getGlobalScoreComponents(
       activity,
       recent_form_score,
       recent_loss_penalty,
+      defensive_vulnerability,
       raw_current,
       multiplied_current,
       quality_wins,
