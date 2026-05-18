@@ -198,6 +198,12 @@ export const fighter = pgTable(
     decayedClinchDiffPerMin: doublePrecision("decayed_clinch_diff_per_min"),
     decayedGroundDiffPerMin: doublePrecision("decayed_ground_diff_per_min"),
 
+    // Wave 19.1: distance-position landed (per minute, decay-weighted)
+    // for the volume-style striking branch. Holloway 6+/min, Topuria ~5
+    // — high-volume strikers max this even when their net stand_diff
+    // is modest.
+    decayedStandLandedPerMin: doublePrecision("decayed_stand_landed_per_min"),
+
     ufcStatsId: text("ufc_stats_id").unique(),
     sherdogId: text("sherdog_id").unique(),
     tapologyId: text("tapology_id").unique(),

@@ -100,6 +100,9 @@ export type FighterDetail = {
   decayed_stand_diff_per_min: number | null;
   decayed_clinch_diff_per_min: number | null;
   decayed_ground_diff_per_min: number | null;
+  /** Wave 19.1: stand-up landed per minute (no opp subtraction).
+   *  Powers volume-style striking branch in max-of-styles formula. */
+  decayed_stand_landed_per_min: number | null;
 };
 
 /** Wave 17: weights powering ScoreBreakdown's contribution math. These
@@ -550,7 +553,8 @@ export async function getFighterBySlug(
       f.decayed_sapm,
       f.decayed_stand_diff_per_min,
       f.decayed_clinch_diff_per_min,
-      f.decayed_ground_diff_per_min
+      f.decayed_ground_diff_per_min,
+      f.decayed_stand_landed_per_min
     FROM fighter_with_stats f
     WHERE f.slug = ${slug}
     LIMIT 1

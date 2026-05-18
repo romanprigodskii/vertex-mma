@@ -51,31 +51,35 @@ export function computeAttributes(f: FighterDetail): FighterAttributes {
   const totalDf = safe(f.decayed_total_weight);
   const decayedWins = safe(f.decayed_wins_weighted);
 
-  // --- Striking: stand-up differential + accuracy + decayed KD power ---
-  // Wave 19: SLpM dropped — it conflated GnP from top control (Khabib,
-  // Islam) with real distance striking (Pereira, Holloway, Topuria).
-  // standDiff is net strikes/min in DISTANCE position only, so the
-  // GnP-heavy wrestlers no longer read as stand-up strikers. str_acc
-  // stays career — UFCStats doesn't publish per-bout accuracy.
-  //
-  // standDiff threshold: ±2/min → full ±50 from neutral 50. Spec
-  // suggested ±3; recalibrated to ±2 because at ±3 Pereira lands at 82
-  // (under the spec's `<85` STOP). At ±2 he reads 87 and Khabib still
-  // lands at 55 (≤ the spec's 40-50 target window, just over).
+  // --- Striking: max of 3 styles (volume / power / technical) ---
+  // Wave 19.1: each style scores excellence in one striking approach;
+  // fighter reads their best. Volume (Holloway 6+/min landed). Power
+  // (Pereira/Topuria/Aspinall — high KD rate + positive stand_diff).
+  // Technical (Islam — accuracy + clean stand_diff above Khabib who
+  // lacks any stand-up signal). The Wave 19 SLpM→stand_diff fix is
+  // preserved inside the power and technical branches; volume reads
+  // raw stand-up output (no GnP contamination because we use the
+  // position-broken distance-landed column).
+  const standLanded = safe(f.decayed_stand_landed_per_min);
   const standDiff = safe(f.decayed_stand_diff_per_min);
-  const standDiffScore = clamp(50 + (standDiff / 2) * 50);
+  const standLandedScore = clamp((standLanded / 5) * 100);
+  const standDiffScore = clamp(50 + (standDiff / 3) * 50);
   const accScore = clamp((safe(f.str_acc) * 100) / 0.55);
   const kdSrc = f.decayed_kd_per_fight ?? safe(f.knockdowns_per_fight);
   const kdScore = clamp((kdSrc / 0.65) * 100);
+
+  const strVolumeStyle = standLandedScore * 0.7 + accScore * 0.3;
+  const strPowerStyle = kdScore * 0.6 + standDiffScore * 0.4;
+  const strTechnicalStyle = accScore * 0.5 + standDiffScore * 0.5;
   const striking = Math.round(
-    standDiffScore * 0.5 + accScore * 0.25 + kdScore * 0.25,
+    Math.max(strVolumeStyle, strPowerStyle, strTechnicalStyle),
   );
 
-  // --- Grappling: decayed TD volume + accuracy + control + sub threat ---
-  // td_landed_per_fight is the recent-weighted bout average; td_acc is
-  // the recent landed/attempted ratio when the fighter has decay weight,
-  // otherwise the career rate. subThreat is max(attempt rate, decayed
-  // realised sub wins).
+  // --- Grappling: max of 3 styles (control / wrestler / submission) ---
+  // Wave 19.1: control (Khabib/Islam — top control + GnP volume).
+  // Wrestler (Umar — TD volume + accuracy). Submission (Charles —
+  // sub threat dominant). Each fighter reads their specialty via max
+  // rather than being penalised for one-dimensionality.
   const tdLanded = safe(f.decayed_td_landed_per_fight);
   const tdAttempted = safe(f.decayed_td_attempted_per_fight);
   const tdAvgScore = clamp((tdLanded / 2.5) * 100);
@@ -84,11 +88,6 @@ export function computeAttributes(f: FighterDetail): FighterAttributes {
   const controlSrc =
     f.decayed_control_per_fight ?? safe(f.control_seconds_avg);
   const controlScore = clamp((controlSrc / 300) * 100);
-  // Wave 19: ground_diff captures GnP / ground-position dominance.
-  // ±2/min net edge in ground position → full ±50 from neutral 50.
-  // Khabib (+2.15), Aspinall (+1.83) cap; Pereira/Holloway near 50.
-  const groundDiff = safe(f.decayed_ground_diff_per_min);
-  const groundDiffScore = clamp(50 + (groundDiff / 2) * 50);
   const subAttemptScore = clamp(
     (safe(f.decayed_sub_attempts_per_fight) / 1.5) * 100,
   );
@@ -99,25 +98,19 @@ export function computeAttributes(f: FighterDetail): FighterAttributes {
         )
       : 0;
   const subThreat = Math.max(subAttemptScore, subWinScore);
-  // Wave 19: rebalance again to fit groundDiff into the grappling mix.
-  // 18/12/20/15/35 (sum 100). Wave 18.4 was 20/15/25/40. The 5% taken
-  // off subThreat goes into groundDiff — wrestlers with GnP edges
-  // (Khabib, Aspinall) recoup it via the new axis; pure sub
-  // specialists without GnP (Charles ground_diff ~0.11) take a slight
-  // hit. Trade-off accepted to honestly separate ground GnP from
-  // submission threat.
+
+  const grpControlStyle = controlScore * 0.6 + tdAvgScore * 0.4;
+  const grpWrestlerStyle = tdAvgScore * 0.6 + tdAccScore * 0.4;
+  const grpSubmissionStyle = subThreat * 0.8 + tdAvgScore * 0.2;
   const grappling = Math.round(
-    tdAvgScore * 0.18
-      + tdAccScore * 0.12
-      + controlScore * 0.2
-      + groundDiffScore * 0.15
-      + subThreat * 0.35,
+    Math.max(grpControlStyle, grpWrestlerStyle, grpSubmissionStyle),
   );
 
-  // --- Defense: TD def + Str def + decayed damage absorbed + decayed durability ---
-  // tdDef/strDef stay career rates. damageScore uses decayed SApM.
-  // durabilityScore uses decay-weighted finish-loss rate (Σ df over KO/
-  // TKO/sub losses) over the same df denominator as everything else.
+  // --- Defense: max of 3 styles (wrestler / striker / iron-chin) ---
+  // Wave 19.1: wrestler_def (Khabib/Islam — top TD def). striker_def
+  // (Holloway — head-movement / str def). iron_chin (Aspinall — never
+  // finished, low SApM). Each style measures a different durability
+  // axis; max() keeps specialists from being averaged into mediocrity.
   const tdDefScore = clamp((safe(f.td_def) * 100) / 0.8);
   const strDefScore = clamp((safe(f.str_def) * 100) / 0.65);
   const sapmSrc = f.decayed_sapm ?? safe(f.sapm);
@@ -125,11 +118,12 @@ export function computeAttributes(f: FighterDetail): FighterAttributes {
   const finishLossRate =
     totalDf > 0 ? safe(f.decayed_finish_losses_weighted) / totalDf : 0;
   const durabilityScore = clamp(100 - finishLossRate * 200);
+
+  const defWrestlerStyle = tdDefScore * 0.7 + strDefScore * 0.3;
+  const defStrikerStyle = strDefScore * 0.6 + damageScore * 0.4;
+  const defIronChinStyle = durabilityScore * 0.8 + damageScore * 0.2;
   const defense = Math.round(
-    tdDefScore * 0.3
-      + strDefScore * 0.25
-      + damageScore * 0.2
-      + durabilityScore * 0.25,
+    Math.max(defWrestlerStyle, defStrikerStyle, defIronChinStyle),
   );
 
   // --- Cardio: decayed late-round reach + Wave 18.1 confidence blend ---

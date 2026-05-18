@@ -119,6 +119,8 @@ async function main() {
         COALESCE(ps.stand_landed, 0)  - COALESCE(opp.stand_absorbed, 0)  AS stand_diff_bout,
         COALESCE(ps.clinch_landed, 0) - COALESCE(opp.clinch_absorbed, 0) AS clinch_diff_bout,
         COALESCE(ps.ground_landed, 0) - COALESCE(opp.ground_absorbed, 0) AS ground_diff_bout,
+        -- Wave 19.1: raw stand-up landed (no opponent subtraction)
+        COALESCE(ps.stand_landed, 0) AS stand_landed_bout,
         CASE
           WHEN bd.round_finished IS NOT NULL AND bd.time_finished_seconds IS NOT NULL
             THEN (bd.round_finished - 1) * 5.0 + bd.time_finished_seconds / 60.0
@@ -176,7 +178,12 @@ async function main() {
         (SUM(df * clinch_diff_bout)
           / NULLIF(SUM(df * minutes_fought), 0))::float           AS decayed_clinch_diff_per_min,
         (SUM(df * ground_diff_bout)
-          / NULLIF(SUM(df * minutes_fought), 0))::float           AS decayed_ground_diff_per_min
+          / NULLIF(SUM(df * minutes_fought), 0))::float           AS decayed_ground_diff_per_min,
+        -- Wave 19.1: stand-up landed per minute (no opponent subtraction).
+        -- Powers the volume-style striking branch — Holloway maxes here
+        -- even when his stand_diff (1.8) caps below the highest threshold.
+        (SUM(df * COALESCE(stand_landed_bout, 0))
+          / NULLIF(SUM(df * minutes_fought), 0))::float           AS decayed_stand_landed_per_min
       FROM per_bout
       GROUP BY fighter_id
     )
@@ -201,7 +208,8 @@ async function main() {
       decayed_sapm                   = a.decayed_sapm,
       decayed_stand_diff_per_min     = a.decayed_stand_diff_per_min,
       decayed_clinch_diff_per_min    = a.decayed_clinch_diff_per_min,
-      decayed_ground_diff_per_min    = a.decayed_ground_diff_per_min
+      decayed_ground_diff_per_min    = a.decayed_ground_diff_per_min,
+      decayed_stand_landed_per_min   = a.decayed_stand_landed_per_min
     FROM aggs a
     WHERE f.id = a.fighter_id
     RETURNING f.id
