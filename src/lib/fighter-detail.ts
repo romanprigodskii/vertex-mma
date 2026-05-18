@@ -67,6 +67,31 @@ export type FighterDetail = {
    *  (NULL for prospects who haven't fought). Wave 14B.2 reads this to
    *  pick which divisional row to surface in the hero. */
   current_division: string | null;
+  /** Wave 18: bout-derived aggregates powering the rebuilt radar
+   *  attributes. NULL for fighters with no completed UFC bouts (treated
+   *  as 0 by the radar's safe() helper). Populated by
+   *  scripts/compute_radar_aggregates.ts. */
+  control_seconds_avg: number | null;
+  knockdowns_per_fight: number | null;
+  late_round_reach_rate: number | null;
+  fights_last_24mo: number | null;
+  /** Wave 18.3: decay-weighted radar inputs (same curve as Wave 15
+   *  quality_wins). The radar reads these first and falls back to the
+   *  career columns above when a fighter has no decay weight (no
+   *  completed bouts). */
+  decayed_total_weight: number | null;
+  decayed_kd_per_fight: number | null;
+  decayed_control_per_fight: number | null;
+  decayed_td_landed_per_fight: number | null;
+  decayed_td_attempted_per_fight: number | null;
+  decayed_sub_attempts_per_fight: number | null;
+  decayed_ko_wins_weighted: number | null;
+  decayed_sub_wins_weighted: number | null;
+  decayed_wins_weighted: number | null;
+  decayed_late_reach_rate: number | null;
+  decayed_finish_losses_weighted: number | null;
+  decayed_slpm: number | null;
+  decayed_sapm: number | null;
 };
 
 /** Wave 17: weights powering ScoreBreakdown's contribution math. These
@@ -497,7 +522,24 @@ export async function getFighterBySlug(
       f.bout_count::int AS bout_count,
       f.vertex_score,
       f.vertex_score_all_time,
-      f.current_division
+      f.current_division,
+      f.control_seconds_avg,
+      f.knockdowns_per_fight,
+      f.late_round_reach_rate,
+      f.fights_last_24mo,
+      f.decayed_total_weight,
+      f.decayed_kd_per_fight,
+      f.decayed_control_per_fight,
+      f.decayed_td_landed_per_fight,
+      f.decayed_td_attempted_per_fight,
+      f.decayed_sub_attempts_per_fight,
+      f.decayed_ko_wins_weighted,
+      f.decayed_sub_wins_weighted,
+      f.decayed_wins_weighted,
+      f.decayed_late_reach_rate,
+      f.decayed_finish_losses_weighted,
+      f.decayed_slpm,
+      f.decayed_sapm
     FROM fighter_with_stats f
     WHERE f.slug = ${slug}
     LIMIT 1

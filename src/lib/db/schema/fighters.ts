@@ -135,6 +135,58 @@ export const fighter = pgTable(
     top10Wins: integer("top10_wins").default(0).notNull(),
     top15Wins: integer("top15_wins").default(0).notNull(),
 
+    // Wave 18: bout-derived aggregates powering the rebuilt radar
+    // attributes in src/lib/fighter-attributes.ts. Populated by
+    // scripts/compute_radar_aggregates.ts. NULL for fighters with zero
+    // completed UFC bouts.
+    //   control_seconds_avg     — mean control_time seconds per completed
+    //                             UFC bout (summed across rounds). Powers
+    //                             the new Grappling axis so wrestlers
+    //                             whose game is hold-down dominance score
+    //                             high even without finish-heavy stat
+    //                             lines.
+    //   knockdowns_per_fight    — mean knockdowns landed per UFC bout.
+    //                             KO power proxy folded into Striking.
+    //   late_round_reach_rate   — share of bouts that reached round ≥2
+    //                             (or NULL round_finished → decision /
+    //                             went distance). Replaces the old
+    //                             "% wins by decision" cardio proxy that
+    //                             punished finishers.
+    //   fights_last_24mo        — count of completed UFC bouts in the
+    //                             trailing 24 months. Drives the rebuilt
+    //                             Activity axis (recent, not career
+    //                             tenure).
+    controlSecondsAvg: doublePrecision("control_seconds_avg"),
+    knockdownsPerFight: doublePrecision("knockdowns_per_fight"),
+    lateRoundReachRate: doublePrecision("late_round_reach_rate"),
+    fightsLast24mo: smallint("fights_last_24mo"),
+
+    // Wave 18.3: per-bout time-decay-weighted aggregates. Same decay
+    // curve as Wave 15 quality_wins (1.0 within 1y → linearly to 0.3 at
+    // 3y → linearly to 0.1 at 5y → 0.1 floor). Populated by the same
+    // scripts/compute_radar_aggregates.ts run that fills the Wave 18
+    // career columns above. NULL for fighters with no completed UFC
+    // bouts (radar falls back to the career column via ??).
+    //
+    // *_per_fight  values are weighted means: Σ(stat × df) / Σ(df).
+    // *_weighted   values are weighted SUMs (used as numerators in
+    //              ratio formulas inside computeAttributes).
+    // decayed_total_weight is Σ(df) — denominator for ratio fields and
+    // a sample-size proxy for confidence weighting.
+    decayedTotalWeight: doublePrecision("decayed_total_weight"),
+    decayedKdPerFight: doublePrecision("decayed_kd_per_fight"),
+    decayedControlPerFight: doublePrecision("decayed_control_per_fight"),
+    decayedTdLandedPerFight: doublePrecision("decayed_td_landed_per_fight"),
+    decayedTdAttemptedPerFight: doublePrecision("decayed_td_attempted_per_fight"),
+    decayedSubAttemptsPerFight: doublePrecision("decayed_sub_attempts_per_fight"),
+    decayedKoWinsWeighted: doublePrecision("decayed_ko_wins_weighted"),
+    decayedSubWinsWeighted: doublePrecision("decayed_sub_wins_weighted"),
+    decayedWinsWeighted: doublePrecision("decayed_wins_weighted"),
+    decayedLateReachRate: doublePrecision("decayed_late_reach_rate"),
+    decayedFinishLossesWeighted: doublePrecision("decayed_finish_losses_weighted"),
+    decayedSlpm: doublePrecision("decayed_slpm"),
+    decayedSapm: doublePrecision("decayed_sapm"),
+
     ufcStatsId: text("ufc_stats_id").unique(),
     sherdogId: text("sherdog_id").unique(),
     tapologyId: text("tapology_id").unique(),
