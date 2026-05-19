@@ -4,6 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 
 import { signUpAction } from "@/app/signup/actions";
+import { PasswordInput } from "@/components/auth/PasswordInput";
 
 export function SignUpForm() {
   const [pending, setPending] = React.useState(false);
@@ -91,13 +92,11 @@ export function SignUpForm() {
           <span className="font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
             Password
           </span>
-          <input
-            type="password"
+          <PasswordInput
             name="password"
             required
             minLength={8}
             autoComplete="new-password"
-            className="rounded-sm border border-foreground/15 bg-background-elevated/30 px-3 py-2 font-sans text-sm text-foreground focus:border-primary focus:outline-none"
           />
           <span className="font-sans text-[11px] text-foreground-subtle">
             At least 8 characters.

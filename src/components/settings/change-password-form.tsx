@@ -3,9 +3,7 @@
 import * as React from "react";
 
 import { changePasswordAction } from "@/app/settings/actions";
-
-const INPUT_CLASS =
-  "rounded-sm border border-foreground/15 bg-background-elevated/30 px-3 py-2 font-sans text-sm text-foreground focus:border-primary focus:outline-none";
+import { PasswordInput } from "@/components/auth/PasswordInput";
 
 export function ChangePasswordForm() {
   const [pending, setPending] = React.useState(false);
@@ -46,13 +44,11 @@ export function ChangePasswordForm() {
         <span className="font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
           New password
         </span>
-        <input
-          type="password"
+        <PasswordInput
           name="newPassword"
           required
           minLength={8}
           autoComplete="new-password"
-          className={INPUT_CLASS}
         />
         <span className="font-sans text-[11px] text-foreground-subtle">
           At least 8 characters.
@@ -62,13 +58,11 @@ export function ChangePasswordForm() {
         <span className="font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
           Confirm new password
         </span>
-        <input
-          type="password"
+        <PasswordInput
           name="confirm"
           required
           minLength={8}
           autoComplete="new-password"
-          className={INPUT_CLASS}
         />
       </label>
       {error ? (

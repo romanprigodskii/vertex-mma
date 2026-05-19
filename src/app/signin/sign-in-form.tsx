@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { signInAction } from "@/app/signin/actions";
+import { PasswordInput } from "@/components/auth/PasswordInput";
 
 const INPUT_CLASS =
   "rounded-sm border border-foreground/15 bg-background-elevated/30 px-3 py-2 font-sans text-sm text-foreground focus:border-primary focus:outline-none";
@@ -74,12 +75,10 @@ export function SignInForm() {
               Forgot password?
             </Link>
           </div>
-          <input
-            type="password"
+          <PasswordInput
             name="password"
             required
             autoComplete="current-password"
-            className={INPUT_CLASS}
           />
         </label>
 
