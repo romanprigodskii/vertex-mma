@@ -4,7 +4,7 @@
 # (node:20-alpine + pruned standalone bundle).
 
 FROM node:20-alpine AS base
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN npm install -g pnpm@11.1.0
 WORKDIR /app
 
 # --- Deps stage: install once, cache aggressively ---
