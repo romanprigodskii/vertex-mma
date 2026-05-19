@@ -61,7 +61,7 @@ export default async function HomePage() {
             <h1 className="mt-4 font-display uppercase tracking-tight text-foreground text-hero">
               Every UFC fighter,
               <br />
-              ranked &amp; wagered.
+              ranked and wagered.
             </h1>
             <p className="mt-6 max-w-2xl font-sans text-base text-foreground-muted md:text-lg">
               Vertex Score combines quality wins, championship pedigree,
