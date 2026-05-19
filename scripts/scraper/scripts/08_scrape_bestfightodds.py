@@ -248,17 +248,28 @@ def match_bout(
     conn: psycopg.Connection,
     fighter_a: str,
     fighter_b: str,
-) -> Optional[str]:
+) -> Optional[tuple[str, bool]]:
     """Find a scheduled or in_progress bout in our DB where the two
-    fighter rows fuzzy-match the given names. Returns bout.id or None.
+    fighter rows fuzzy-match the given names.
 
-    Strategy: trigram similarity on f.name_en against the bestfightodds
-    name. Threshold 0.45 keeps "Khamzat Chimaev" matching a slugged
-    "khamzat-chimaev" while rejecting unrelated rows.
+    Returns (bout_id, swapped) where `swapped` is True iff bestfightodds'
+    fighter A corresponds to the local bout's fighter B. Callers must
+    honour the orientation when writing winner_a/b_decimal — otherwise
+    the seeded prices end up inverted (this was the Wave 44 bug fixed
+    in Wave 49).
+
+    Strategy: trigram similarity on f.name_en. Pick the orientation
+    that maximises the geometric-mean similarity across both sides so
+    near-ties don't accidentally flip on a single noisy match.
     """
-    rows = conn.execute(
+    row = conn.execute(
         """
-        SELECT b.id::text AS bout_id
+        SELECT
+            b.id::text AS bout_id,
+            similarity(fa.name_en, %s) AS s_a_fa,
+            similarity(fb.name_en, %s) AS s_b_fb,
+            similarity(fa.name_en, %s) AS s_b_fa,
+            similarity(fb.name_en, %s) AS s_a_fb
         FROM bout b
         JOIN fighter fa ON fa.id = b.fighter_a_id
         JOIN fighter fb ON fb.id = b.fighter_b_id
@@ -269,18 +280,28 @@ def match_bout(
             (similarity(fa.name_en, %s) >= 0.45 AND similarity(fb.name_en, %s) >= 0.45)
           )
         ORDER BY
-          GREATEST(similarity(fa.name_en, %s), similarity(fa.name_en, %s)) DESC
+            GREATEST(
+              similarity(fa.name_en, %s) * similarity(fb.name_en, %s),
+              similarity(fa.name_en, %s) * similarity(fb.name_en, %s)
+            ) DESC
         LIMIT 1
         """,
         (
-            fighter_a, fighter_b,
-            fighter_b, fighter_a,
-            fighter_a, fighter_b,
+            fighter_a, fighter_b,        # s_a_fa, s_b_fb (same order)
+            fighter_b, fighter_a,        # s_b_fa, s_a_fb (swapped)
+            fighter_a, fighter_b,        # WHERE same-order pair
+            fighter_b, fighter_a,        # WHERE swapped pair
+            fighter_a, fighter_b,        # ORDER BY same-order pair
+            fighter_b, fighter_a,        # ORDER BY swapped pair
         ),
     ).fetchone()
-    if rows is None:
+    if row is None:
         return None
-    return rows[0]
+    bout_id, s_a_fa, s_b_fb, s_b_fa, s_a_fb = row
+    same_score = (s_a_fa or 0) * (s_b_fb or 0)
+    swapped_score = (s_b_fa or 0) * (s_a_fb or 0)
+    swapped = swapped_score > same_score
+    return bout_id, swapped
 
 
 def upsert_odds(
@@ -288,7 +309,13 @@ def upsert_odds(
     bout_id: str,
     fight: ScrapedFight,
     source_url: str,
+    swapped: bool,
 ) -> None:
+    """If `swapped` is True, write the scrape's A decimal into
+    winner_b_decimal (and vice versa) so the row matches the local
+    bout's fighter_a/fighter_b ordering."""
+    winner_a = fight.winner_b_decimal if swapped else fight.winner_a_decimal
+    winner_b = fight.winner_a_decimal if swapped else fight.winner_b_decimal
     conn.execute(
         """
         INSERT INTO bout_external_odds (
@@ -306,8 +333,8 @@ def upsert_odds(
         """,
         (
             bout_id,
-            fight.winner_a_decimal,
-            fight.winner_b_decimal,
+            winner_a,
+            winner_b,
             source_url,
         ),
     )
@@ -360,24 +387,28 @@ def main() -> int:
     try:
         for ev in events:
             for fight in ev.fights:
-                bout_id = match_bout(
+                match = match_bout(
                     conn, fight.fighter_a_name, fight.fighter_b_name
                 )
-                if not bout_id:
+                if not match:
                     unmatched += 1
                     log.debug(
                         f"no local bout for {fight.fighter_a_name} vs "
                         f"{fight.fighter_b_name}"
                     )
                     continue
+                bout_id, swapped = match
                 matched += 1
-                if fight.winner_a_decimal is None or fight.winner_b_decimal is None:
+                if (
+                    fight.winner_a_decimal is None
+                    or fight.winner_b_decimal is None
+                ):
                     log.debug(
                         f"skip {fight.fighter_a_name} vs {fight.fighter_b_name}"
                         f" — missing odds"
                     )
                     continue
-                upsert_odds(conn, bout_id, fight, ev.source_url)
+                upsert_odds(conn, bout_id, fight, ev.source_url, swapped)
                 written += 1
             conn.commit()
             time.sleep(0.25)

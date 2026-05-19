@@ -1,6 +1,5 @@
 import Link from "next/link";
 
-import { FighterCard } from "@/components/fighter/FighterCard";
 import { Container } from "@/components/layout/container";
 import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
@@ -114,10 +113,48 @@ export default async function HomePage() {
                 No fighters yet.
               </p>
             ) : (
-              <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-                {topFighters.map((f) => (
+              <ul className="flex flex-col gap-2">
+                {topFighters.map((f, i) => (
                   <li key={f.id}>
-                    <FighterCard fighter={f} scoreMode="current" priority />
+                    <Link
+                      href={`/fighters/${f.slug}`}
+                      prefetch={false}
+                      className="flex items-center gap-4 rounded-md border border-foreground/10 bg-background-elevated/30 px-4 py-3 transition-colors hover:border-foreground/20 hover:bg-foreground/[0.04]"
+                    >
+                      <span className="min-w-[2.5rem] text-center font-display text-2xl tabular text-foreground-subtle">
+                        #{i + 1}
+                      </span>
+                      {f.photo_thumbnail_url || f.photo_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={
+                            f.photo_thumbnail_url ?? f.photo_url ?? undefined
+                          }
+                          alt={f.name_en}
+                          className="h-12 w-12 shrink-0 rounded-sm border border-foreground/15 object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-sm bg-primary/15 font-display text-sm uppercase text-primary">
+                          {f.name_en.slice(0, 2)}
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-display text-base uppercase tracking-tight text-foreground">
+                          {f.name_en}
+                        </p>
+                        <p className="font-mono text-[11px] uppercase tracking-widest text-foreground-subtle">
+                          {f.weight_class_primary?.replace(/_/g, " ") ?? "—"}
+                        </p>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <p className="font-display text-2xl tabular text-foreground">
+                          {f.vertex_score ?? "—"}
+                        </p>
+                        <p className="font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
+                          Vertex
+                        </p>
+                      </div>
+                    </Link>
                   </li>
                 ))}
               </ul>
