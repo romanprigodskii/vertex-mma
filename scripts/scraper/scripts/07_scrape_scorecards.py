@@ -605,8 +605,54 @@ def run(*, limit: int | None = None, dry_run: bool = False) -> dict:
                             conn.commit()
                         done.add(bout_id)
                         totals["processed"] += 1
+                    except psycopg.OperationalError as exc:
+                        # Supabase pooler kills long-idle session connections
+                        # after ~8 min of URL-only crawl phases. Reconnect and
+                        # retry the bout once before giving up.
+                        log.warning(
+                            f"db connection lost ({exc!r}) — reconnecting and retrying bout {bout_id}"
+                        )
+                        try:
+                            conn.close()
+                        except Exception:
+                            pass
+                        conn = get_connection()
+                        try:
+                            n = _insert_scorecards(
+                                conn,
+                                bout_id=bout_id,
+                                decision_id=decision["decision_id"],
+                                source_url=decision_url,
+                                judges=judges,
+                                fighter_a_name=b["fighter_a_name"],
+                                fighter_b_name=b["fighter_b_name"],
+                                dry_run=dry_run,
+                            )
+                            totals["rows_inserted"] += n
+                            if not dry_run:
+                                conn.commit()
+                            done.add(bout_id)
+                            totals["processed"] += 1
+                        except Exception as retry_exc:  # noqa: BLE001
+                            try:
+                                conn.rollback()
+                            except Exception:
+                                pass
+                            totals["errors"] += 1
+                            record_parse_error(
+                                url=decision_url,
+                                kind="scorecard_insert_retry",
+                                message=repr(retry_exc),
+                                extra={"bout_id": bout_id},
+                            )
+                            log.error(
+                                f"bout {bout_id} retry after reconnect failed: {retry_exc!r}"
+                            )
                     except Exception as exc:  # noqa: BLE001
-                        conn.rollback()
+                        try:
+                            conn.rollback()
+                        except Exception:
+                            pass
                         totals["errors"] += 1
                         record_parse_error(
                             url=decision_url,
