@@ -3,7 +3,7 @@
 # Multi-stage build for Next.js standalone output. Final image ~150MB
 # (node:20-alpine + pruned standalone bundle).
 
-FROM node:20-alpine AS base
+FROM node:22-alpine AS base
 RUN npm install -g pnpm@11.1.0
 WORKDIR /app
 
@@ -31,7 +31,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN pnpm build
 
 # --- Runner stage: minimal image, non-root user ---
-FROM node:20-alpine AS runner
+FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
