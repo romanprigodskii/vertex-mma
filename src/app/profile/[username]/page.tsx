@@ -15,6 +15,7 @@ import {
 } from "@/lib/achievements";
 import { getCurrentUser, getUserProfileByUsername } from "@/lib/auth";
 import { listRankingsByUser } from "@/lib/rankings";
+import { listUserSimulations } from "@/lib/simulations";
 
 export const dynamic = "force-dynamic";
 
@@ -61,11 +62,13 @@ export default async function PublicProfilePage({ params }: PageProps) {
   if (!profile) notFound();
 
   const isOwner = currentUser?.username === profile.username;
-  const [rankings, userAchievements, allAchievements] = await Promise.all([
-    listRankingsByUser(profile.userProfileId),
-    listUserAchievements(profile.userProfileId),
-    isOwner ? listAchievements() : Promise.resolve(undefined),
-  ]);
+  const [rankings, userAchievements, allAchievements, simulations] =
+    await Promise.all([
+      listRankingsByUser(profile.userProfileId),
+      listUserAchievements(profile.userProfileId),
+      isOwner ? listAchievements() : Promise.resolve(undefined),
+      listUserSimulations(profile.userProfileId, 6),
+    ]);
   const joined = new Date(profile.joinedAt);
   const joinedLabel = joined.toLocaleDateString("en-US", {
     year: "numeric",
@@ -180,6 +183,41 @@ export default async function PublicProfilePage({ params }: PageProps) {
                 {rankings.map((r) => (
                   <li key={r.id}>
                     <RankingCard ranking={r} />
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+
+          {simulations.length > 0 ? (
+            <section className="mt-12">
+              <h2 className="mb-5 font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
+                Recent simulations by @{profile.username}
+              </h2>
+              <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {simulations.map((s) => (
+                  <li key={s.id}>
+                    <Link
+                      href={`/simulator/${s.id}`}
+                      prefetch={false}
+                      className="block rounded-md border border-foreground/10 bg-background-elevated/30 p-3 transition-colors hover:border-foreground/20 hover:bg-foreground/[0.04]"
+                    >
+                      <p className="font-display text-base uppercase tracking-tight text-foreground">
+                        {s.a_name}{" "}
+                        <span className="text-foreground-subtle">vs</span>{" "}
+                        {s.b_name}
+                      </p>
+                      <p className="mt-1 line-clamp-1 font-sans text-xs text-foreground-muted">
+                        {s.result.mostLikelyScenario}
+                      </p>
+                      <p className="mt-1 font-mono text-[10px] tabular text-foreground-subtle">
+                        {new Date(s.created_at).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })}
+                      </p>
+                    </Link>
                   </li>
                 ))}
               </ul>

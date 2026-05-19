@@ -11,6 +11,7 @@ export const NAV_SECTIONS: NavSection[] = [
   { href: "/events", label: "Events" },
   { href: "/markets", label: "Markets" },
   { href: "/predictions", label: "Predictions" },
+  { href: "/simulator", label: "Simulator" },
   { href: "/rankings", label: "Rankings" },
   { href: "/leaderboard", label: "Leaderboard" },
 ];
