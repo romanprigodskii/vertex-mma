@@ -97,6 +97,12 @@ export default async function MarketDetailPage({ params }: PageProps) {
           >
             {market.type === "method" ? (
               "How will it end?"
+            ) : market.type === "round" ? (
+              "Which round?"
+            ) : market.type === "distance" ? (
+              "Goes the distance?"
+            ) : market.type === "prop" ? (
+              market.question
             ) : (
               <>
                 {market.fighter_a_name}{" "}
@@ -106,9 +112,11 @@ export default async function MarketDetailPage({ params }: PageProps) {
             )}
           </h1>
           <p className="mt-3 font-sans text-sm text-foreground-muted">
-            {market.type === "method"
-              ? `${market.fighter_a_name} vs ${market.fighter_b_name}`
-              : market.question}
+            {market.type === "winner"
+              ? market.question
+              : market.type === "prop"
+                ? `${market.fighter_a_name} vs ${market.fighter_b_name}`
+                : `${market.fighter_a_name} vs ${market.fighter_b_name} · ${market.question}`}
           </p>
 
           {market.type === "method" ? (
@@ -121,6 +129,26 @@ export default async function MarketDetailPage({ params }: PageProps) {
                 fighterName={market.fighter_b_name}
                 outcomes={market.outcomes.filter((o) => o.order_index >= 3)}
               />
+            </div>
+          ) : market.type === "round" ? (
+            <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              {market.outcomes.map((o) => (
+                <div
+                  key={o.id}
+                  className="rounded-md border border-foreground/10 bg-background-elevated/30 p-3"
+                >
+                  <p className="truncate font-sans text-[11px] uppercase tracking-widest text-foreground-muted">
+                    {o.label}
+                  </p>
+                  <p className="mt-2 font-display text-2xl tabular text-foreground">
+                    {(o.current_price * 100).toFixed(1)}
+                    <span className="text-xs text-foreground-muted">%</span>
+                  </p>
+                  <p className="mt-1 font-mono text-[10px] tabular text-foreground-subtle">
+                    {o.current_shares.toFixed(1)} sh
+                  </p>
+                </div>
+              ))}
             </div>
           ) : (
             <div className="mt-8 grid grid-cols-2 gap-3">

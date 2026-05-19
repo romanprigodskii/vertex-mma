@@ -2,22 +2,26 @@ import Link from "next/link";
 
 import type { MarketCardOutcome, MarketListItem } from "@/lib/markets";
 
+const TYPE_LABEL: Record<string, string> = {
+  winner: "Winner",
+  method: "Method",
+  round: "Round",
+  distance: "Distance",
+  prop: "Prop",
+};
+
 function lastName(full: string): string {
   const parts = full.trim().split(/\s+/);
   return parts[parts.length - 1] ?? full;
 }
 
+function truncate(s: string, max: number): string {
+  return s.length > max ? `${s.slice(0, max - 1)}…` : s;
+}
+
 const METHOD_SHORT = ["KO", "Sub", "Dec"];
 
 export function MarketCard({ market }: { market: MarketListItem }) {
-  const isMethod = market.type === "method";
-  const aOutcomes = market.outcomes.filter(
-    (o) => o.order_index < (isMethod ? 3 : 1),
-  );
-  const bOutcomes = market.outcomes.filter(
-    (o) => o.order_index >= (isMethod ? 3 : 1),
-  );
-
   return (
     <Link
       href={`/markets/${market.id}`}
@@ -29,7 +33,7 @@ export function MarketCard({ market }: { market: MarketListItem }) {
           {market.event_name}
         </p>
         <span className="shrink-0 rounded-sm border border-foreground/15 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-foreground-muted">
-          {isMethod ? "Method" : "Winner"}
+          {TYPE_LABEL[market.type] ?? market.type}
         </span>
       </div>
       <h3 className="mt-2 font-display text-lg uppercase tracking-tight text-foreground">
@@ -38,37 +42,7 @@ export function MarketCard({ market }: { market: MarketListItem }) {
         {market.fighter_b_name}
       </h3>
 
-      {isMethod ? (
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <FighterColumn
-            name={market.fighter_a_name}
-            outcomes={aOutcomes}
-          />
-          <FighterColumn
-            name={market.fighter_b_name}
-            outcomes={bOutcomes}
-          />
-        </div>
-      ) : (
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <div className="rounded-sm bg-foreground/[0.04] px-2 py-1.5">
-            <p className="truncate font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
-              {lastName(market.fighter_a_name)}
-            </p>
-            <p className="font-display text-base tabular text-foreground">
-              {((aOutcomes[0]?.current_price ?? 0.5) * 100).toFixed(0)}%
-            </p>
-          </div>
-          <div className="rounded-sm bg-foreground/[0.04] px-2 py-1.5">
-            <p className="truncate font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
-              {lastName(market.fighter_b_name)}
-            </p>
-            <p className="font-display text-base tabular text-foreground">
-              {((bOutcomes[0]?.current_price ?? 0.5) * 100).toFixed(0)}%
-            </p>
-          </div>
-        </div>
-      )}
+      <MarketBody market={market} />
 
       <p className="mt-3 font-mono text-[10px] tabular text-foreground-subtle">
         Vol {market.total_volume.toLocaleString()} ·{" "}
@@ -79,7 +53,50 @@ export function MarketCard({ market }: { market: MarketListItem }) {
   );
 }
 
-function FighterColumn({
+function MarketBody({ market }: { market: MarketListItem }) {
+  if (market.type === "method") {
+    const aOutcomes = market.outcomes.filter((o) => o.order_index < 3);
+    const bOutcomes = market.outcomes.filter((o) => o.order_index >= 3);
+    return (
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <MethodColumn name={market.fighter_a_name} outcomes={aOutcomes} />
+        <MethodColumn name={market.fighter_b_name} outcomes={bOutcomes} />
+      </div>
+    );
+  }
+  if (market.type === "round") {
+    return <RoundCompact outcomes={market.outcomes} />;
+  }
+  if (market.type === "distance" || market.type === "prop") {
+    return <BinaryCompact outcomes={market.outcomes} />;
+  }
+
+  // winner (default)
+  const a = market.outcomes.find((o) => o.order_index === 0);
+  const b = market.outcomes.find((o) => o.order_index === 1);
+  return (
+    <div className="mt-3 grid grid-cols-2 gap-2">
+      <div className="rounded-sm bg-foreground/[0.04] px-2 py-1.5">
+        <p className="truncate font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
+          {lastName(market.fighter_a_name)}
+        </p>
+        <p className="font-display text-base tabular text-foreground">
+          {(((a?.current_price ?? 0.5) * 100).toFixed(0))}%
+        </p>
+      </div>
+      <div className="rounded-sm bg-foreground/[0.04] px-2 py-1.5">
+        <p className="truncate font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
+          {lastName(market.fighter_b_name)}
+        </p>
+        <p className="font-display text-base tabular text-foreground">
+          {(((b?.current_price ?? 0.5) * 100).toFixed(0))}%
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function MethodColumn({
   name,
   outcomes,
 }: {
@@ -106,6 +123,47 @@ function FighterColumn({
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+function BinaryCompact({ outcomes }: { outcomes: MarketCardOutcome[] }) {
+  const sorted = [...outcomes].sort((a, b) => a.order_index - b.order_index);
+  return (
+    <div className="mt-3 grid grid-cols-2 gap-2">
+      {sorted.slice(0, 2).map((o) => (
+        <div
+          key={o.order_index}
+          className="rounded-sm bg-foreground/[0.04] px-2 py-1.5"
+        >
+          <p className="truncate font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
+            {truncate(o.label, 18)}
+          </p>
+          <p className="font-display text-base tabular text-foreground">
+            {(o.current_price * 100).toFixed(0)}%
+          </p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function RoundCompact({ outcomes }: { outcomes: MarketCardOutcome[] }) {
+  if (outcomes.length === 0) return null;
+  const top = [...outcomes].sort(
+    (a, b) => b.current_price - a.current_price,
+  )[0];
+  return (
+    <div className="mt-3 rounded-sm bg-foreground/[0.04] px-2 py-1.5">
+      <p className="font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
+        Favorite · {top.label}
+      </p>
+      <p className="font-display text-base tabular text-foreground">
+        {(top.current_price * 100).toFixed(0)}%
+        <span className="ml-2 font-mono text-[10px] text-foreground-subtle">
+          +{outcomes.length - 1} more
+        </span>
+      </p>
     </div>
   );
 }
