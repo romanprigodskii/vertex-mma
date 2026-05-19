@@ -7,8 +7,8 @@ import { checkAndUnlockAchievements } from "@/lib/achievements";
 import { db } from "@/lib/db";
 import { userProfile } from "@/lib/db/schema/users";
 import { createClient } from "@/lib/supabase/server";
+import { dailyBonusAmount } from "@/lib/tier";
 
-const DAILY_BONUS_COINS = 500;
 const COOLDOWN_HOURS = 20;
 
 export async function claimDailyBonusAction(): Promise<{
@@ -26,6 +26,7 @@ export async function claimDailyBonusAction(): Promise<{
     .select({
       id: userProfile.id,
       lastDaily: userProfile.lastDailyBonusAt,
+      tier: userProfile.tier,
     })
     .from(userProfile)
     .where(eq(userProfile.authUserId, user.id))
@@ -44,11 +45,16 @@ export async function claimDailyBonusAction(): Promise<{
     }
   }
 
+  // Wave 47: tier drives the daily-bonus amount. The TS-side mapping in
+  // src/lib/tier.ts mirrors the PL/pgSQL CASE in check_and_promote_tier.
+  const amount = dailyBonusAmount(profile.tier);
+  const tierLabel = profile.tier;
+
   await db.transaction(async (tx) => {
     await tx.execute(sql`
       UPDATE user_profile
-      SET balance_coins = balance_coins + ${DAILY_BONUS_COINS},
-          total_coins_earned = total_coins_earned + ${DAILY_BONUS_COINS},
+      SET balance_coins = balance_coins + ${amount},
+          total_coins_earned = total_coins_earned + ${amount},
           last_daily_bonus_at = NOW()
       WHERE id = ${profile.id}::uuid
     `);
@@ -57,11 +63,17 @@ export async function claimDailyBonusAction(): Promise<{
       SELECT
         ${profile.id}::uuid,
         'daily_bonus',
-        ${DAILY_BONUS_COINS},
+        ${amount},
         balance_coins,
-        'Daily login bonus'
+        ${`Daily login bonus (${tierLabel})`}
       FROM user_profile WHERE id = ${profile.id}::uuid
     `);
+    // Wave 47: the bonus just bumped total_coins_earned, so check whether
+    // the user crossed into a new tier. Idempotent (no-op when below the
+    // next threshold).
+    await tx.execute(
+      sql`SELECT public.check_and_promote_tier(${profile.id}::uuid)`,
+    );
   });
 
   // After the bonus posts, daily_streak_7 / balance_50k / balance_100k
@@ -73,5 +85,5 @@ export async function claimDailyBonusAction(): Promise<{
   // the new balance + last-claim timestamp without us needing the username.
   revalidatePath("/profile/[username]", "page");
   revalidatePath("/leaderboard");
-  return { awarded: DAILY_BONUS_COINS, newlyUnlocked };
+  return { awarded: amount, newlyUnlocked };
 }

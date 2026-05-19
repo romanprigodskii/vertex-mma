@@ -4,11 +4,13 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 
 import { claimDailyBonusAction } from "@/app/me/actions";
+import { dailyBonusAmount } from "@/lib/tier";
 
 const COOLDOWN_HOURS = 20;
 
 interface Props {
   lastDailyBonusAt: string | null;
+  tier: string;
 }
 
 function hoursUntilEligible(lastIso: string | null): number {
@@ -17,7 +19,7 @@ function hoursUntilEligible(lastIso: string | null): number {
   return Math.max(0, COOLDOWN_HOURS - ms / (1000 * 60 * 60));
 }
 
-export function DailyBonusButton({ lastDailyBonusAt }: Props) {
+export function DailyBonusButton({ lastDailyBonusAt, tier }: Props) {
   const router = useRouter();
   const [pending, setPending] = React.useState(false);
   const [feedback, setFeedback] = React.useState<string | null>(null);
@@ -25,6 +27,7 @@ export function DailyBonusButton({ lastDailyBonusAt }: Props) {
   // disables the button without needing a full server refresh.
   const [lastIso, setLastIso] = React.useState<string | null>(lastDailyBonusAt);
 
+  const amount = dailyBonusAmount(tier);
   const eligible = hoursUntilEligible(lastIso) <= 0;
 
   async function onClick() {
@@ -36,7 +39,7 @@ export function DailyBonusButton({ lastDailyBonusAt }: Props) {
       setFeedback(res.error);
       return;
     }
-    let msg = `+${res.awarded} coins claimed!`;
+    let msg = `+${res.awarded?.toLocaleString() ?? amount} coins claimed!`;
     if (res.newlyUnlocked && res.newlyUnlocked.length > 0) {
       msg += ` Unlocked: ${res.newlyUnlocked.join(", ")}`;
     }
@@ -62,7 +65,7 @@ export function DailyBonusButton({ lastDailyBonusAt }: Props) {
         disabled={pending}
         className="rounded-sm bg-primary px-4 py-2 font-display text-sm uppercase tracking-widest text-background-base hover:opacity-90 disabled:opacity-50"
       >
-        {pending ? "Claiming…" : "Claim daily +500"}
+        {pending ? "Claiming…" : `Claim daily +${amount.toLocaleString()}`}
       </button>
       {feedback ? (
         <p className="mt-2 font-sans text-sm text-streak-win">{feedback}</p>

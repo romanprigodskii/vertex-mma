@@ -13,6 +13,9 @@ const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 const COUNTRY_RE = /^[A-Z]{2}$/;
 
+const USERNAME_RE = /^[a-zA-Z0-9_]{3,30}$/;
+const USERNAME_CHANGE_COOLDOWN_DAYS = 30;
+
 export async function updateProfileAction(
   formData: FormData,
 ): Promise<{ error?: string; success?: boolean }> {
@@ -158,4 +161,81 @@ export async function deleteAccountAction(): Promise<{
   if (error) return { error: error.message };
 
   return { success: true };
+}
+
+export async function changeUsernameAction(
+  formData: FormData,
+): Promise<{
+  error?: string;
+  success?: boolean;
+  newUsername?: string;
+}> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Not signed in." };
+
+  const newUsername = String(formData.get("newUsername") ?? "").trim();
+  if (!USERNAME_RE.test(newUsername)) {
+    return {
+      error:
+        "Username must be 3–30 chars: letters, digits, underscore.",
+    };
+  }
+
+  const profileRows = await db
+    .select({
+      id: userProfile.id,
+      currentUsername: userProfile.username,
+      lastChanged: userProfile.usernameLastChangedAt,
+    })
+    .from(userProfile)
+    .where(eq(userProfile.authUserId, user.id))
+    .limit(1);
+  const profile = profileRows[0];
+  if (!profile) return { error: "Profile not found." };
+
+  if (profile.currentUsername === newUsername) {
+    return { error: "That is already your username." };
+  }
+
+  if (profile.lastChanged) {
+    const daysSince =
+      (Date.now() - new Date(profile.lastChanged).getTime()) /
+      (1000 * 60 * 60 * 24);
+    if (daysSince < USERNAME_CHANGE_COOLDOWN_DAYS) {
+      const daysLeft = Math.ceil(
+        USERNAME_CHANGE_COOLDOWN_DAYS - daysSince,
+      );
+      return {
+        error: `You can change again in ${daysLeft} day${daysLeft === 1 ? "" : "s"}.`,
+      };
+    }
+  }
+
+  // Uniqueness pre-check. The unique constraint on user_profile.username
+  // is the ultimate safety net, but a friendly error message is nicer
+  // than a 500 on the rare race.
+  const existing = await db
+    .select({ id: userProfile.id })
+    .from(userProfile)
+    .where(eq(userProfile.username, newUsername))
+    .limit(1);
+  if (existing.length > 0) {
+    return { error: "Username already taken." };
+  }
+
+  await db
+    .update(userProfile)
+    .set({
+      username: newUsername,
+      usernameLastChangedAt: new Date(),
+    })
+    .where(eq(userProfile.id, profile.id));
+
+  revalidatePath("/settings");
+  revalidatePath(`/profile/${profile.currentUsername}`);
+  revalidatePath(`/profile/${newUsername}`);
+  return { success: true, newUsername };
 }

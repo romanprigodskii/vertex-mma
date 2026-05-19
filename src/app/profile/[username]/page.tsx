@@ -145,6 +145,7 @@ export default async function PublicProfilePage({ params }: PageProps) {
               </h2>
               <DailyBonusButton
                 lastDailyBonusAt={profile.lastDailyBonusAt}
+                tier={profile.tier}
               />
             </section>
           ) : null}

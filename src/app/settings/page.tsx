@@ -8,6 +8,7 @@ import { Navbar } from "@/components/layout/navbar";
 import { AvatarUpload } from "@/components/settings/avatar-upload";
 import { ChangeEmailForm } from "@/components/settings/change-email-form";
 import { ChangePasswordForm } from "@/components/settings/change-password-form";
+import { ChangeUsernameForm } from "@/components/settings/change-username-form";
 import { DeleteAccountSection } from "@/components/settings/delete-account-section";
 import { ProfileEditForm } from "@/components/settings/profile-edit-form";
 import { getCurrentUser } from "@/lib/auth";
@@ -43,8 +44,8 @@ export default async function SettingsPage() {
               Settings
             </h1>
             <p className="mt-2 font-sans text-sm text-foreground-muted">
-              Update your profile, change your email or password, or delete
-              your account. Username changes are not supported yet.
+              Update your profile, change your username, email or password,
+              or delete your account.
             </p>
           </header>
 
@@ -67,6 +68,16 @@ export default async function SettingsPage() {
               initialDisplayName={user.displayName ?? ""}
               initialBio={user.bio ?? ""}
               initialCountryCode={user.countryCode ?? ""}
+            />
+          </section>
+
+          <section>
+            <h2 className="mb-4 font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
+              Username
+            </h2>
+            <ChangeUsernameForm
+              currentUsername={user.username}
+              usernameLastChangedAt={user.usernameLastChangedAt}
             />
           </section>
 

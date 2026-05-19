@@ -44,6 +44,10 @@ export const userProfile = pgTable(
       .defaultNow()
       .notNull(),
     lastDailyBonusAt: timestamp("last_daily_bonus_at", { withTimezone: true }),
+    // Wave 47: rate-limits username changes to once per 30 days.
+    usernameLastChangedAt: timestamp("username_last_changed_at", {
+      withTimezone: true,
+    }),
   },
   (table) => [
     index("user_profile_auth_idx").on(table.authUserId),
