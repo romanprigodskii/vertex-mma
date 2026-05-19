@@ -1,0 +1,35 @@
+# Manual-deploy stack: app container + bind to localhost so a host Nginx
+# proxies HTTPS to it. Use this when NOT running Coolify (Coolify wraps
+# the same image in its own Traefik proxy and ignores this file).
+#
+# Usage:
+#   cp .env.example .env.production
+#   # fill in DATABASE_URL, NEXT_PUBLIC_*, SUPABASE_SERVICE_ROLE_KEY,
+#   # NEXT_PUBLIC_SITE_URL
+#   docker compose --env-file .env.production up -d --build
+
+services:
+  app:
+    build:
+      context: .
+      args:
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-https://vertexmma.com}
+    container_name: vertexmma-app
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-https://vertexmma.com}
+    ports:
+      # Bind to loopback only — host Nginx terminates TLS and proxies in.
+      - "127.0.0.1:3000:3000"
+    networks:
+      - web
+
+networks:
+  web:
+    driver: bridge

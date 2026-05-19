@@ -1,0 +1,54 @@
+# Don't ship dev artifacts into the build context — keeps `docker build`
+# fast and prevents accidental secret leaks via .env.local.
+
+node_modules
+.next
+out
+.git
+.gitignore
+
+# Local env files (NEVER bake into image)
+.env
+.env.local
+.env*.local
+.env.development
+.env.production
+
+# Editor / OS junk
+.vscode
+.idea
+.DS_Store
+*.swp
+
+# Docs + misc
+*.md
+docs/
+
+# Claude Code local state
+.claude/
+
+# Scraper artifacts (Python venvs, checkpoints, caches)
+scripts/scraper/venv/
+scripts/scraper/.checkpoint_*.json
+scripts/scraper/.errors.jsonl
+scripts/scraper/**/__pycache__/
+scripts/photo_scraper/venv/
+scripts/photo_scraper/.errors.jsonl
+scripts/photo_scraper/.cache/
+scripts/photo_scraper/**/__pycache__/
+scripts/**/__pycache__/
+scripts/*.log
+
+# Raw imports (regenerable, large)
+imports/
+
+# Vercel / coverage / TS build info
+.vercel
+coverage
+*.tsbuildinfo
+
+# Docker artifacts themselves
+Dockerfile
+.dockerignore
+docker-compose.yml
+nginx/
