@@ -12,8 +12,15 @@ interface CareerTimelineProps {
 
 const DOT_R = 6;
 const TITLE_DOT_R = 8;
-const HEIGHT = 100;
-const PADDING_X = 16;
+// Wave 51 — unified scale: every fighter's timeline uses the same UFC-era
+// axis (1993 → current year + 1), so two generations can be visually
+// compared on the same horizontal coordinate. The SVG is intentionally
+// wider than the viewport; the container scrolls horizontally and the
+// view auto-centers on the fighter's career midpoint on mount.
+const FIRST_YEAR = 1993;
+const YEAR_WIDTH = 180; // px per year
+const TIMELINE_HEIGHT = 100;
+const PADDING_X = 24;
 const TOOLTIP_W = 240;
 const TOOLTIP_GAP = 14;
 
@@ -69,6 +76,13 @@ const RESULT_LABEL: Record<TimelineBout["result"], string> = {
   NC: "No contest",
 };
 
+function xForDateMs(ms: number): number {
+  const d = new Date(ms);
+  const year =
+    d.getUTCFullYear() + d.getUTCMonth() / 12 + d.getUTCDate() / 365;
+  return PADDING_X + (year - FIRST_YEAR) * YEAR_WIDTH;
+}
+
 type TooltipState = {
   bout: TimelineBout;
   cx: number;
@@ -77,15 +91,12 @@ type TooltipState = {
 };
 
 function Tooltip({ state }: { state: TooltipState }) {
-  // Defer viewport-aware positioning to first browser paint; the parent
-  // re-renders this on every hover so initial value uses event-time window.
   const viewport =
     typeof window !== "undefined" ? window.innerWidth : TOOLTIP_W + 64;
   const left = Math.max(
     16,
     Math.min(viewport - TOOLTIP_W - 16, state.cx - TOOLTIP_W / 2),
   );
-  // Tooltip height varies with content but ~190 covers all rows.
   const tooltipHeight = 200;
   const top =
     state.placement === "above"
@@ -185,6 +196,12 @@ function Tooltip({ state }: { state: TooltipState }) {
 export function CareerTimeline({ bouts }: CareerTimelineProps) {
   const [tooltip, setTooltip] = React.useState<TooltipState | null>(null);
   const hideTimer = React.useRef<number | null>(null);
+  const scrollRef = React.useRef<HTMLDivElement>(null);
+  const dragState = React.useRef<{
+    startX: number;
+    startScrollLeft: number;
+    moved: boolean;
+  } | null>(null);
 
   const onEnter = (bout: TimelineBout, el: SVGCircleElement) => {
     if (hideTimer.current) {
@@ -194,13 +211,11 @@ export function CareerTimeline({ bouts }: CareerTimelineProps) {
     const rect = el.getBoundingClientRect();
     const cx = rect.left + rect.width / 2;
     const cy = rect.top + rect.height / 2;
-    // Flip below the dot if the timeline sits near the top of the viewport.
     const placement: "above" | "below" = cy < 240 ? "below" : "above";
     setTooltip({ bout, cx, cy, placement });
   };
 
   const onLeave = () => {
-    // tiny defer so a fast cursor sweep doesn't ping-pong show/hide
     if (hideTimer.current) window.clearTimeout(hideTimer.current);
     hideTimer.current = window.setTimeout(() => setTooltip(null), 80);
   };
@@ -212,31 +227,47 @@ export function CareerTimeline({ bouts }: CareerTimelineProps) {
     [],
   );
 
+  // After mount, scroll horizontally so the fighter's career midpoint
+  // lands roughly in the centre of the visible area. Without this, every
+  // modern fighter would open with the camera on 1993 and look empty.
+  React.useEffect(() => {
+    if (!scrollRef.current || bouts.length === 0) return;
+    const dates = bouts
+      .map((b) => new Date(b.event_date).getTime())
+      .filter((t) => Number.isFinite(t));
+    if (dates.length === 0) return;
+    const midMs = (Math.min(...dates) + Math.max(...dates)) / 2;
+    const midX = xForDateMs(midMs);
+    const viewport = scrollRef.current.clientWidth;
+    scrollRef.current.scrollLeft = Math.max(0, midX - viewport / 2);
+    // Run once after the first paint — subsequent re-renders should
+    // preserve whatever the user has scrolled to.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   if (bouts.length === 0) return null;
 
   const sorted = [...bouts].sort((a, b) =>
     a.event_date.localeCompare(b.event_date),
   );
-  const startMs = new Date(sorted[0].event_date).getTime();
-  const endMs = new Date(sorted[sorted.length - 1].event_date).getTime();
-  const span = Math.max(1, endMs - startMs);
 
-  const width = 720;
-  const innerWidth = width - PADDING_X * 2;
+  const currentYear = new Date().getFullYear();
+  const lastYear = currentYear + 1;
+  const totalYears = lastYear - FIRST_YEAR;
+  const svgWidth = totalYears * YEAR_WIDTH + PADDING_X * 2;
+
   const yCenter = 42;
-  const yYearLabel = HEIGHT - 12;
+  const yYearLabel = TIMELINE_HEIGHT - 12;
 
-  const startYear = new Date(sorted[0].event_date).getUTCFullYear();
-  const endYear = new Date(
-    sorted[sorted.length - 1].event_date,
-  ).getUTCFullYear();
-  const ticks: Array<{ year: number; x: number }> = [];
-  const yearSpan = endYear - startYear;
-  const step = yearSpan > 16 ? 3 : yearSpan > 8 ? 2 : 1;
-  for (let y = startYear; y <= endYear; y += step) {
-    const t = new Date(Date.UTC(y, 0, 1)).getTime();
-    const x = PADDING_X + ((t - startMs) / span) * innerWidth;
-    ticks.push({ year: y, x });
+  // Year tick marks. Label every 2 years so the bar reads cleanly even
+  // at full zoom; minor ticks on the others keep the rhythm.
+  const ticks: Array<{ year: number; x: number; label: boolean }> = [];
+  for (let y = FIRST_YEAR; y < lastYear; y += 1) {
+    ticks.push({
+      year: y,
+      x: PADDING_X + (y - FIRST_YEAR) * YEAR_WIDTH,
+      label: y % 2 === 0,
+    });
   }
 
   const wins = bouts.filter((b) => b.result === "W").length;
@@ -248,53 +279,94 @@ export function CareerTimeline({ bouts }: CareerTimelineProps) {
     .map((b) => b.result)
     .join(" ");
 
+  function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    if (!scrollRef.current) return;
+    // Only react to primary mouse / touch / pen. Ignore right-click.
+    if (e.button !== 0) return;
+    dragState.current = {
+      startX: e.clientX,
+      startScrollLeft: scrollRef.current.scrollLeft,
+      moved: false,
+    };
+    e.currentTarget.style.cursor = "grabbing";
+  }
+  function onPointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    if (!dragState.current || !scrollRef.current) return;
+    const dx = e.clientX - dragState.current.startX;
+    if (Math.abs(dx) > 3) {
+      dragState.current.moved = true;
+      e.currentTarget.setPointerCapture(e.pointerId);
+    }
+    if (dragState.current.moved) {
+      scrollRef.current.scrollLeft = dragState.current.startScrollLeft - dx;
+    }
+  }
+  function onPointerUp(e: React.PointerEvent<HTMLDivElement>) {
+    const moved = dragState.current?.moved;
+    dragState.current = null;
+    e.currentTarget.style.cursor = "grab";
+    // If the pointer never moved past the threshold, let the click through
+    // to the bout anchor underneath. If it did move, swallow the click so
+    // a drag-release doesn't accidentally navigate.
+    if (moved) {
+      e.preventDefault();
+    }
+  }
+
   return (
     <div className="flex flex-col gap-4">
-      <div className="overflow-x-auto">
+      <div
+        ref={scrollRef}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        className="cursor-grab overflow-x-auto select-none"
+        style={{ touchAction: "pan-x", overscrollBehaviorX: "contain" }}
+      >
         <svg
-          viewBox={`0 0 ${width} ${HEIGHT}`}
-          className="h-auto w-full min-w-[600px]"
+          width={svgWidth}
+          height={TIMELINE_HEIGHT}
+          style={{ display: "block" }}
           role="img"
-          aria-label="Career timeline of completed bouts"
+          aria-label="Career timeline of completed bouts across UFC history"
         >
-          {/* Axis line */}
           <line
             x1={PADDING_X}
             y1={yCenter}
-            x2={width - PADDING_X}
+            x2={svgWidth - PADDING_X}
             y2={yCenter}
             stroke="oklch(0.30 0.01 240)"
             strokeWidth={1}
           />
 
-          {/* Year ticks — labels sit BELOW the dot line so they never overlap. */}
           {ticks.map((t) => (
             <g key={t.year}>
               <line
                 x1={t.x}
                 y1={yCenter + DOT_R + 6}
                 x2={t.x}
-                y2={yCenter + DOT_R + 14}
+                y2={yCenter + DOT_R + (t.label ? 14 : 10)}
                 stroke="oklch(0.30 0.01 240)"
                 strokeWidth={1}
               />
-              <text
-                x={t.x}
-                y={yYearLabel}
-                textAnchor="middle"
-                fill="oklch(0.45 0.01 240)"
-                style={{ fontSize: 10, letterSpacing: "0.16em" }}
-                className="font-mono"
-              >
-                {t.year}
-              </text>
+              {t.label ? (
+                <text
+                  x={t.x}
+                  y={yYearLabel}
+                  textAnchor="middle"
+                  fill="oklch(0.45 0.01 240)"
+                  style={{ fontSize: 10, letterSpacing: "0.16em" }}
+                  className="font-mono"
+                >
+                  {t.year}
+                </text>
+              ) : null}
             </g>
           ))}
 
           {sorted.map((b) => {
-            const t = new Date(b.event_date).getTime();
-            const x = PADDING_X + ((t - startMs) / span) * innerWidth;
-            // Curated list, not bout.is_title_fight (scraper flag is unreliable).
+            const x = xForDateMs(new Date(b.event_date).getTime());
             const isTitle = isCuratedTitleFight(b.bout_id);
             const r = isTitle ? TITLE_DOT_R : DOT_R;
             const isHovered = tooltip?.bout.bout_id === b.bout_id;
@@ -305,7 +377,6 @@ export function CareerTimeline({ bouts }: CareerTimelineProps) {
                 aria-label={`${b.event_date.slice(0, 10)} ${RESULT_LABEL[b.result]} vs ${b.opponent_name}`}
                 style={{ outline: "none" }}
               >
-                {/* Halo: pointer-events:none so it doesn't catch hover. */}
                 <circle
                   cx={x}
                   cy={yCenter}
@@ -314,9 +385,6 @@ export function CareerTimeline({ bouts }: CareerTimelineProps) {
                   opacity={0.25}
                   pointerEvents="none"
                 />
-                {/* Visible dot: no hover transform, pointer-events:none —
-                    prevents the boundary-vibration loop where a scaled dot
-                    chases the cursor in/out of itself. */}
                 <circle
                   className="dot"
                   cx={x}
@@ -327,8 +395,6 @@ export function CareerTimeline({ bouts }: CareerTimelineProps) {
                   strokeWidth={1.5}
                   pointerEvents="none"
                 />
-                {/* Hover-only outer ring — rendered when this bout's tooltip
-                    is showing. Doesn't catch hover, so toggle is stable. */}
                 {isHovered ? (
                   <circle
                     cx={x}
@@ -341,8 +407,6 @@ export function CareerTimeline({ bouts }: CareerTimelineProps) {
                     pointerEvents="none"
                   />
                 ) : null}
-                {/* Stable invisible hit target — generously larger than the
-                    visible dot so hover doesn't flicker, but doesn't grow. */}
                 <circle
                   cx={x}
                   cy={yCenter}
@@ -398,6 +462,10 @@ export function CareerTimeline({ bouts }: CareerTimelineProps) {
           <span className="font-mono tabular text-foreground">
             {lastFiveLabel}
           </span>
+        </span>
+        <span aria-hidden className="text-foreground-subtle/40">·</span>
+        <span className="text-foreground-subtle">
+          drag to scroll · {FIRST_YEAR}–{lastYear}
         </span>
       </p>
 

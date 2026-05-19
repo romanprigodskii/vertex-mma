@@ -3,9 +3,9 @@ import Link from "next/link";
 import { Container } from "@/components/layout/container";
 import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
-import { MarketCard } from "@/components/markets/market-card";
+import { EventMarketsAccordion } from "@/components/markets/event-markets-accordion";
 import { getCurrentUser } from "@/lib/auth";
-import { listOpenMarkets } from "@/lib/markets";
+import { listOpenMarketsByEvent } from "@/lib/markets";
 
 export const dynamic = "force-dynamic";
 
@@ -15,8 +15,8 @@ export const metadata = {
 };
 
 export default async function MarketsPage() {
-  const [markets, user] = await Promise.all([
-    listOpenMarkets(50),
+  const [events, user] = await Promise.all([
+    listOpenMarketsByEvent(20),
     getCurrentUser(),
   ]);
 
@@ -64,23 +64,7 @@ export default async function MarketsPage() {
             )}
           </header>
 
-          {markets.length === 0 ? (
-            <p className="py-12 text-center font-sans text-sm text-foreground-muted">
-              No open markets yet. Run{" "}
-              <code className="rounded-sm bg-foreground/[0.05] px-1 py-0.5 font-mono text-xs">
-                pnpm markets:generate
-              </code>{" "}
-              to seed from scheduled bouts.
-            </p>
-          ) : (
-            <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {markets.map((m) => (
-                <li key={m.id}>
-                  <MarketCard market={m} />
-                </li>
-              ))}
-            </ul>
-          )}
+          <EventMarketsAccordion events={events} />
         </Container>
       </main>
       <Footer />

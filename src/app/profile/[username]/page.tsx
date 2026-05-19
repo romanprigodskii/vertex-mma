@@ -8,6 +8,7 @@ import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
 import { DailyBonusButton } from "@/components/me/daily-bonus-button";
 import { RankingCard } from "@/components/rankings/ranking-card";
+import { ShareButton } from "@/components/share/share-button";
 import {
   listAchievements,
   listUserAchievements,
@@ -119,14 +120,23 @@ export default async function PublicProfilePage({ params }: PageProps) {
                   {profile.bio}
                 </p>
               ) : null}
-              {isOwner ? (
-                <Link
-                  href="/settings"
-                  className="mt-5 inline-flex rounded-sm border border-foreground/15 px-4 py-2 font-sans text-sm text-foreground-muted hover:bg-foreground/[0.05] hover:text-foreground"
-                >
-                  Edit profile
-                </Link>
-              ) : null}
+              <div className="mt-5 flex flex-wrap items-center gap-3 sm:justify-start justify-center">
+                {isOwner ? (
+                  <Link
+                    href="/settings"
+                    className="inline-flex rounded-sm border border-foreground/15 px-4 py-2 font-sans text-sm text-foreground-muted hover:bg-foreground/[0.05] hover:text-foreground"
+                  >
+                    Edit profile
+                  </Link>
+                ) : null}
+                <ShareButton
+                  url={`/profile/${profile.username}`}
+                  ogImageUrl={`/api/og/profile/${profile.username}`}
+                  title={`@${profile.username} · Vertex MMA profile`}
+                  filename={`vertexmma-profile-${profile.username}`}
+                  label="Share profile"
+                />
+              </div>
             </div>
           </div>
 

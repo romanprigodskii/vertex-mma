@@ -12,6 +12,7 @@ import { BoutTotals } from "@/components/bout/BoutTotals";
 import { Container } from "@/components/layout/container";
 import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
+import { ShareButton } from "@/components/share/share-button";
 import {
   computeFighterPositionMap,
   computeFighterStrikeMap,
@@ -89,7 +90,7 @@ export default async function BoutDetailPage({ params }: PageProps) {
       <Navbar />
       <main className="flex-1">
         <div className="border-b border-foreground/[0.06]">
-          <Container size="xl" className="py-3">
+          <Container size="xl" className="flex items-center justify-between py-3">
             <Link
               href={backHref}
               className="inline-flex items-center gap-1.5 font-sans text-sm text-foreground-muted transition-colors hover:text-primary"
@@ -97,6 +98,14 @@ export default async function BoutDetailPage({ params }: PageProps) {
               <ChevronLeft className="h-4 w-4" aria-hidden />
               Back to event
             </Link>
+            <ShareButton
+              url={`/bouts/${bout.id}`}
+              ogImageUrl={`/api/og/bouts/${bout.id}`}
+              title={`${bout.fighter_a.name_en} vs ${bout.fighter_b.name_en} · Vertex MMA`}
+              filename={`vertexmma-bout-${bout.id.slice(0, 8)}`}
+              label="Share fight"
+              variant="icon"
+            />
           </Container>
         </div>
 

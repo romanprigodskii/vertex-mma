@@ -6,6 +6,7 @@ import { Container } from "@/components/layout/container";
 import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
 import { RankingView } from "@/components/rankings/ranking-view";
+import { ShareButton } from "@/components/share/share-button";
 import { getCurrentUser } from "@/lib/auth";
 import { getRankingById } from "@/lib/rankings";
 
@@ -72,14 +73,24 @@ export default async function RankingViewPage({ params }: PageProps) {
             >
               <ChevronLeft className="h-4 w-4" aria-hidden /> All rankings
             </Link>
-            {isOwner ? (
-              <Link
-                href={`/rankings/${ranking.id}/edit`}
-                className="inline-flex items-center gap-1.5 font-sans text-sm text-foreground-muted hover:text-primary"
-              >
-                <Edit3 className="h-4 w-4" aria-hidden /> Edit
-              </Link>
-            ) : null}
+            <div className="flex items-center gap-3">
+              <ShareButton
+                url={`/rankings/${ranking.id}`}
+                ogImageUrl={`/api/og/rankings/${ranking.id}`}
+                title={`${ranking.title} · by @${ranking.author_username}`}
+                filename={`vertexmma-ranking-${ranking.id.slice(0, 8)}`}
+                label="Share"
+                variant="icon"
+              />
+              {isOwner ? (
+                <Link
+                  href={`/rankings/${ranking.id}/edit`}
+                  className="inline-flex items-center gap-1.5 font-sans text-sm text-foreground-muted hover:text-primary"
+                >
+                  <Edit3 className="h-4 w-4" aria-hidden /> Edit
+                </Link>
+              ) : null}
+            </div>
           </Container>
         </div>
 

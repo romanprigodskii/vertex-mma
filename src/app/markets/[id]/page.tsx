@@ -7,6 +7,7 @@ import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
 import { BetForm } from "@/components/markets/bet-form";
 import { SportsbookConsensus } from "@/components/markets/sportsbook-consensus";
+import { ShareButton } from "@/components/share/share-button";
 import { getCurrentUser } from "@/lib/auth";
 import { priceToDecimalOdds } from "@/lib/lmsr";
 import { getBoutExternalOdds, getMarketById } from "@/lib/markets";
@@ -67,13 +68,21 @@ export default async function MarketDetailPage({ params }: PageProps) {
       <Navbar />
       <main className="flex-1">
         <div className="border-b border-foreground/[0.06]">
-          <Container size="xl" className="py-3">
+          <Container size="xl" className="flex items-center justify-between py-3">
             <Link
               href="/markets"
               className="inline-flex items-center gap-1.5 font-sans text-sm text-foreground-muted hover:text-primary"
             >
               <ChevronLeft className="h-4 w-4" aria-hidden /> All markets
             </Link>
+            <ShareButton
+              url={`/markets/${market.id}`}
+              ogImageUrl={`/api/og/markets/${market.id}`}
+              title={`${market.fighter_a_name} vs ${market.fighter_b_name} · betting market`}
+              filename={`vertexmma-market-${market.id.slice(0, 8)}`}
+              label="Share market"
+              variant="icon"
+            />
           </Container>
         </div>
 
