@@ -4,6 +4,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 
 import { placeBetAction, previewBetCost } from "@/app/markets/actions";
+import { priceToDecimalOdds } from "@/lib/lmsr";
 import type { MarketDetail } from "@/lib/markets";
 
 const INPUT_CLASS =
@@ -92,7 +93,8 @@ export function BetForm({ market, userBalance }: Props) {
         >
           {market.outcomes.map((o) => (
             <option key={o.id} value={o.id}>
-              {o.label} · {(o.current_price * 100).toFixed(1)}%
+              {o.label} · {(o.current_price * 100).toFixed(1)}% ·{" "}
+              {priceToDecimalOdds(o.current_price)}x
             </option>
           ))}
         </select>
@@ -120,7 +122,7 @@ export function BetForm({ market, userBalance }: Props) {
       {preview ? (
         <p className="mt-3 font-mono text-[11px] tabular text-foreground-subtle">
           → {preview.shares.toFixed(2)} shares · price moves to{" "}
-          {(preview.newPrice * 100).toFixed(1)}% · actual cost {preview.cost}c
+          {(preview.newPrice * 100).toFixed(1)}% ({priceToDecimalOdds(preview.newPrice)}x) · actual cost {preview.cost}c
         </p>
       ) : null}
       {error ? (

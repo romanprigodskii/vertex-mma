@@ -8,6 +8,7 @@ import { Navbar } from "@/components/layout/navbar";
 import { BetForm } from "@/components/markets/bet-form";
 import { SportsbookConsensus } from "@/components/markets/sportsbook-consensus";
 import { getCurrentUser } from "@/lib/auth";
+import { priceToDecimalOdds } from "@/lib/lmsr";
 import { getBoutExternalOdds, getMarketById } from "@/lib/markets";
 
 export const dynamic = "force-dynamic";
@@ -144,6 +145,9 @@ export default async function MarketDetailPage({ params }: PageProps) {
                     {(o.current_price * 100).toFixed(1)}
                     <span className="text-xs text-foreground-muted">%</span>
                   </p>
+                  <p className="mt-1 font-mono text-xs tabular text-primary">
+                    {priceToDecimalOdds(o.current_price)}x
+                  </p>
                   <p className="mt-1 font-mono text-[10px] tabular text-foreground-subtle">
                     {o.current_shares.toFixed(1)} sh
                   </p>
@@ -163,6 +167,9 @@ export default async function MarketDetailPage({ params }: PageProps) {
                   <p className="mt-2 font-display text-3xl tabular text-foreground">
                     {(o.current_price * 100).toFixed(1)}
                     <span className="text-base text-foreground-muted">%</span>
+                  </p>
+                  <p className="mt-1 font-mono text-sm tabular text-primary">
+                    {priceToDecimalOdds(o.current_price)}x
                   </p>
                   <p className="mt-1 font-mono text-[10px] tabular text-foreground-subtle">
                     {o.current_shares.toFixed(1)} shares outstanding
@@ -269,6 +276,9 @@ function FighterOutcomesPanel({
               <p className="font-display text-2xl tabular text-foreground">
                 {(o.current_price * 100).toFixed(1)}
                 <span className="text-xs text-foreground-muted">%</span>
+                <span className="ml-2 font-mono text-xs tabular text-primary">
+                  {priceToDecimalOdds(o.current_price)}x
+                </span>
               </p>
               <p className="font-mono text-[10px] tabular text-foreground-subtle">
                 {o.current_shares.toFixed(1)} sh

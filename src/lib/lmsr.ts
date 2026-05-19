@@ -91,6 +91,23 @@ export function sharesFromTargetProbs(probs: number[], b: number): number[] {
   return normalised.map((p) => b * Math.log(p / minP));
 }
 
+/**
+ * Convert an LMSR price (implied probability, 0..1) to decimal odds for
+ * display. Decimal odds = total payout per 1 coin staked (stake + profit),
+ * which is just `1 / price`.
+ *
+ *   price 0.50 → 2.00   (1 coin → 2 coins back)
+ *   price 0.20 → 5.00   (1 coin → 5 coins back)
+ *   price 0.80 → 1.25
+ *
+ * Returns "—" for invalid / degenerate inputs so the UI doesn't show
+ * `Infinity` or `NaN` on a bad row.
+ */
+export function priceToDecimalOdds(price: number): string {
+  if (!Number.isFinite(price) || price <= 0 || price >= 1) return "—";
+  return (1 / price).toFixed(2);
+}
+
 export function lmsrSharesForCoins(
   shares: number[],
   b: number,

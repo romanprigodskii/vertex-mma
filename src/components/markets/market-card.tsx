@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { priceToDecimalOdds } from "@/lib/lmsr";
 import type { MarketCardOutcome, MarketListItem } from "@/lib/markets";
 
 const TYPE_LABEL: Record<string, string> = {
@@ -76,22 +77,24 @@ function MarketBody({ market }: { market: MarketListItem }) {
   const b = market.outcomes.find((o) => o.order_index === 1);
   return (
     <div className="mt-3 grid grid-cols-2 gap-2">
-      <div className="rounded-sm bg-foreground/[0.04] px-2 py-1.5">
-        <p className="truncate font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
-          {lastName(market.fighter_a_name)}
-        </p>
-        <p className="font-display text-base tabular text-foreground">
-          {(((a?.current_price ?? 0.5) * 100).toFixed(0))}%
-        </p>
-      </div>
-      <div className="rounded-sm bg-foreground/[0.04] px-2 py-1.5">
-        <p className="truncate font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
-          {lastName(market.fighter_b_name)}
-        </p>
-        <p className="font-display text-base tabular text-foreground">
-          {(((b?.current_price ?? 0.5) * 100).toFixed(0))}%
-        </p>
-      </div>
+      <WinnerCell name={lastName(market.fighter_a_name)} price={a?.current_price ?? 0.5} />
+      <WinnerCell name={lastName(market.fighter_b_name)} price={b?.current_price ?? 0.5} />
+    </div>
+  );
+}
+
+function WinnerCell({ name, price }: { name: string; price: number }) {
+  return (
+    <div className="rounded-sm bg-foreground/[0.04] px-2 py-1.5">
+      <p className="truncate font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
+        {name}
+      </p>
+      <p className="font-display text-base tabular text-foreground">
+        {(price * 100).toFixed(0)}%
+      </p>
+      <p className="font-mono text-[10px] tabular text-foreground-subtle">
+        {priceToDecimalOdds(price)}x
+      </p>
     </div>
   );
 }
@@ -117,8 +120,13 @@ function MethodColumn({
             <span className="font-mono text-[9px] uppercase tracking-widest text-foreground-subtle">
               {METHOD_SHORT[i]}
             </span>
-            <span className="font-display text-xs tabular text-foreground">
-              {(o.current_price * 100).toFixed(0)}%
+            <span className="text-right">
+              <span className="font-display text-xs tabular text-foreground">
+                {(o.current_price * 100).toFixed(0)}%
+              </span>
+              <span className="ml-1.5 font-mono text-[9px] tabular text-foreground-subtle">
+                {priceToDecimalOdds(o.current_price)}x
+              </span>
             </span>
           </div>
         ))}
@@ -142,6 +150,9 @@ function BinaryCompact({ outcomes }: { outcomes: MarketCardOutcome[] }) {
           <p className="font-display text-base tabular text-foreground">
             {(o.current_price * 100).toFixed(0)}%
           </p>
+          <p className="font-mono text-[10px] tabular text-foreground-subtle">
+            {priceToDecimalOdds(o.current_price)}x
+          </p>
         </div>
       ))}
     </div>
@@ -160,6 +171,9 @@ function RoundCompact({ outcomes }: { outcomes: MarketCardOutcome[] }) {
       </p>
       <p className="font-display text-base tabular text-foreground">
         {(top.current_price * 100).toFixed(0)}%
+        <span className="ml-1.5 font-mono text-[10px] tabular text-foreground-subtle">
+          {priceToDecimalOdds(top.current_price)}x
+        </span>
         <span className="ml-2 font-mono text-[10px] text-foreground-subtle">
           +{outcomes.length - 1} more
         </span>
