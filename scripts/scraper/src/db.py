@@ -19,4 +19,17 @@ if not DATABASE_URL:
 
 def get_connection() -> psycopg.Connection:
     # autocommit=False so callers can group inserts in transactions.
-    return psycopg.connect(DATABASE_URL, autocommit=False)
+    # TCP keepalives: long URL-only crawl phases (e.g., walking 1995-2008
+    # mmadecisions year indexes) leave the DB socket idle for minutes;
+    # Supabase pooler kills it, then the next executemany throws
+    # OperationalError and the in-flight pipeline rolls back the prior
+    # ~20 commits. keepalives_idle=30 sends a TCP probe before the pooler
+    # decides we're dead.
+    return psycopg.connect(
+        DATABASE_URL,
+        autocommit=False,
+        keepalives=1,
+        keepalives_idle=30,
+        keepalives_interval=10,
+        keepalives_count=5,
+    )
