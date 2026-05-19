@@ -35,7 +35,8 @@
     "markets:settle": "tsx scripts/settle_market.ts",
     "markets:refund": "tsx scripts/refund_market.ts",
     "odds:scrape": "cd scripts/scraper && ./venv/bin/python scripts/08_scrape_bestfightodds.py",
-    "odds:scrape:dry": "cd scripts/scraper && ./venv/bin/python scripts/08_scrape_bestfightodds.py --dry-run --limit 5"
+    "odds:scrape:dry": "cd scripts/scraper && ./venv/bin/python scripts/08_scrape_bestfightodds.py --dry-run --limit 5",
+    "predictions:generate": "tsx scripts/generate_prediction_events.ts"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.11",

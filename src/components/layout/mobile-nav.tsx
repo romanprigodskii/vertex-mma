@@ -105,6 +105,14 @@ export function MobileNav({ user }: { user: CurrentUser | null }) {
                   </li>
                   <li>
                     <Link
+                      href="/me/predictions"
+                      className="block rounded-sm px-3 py-2 font-sans text-sm text-foreground hover:bg-foreground/[0.04]"
+                    >
+                      My predictions
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
                       href="/settings"
                       className="block rounded-sm px-3 py-2 font-sans text-sm text-foreground hover:bg-foreground/[0.04]"
                     >

@@ -24,6 +24,7 @@ const COLUMNS: Array<{
   {
     title: "Community",
     links: [
+      { href: "/predictions", label: "Predictions" },
       { href: "/rankings", label: "Rankings" },
       { href: "/leaderboard", label: "Leaderboard" },
     ],
