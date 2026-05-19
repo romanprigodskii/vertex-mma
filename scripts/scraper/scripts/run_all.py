@@ -15,6 +15,7 @@ PHASES = {
     "enrich-fighters": "04_enrich_fighters.py",
     "enrich-bouts": "05_enrich_bouts.py",
     "scorecards": "07_scrape_scorecards.py",
+    "odds": "08_scrape_bestfightodds.py",
 }
 
 PHASE_GROUPS = {

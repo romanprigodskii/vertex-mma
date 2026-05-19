@@ -191,6 +191,46 @@ export type MyBetRow = {
   fighter_b_name: string;
 };
 
+export type BoutExternalOddsRow = {
+  source: string;
+  fetched_at: string;
+  source_url: string | null;
+  winner_a_decimal: number | null;
+  winner_b_decimal: number | null;
+  method_a_kotko_decimal: number | null;
+  method_a_sub_decimal: number | null;
+  method_a_dec_decimal: number | null;
+  method_b_kotko_decimal: number | null;
+  method_b_sub_decimal: number | null;
+  method_b_dec_decimal: number | null;
+};
+
+export async function getBoutExternalOdds(
+  boutId: string,
+): Promise<BoutExternalOddsRow | null> {
+  if (!UUID_RE.test(boutId)) return null;
+  const rows = await db.execute<BoutExternalOddsRow>(sql`
+    SELECT
+      source,
+      fetched_at::text AS fetched_at,
+      source_url,
+      winner_a_decimal,
+      winner_b_decimal,
+      method_a_kotko_decimal,
+      method_a_sub_decimal,
+      method_a_dec_decimal,
+      method_b_kotko_decimal,
+      method_b_sub_decimal,
+      method_b_dec_decimal
+    FROM bout_external_odds
+    WHERE bout_id = ${boutId}::uuid
+    ORDER BY fetched_at DESC
+    LIMIT 1
+  `);
+  const arr = rows as unknown as BoutExternalOddsRow[];
+  return arr[0] ?? null;
+}
+
 export async function listMyBets(userProfileId: string): Promise<MyBetRow[]> {
   if (!UUID_RE.test(userProfileId)) return [];
   const rows = await db.execute<MyBetRow>(sql`

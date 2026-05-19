@@ -6,8 +6,9 @@ import { Container } from "@/components/layout/container";
 import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
 import { BetForm } from "@/components/markets/bet-form";
+import { SportsbookConsensus } from "@/components/markets/sportsbook-consensus";
 import { getCurrentUser } from "@/lib/auth";
-import { getMarketById } from "@/lib/markets";
+import { getBoutExternalOdds, getMarketById } from "@/lib/markets";
 
 export const dynamic = "force-dynamic";
 
@@ -48,11 +49,13 @@ export async function generateMetadata({ params }: PageProps) {
 
 export default async function MarketDetailPage({ params }: PageProps) {
   const { id } = await params;
-  const [market, user] = await Promise.all([
-    getMarketById(id),
-    getCurrentUser(),
-  ]);
+  const market = await getMarketById(id);
   if (!market) notFound();
+
+  const [user, externalOdds] = await Promise.all([
+    getCurrentUser(),
+    getBoutExternalOdds(market.bout_id),
+  ]);
 
   const closed =
     market.status !== "open" ||
@@ -157,6 +160,15 @@ export default async function MarketDetailPage({ params }: PageProps) {
               </Link>
             )}
           </div>
+
+          {externalOdds ? (
+            <SportsbookConsensus
+              odds={externalOdds}
+              marketType={market.type}
+              fighterAName={market.fighter_a_name}
+              fighterBName={market.fighter_b_name}
+            />
+          ) : null}
 
           <dl className="mt-10 grid grid-cols-3 gap-4">
             <div className="rounded-md border border-foreground/10 bg-background-elevated/30 px-4 py-3">

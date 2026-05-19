@@ -4,6 +4,7 @@ import {
   index,
   integer,
   pgTable,
+  real,
   text,
   timestamp,
   unique,
@@ -179,9 +180,50 @@ export const boutScorecard = pgTable(
   ],
 );
 
+// Wave 44: external sportsbook consensus odds per bout (one row per
+// (bout, source) pair). Used to seed initial LMSR shares so brand-new
+// markets open with prices close to the public market, and to render a
+// "Sportsbook consensus" reference panel on /markets/[id].
+//
+// Decimal odds are the canonical storage format. American → decimal
+// conversion happens on the scraper side so SQL stays simple. Method
+// columns are nullable because the bestfightodds HTML doesn't expose
+// stable prop IDs we can trust without a manual map.
+export const boutExternalOdds = pgTable(
+  "bout_external_odds",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    boutId: uuid("bout_id")
+      .notNull()
+      .references(() => bout.id, { onDelete: "cascade" }),
+    source: text("source").notNull().default("bestfightodds"),
+    fetchedAt: timestamp("fetched_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    winnerADecimal: real("winner_a_decimal"),
+    winnerBDecimal: real("winner_b_decimal"),
+    methodAKotkoDecimal: real("method_a_kotko_decimal"),
+    methodASubDecimal: real("method_a_sub_decimal"),
+    methodADecDecimal: real("method_a_dec_decimal"),
+    methodBKotkoDecimal: real("method_b_kotko_decimal"),
+    methodBSubDecimal: real("method_b_sub_decimal"),
+    methodBDecDecimal: real("method_b_dec_decimal"),
+    sourceUrl: text("source_url"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("bout_external_odds_bout_idx").on(table.boutId),
+    unique("bout_external_odds_unique").on(table.boutId, table.source),
+  ],
+);
+
 export type Event = typeof event.$inferSelect;
 export type NewEvent = typeof event.$inferInsert;
 export type Bout = typeof bout.$inferSelect;
 export type NewBout = typeof bout.$inferInsert;
 export type BoutScorecard = typeof boutScorecard.$inferSelect;
 export type NewBoutScorecard = typeof boutScorecard.$inferInsert;
+export type BoutExternalOdds = typeof boutExternalOdds.$inferSelect;
+export type NewBoutExternalOdds = typeof boutExternalOdds.$inferInsert;

@@ -64,6 +64,33 @@ export function lmsrBuyCost(
  * doubles until cost exceeds the budget; 60 iterations gives < 1e-15
  * precision on any realistic input.
  */
+/**
+ * Inverse of `lmsrPrices` — return shares that would produce the given
+ * target probabilities. Used to seed initial market shares from external
+ * sportsbook odds so a brand-new market opens at consensus instead of
+ * uniform 1/N.
+ *
+ * Math: prices p_i = exp(q_i/b) / Σ exp(q_j/b). Setting q_i = b·log(p_i/p_min)
+ * exactly reproduces the input probs (any additive constant in q cancels
+ * in the normalisation). Anchoring on min(p) keeps every share ≥ 0 so the
+ * stored values are clean.
+ *
+ * Throws if input is empty, sums to ≤ 0, or contains a non-positive prob —
+ * a zero-probability outcome can't be expressed as a finite share state in
+ * LMSR.
+ */
+export function sharesFromTargetProbs(probs: number[], b: number): number[] {
+  if (!(b > 0)) throw new Error("b must be > 0");
+  if (probs.length === 0) return [];
+  const sum = probs.reduce((a, c) => a + c, 0);
+  if (!(sum > 0)) throw new Error("Probs must sum to > 0");
+  const normalised = probs.map((p) => p / sum);
+  let minP = Infinity;
+  for (const p of normalised) if (p < minP) minP = p;
+  if (!(minP > 0)) throw new Error("All probs must be > 0");
+  return normalised.map((p) => b * Math.log(p / minP));
+}
+
 export function lmsrSharesForCoins(
   shares: number[],
   b: number,
