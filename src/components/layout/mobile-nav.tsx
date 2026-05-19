@@ -113,6 +113,14 @@ export function MobileNav({ user }: { user: CurrentUser | null }) {
                   </li>
                   <li>
                     <Link
+                      href="/notifications"
+                      className="block rounded-sm px-3 py-2 font-sans text-sm text-foreground hover:bg-foreground/[0.04]"
+                    >
+                      Notifications
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
                       href="/settings"
                       className="block rounded-sm px-3 py-2 font-sans text-sm text-foreground hover:bg-foreground/[0.04]"
                     >

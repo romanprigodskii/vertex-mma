@@ -1,4 +1,5 @@
 import {
+  boolean,
   char,
   index,
   integer,
@@ -108,5 +109,38 @@ export const userAchievement = pgTable(
   ],
 );
 
+// Wave 46: in-app notifications. INSERTs happen exclusively from PL/pgSQL
+// helpers (settle_market_winner / settle_market_method / refund_market /
+// unlock_achievement / on_bout_score_predictions), so RLS only exposes
+// SELECT + UPDATE (mark-read) to the owner.
+//
+// `type` is a string discriminator — common values:
+//   bet_settled, prediction_scored, achievement_unlocked, system.
+// We keep it as text rather than an enum so future categories don't need
+// a migration just to add a value.
+export const notification = pgTable(
+  "notification",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => userProfile.id, { onDelete: "cascade" }),
+    type: text("type").notNull(),
+    title: text("title").notNull(),
+    body: text("body"),
+    link: text("link"),
+    isRead: boolean("is_read").default(false).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("notification_user_unread_idx").on(table.userId, table.isRead),
+    index("notification_user_created_idx").on(table.userId, table.createdAt),
+  ],
+);
+
 export type UserProfile = typeof userProfile.$inferSelect;
 export type NewUserProfile = typeof userProfile.$inferInsert;
+export type Notification = typeof notification.$inferSelect;
+export type NewNotification = typeof notification.$inferInsert;

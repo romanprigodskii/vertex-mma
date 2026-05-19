@@ -4,8 +4,16 @@ import { Coins } from "lucide-react";
 import { Container } from "@/components/layout/container";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { NavSections } from "@/components/layout/nav-sections";
+import { NavbarNotifications } from "@/components/layout/navbar-notifications";
 import { NavbarUserMenu } from "@/components/layout/navbar-user-menu";
 import type { CurrentUser } from "@/lib/auth";
+import type { NotificationRow } from "@/lib/notifications";
+
+interface Props {
+  user: CurrentUser | null;
+  unreadCount: number;
+  recentNotifications: NotificationRow[];
+}
 
 function Logo() {
   return (
@@ -20,7 +28,11 @@ function Logo() {
   );
 }
 
-export function NavbarInner({ user }: { user: CurrentUser | null }) {
+export function NavbarInner({
+  user,
+  unreadCount,
+  recentNotifications,
+}: Props) {
   return (
     <header className="sticky top-0 z-40 border-b border-foreground/[0.06] bg-background-base/85 backdrop-blur-md">
       <Container size="xl">
@@ -36,6 +48,10 @@ export function NavbarInner({ user }: { user: CurrentUser | null }) {
                     {user.balanceCoins.toLocaleString()}
                   </span>
                 </div>
+                <NavbarNotifications
+                  unreadCount={unreadCount}
+                  recent={recentNotifications}
+                />
                 <NavbarUserMenu user={user} />
               </>
             ) : (
