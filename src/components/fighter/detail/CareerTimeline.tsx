@@ -373,7 +373,7 @@ export function CareerTimeline({ bouts }: CareerTimelineProps) {
             return (
               <a
                 key={b.bout_id}
-                href={`/events/${b.event_slug}#bout-${b.bout_id}`}
+                href={`/bouts/${b.bout_id}`}
                 aria-label={`${b.event_date.slice(0, 10)} ${RESULT_LABEL[b.result]} vs ${b.opponent_name}`}
                 style={{ outline: "none" }}
               >

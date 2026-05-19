@@ -30,45 +30,53 @@ interface FightHistoryRowProps {
 export function FightHistoryRow({ entry }: FightHistoryRowProps) {
   const date = entry.event_date.slice(0, 10);
   const methodLabel = abbreviateMethod(entry.method_resolved ?? entry.method);
-  // Method is "inferred" when the raw column was NULL but we resolved from
-  // round-stats. Slight visual hint so the user knows it's a best guess.
   const methodInferred =
     entry.method == null && entry.method_resolved != null;
   const time = formatRoundTime(entry.time_finished_seconds);
   const finishDetail = entry.round_finished
     ? `R${entry.round_finished}${time ? ` · ${time}` : ""}`
     : null;
-  // Source of truth: curated list, not `bout.is_title_fight` (scraper flags
-  // entire main cards — see src/lib/title-fights.ts).
   const isTitle = isCuratedTitleFight(entry.bout_id);
 
+  // Pattern: row background is a full-bleed absolute link to the bout
+  // detail. Inner segments (event name, opponent, result) sit above it on
+  // a higher z-index and have their own hrefs, so each region routes to
+  // its semantic destination. Clicking blank space between segments still
+  // lands on the bout.
   return (
     <li
       className={cn(
+        "group relative",
         "grid grid-cols-[1fr_auto] items-baseline gap-x-3 gap-y-1",
         "border-b border-foreground/[0.06] px-2 py-3",
         "transition-colors duration-150 hover:bg-foreground/[0.03]",
         "sm:grid-cols-[minmax(0,260px)_minmax(0,1fr)_auto] sm:gap-x-4",
       )}
     >
-      {/* Event + date → /events/{slug}#bout-{id}: lands on event with the bout
-          row briefly highlighted (BoutAnchorHighlight from Wave 3B.3). */}
       <Link
-        href={`/events/${entry.event_slug}#bout-${entry.bout_id}`}
+        href={`/bouts/${entry.bout_id}`}
         prefetch={false}
-        title={entry.event_name}
-        className="col-span-2 flex min-w-0 items-baseline gap-2 sm:col-span-1 sm:flex-col sm:gap-0.5"
-      >
-        <span className="truncate font-sans text-sm text-foreground hover:text-primary transition-colors">
+        aria-label={`Bout vs ${entry.opponent_name} at ${entry.event_name}`}
+        className="absolute inset-0 z-0"
+      />
+
+      {/* Event + date → event page (no bout anchor). */}
+      <div className="relative z-10 col-span-2 flex min-w-0 items-baseline gap-2 pr-2 sm:col-span-1 sm:flex-col sm:items-start sm:gap-0.5 sm:pr-3">
+        <Link
+          href={`/events/${entry.event_slug}`}
+          prefetch={false}
+          title={entry.event_name}
+          className="line-clamp-2 min-w-0 break-words font-sans text-sm text-foreground transition-colors hover:text-primary"
+        >
           {entry.event_name}
-        </span>
+        </Link>
         <span className="shrink-0 font-mono text-[11px] tabular text-foreground-muted">
           {date}
         </span>
-      </Link>
+      </div>
 
-      {/* Opponent */}
-      <div className="col-span-2 flex min-w-0 flex-wrap items-baseline gap-x-1.5 sm:col-span-1">
+      {/* Opponent → opponent profile. */}
+      <div className="relative z-10 col-span-2 flex min-w-0 flex-wrap items-baseline gap-x-1.5 sm:col-span-1">
         <span className="shrink-0 font-sans text-[11px] uppercase tracking-widest text-foreground-subtle">
           vs
         </span>
@@ -76,7 +84,7 @@ export function FightHistoryRow({ entry }: FightHistoryRowProps) {
           href={`/fighters/${entry.opponent_slug}`}
           prefetch={false}
           title={entry.opponent_name}
-          className="min-w-0 truncate font-sans text-sm text-foreground hover:text-primary transition-colors"
+          className="min-w-0 truncate font-sans text-sm text-foreground transition-colors hover:text-primary"
         >
           {entry.opponent_name}
         </Link>
@@ -90,14 +98,13 @@ export function FightHistoryRow({ entry }: FightHistoryRowProps) {
         ) : null}
       </div>
 
-      {/* Result · method · round/time → links to /bouts/{id} for the
-          per-round detail page (Wave 25). */}
+      {/* Result · method · round/time → bout detail. */}
       <Link
         href={`/bouts/${entry.bout_id}`}
         prefetch={false}
         title="View bout detail"
         className={cn(
-          "col-span-2 flex shrink-0 items-baseline justify-end gap-1.5 font-sans text-sm tabular sm:col-span-1",
+          "relative z-10 col-span-2 flex shrink-0 items-baseline justify-end gap-1.5 font-sans text-sm tabular sm:col-span-1",
           "transition-colors hover:opacity-80",
           resultClass(entry.result),
         )}

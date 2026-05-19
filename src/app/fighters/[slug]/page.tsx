@@ -245,7 +245,7 @@ export default async function FighterDetailPage({ params }: PageProps) {
 
         <Section
           label="Career timeline"
-          explainer="Each dot is a fight — green wins, red losses, larger dots are title fights. Hover for details, click to open the event."
+          explainer="Each dot is a fight — green wins, red losses, larger dots are title fights. Hover for details, click to open the bout."
           className="mt-16 sm:mt-20"
         >
           <CareerTimeline bouts={timelineBouts} />

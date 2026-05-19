@@ -67,6 +67,12 @@ const CURATED_TITLE_BOUT_IDS: readonly string[] = [
   "ca0c6474-464e-4f5e-b858-e0b6de8fe490", // UFC 251 vs Max Holloway 2        (2020-07-11) FW title
   "4e081b72-0bff-4f1d-85fc-214ad7389246", // UFC 245 vs Max Holloway 1        (2019-12-14) FW title
 
+  // --- Merab Dvalishvili (former BW champ — 3 defenses) ---
+  "03ba29d4-9423-4ede-9abf-16ddeaa4ee83", // UFC 320 vs Cory Sandhagen        (2025-10-04) BW title (defense 3)
+  "887df5eb-11c6-4a5c-9bd0-21193040b9a5", // UFC 316 vs Sean O'Malley 2       (2025-06-07) BW title (defense 2)
+  "fda6561d-2272-4087-b4f5-96f13dc857d9", // UFC 311 vs Umar Nurmagomedov     (2025-01-18) BW title (defense 1)
+  "dea47513-e078-4a0b-a5bd-fde087325883", // UFC 306 vs Sean O'Malley         (2024-09-14) BW title (won)
+
   // --- Petr Yan (former BW champ) ---
   "ecdb40c4-4801-49a8-b39a-9101b376f9ed", // UFC 323 vs Merab Dvalishvili 2   (2025-12-06) BW title
   "111ccda1-42f7-45f1-b2ec-814fdff1904e", // UFC 273 vs Aljamain Sterling 2   (2022-04-09) BW title

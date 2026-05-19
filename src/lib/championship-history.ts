@@ -219,7 +219,7 @@ export const CHAMPIONSHIP_HISTORY: readonly ChampionshipReign[] = [
   // BANTAMWEIGHT
   // ============================================================
   { slug: "petr-yan-d661ce",          weightClass: "bantamweight", startDate: "2025-12-06", endDate: null,         defenses: 0 }, // reign 2 — beat Merab at UFC 323
-  { slug: "merab-dvalishvili-c03520", weightClass: "bantamweight", startDate: "2024-09-14", endDate: "2025-12-06", defenses: 3 }, // Umar, O'Malley 2, Yan 2
+  { slug: "merab-dvalishvili-c03520", weightClass: "bantamweight", startDate: "2024-09-14", endDate: "2025-12-06", defenses: 3 }, // Umar, O'Malley 2, Sandhagen
   { slug: "sean-o-malley-b50a42",     weightClass: "bantamweight", startDate: "2023-08-19", endDate: "2024-09-14", defenses: 1 }, // Vera 2
   { slug: "aljamain-sterling-cb696e", weightClass: "bantamweight", startDate: "2021-03-06", endDate: "2023-08-19", defenses: 3 }, // Yan 2, Cejudo, Dillashaw
   { slug: "petr-yan-d661ce",          weightClass: "bantamweight", startDate: "2021-10-30", endDate: "2022-04-09", defenses: 0, isInterim: true }, // UFC 267 vs Sandhagen; lost unification vs Sterling at UFC 273
