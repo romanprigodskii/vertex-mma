@@ -10,8 +10,8 @@ interface CareerTimelineProps {
   bouts: TimelineBout[];
 }
 
-const DOT_R = 6;
-const TITLE_DOT_R = 8;
+const DOT_R = 8;
+const TITLE_DOT_R = 11;
 // Wave 51 — unified scale: every fighter's timeline uses the same UFC-era
 // axis (1993 → current year + 1), so two generations can be visually
 // compared on the same horizontal coordinate. The SVG is intentionally
@@ -410,7 +410,7 @@ export function CareerTimeline({ bouts }: CareerTimelineProps) {
                 <circle
                   cx={x}
                   cy={yCenter}
-                  r={14}
+                  r={18}
                   fill="transparent"
                   onMouseEnter={(e) => onEnter(b, e.currentTarget)}
                   onMouseLeave={onLeave}
