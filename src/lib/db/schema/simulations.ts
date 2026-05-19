@@ -20,6 +20,8 @@ export type SimulationResult = {
   mostLikelyScenario: string;
   keyFactors: Array<{ label: string; delta: number }>;
   modelVersion: string;
+  gameplanA?: string;
+  gameplanB?: string;
 };
 
 export const simulation = pgTable(

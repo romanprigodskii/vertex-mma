@@ -43,9 +43,13 @@ async function fetchSimulatorFighter(
   return (rows as unknown as SimulatorFighter[])[0] ?? null;
 }
 
+const GAMEPLAN_MAX = 500;
+
 export async function runSimulationAction(
   fighterAId: string,
   fighterBId: string,
+  gameplanA?: string,
+  gameplanB?: string,
 ): Promise<{ error?: string; simulationId?: string }> {
   if (!UUID_RE.test(fighterAId) || !UUID_RE.test(fighterBId)) {
     return { error: "Invalid fighter id." };
@@ -60,7 +64,10 @@ export async function runSimulationAction(
   ]);
   if (!a || !b) return { error: "Fighter not found." };
 
-  const result = simulate(a, b);
+  const result = simulate(a, b, {
+    gameplanA: gameplanA?.slice(0, GAMEPLAN_MAX),
+    gameplanB: gameplanB?.slice(0, GAMEPLAN_MAX),
+  });
 
   // Anonymous sims are allowed — userId stays NULL. Only signed-in
   // users get the row credited to them + their simulation_count bumped.

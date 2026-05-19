@@ -4,7 +4,6 @@ import * as React from "react";
 import { ChevronDown, X } from "lucide-react";
 
 import { CountrySelect } from "@/components/fighter/CountrySelect";
-import { SortDropdown } from "@/components/fighter/SortDropdown";
 import { StanceChips } from "@/components/fighter/StanceChips";
 import { ChampionRadio } from "@/components/fighter/ChampionRadio";
 import { GenderToggle } from "@/components/fighter/GenderToggle";
@@ -13,7 +12,6 @@ import { TierRadio } from "@/components/fighter/TierRadio";
 import { WeightClassChips } from "@/components/fighter/WeightClassChips";
 import { Button } from "@/components/ui/button";
 import type {
-  CatalogSort,
   CountryAggregate,
   FighterCatalogFilters,
 } from "@/lib/fighter-search";
@@ -271,12 +269,6 @@ export function FilterSidebar({
         </div>
       </Section>
 
-      <Section title="Sort">
-        <SortDropdown
-          value={filters.sort}
-          onChange={(sort: CatalogSort) => onChange({ sort })}
-        />
-      </Section>
     </aside>
   );
 }

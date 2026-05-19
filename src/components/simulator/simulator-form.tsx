@@ -17,10 +17,14 @@ interface PickedFighter {
   weight_class: string | null;
 }
 
+const GAMEPLAN_MAX = 500;
+
 export function SimulatorForm() {
   const router = useRouter();
   const [a, setA] = React.useState<PickedFighter | null>(null);
   const [b, setB] = React.useState<PickedFighter | null>(null);
+  const [gameplanA, setGameplanA] = React.useState("");
+  const [gameplanB, setGameplanB] = React.useState("");
   const [pending, setPending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -35,7 +39,12 @@ export function SimulatorForm() {
     }
     setError(null);
     setPending(true);
-    const res = await runSimulationAction(a.id, b.id);
+    const res = await runSimulationAction(
+      a.id,
+      b.id,
+      gameplanA.trim() || undefined,
+      gameplanB.trim() || undefined,
+    );
     setPending(false);
     if (res.error) {
       setError(res.error);
@@ -46,22 +55,46 @@ export function SimulatorForm() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="grid grid-cols-1 items-center gap-4 sm:grid-cols-[1fr_auto_1fr]">
-        <PickerSlot
-          label="Fighter A"
-          picked={a}
-          onPick={setA}
-          excludeId={b?.id ?? null}
-        />
-        <p className="text-center font-display text-2xl uppercase tracking-widest text-foreground-subtle">
+      <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-[1fr_auto_1fr]">
+        <div className="flex flex-col gap-3">
+          <PickerSlot
+            label="Fighter A"
+            picked={a}
+            onPick={(f) => {
+              setA(f);
+              if (!f) setGameplanA("");
+            }}
+            excludeId={b?.id ?? null}
+          />
+          {a ? (
+            <GameplanInput
+              fighterName={a.name}
+              value={gameplanA}
+              onChange={setGameplanA}
+            />
+          ) : null}
+        </div>
+        <p className="pt-12 text-center font-display text-2xl uppercase tracking-widest text-foreground-subtle">
           vs
         </p>
-        <PickerSlot
-          label="Fighter B"
-          picked={b}
-          onPick={setB}
-          excludeId={a?.id ?? null}
-        />
+        <div className="flex flex-col gap-3">
+          <PickerSlot
+            label="Fighter B"
+            picked={b}
+            onPick={(f) => {
+              setB(f);
+              if (!f) setGameplanB("");
+            }}
+            excludeId={a?.id ?? null}
+          />
+          {b ? (
+            <GameplanInput
+              fighterName={b.name}
+              value={gameplanB}
+              onChange={setGameplanB}
+            />
+          ) : null}
+        </div>
       </div>
       {error ? (
         <p className="text-center font-sans text-sm text-streak-loss">
@@ -77,6 +110,34 @@ export function SimulatorForm() {
         {pending ? "Simulating…" : "Run simulation"}
       </button>
     </div>
+  );
+}
+
+function GameplanInput({
+  fighterName,
+  value,
+  onChange,
+}: {
+  fighterName: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const lastName = fighterName.split(" ").pop() ?? fighterName;
+  return (
+    <label className="flex flex-col gap-1.5">
+      <span className="font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
+        Gameplan for {lastName}{" "}
+        <span className="text-foreground-subtle/60">(optional)</span>
+      </span>
+      <textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        maxLength={GAMEPLAN_MAX}
+        rows={2}
+        placeholder='e.g. "Pressure with leg kicks, avoid the clinch"'
+        className="resize-y rounded-sm border border-foreground/15 bg-foreground/[0.04] px-2 py-1.5 font-sans text-xs text-foreground placeholder:text-foreground-subtle focus:border-primary focus:outline-none"
+      />
+    </label>
   );
 }
 

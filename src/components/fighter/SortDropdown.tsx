@@ -1,6 +1,8 @@
 "use client";
 
-import { ChevronDown } from "lucide-react";
+import * as React from "react";
+import * as Popover from "@radix-ui/react-popover";
+import { Check, ChevronDown } from "lucide-react";
 
 import type { CatalogSort } from "@/lib/fighter-search";
 import { cn } from "@/lib/utils";
@@ -26,28 +28,75 @@ interface SortDropdownProps {
 }
 
 export function SortDropdown({ value, onChange, className }: SortDropdownProps) {
+  const [open, setOpen] = React.useState(false);
+  const current = SORT_OPTIONS.find((o) => o.id === value);
+
   return (
-    <div className={cn("relative inline-flex w-full", className)}>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value as CatalogSort)}
-        className={cn(
-          "h-9 w-full appearance-none rounded-md border border-border bg-background-base pl-3 pr-8 text-xs text-foreground",
-          "focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/30",
-          "transition-colors",
-        )}
-        aria-label="Sort fighters"
-      >
-        {SORT_OPTIONS.map((opt) => (
-          <option key={opt.id} value={opt.id}>
-            {opt.label}
-          </option>
-        ))}
-      </select>
-      <ChevronDown
-        aria-hidden
-        className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-foreground-subtle"
-      />
-    </div>
+    <Popover.Root open={open} onOpenChange={setOpen}>
+      <Popover.Trigger asChild>
+        <button
+          type="button"
+          aria-label="Sort fighters"
+          className={cn(
+            "inline-flex h-9 w-full min-w-[220px] items-center justify-between gap-2 rounded-md border border-border bg-background-base pl-3 pr-2 text-xs text-foreground",
+            "hover:bg-foreground/[0.04]",
+            "focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/30",
+            "transition-colors",
+            className,
+          )}
+        >
+          <span className="truncate">{current?.label ?? "Sort by…"}</span>
+          <ChevronDown
+            aria-hidden
+            className={cn(
+              "h-3.5 w-3.5 shrink-0 text-foreground-subtle transition-transform",
+              open && "rotate-180",
+            )}
+          />
+        </button>
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content
+          align="end"
+          sideOffset={4}
+          className={cn(
+            "z-50 w-[260px] rounded-md border border-foreground/15 bg-background-overlay p-1 shadow-elevation-2",
+            "data-[state=open]:animate-in data-[state=closed]:animate-out",
+            "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+          )}
+        >
+          <ul className="flex flex-col">
+            {SORT_OPTIONS.map((opt) => {
+              const isSelected = opt.id === value;
+              return (
+                <li key={opt.id}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onChange(opt.id);
+                      setOpen(false);
+                    }}
+                    className={cn(
+                      "flex w-full items-center justify-between gap-2 rounded-sm px-3 py-2 text-left font-sans text-xs transition-colors",
+                      isSelected
+                        ? "bg-primary/15 text-foreground"
+                        : "text-foreground-muted hover:bg-foreground/[0.05] hover:text-foreground",
+                    )}
+                  >
+                    <span className="truncate">{opt.label}</span>
+                    {isSelected ? (
+                      <Check
+                        aria-hidden
+                        className="h-3.5 w-3.5 shrink-0 text-primary"
+                      />
+                    ) : null}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
   );
 }

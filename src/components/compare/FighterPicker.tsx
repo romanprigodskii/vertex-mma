@@ -49,8 +49,11 @@ function PickerInput({ label, slot, onSelect, onClear }: PickerInputProps) {
     const timer = window.setTimeout(async () => {
       setLoading(true);
       try {
+        // status=all so retired legends (Khabib, GSP…) show up; the API
+        // otherwise defaults to active-roster only. sort=vertex_all_time
+        // surfaces the greats at the top of fuzzy-matched results.
         const r = await fetch(
-          `/api/fighters?q=${encodeURIComponent(trimmed)}&limit=8`,
+          `/api/fighters?q=${encodeURIComponent(trimmed)}&limit=8&status=all&sort=vertex_all_time`,
           { signal: ctrl.signal },
         );
         if (!r.ok) throw new Error(`HTTP ${r.status}`);

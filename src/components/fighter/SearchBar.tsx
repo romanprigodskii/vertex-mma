@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Loader2, Search, X } from "lucide-react";
+import { Search, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -56,7 +56,7 @@ export function SearchBar({
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
         className={cn(
-          "h-full w-full bg-transparent pl-10 pr-10 text-sm text-foreground",
+          "h-full w-full bg-transparent pl-10 pr-12 text-sm text-foreground",
           "placeholder:text-foreground-subtle",
           "focus:outline-none",
           "[&::-webkit-search-cancel-button]:hidden",
@@ -66,14 +66,15 @@ export function SearchBar({
         autoComplete="off"
         spellCheck={false}
       />
-      <div className="absolute right-2 flex items-center gap-1">
+      <div className="absolute right-2 flex items-center gap-1.5">
         {loading ? (
-          <Loader2
-            aria-hidden
-            className="h-4 w-4 animate-spin text-foreground-subtle"
+          <span
+            aria-label="Searching"
+            role="status"
+            className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary"
           />
         ) : null}
-        {value && !loading ? (
+        {value ? (
           <button
             type="button"
             onClick={handleClear}

@@ -57,6 +57,7 @@ function round1(v: number): number {
 export function simulate(
   a: SimulatorFighter,
   b: SimulatorFighter,
+  options?: { gameplanA?: string; gameplanB?: string },
 ): SimulationResult {
   // Score: prefer current vertex_score; fall back to all-time so retired
   // legends still produce a sensible probability instead of defaulting
@@ -203,6 +204,12 @@ export function simulate(
     .sort((x, y) => Math.abs(y.delta) - Math.abs(x.delta))
     .slice(0, 5);
 
+  // v1 stores gameplans verbatim for display only — the rule-based
+  // algorithm doesn't read them. A future v2 can parse the text and
+  // adjust probabilities (e.g. clinch focus vs. low clinch defense).
+  const gameplanA = options?.gameplanA?.trim() || undefined;
+  const gameplanB = options?.gameplanB?.trim() || undefined;
+
   return {
     winProbabilityA: round1(pA * 100),
     winProbabilityB: round1(pB * 100),
@@ -220,5 +227,7 @@ export function simulate(
     mostLikelyScenario,
     keyFactors: topFactors,
     modelVersion: MODEL_VERSION,
+    gameplanA,
+    gameplanB,
   };
 }

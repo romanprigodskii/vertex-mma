@@ -82,6 +82,36 @@ export function SimulationResultView({ sim }: { sim: SimulationDetail }) {
         </div>
       </section>
 
+      {result.gameplanA || result.gameplanB ? (
+        <section>
+          <h3 className="mb-4 font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
+            Gameplans
+          </h3>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {result.gameplanA ? (
+              <div className="rounded-md border border-foreground/10 bg-background-elevated/30 p-4">
+                <p className="font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
+                  {sim.fighter_a.name_en}
+                </p>
+                <p className="mt-2 whitespace-pre-line font-sans text-sm text-foreground">
+                  {result.gameplanA}
+                </p>
+              </div>
+            ) : null}
+            {result.gameplanB ? (
+              <div className="rounded-md border border-foreground/10 bg-background-elevated/30 p-4">
+                <p className="font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
+                  {sim.fighter_b.name_en}
+                </p>
+                <p className="mt-2 whitespace-pre-line font-sans text-sm text-foreground">
+                  {result.gameplanB}
+                </p>
+              </div>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
+
       {result.keyFactors && result.keyFactors.length > 0 ? (
         <section>
           <h3 className="mb-4 font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
