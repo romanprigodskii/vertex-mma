@@ -38,16 +38,21 @@ export default async function MyPredictionsPage() {
           </h1>
 
           {rows.length === 0 ? (
-            <p className="mt-8 text-center font-sans text-sm text-foreground-muted">
-              No predictions yet —{" "}
+            <div className="mt-10 rounded-md border border-dashed border-foreground/15 bg-background-elevated/20 px-6 py-16 text-center">
+              <p className="font-display text-2xl uppercase tracking-tight text-foreground">
+                No picks yet
+              </p>
+              <p className="mx-auto mt-3 max-w-md font-sans text-sm text-foreground-muted">
+                Predict the next card to climb the leaderboard. 10 points per
+                correct call — free, no coins needed.
+              </p>
               <Link
                 href="/predictions"
-                className="text-primary hover:underline"
+                className="mt-6 inline-block rounded-sm bg-primary px-4 py-2 font-display text-sm uppercase tracking-widest text-background-base hover:opacity-90"
               >
-                browse open events
+                Browse open events →
               </Link>
-              .
-            </p>
+            </div>
           ) : (
             <ul className="mt-8 flex flex-col gap-2">
               {rows.map((r) => (

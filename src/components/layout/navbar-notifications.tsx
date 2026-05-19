@@ -2,16 +2,21 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Bell } from "lucide-react";
 
 import type { NotificationRow } from "@/lib/notifications";
 
 interface Props {
-  unreadCount: number;
-  recent: NotificationRow[];
+  initialUnreadCount: number;
+  initialRecent: NotificationRow[];
 }
 
-export function NavbarNotifications({ unreadCount, recent }: Props) {
+export function NavbarNotifications({
+  initialUnreadCount,
+  initialRecent,
+}: Props) {
+  const router = useRouter();
   const [open, setOpen] = React.useState(false);
   const ref = React.useRef<HTMLDivElement>(null);
 
@@ -26,14 +31,27 @@ export function NavbarNotifications({ unreadCount, recent }: Props) {
     return () => document.removeEventListener("mousedown", onDocClick);
   }, [open]);
 
+  // Poor-man's real-time: re-fetch server state when the tab regains focus
+  // (claim a daily bonus elsewhere → return to this tab → count refreshes).
+  // True realtime would need a Supabase channel subscription — separate wave.
+  React.useEffect(() => {
+    function onVisible() {
+      if (document.visibilityState === "visible") {
+        router.refresh();
+      }
+    }
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [router]);
+
   return (
     <div ref={ref} className="relative">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-label={
-          unreadCount > 0
-            ? `Notifications · ${unreadCount} unread`
+          initialUnreadCount > 0
+            ? `Notifications · ${initialUnreadCount} unread`
             : "Notifications"
         }
         aria-haspopup="menu"
@@ -41,7 +59,7 @@ export function NavbarNotifications({ unreadCount, recent }: Props) {
         className="relative rounded-sm p-1.5 text-foreground-muted transition-colors hover:bg-foreground/[0.05] hover:text-foreground"
       >
         <Bell className="h-5 w-5" />
-        {unreadCount > 0 ? (
+        {initialUnreadCount > 0 ? (
           <span
             className="absolute right-0.5 top-0.5 h-2 w-2 rounded-full bg-primary"
             aria-hidden
@@ -65,13 +83,13 @@ export function NavbarNotifications({ unreadCount, recent }: Props) {
               See all
             </Link>
           </div>
-          {recent.length === 0 ? (
+          {initialRecent.length === 0 ? (
             <p className="px-3 py-6 text-center font-sans text-xs text-foreground-muted">
               All caught up.
             </p>
           ) : (
             <ul className="max-h-80 overflow-y-auto">
-              {recent.map((n) => (
+              {initialRecent.map((n) => (
                 <li key={n.id}>
                   {n.link ? (
                     <Link

@@ -44,16 +44,21 @@ export default async function MyBetsPage() {
           </p>
 
           {bets.length === 0 ? (
-            <p className="mt-10 text-center font-sans text-sm text-foreground-muted">
-              No bets yet —{" "}
+            <div className="mt-10 rounded-md border border-dashed border-foreground/15 bg-background-elevated/20 px-6 py-16 text-center">
+              <p className="font-display text-2xl uppercase tracking-tight text-foreground">
+                No bets yet
+              </p>
+              <p className="mx-auto mt-3 max-w-md font-sans text-sm text-foreground-muted">
+                Pick a market to start. Every trade nudges the implied odds —
+                early shares pay more if you&rsquo;re right.
+              </p>
               <Link
                 href="/markets"
-                className="text-primary hover:underline"
+                className="mt-6 inline-block rounded-sm bg-primary px-4 py-2 font-display text-sm uppercase tracking-widest text-background-base hover:opacity-90"
               >
-                browse markets
+                Browse markets →
               </Link>
-              .
-            </p>
+            </div>
           ) : (
             <ul className="mt-8 flex flex-col gap-2">
               {bets.map((b) => (

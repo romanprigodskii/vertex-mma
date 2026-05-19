@@ -56,9 +56,21 @@ export default async function RankingsListPage() {
           </header>
 
           {rankings.length === 0 ? (
-            <p className="py-12 text-center font-sans text-sm text-foreground-muted">
-              No rankings yet — be the first to publish one.
-            </p>
+            <div className="rounded-md border border-dashed border-foreground/15 bg-background-elevated/20 px-6 py-16 text-center">
+              <p className="font-display text-2xl uppercase tracking-tight text-foreground">
+                No community rankings yet
+              </p>
+              <p className="mx-auto mt-3 max-w-md font-sans text-sm text-foreground-muted">
+                Be the first to publish one. Drag-and-drop up to 25 fighters,
+                add notes, share with the community.
+              </p>
+              <Link
+                href={currentUser ? "/rankings/create" : "/signin?next=/rankings/create"}
+                className="mt-6 inline-block rounded-sm bg-primary px-4 py-2 font-display text-sm uppercase tracking-widest text-background-base hover:opacity-90"
+              >
+                Create the first ranking →
+              </Link>
+            </div>
           ) : (
             <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {rankings.map((r) => (

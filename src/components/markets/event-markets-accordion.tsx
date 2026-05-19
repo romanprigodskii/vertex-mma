@@ -27,13 +27,21 @@ export function EventMarketsAccordion({
 }) {
   if (events.length === 0) {
     return (
-      <p className="py-12 text-center font-sans text-sm text-foreground-muted">
-        No open markets yet. Run{" "}
-        <code className="rounded-sm bg-foreground/[0.05] px-1 py-0.5 font-mono text-xs">
-          pnpm markets:generate
-        </code>{" "}
-        to seed.
-      </p>
+      <div className="rounded-md border border-dashed border-foreground/15 bg-background-elevated/20 px-6 py-16 text-center">
+        <p className="font-display text-2xl uppercase tracking-tight text-foreground">
+          No open markets
+        </p>
+        <p className="mx-auto mt-3 max-w-md font-sans text-sm text-foreground-muted">
+          New markets get generated automatically when the UFC schedules upcoming
+          bouts. Check back when the next card is announced.
+        </p>
+        <Link
+          href="/events"
+          className="mt-6 inline-block rounded-sm border border-foreground/15 px-4 py-2 font-sans text-sm text-foreground-muted hover:bg-foreground/[0.05] hover:text-foreground"
+        >
+          Browse upcoming events →
+        </Link>
+      </div>
     );
   }
 

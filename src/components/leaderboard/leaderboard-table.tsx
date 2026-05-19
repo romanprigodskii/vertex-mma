@@ -43,9 +43,21 @@ export function LeaderboardTable({ rows, activeSort }: Props) {
       </nav>
 
       {rows.length === 0 ? (
-        <p className="py-12 text-center font-sans text-sm text-foreground-muted">
-          No data yet.
-        </p>
+        <div className="rounded-md border border-dashed border-foreground/15 bg-background-elevated/20 px-6 py-16 text-center">
+          <p className="font-display text-2xl uppercase tracking-tight text-foreground">
+            No bettors with activity yet
+          </p>
+          <p className="mx-auto mt-3 max-w-md font-sans text-sm text-foreground-muted">
+            Place a bet on any open market and land on the leaderboard the
+            moment it settles.
+          </p>
+          <Link
+            href="/markets"
+            className="mt-6 inline-block rounded-sm bg-primary px-4 py-2 font-display text-sm uppercase tracking-widest text-background-base hover:opacity-90"
+          >
+            Browse markets →
+          </Link>
+        </div>
       ) : (
         <ul className="flex flex-col gap-1">
           {rows.map((r) => (

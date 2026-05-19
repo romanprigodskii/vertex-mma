@@ -49,8 +49,8 @@ export function NavbarInner({
                   </span>
                 </div>
                 <NavbarNotifications
-                  unreadCount={unreadCount}
-                  recent={recentNotifications}
+                  initialUnreadCount={unreadCount}
+                  initialRecent={recentNotifications}
                 />
                 <NavbarUserMenu user={user} />
               </>

@@ -7,6 +7,7 @@ import { Container } from "@/components/layout/container";
 import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
 import { DailyBonusButton } from "@/components/me/daily-bonus-button";
+import { TierProgress } from "@/components/profile/tier-progress";
 import { RankingCard } from "@/components/rankings/ranking-card";
 import { ShareButton } from "@/components/share/share-button";
 import {
@@ -16,6 +17,7 @@ import {
 import { getCurrentUser, getUserProfileByUsername } from "@/lib/auth";
 import { listRankingsByUser } from "@/lib/rankings";
 import { listUserSimulations } from "@/lib/simulations";
+import { isTier } from "@/lib/tier";
 
 export const dynamic = "force-dynamic";
 
@@ -118,6 +120,13 @@ export default async function PublicProfilePage({ params }: PageProps) {
                 {profile.tier.toUpperCase()} · joined {joinedLabel}
                 {profile.countryCode ? ` · ${profile.countryCode}` : ""}
               </p>
+              {isOwner && isTier(profile.tier) ? (
+                <TierProgress
+                  currentTier={profile.tier}
+                  totalEarned={profile.totalCoinsEarned}
+                  isOwner={isOwner}
+                />
+              ) : null}
               {profile.bio ? (
                 <p className="mt-4 max-w-xl font-sans text-sm text-foreground-muted whitespace-pre-line">
                   {profile.bio}
@@ -174,11 +183,11 @@ export default async function PublicProfilePage({ params }: PageProps) {
             />
           </section>
 
-          {rankings.length > 0 ? (
-            <section className="mt-12">
-              <h2 className="mb-5 font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
-                Rankings by @{profile.username}
-              </h2>
+          <section className="mt-12">
+            <h2 className="mb-5 font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
+              Rankings by @{profile.username}
+            </h2>
+            {rankings.length > 0 ? (
               <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 {rankings.map((r) => (
                   <li key={r.id}>
@@ -186,14 +195,24 @@ export default async function PublicProfilePage({ params }: PageProps) {
                   </li>
                 ))}
               </ul>
-            </section>
-          ) : null}
+            ) : (
+              <ProfileEmptySection
+                message={
+                  isOwner
+                    ? "You haven't published any rankings yet."
+                    : `@${profile.username} hasn't published any rankings yet.`
+                }
+                ctaHref={isOwner ? "/rankings/create" : null}
+                ctaLabel="Create your first ranking →"
+              />
+            )}
+          </section>
 
-          {simulations.length > 0 ? (
-            <section className="mt-12">
-              <h2 className="mb-5 font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
-                Recent simulations by @{profile.username}
-              </h2>
+          <section className="mt-12">
+            <h2 className="mb-5 font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
+              Recent simulations by @{profile.username}
+            </h2>
+            {simulations.length > 0 ? (
               <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {simulations.map((s) => (
                   <li key={s.id}>
@@ -221,12 +240,46 @@ export default async function PublicProfilePage({ params }: PageProps) {
                   </li>
                 ))}
               </ul>
-            </section>
-          ) : null}
+            ) : (
+              <ProfileEmptySection
+                message={
+                  isOwner
+                    ? "You haven't run any simulations yet."
+                    : `@${profile.username} hasn't run any simulations yet.`
+                }
+                ctaHref={isOwner ? "/simulator" : null}
+                ctaLabel="Run your first simulation →"
+              />
+            )}
+          </section>
         </Container>
       </main>
       <Footer />
     </>
+  );
+}
+
+function ProfileEmptySection({
+  message,
+  ctaHref,
+  ctaLabel,
+}: {
+  message: string;
+  ctaHref: string | null;
+  ctaLabel: string;
+}) {
+  return (
+    <div className="rounded-md border border-dashed border-foreground/15 bg-background-elevated/20 px-6 py-10 text-center">
+      <p className="font-sans text-sm text-foreground-muted">{message}</p>
+      {ctaHref ? (
+        <Link
+          href={ctaHref}
+          className="mt-4 inline-block rounded-sm border border-foreground/15 px-4 py-2 font-sans text-sm text-foreground-muted hover:bg-foreground/[0.05] hover:text-foreground"
+        >
+          {ctaLabel}
+        </Link>
+      ) : null}
+    </div>
   );
 }
 

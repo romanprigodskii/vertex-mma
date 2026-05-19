@@ -56,13 +56,21 @@ export default async function PredictionsListPage() {
           </header>
 
           {events.length === 0 ? (
-            <p className="py-12 text-center font-sans text-sm text-foreground-muted">
-              No open events. Run{" "}
-              <code className="rounded-sm bg-foreground/[0.05] px-1 py-0.5 font-mono text-xs">
-                pnpm predictions:generate
-              </code>{" "}
-              to seed.
-            </p>
+            <div className="rounded-md border border-dashed border-foreground/15 bg-background-elevated/20 px-6 py-16 text-center">
+              <p className="font-display text-2xl uppercase tracking-tight text-foreground">
+                No open prediction events
+              </p>
+              <p className="mx-auto mt-3 max-w-md font-sans text-sm text-foreground-muted">
+                Prediction events open about two weeks before each UFC card.
+                Check back when the next event is announced.
+              </p>
+              <Link
+                href="/events"
+                className="mt-6 inline-block rounded-sm border border-foreground/15 px-4 py-2 font-sans text-sm text-foreground-muted hover:bg-foreground/[0.05] hover:text-foreground"
+              >
+                Browse upcoming events →
+              </Link>
+            </div>
           ) : (
             <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {events.map((e) => (

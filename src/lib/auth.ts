@@ -95,6 +95,7 @@ export type PublicProfile = {
   bio: string | null;
   countryCode: string | null;
   tier: string;
+  totalCoinsEarned: number;
   simulationCount: number;
   predictionCount: number;
   betCount: number;
@@ -116,6 +117,7 @@ export async function getUserProfileByUsername(
       bio: userProfile.bio,
       countryCode: userProfile.countryCode,
       tier: userProfile.tier,
+      totalCoinsEarned: userProfile.totalCoinsEarned,
       simulationCount: userProfile.simulationCount,
       predictionCount: userProfile.predictionCount,
       betCount: userProfile.betCount,
