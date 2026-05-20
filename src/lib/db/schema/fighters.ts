@@ -7,6 +7,7 @@ import {
   index,
   integer,
   pgTable,
+  primaryKey,
   real,
   serial,
   smallint,
@@ -441,9 +442,40 @@ export const fighterDivisionalScore = pgTable(
   ],
 );
 
+// Wave 31.7: per-bout vertex_score replay history. One row per (fighter,
+// completed bout) recording the score the fighter would have had as of
+// that bout's event_date. FK to bout(id) is enforced in the migration
+// SQL (0070); the Drizzle declaration omits .references() to keep this
+// module free of events.ts ⇄ fighters.ts circular imports.
+export const fighterScoreHistory = pgTable(
+  "fighter_score_history",
+  {
+    fighterId: uuid("fighter_id")
+      .notNull()
+      .references(() => fighter.id, { onDelete: "cascade" }),
+    asOfBoutId: uuid("as_of_bout_id").notNull(),
+    asOfDate: date("as_of_date").notNull(),
+    vertexScore: smallint("vertex_score").notNull(),
+    rawCurrent: real("raw_current").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.fighterId, table.asOfBoutId] }),
+    index("fighter_score_history_fighter_date_idx").on(
+      table.fighterId,
+      sql`${table.asOfDate} DESC`,
+    ),
+    index("fighter_score_history_peak_idx").on(
+      table.fighterId,
+      sql`${table.vertexScore} DESC`,
+    ),
+  ],
+);
+
 export type Fighter = typeof fighter.$inferSelect;
 export type NewFighter = typeof fighter.$inferInsert;
 export type RankingSnapshot = typeof rankingSnapshot.$inferSelect;
 export type NewRankingSnapshot = typeof rankingSnapshot.$inferInsert;
 export type FighterDivisionalScore = typeof fighterDivisionalScore.$inferSelect;
 export type NewFighterDivisionalScore = typeof fighterDivisionalScore.$inferInsert;
+export type FighterScoreHistory = typeof fighterScoreHistory.$inferSelect;
+export type NewFighterScoreHistory = typeof fighterScoreHistory.$inferInsert;

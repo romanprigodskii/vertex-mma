@@ -9,6 +9,7 @@ import { CareerTimeline } from "@/components/fighter/detail/CareerTimeline";
 import { FightHistoryList } from "@/components/fighter/detail/FightHistoryList";
 import { FighterHero } from "@/components/fighter/detail/FighterHero";
 import { OtherDivisions } from "@/components/fighter/detail/OtherDivisions";
+import { PeakVertex } from "@/components/fighter/detail/PeakVertex";
 import { PhysicalInfo } from "@/components/fighter/detail/PhysicalInfo";
 import { RadarChart } from "@/components/fighter/detail/RadarChart";
 import { RoundByRoundChart } from "@/components/fighter/detail/RoundByRoundChart";
@@ -30,6 +31,7 @@ import {
   getFighterBySlug,
   getGlobalScoreComponents,
 } from "@/lib/fighter-detail";
+import { getPeakVertex } from "@/lib/score-history";
 import { getSimilarFighters } from "@/lib/similar-fighters";
 
 export const dynamic = "force-dynamic";
@@ -95,14 +97,21 @@ export default async function FighterDetailPage({ params }: PageProps) {
   const fighter = await getFighterBySlug(slug);
   if (!fighter) notFound();
 
-  const [boutRounds, history, similar, divisionalScores, globalComponents] =
-    await Promise.all([
-      getFighterBoutRounds(fighter.id),
-      getFightHistory(fighter.id),
-      getSimilarFighters(fighter),
-      getDivisionalScores(fighter.id),
-      getGlobalScoreComponents(fighter.id),
-    ]);
+  const [
+    boutRounds,
+    history,
+    similar,
+    divisionalScores,
+    globalComponents,
+    peakVertex,
+  ] = await Promise.all([
+    getFighterBoutRounds(fighter.id),
+    getFightHistory(fighter.id),
+    getSimilarFighters(fighter),
+    getDivisionalScores(fighter.id),
+    getGlobalScoreComponents(fighter.id),
+    getPeakVertex(fighter.id),
+  ]);
 
   const championEntry = CHAMPION_BY_SLUG.get(slug) ?? null;
   const attributes = computeAttributes(fighter);
@@ -206,6 +215,11 @@ export default async function FighterDetailPage({ params }: PageProps) {
                 rows={otherDivisionRows}
                 currentDivision={fighter.current_division}
               />
+            </div>
+          ) : null}
+          {peakVertex ? (
+            <div className="mt-6">
+              <PeakVertex info={peakVertex} />
             </div>
           ) : null}
         </Container>
