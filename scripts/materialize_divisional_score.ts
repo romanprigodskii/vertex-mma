@@ -431,6 +431,13 @@ async function main() {
       status = "former";
     }
 
+    // Wave 31.6: drop 'former' divisional rows from the table entirely.
+    // The "Other divisions" sidebar on fighter detail and old-division
+    // entries in rankings carry no useful information for past weight
+    // classes — a fighter's current standing is captured by their
+    // current/provisional row(s). Reduces table size from ~2000 to ~460.
+    if (status === "former") continue;
+
     // Wave 14B.1: ranking-display eligibility.
     //
     //   (roster_status='active' AND primaryDiv === division)
