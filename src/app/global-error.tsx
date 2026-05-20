@@ -6,6 +6,13 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  // global-error runs when the app shell itself crashed — no router/layout
+  // available. A full reload is the only reliable way to refetch server
+  // data; reset() alone would re-render with the same broken state.
+  const handleRetry = () => {
+    if (typeof window !== "undefined") window.location.reload();
+    else reset();
+  };
   return (
     <html lang="en">
       <body
@@ -26,7 +33,7 @@ export default function GlobalError({
             Critical error in the app shell. Try again.
           </p>
           <button
-            onClick={reset}
+            onClick={handleRetry}
             style={{
               background: "#f59e0b",
               color: "#0a0a0a",

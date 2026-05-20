@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import { Container } from "@/components/layout/container";
 
@@ -12,9 +13,22 @@ export default function ErrorPage({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const router = useRouter();
+
   React.useEffect(() => {
     console.error("ErrorBoundary:", error);
   }, [error]);
+
+  // App Router's `reset()` only re-renders the error boundary on the
+  // client — it doesn't refetch server data. When the error came from a
+  // server query (DB timeout, pool exhaustion, etc.), reset alone leaves
+  // the stale failed state in place. Pair it with router.refresh() to
+  // invalidate the server-component cache so the next render actually
+  // re-runs the data fetch.
+  const handleRetry = React.useCallback(() => {
+    router.refresh();
+    reset();
+  }, [router, reset]);
 
   return (
     <main className="flex-1">
@@ -37,7 +51,7 @@ export default function ErrorPage({
         <div className="mt-8 flex flex-wrap justify-center gap-3">
           <button
             type="button"
-            onClick={reset}
+            onClick={handleRetry}
             className="rounded-sm bg-primary px-5 py-2.5 font-display text-sm uppercase tracking-widest text-background-base hover:opacity-90"
           >
             Try again
