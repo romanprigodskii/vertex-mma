@@ -16,8 +16,15 @@ if (!connectionString) {
   throw new Error("DATABASE_URL is not set");
 }
 
-// prepare: false для совместимости с Supabase pooler.
-const queryClient = postgres(connectionString, { prepare: false });
+// prepare: false для совместимости с Supabase pooler. max + idle_timeout
+// keep us under the session-pooler 15-slot cap when Turbopack HMR
+// creates fresh module instances (each leaks its old pool until GC),
+// and when several scripts run concurrently against the same project.
+const queryClient = postgres(connectionString, {
+  prepare: false,
+  max: 3,
+  idle_timeout: 20,
+});
 export const db = drizzle(queryClient, { schema });
 
 export type Db = typeof db;

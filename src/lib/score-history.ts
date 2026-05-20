@@ -70,72 +70,103 @@ type BoutDetailRow = {
 export async function getPeakVertex(
   fighterId: string,
 ): Promise<PeakVertexInfo | null> {
-  // 1. Find peak row (earliest date if ties — represents first achievement).
-  const peakRowsResult = await db.execute<HistoryRow>(sql`
-    SELECT
-      as_of_bout_id::text,
-      as_of_date::text,
-      vertex_score
-    FROM fighter_score_history
-    WHERE fighter_id = ${fighterId}::uuid
-    ORDER BY vertex_score DESC, as_of_date ASC
-    LIMIT 1
-  `);
-  const peakRows = peakRowsResult as unknown as HistoryRow[];
-  const peakRow = peakRows[0];
-  if (!peakRow) return null;
-
-  // 2. Find ending bout (first row after peak with vertex_score < peak).
-  const endingRowsResult = await db.execute<HistoryRow>(sql`
-    SELECT
-      as_of_bout_id::text,
-      as_of_date::text,
-      vertex_score
-    FROM fighter_score_history
-    WHERE fighter_id = ${fighterId}::uuid
-      AND as_of_date > ${peakRow.as_of_date}::date
-      AND vertex_score < ${peakRow.vertex_score}
-    ORDER BY as_of_date ASC
-    LIMIT 1
-  `);
-  const endingRows = endingRowsResult as unknown as HistoryRow[];
-  const endingRow = endingRows[0] ?? null;
-
-  // 3. Hydrate bout details for both. Run separate queries — Drizzle's
-  //    sql tag unpacks JS arrays into positional params, which breaks
-  //    `= ANY(...)` (needs an array literal on the right). Two queries
-  //    are simpler than fighting the template.
-  async function fetchBout(boutId: string): Promise<BoutDetailRow | null> {
-    const r = await db.execute<BoutDetailRow>(sql`
+  // Single round-trip: peak row + ending row + fighter's current score,
+  // all in one query via CTEs. Saves 2-3 connections per page render —
+  // important on Supabase session pooler (15-slot limit).
+  type CombinedRow = {
+    peak_bout_id: string;
+    peak_date: string;
+    peak_score: number;
+    end_bout_id: string | null;
+    end_date: string | null;
+    end_score: number | null;
+    current_score: number | null;
+    all_time_score: number | null;
+  };
+  const combinedResult = await db.execute<CombinedRow>(sql`
+    WITH peak AS (
       SELECT
-        b.id::text,
-        e.date::text AS event_date,
-        e.name AS event_name,
-        e.slug AS event_slug,
-        b.method::text AS method,
-        b.winner_id::text AS winner_id,
-        b.fighter_a_id::text AS fighter_a_id,
-        b.fighter_b_id::text AS fighter_b_id,
-        fa.name_en AS fighter_a_name,
-        fa.slug AS fighter_a_slug,
-        fb.name_en AS fighter_b_name,
-        fb.slug AS fighter_b_slug
-      FROM bout b
-      JOIN event e ON e.id = b.event_id
-      JOIN fighter fa ON fa.id = b.fighter_a_id
-      JOIN fighter fb ON fb.id = b.fighter_b_id
-      WHERE b.id = ${boutId}::uuid
+        as_of_bout_id,
+        as_of_date,
+        vertex_score
+      FROM fighter_score_history
+      WHERE fighter_id = ${fighterId}::uuid
+      ORDER BY vertex_score DESC, as_of_date ASC
       LIMIT 1
-    `);
-    return ((r as unknown as BoutDetailRow[])[0] as BoutDetailRow) ?? null;
-  }
-  const [peakBout, endingBoutRaw] = await Promise.all([
-    fetchBout(peakRow.as_of_bout_id),
-    endingRow ? fetchBout(endingRow.as_of_bout_id) : Promise.resolve(null),
-  ]);
+    ),
+    ending AS (
+      SELECT
+        h.as_of_bout_id,
+        h.as_of_date,
+        h.vertex_score
+      FROM fighter_score_history h
+      CROSS JOIN peak p
+      WHERE h.fighter_id = ${fighterId}::uuid
+        AND h.as_of_date > p.as_of_date
+        AND h.vertex_score < p.vertex_score
+      ORDER BY h.as_of_date ASC
+      LIMIT 1
+    ),
+    fighter_now AS (
+      SELECT vertex_score, vertex_score_all_time
+      FROM fighter
+      WHERE id = ${fighterId}::uuid
+    )
+    SELECT
+      p.as_of_bout_id::text AS peak_bout_id,
+      p.as_of_date::text AS peak_date,
+      p.vertex_score AS peak_score,
+      e.as_of_bout_id::text AS end_bout_id,
+      e.as_of_date::text AS end_date,
+      e.vertex_score AS end_score,
+      f.vertex_score AS current_score,
+      f.vertex_score_all_time AS all_time_score
+    FROM peak p
+    LEFT JOIN ending e ON true
+    LEFT JOIN fighter_now f ON true
+  `);
+  const combined = (combinedResult as unknown as CombinedRow[])[0];
+  if (!combined) return null;
+
+  // Hydrate bout details: peak + ending (if present) in one query via
+  // UNION ALL. Avoids the array-param ANY issue and keeps it single-RTT.
+  const boutDetailRowsResult = await db.execute<BoutDetailRow>(sql`
+    SELECT
+      b.id::text,
+      e.date::text AS event_date,
+      e.name AS event_name,
+      e.slug AS event_slug,
+      b.method::text AS method,
+      b.winner_id::text AS winner_id,
+      b.fighter_a_id::text AS fighter_a_id,
+      b.fighter_b_id::text AS fighter_b_id,
+      fa.name_en AS fighter_a_name,
+      fa.slug AS fighter_a_slug,
+      fb.name_en AS fighter_b_name,
+      fb.slug AS fighter_b_slug
+    FROM bout b
+    JOIN event e ON e.id = b.event_id
+    JOIN fighter fa ON fa.id = b.fighter_a_id
+    JOIN fighter fb ON fb.id = b.fighter_b_id
+    WHERE b.id = ${combined.peak_bout_id}::uuid
+       OR b.id = ${combined.end_bout_id ?? combined.peak_bout_id}::uuid
+  `);
+  const boutDetailRows = boutDetailRowsResult as unknown as BoutDetailRow[];
   const boutMap = new Map<string, BoutDetailRow>();
-  if (peakBout) boutMap.set(peakBout.id, peakBout);
-  if (endingBoutRaw) boutMap.set(endingBoutRaw.id, endingBoutRaw);
+  for (const b of boutDetailRows) boutMap.set(b.id, b);
+
+  const peakRow = {
+    as_of_bout_id: combined.peak_bout_id,
+    as_of_date: combined.peak_date,
+    vertex_score: combined.peak_score,
+  };
+  const endingRow = combined.end_bout_id
+    ? {
+        as_of_bout_id: combined.end_bout_id,
+        as_of_date: combined.end_date!,
+        vertex_score: combined.end_score!,
+      }
+    : null;
 
   function hydrate(row: {
     as_of_bout_id: string;
@@ -171,21 +202,8 @@ export async function getPeakVertex(
   if (!anchorBout) return null;
   const endingBoutBase = endingRow ? hydrate(endingRow) : null;
 
-  // Current score: read fighter.vertex_score (with all_time fallback).
-  const currentRowResult = await db.execute<{
-    vertex_score: number | null;
-    vertex_score_all_time: number | null;
-  }>(sql`
-    SELECT vertex_score, vertex_score_all_time
-    FROM fighter
-    WHERE id = ${fighterId}::uuid
-  `);
-  const currentRow = (currentRowResult as unknown as Array<{
-    vertex_score: number | null;
-    vertex_score_all_time: number | null;
-  }>)[0];
   const currentScore =
-    currentRow?.vertex_score ?? currentRow?.vertex_score_all_time ?? null;
+    combined.current_score ?? combined.all_time_score ?? null;
 
   return {
     peak: peakRow.vertex_score,
