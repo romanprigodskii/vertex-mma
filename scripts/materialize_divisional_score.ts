@@ -33,6 +33,8 @@
  */
 import { config } from "dotenv";
 config({ path: ".env.local" });
+import { install as installDnsFallback } from "../src/lib/dns-fallback";
+installDnsFallback();
 import postgres from "postgres";
 
 import {
@@ -197,12 +199,20 @@ function divisionalCurrentCp(
   return Math.min(baseCp, Math.round(decayed + bonus));
 }
 
-/** Wave 15.1 soft-multiplier curve. */
+/**
+ * Wave 31.5 re-anchored multiplier curve. Anchors:
+ *   (0,0), (25,25), (45,60), (60,80), (75,93), (88,100).
+ * 100 now requires raw ≥ 88 (was raw ≥ ~67 in Wave 15.1). Mirrors the
+ * global view's Wave 31 curve so divisional and global agree at the
+ * ceiling.
+ */
 function applyCurve(raw: number): number {
-  if (raw < 25) return Math.min(100, Math.round(raw * 1.0));
-  if (raw < 45) return Math.min(100, Math.round(raw * 1.3));
-  if (raw < 60) return Math.min(100, Math.round(raw * 1.45));
-  return Math.min(100, Math.round(raw * 1.5));
+  if (raw >= 88) return 100;
+  if (raw >= 75) return Math.min(100, Math.round(93 + (raw - 75) * (7 / 13)));
+  if (raw >= 60) return Math.min(100, Math.round(80 + (raw - 60) * (13 / 15)));
+  if (raw >= 45) return Math.min(100, Math.round(60 + (raw - 45) * (20 / 15)));
+  if (raw >= 25) return Math.min(100, Math.round(25 + (raw - 25) * (35 / 20)));
+  return Math.max(0, Math.round(raw));
 }
 
 interface ViewRow {
@@ -229,6 +239,11 @@ interface ViewRow {
   recent_loss_penalty: number;
   performance_diff_current: number;
   finishing_dominance_decayed: number;
+  most_recent_is_loss: boolean;
+  age_years: number | null;
+  age_factor: number;
+  months_since_last: number | null;
+  layoff_penalty: number;
   raw_current_excl_cp: number;
 }
 
@@ -265,6 +280,11 @@ async function main() {
       recent_loss_penalty,
       performance_diff_current,
       finishing_dominance_decayed,
+      most_recent_is_loss,
+      age_years,
+      age_factor,
+      months_since_last,
+      layoff_penalty,
       raw_current_excl_cp
     FROM fighter_divisional_vertex_score
   `;
@@ -375,13 +395,25 @@ async function main() {
       avgOpp,
     );
 
-    const rawCurrent = Math.max(
+    // Wave 31.5: apply age multiplier AFTER CP injection so positives +
+    // CP × 0.10 are scaled together, matching the global view's
+    // (positives_total) × (1 + age_factor) semantics.
+    const rawPreAge = Math.max(
       0,
       Number(r.raw_current_excl_cp) + currentCp * 0.1,
     );
+    const rawCurrent = rawPreAge * (1 + Number(r.age_factor));
     const multiplied = applyCurve(rawCurrent);
+    // Wave 31.5: skid penalty stays at -25 at losses_last_3 ≥ 3 (graduated
+    // skid is a separate parity item for divisional). Fresh-loss flat
+    // penalty only fires when skid didn't catch.
     const skidPenalty = r.losses_last_3 >= 3 ? 25 : 0;
-    const vertexScore = Math.max(0, Math.min(100, multiplied - skidPenalty));
+    const freshLossPenalty =
+      skidPenalty === 0 && r.most_recent_is_loss ? 5 : 0;
+    const vertexScore = Math.max(
+      0,
+      Math.min(100, multiplied - skidPenalty - freshLossPenalty),
+    );
 
     // Status precedence: 'current' / 'provisional' beat 'former' only
     // when the fighter is active in this exact division with a recent
