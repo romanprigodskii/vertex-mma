@@ -227,19 +227,12 @@ export function CareerTimeline({ bouts }: CareerTimelineProps) {
     [],
   );
 
-  // After mount, scroll horizontally so the fighter's career midpoint
-  // lands roughly in the centre of the visible area. Without this, every
-  // modern fighter would open with the camera on 1993 and look empty.
+  // After mount, scroll fully to the end so the most recent fights and
+  // the "today" marker are in view — a career reads newest-first. Setting
+  // scrollLeft past the maximum clamps automatically.
   React.useEffect(() => {
-    if (!scrollRef.current || bouts.length === 0) return;
-    const dates = bouts
-      .map((b) => new Date(b.event_date).getTime())
-      .filter((t) => Number.isFinite(t));
-    if (dates.length === 0) return;
-    const midMs = (Math.min(...dates) + Math.max(...dates)) / 2;
-    const midX = xForDateMs(midMs);
-    const viewport = scrollRef.current.clientWidth;
-    scrollRef.current.scrollLeft = Math.max(0, midX - viewport / 2);
+    if (!scrollRef.current) return;
+    scrollRef.current.scrollLeft = scrollRef.current.scrollWidth;
     // Run once after the first paint — subsequent re-renders should
     // preserve whatever the user has scrolled to.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -251,24 +244,36 @@ export function CareerTimeline({ bouts }: CareerTimelineProps) {
     a.event_date.localeCompare(b.event_date),
   );
 
-  const currentYear = new Date().getFullYear();
-  const lastYear = currentYear + 1;
-  const totalYears = lastYear - FIRST_YEAR;
-  const svgWidth = totalYears * YEAR_WIDTH + PADDING_X * 2;
+  // The timeline's right edge is "today", placed proportionally by
+  // day-of-year — not a padded future year. xForDateMs maps any date to
+  // a fractional-year x, so today's x is simply the axis end.
+  const nowMs = Date.now();
+  const currentYear = new Date(nowMs).getUTCFullYear();
+  const todayX = xForDateMs(nowMs);
+  const svgWidth = todayX + PADDING_X;
 
   const yCenter = 42;
   const yYearLabel = TIMELINE_HEIGHT - 12;
 
-  // Year tick marks. Label every 2 years so the bar reads cleanly even
-  // at full zoom; minor ticks on the others keep the rhythm.
-  const ticks: Array<{ year: number; x: number; label: boolean }> = [];
-  for (let y = FIRST_YEAR; y < lastYear; y += 1) {
+  // Year tick marks. Whole years 1993..currentYear-1 sit at their Jan-1
+  // boundary; the current year is marked at today's proportional
+  // position (the axis end) and always labelled. Label every 2nd whole
+  // year so the bar reads cleanly at full zoom.
+  const ticks: Array<{
+    year: number;
+    x: number;
+    label: boolean;
+    isToday: boolean;
+  }> = [];
+  for (let y = FIRST_YEAR; y < currentYear; y += 1) {
     ticks.push({
       year: y,
       x: PADDING_X + (y - FIRST_YEAR) * YEAR_WIDTH,
       label: y % 2 === 0,
+      isToday: false,
     });
   }
+  ticks.push({ year: currentYear, x: todayX, label: true, isToday: true });
 
   const wins = bouts.filter((b) => b.result === "W").length;
   const losses = bouts.filter((b) => b.result === "L").length;
@@ -342,20 +347,36 @@ export function CareerTimeline({ bouts }: CareerTimelineProps) {
 
           {ticks.map((t) => (
             <g key={t.year}>
-              <line
-                x1={t.x}
-                y1={yCenter + DOT_R + 6}
-                x2={t.x}
-                y2={yCenter + DOT_R + (t.label ? 14 : 10)}
-                stroke="oklch(0.30 0.01 240)"
-                strokeWidth={1}
-              />
+              {t.isToday ? (
+                // "Today" marker — a dashed gold accent line so the
+                // current year reads as "now", positioned by day-of-year.
+                <line
+                  x1={t.x}
+                  y1={yCenter - 22}
+                  x2={t.x}
+                  y2={yCenter + DOT_R + 14}
+                  stroke="oklch(0.78 0.15 70 / 0.55)"
+                  strokeWidth={1}
+                  strokeDasharray="2 3"
+                />
+              ) : (
+                <line
+                  x1={t.x}
+                  y1={yCenter + DOT_R + 6}
+                  x2={t.x}
+                  y2={yCenter + DOT_R + (t.label ? 14 : 10)}
+                  stroke="oklch(0.30 0.01 240)"
+                  strokeWidth={1}
+                />
+              )}
               {t.label ? (
                 <text
                   x={t.x}
                   y={yYearLabel}
                   textAnchor="middle"
-                  fill="oklch(0.45 0.01 240)"
+                  fill={
+                    t.isToday ? "oklch(0.78 0.15 70)" : "oklch(0.45 0.01 240)"
+                  }
                   style={{ fontSize: 10, letterSpacing: "0.16em" }}
                   className="font-mono"
                 >
@@ -465,7 +486,7 @@ export function CareerTimeline({ bouts }: CareerTimelineProps) {
         </span>
         <span aria-hidden className="text-foreground-subtle/40">·</span>
         <span className="text-foreground-subtle">
-          drag to scroll · {FIRST_YEAR}–{lastYear}
+          drag to scroll · {FIRST_YEAR}–{currentYear}
         </span>
       </p>
 
