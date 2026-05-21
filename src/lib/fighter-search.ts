@@ -363,14 +363,16 @@ function buildWhere(filters: FighterCatalogFilters): SQL {
 
 function buildOrderBy(filters: FighterCatalogFilters): SQL {
   const hasQuery = Boolean(filters.q?.trim());
-  // Wave 14B.2: when filtering to a single weight class, sort by the
-  // divisional score (alias `divisional_sort_score` in rowsQuery) which
-  // falls back to global vertex_score for fighters without an FDS row
-  // (<3 bouts in division). Multi/no-weight keeps the global sort.
-  const singleWeight = filters.weight?.length === 1;
+  // Sort by the canonical divisional score (`divisional_sort_score` =
+  // COALESCE(divisional, global)) for both the single-weight catalog
+  // (that division's score) AND the unfiltered catalog (the fighter's
+  // own current-division score — same number the profile hero shows).
+  // Only multi-weight comparison stays on the global score, since
+  // divisional scores aren't comparable across divisions.
+  const multiWeight = (filters.weight?.length ?? 0) > 1;
   switch (filters.sort) {
     case "vertex_current":
-      if (singleWeight) {
+      if (!multiWeight) {
         return hasQuery
           ? sql`match_score DESC, divisional_sort_score DESC NULLS LAST`
           : sql`divisional_sort_score DESC NULLS LAST, f.vertex_score_all_time DESC NULLS LAST, f.bout_count DESC`;
@@ -499,25 +501,32 @@ export async function searchFightersWithFilters(
       )::float AS match_score`
     : sql``;
 
-  // Wave 14B.2: single-weight filter joins fighter_divisional_score so the
-  // catalog can show + sort by the per-division score. Multi/no-weight
-  // path keeps the unchanged shape so cross-division catalogs continue
-  // to use the global vertex_score.
+  // Divisional score join. Single-weight filter → join the FILTERED
+  // division. No weight filter → join the fighter's OWN current division
+  // so the catalog shows the canonical headline score (same as the
+  // profile hero, Wave 14B.2). Multi-weight comparison keeps the global
+  // score — divisional scores aren't comparable across divisions.
   const singleWeight = filters.weight?.length === 1;
+  const multiWeight = (filters.weight?.length ?? 0) > 1;
   const divisionalJoin = singleWeight
     ? sql`LEFT JOIN fighter_divisional_score fds
             ON fds.fighter_id = f.id
            AND fds.division::text = ${filters.weight![0]}
            AND fds.in_active_ranking = TRUE`
-    : sql``;
-  const divisionalSelect = singleWeight
+    : multiWeight
+      ? sql``
+      : sql`LEFT JOIN fighter_divisional_score fds
+              ON fds.fighter_id = f.id
+             AND fds.division::text = f.current_division
+             AND fds.in_active_ranking = TRUE`;
+  const divisionalSelect = multiWeight
     ? sql`,
+      NULL::int AS divisional_score,
+      NULL::text AS divisional_status`
+    : sql`,
       fds.vertex_score AS divisional_score,
       fds.divisional_status,
-      COALESCE(fds.vertex_score, f.vertex_score) AS divisional_sort_score`
-    : sql`,
-      NULL::int AS divisional_score,
-      NULL::text AS divisional_status`;
+      COALESCE(fds.vertex_score, f.vertex_score) AS divisional_sort_score`;
 
   const rowsQuery = sql`
     SELECT
