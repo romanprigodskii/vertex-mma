@@ -7,14 +7,18 @@
  * including B. Insert one row per (fighter, anchor bout) into
  * fighter_score_history.
  *
- * Mirrors the Wave 31 formula from migration 0068:
+ * Mirrors the current-score formula through Wave 55:
  *   raw_current = (
  *       qw_decayed × 0.16 + cp × 0.10 + era × 0.06 + perf × 0.16
  *     + finishing_decayed × 0.10 + activity × 0.12 + form × 0.18
- *     - rlp × 0.20 - dv × 0.10 - layoff
- *   ) × (1 + age_factor)
+ *     - rlp × 0.20 - dv × 0.10 - layoff + streak_bonus
+ *   ) × (1 + age_factor) × credibility
  *   multiplied = re-anchored curve (88→100 cap)
  *   vertex_score = multiplied - skid - fresh_loss
+ *
+ * Folds in: Wave 32 streak bonus, Wave 33 loss-severity floor 0.6,
+ * Wave 54 sample-size credibility, Wave 55 scorecard win-quality in
+ * recent_form. (Wave 53 was all-time only — not replayed here.)
  *
  * Components replicate the SQL view as faithfully as possible:
  *   - opp_tier_value: read from bout_opponent_tier (already date-anchored)
@@ -64,6 +68,9 @@ interface BoutRow {
   is_win: boolean | null; // null when no winner (draw / NC)
   is_no_contest: boolean;
   opp_tier_value: number;
+  // Wave 55: scorecard margin per round for this fighter in this bout.
+  // null when the bout has no mmadecisions.com scorecard.
+  margin_per_round: number | null;
   // Fighter side per-bout aggregated stats (from bout_round_stats)
   f_sig_landed: number;
   f_sig_attempted: number;
@@ -187,10 +194,25 @@ function computeFinishingDomDecayed(
 }
 
 // =====================================================================
-// Component: recent_form (Wave 31 recency-weighted)
+// Component: recent_form (Wave 31 recency-weighted, Wave 55 win-quality)
 // =====================================================================
 
 const FORM_WEIGHTS = [2.0, 1.5, 1.0, 0.75, 0.5];
+
+/**
+ * Wave 55 win-quality multiplier for a win's recent_form contribution.
+ * Finish 1.15; decision scaled 0.90 (razor split) .. 1.10 (blowout) by
+ * scorecard margin per round; decision with no scorecard → 1.00.
+ * Method check uses the string only (no KD fallback) to match the SQL.
+ */
+function winQuality(b: BoutRow): number {
+  const m = (b.method ?? "").toLowerCase();
+  if (m.startsWith("ko") || m.startsWith("tko") || m.startsWith("sub")) {
+    return 1.15;
+  }
+  if (b.margin_per_round == null) return 1.0;
+  return 0.9 + 0.1 * Math.min(2.0, Math.max(0.0, b.margin_per_round));
+}
 
 function computeRecentForm(
   recentBouts: BoutRow[],
@@ -203,7 +225,7 @@ function computeRecentForm(
     let contrib = 0;
     if (isNoContest(b)) contrib = 0;
     else if (b.is_win === null) contrib = 0;
-    else if (b.is_win) contrib = b.opp_tier_value;
+    else if (b.is_win) contrib = b.opp_tier_value * winQuality(b);
     else {
       let sev: number;
       const t = b.opp_tier_value;
@@ -272,7 +294,8 @@ function computeRecentLossPenalty(
   bouts.forEach((b, idx) => {
     const isLoss = b.is_win === false && !isNoContest(b);
     if (!isLoss) return;
-    const severity = Math.max(0.3, Math.min(1.0, 1.0 - b.opp_tier_value / 30));
+    // Wave 33: severity floor 0.6 — a loss to a top opponent registers.
+    const severity = Math.max(0.6, Math.min(1.0, 1.0 - b.opp_tier_value / 30));
     if (idx < 3) sev3 += severity;
     if (idx < 5) sev5 += severity;
     const m = monthsBetween(asOfDate, parseDate(b.event_date));
@@ -492,6 +515,29 @@ function layoffPenalty(prevBoutDate: Date | null, asOfDate: Date): number {
   return Math.min(15, (m - 12) * 0.5);
 }
 
+/**
+ * Wave 32 streak bonus. current_streak as of the anchor = consecutive
+ * wins ending at the most recent bout (recentBouts is sorted DESC, so
+ * index 0 is the anchor). Any non-win breaks the count. Bonus is
+ * LEAST(5, GREATEST(0, streak - 2)) raw points.
+ */
+function streakBonus(recentBouts: BoutRow[]): number {
+  let streak = 0;
+  for (const b of recentBouts) {
+    if (b.is_win === true) streak++;
+    else break;
+  }
+  return Math.min(5, Math.max(0, streak - 2));
+}
+
+/**
+ * Wave 54 sample-size credibility — current branch. Mild damping for
+ * thin résumés: 0.85 floor, full credibility by 12 UFC bouts.
+ */
+function credibilityCurrent(ufcBouts: number): number {
+  return Math.min(1.0, 0.85 + 0.15 * Math.min(1.0, ufcBouts / 12.0));
+}
+
 // =====================================================================
 // Curve + skid + fresh loss (Wave 31)
 // =====================================================================
@@ -615,6 +661,22 @@ async function main() {
   `;
   console.log(`  ${tiers.length} (bout, fighter) tier rows`);
 
+  console.log("Loading scorecard margins...");
+  const scoreMargins = await sql<
+    Array<{ bout_id: string; a_margin_per_round: number | null }>
+  >`
+    SELECT
+      sc.bout_id::text AS bout_id,
+      (
+        SUM(sc.fighter_a_score - sc.fighter_b_score)::float
+        / NULLIF(COUNT(DISTINCT sc.judge_name), 0)
+        / NULLIF(COUNT(DISTINCT sc.round), 0)
+      ) AS a_margin_per_round
+    FROM bout_scorecard sc
+    GROUP BY sc.bout_id
+  `;
+  console.log(`  ${scoreMargins.length} bouts with scorecards`);
+
   console.log("Loading fighter dob+slug...");
   const fighters = await sql<
     Array<{ id: string; slug: string; dob: string | null }>
@@ -632,6 +694,13 @@ async function main() {
   for (const t of tiers) tierMap.set(statKey(t.bout_id, t.fighter_id), t.opp_tier_value);
   const fighterMap = new Map<string, { slug: string; dob: string | null }>();
   for (const f of fighters) fighterMap.set(f.id, { slug: f.slug, dob: f.dob });
+  // Wave 55: bout_id → fighter-A scorecard margin per round.
+  const marginMap = new Map<string, number>();
+  for (const s of scoreMargins) {
+    if (s.a_margin_per_round != null) {
+      marginMap.set(s.bout_id, Number(s.a_margin_per_round));
+    }
+  }
 
   // Build BoutRow per (fighter, bout).
   console.log("Building BoutRow array...");
@@ -655,6 +724,9 @@ async function main() {
       const fs = statMap.get(statKey(m.bout_id, fighterId)) ?? zeroStat;
       const os = statMap.get(statKey(m.bout_id, oppId)) ?? zeroStat;
       const opp_tier_value = tierMap.get(statKey(m.bout_id, fighterId)) ?? 0;
+      const aMargin = marginMap.get(m.bout_id);
+      const margin_per_round =
+        aMargin == null ? null : side === "a" ? aMargin : -aMargin;
       const methodLower = (m.method ?? "").toLowerCase();
       rows.push({
         fighter_id: fighterId,
@@ -675,6 +747,7 @@ async function main() {
             : m.winner_id === fighterId,
         is_no_contest: methodLower.includes("no_contest"),
         opp_tier_value,
+        margin_per_round,
         f_sig_landed: fs.sig_landed,
         f_sig_attempted: fs.sig_attempted,
         f_td_landed: fs.td_landed,
@@ -781,7 +854,14 @@ async function main() {
         activity * 0.12 +
         form * 0.18;
       const penalties = rlp * 0.20 + dv * 0.10 + lay;
-      const rawCurrent = Math.max(0, (positives - penalties) * (1 + af));
+      // Wave 32: win-streak bonus. Wave 54: sample-size credibility
+      // (ufc_bouts as of the anchor = i + 1).
+      const streakB = streakBonus(recentDesc);
+      const cred = credibilityCurrent(i + 1);
+      const rawCurrent = Math.max(
+        0,
+        (positives - penalties + streakB) * (1 + af) * cred,
+      );
 
       const multiplied = applyCurve(rawCurrent);
       const vertexScore = skidAndFreshLoss(multiplied, recentDesc);
