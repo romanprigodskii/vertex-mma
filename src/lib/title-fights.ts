@@ -80,6 +80,11 @@ const CURATED_TITLE_BOUT_IDS: readonly string[] = [
   "ff18ce2c-f87a-4b43-8075-87b1cd0c5fd9", // UFC 259 vs Aljamain Sterling 1   (2021-03-06) BW title (DQ loss)
   "80777d32-78d7-46cb-96e1-84cad63096a7", // UFC 251 vs Jose Aldo             (2020-07-11) BW title (vacant)
 
+  // --- Sean Strickland (former MW champ) ---
+  "d5426913-85e9-4577-a444-445196ad347f", // UFC 293 vs Israel Adesanya       (2023-09-09) MW title (won)
+  "9a8affe6-e150-4c2f-a1c7-661055cb8bea", // UFC 297 vs Dricus Du Plessis     (2024-01-20) MW title (lost)
+  "ecca6af1-f088-4460-8a4c-5e744dbd5b14", // UFC 312 vs Dricus Du Plessis 2   (2025-02-08) MW title
+
   // --- Joshua Van (FLW challenger) ---
   "d31d490d-2ffb-4ea9-8aaa-f96cce77955d", // UFC 323 vs Alexandre Pantoja     (2025-12-06) FLW title
 
