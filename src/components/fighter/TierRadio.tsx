@@ -7,7 +7,7 @@ const TIERS: Array<{ id: CatalogTierFilter; label: string }> = [
   { id: "all", label: "All" },
   { id: "apex", label: "Apex" },
   { id: "elite", label: "Elite" },
-  { id: "veteran", label: "Veteran" },
+  { id: "established", label: "Established" },
   { id: "roster", label: "Roster" },
 ];
 

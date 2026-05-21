@@ -25,7 +25,7 @@ const VALID_TIERS: ReadonlySet<CatalogTierFilter> = new Set([
   "all",
   "apex",
   "elite",
-  "veteran",
+  "established",
   "roster",
 ]);
 

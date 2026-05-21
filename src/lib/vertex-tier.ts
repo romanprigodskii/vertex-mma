@@ -6,8 +6,8 @@
  *
  *   Islam Makhachev     → tier=Apex,     champion=active   (gold border + APEX badge)
  *   Jon Jones           → tier=Apex,     champion=dominant (gold border + APEX badge)
- *   Israel Adesanya     → tier=Veteran,  champion=dominant (gold border + VETERAN badge)
- *   Donald Cerrone      → tier=Veteran,  champion=none     (no border + VETERAN badge)
+ *   Israel Adesanya     → tier=Established, champion=dominant (gold border + ESTABLISHED badge)
+ *   Donald Cerrone      → tier=Established, champion=none     (no border + ESTABLISHED badge)
  *
  * The UI layer renders these as two visual elements (border/crown vs. tier
  * badge) so they don't compete for the same slot.
@@ -22,10 +22,10 @@ import {
 
 /** Score-based tier — independent of champion history. */
 export type VertexTier =
-  | "apex" // score >= 80
-  | "elite" // score 60-79
-  | "veteran" // score 40-59
-  | "roster" // score < 40
+  | "apex" // score >= 75
+  | "elite" // score 55-74
+  | "established" // score 35-54
+  | "roster" // score < 35
   | "unranked"; // <3 UFC bouts OR no score
 
 /** Championship history — independent of score. */
@@ -63,9 +63,9 @@ function computeTier(args: ClassifyArgs): VertexTier {
       ? args.vertexScoreAllTime ?? 0
       : args.vertexScore ?? args.vertexScoreAllTime ?? 0;
 
-  if (referenceScore >= 80) return "apex";
-  if (referenceScore >= 60) return "elite";
-  if (referenceScore >= 40) return "veteran";
+  if (referenceScore >= 75) return "apex";
+  if (referenceScore >= 55) return "elite";
+  if (referenceScore >= 35) return "established";
   return "roster";
 }
 
@@ -110,10 +110,10 @@ export interface TierStyle {
 
 // Explicit per-tier OKLCH triples (no color-mix). Each tier reads as a
 // distinct hue on dark backgrounds:
-//   Apex     purple/violet  — GOAT territory
-//   Elite    blue           — championship class
-//   Veteran  teal-grey      — solid pro
-//   Roster   slate          — long-tail roster
+//   Apex        purple/violet  — GOAT territory
+//   Elite       blue           — championship class
+//   Established  teal-grey     — solid pro
+//   Roster      slate          — long-tail roster
 export const TIER_STYLES: Record<VertexTier, TierStyle> = {
   apex: {
     tier: "apex",
@@ -137,10 +137,10 @@ export const TIER_STYLES: Record<VertexTier, TierStyle> = {
     gradientTo: "oklch(0.45 0.18 235 / 0)",
     scoreColor: "oklch(0.82 0.16 235)",
   },
-  veteran: {
-    tier: "veteran",
-    label: "Veteran",
-    badgeText: "VETERAN",
+  established: {
+    tier: "established",
+    label: "Established",
+    badgeText: "ESTABLISHED",
     badgeBg: "oklch(0.28 0.05 200)",
     badgeTextColor: "oklch(0.78 0.06 200)",
     badgeBorder: "oklch(0.45 0.07 200)",

@@ -95,7 +95,7 @@ export function FighterCard({
     scoreMode === "current" && fighter.divisional_status === "provisional";
   // Cap visible score at 100 — raw all-time values can exceed 100 for sort
   // ordering after we lifted the LEAST(100, ...) cap in step 5E, but the UI
-  // tier breaks (Apex 80+, Elite 60-79 etc.) are calibrated against [0, 100].
+  // tier breaks (Apex 75+, Elite 55-74 etc.) are calibrated against [0, 100].
   const displayScore =
     rawScore == null ? null : Math.min(100, Math.max(0, rawScore));
   const weightLabel = fighter.weight_class_primary

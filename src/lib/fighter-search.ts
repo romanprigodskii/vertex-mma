@@ -103,7 +103,7 @@ export type CatalogTierFilter =
   | "all"
   | "apex"
   | "elite"
-  | "veteran"
+  | "established"
   | "roster";
 
 /** Champion-status filter, orthogonal to tier. `any` matches any of the
@@ -305,22 +305,23 @@ function buildWhere(filters: FighterCatalogFilters): SQL {
   // score AND exclude fighters with a champion pedigree (so a Pro who happens
   // to have been a champion doesn't appear in `tier=pro`).
   if (filters.tier && filters.tier !== "all") {
-    // Tier is purely score-based. Champion fighters in Apex / Elite / Veteran
-    // bands appear in those tier filters AND in the champion filter — by
-    // design, the two dimensions are independent.
+    // Tier is purely score-based (Wave 31.9 bands: 75 / 55 / 35).
+    // Champion fighters in Apex / Elite / Established bands appear in
+    // those tier filters AND in the champion filter — by design, the
+    // two dimensions are independent.
     const bestScore = sql`COALESCE(f.vertex_score, f.vertex_score_all_time)`;
     switch (filters.tier) {
       case "apex":
-        conditions.push(sql`${bestScore} >= 80`);
+        conditions.push(sql`${bestScore} >= 75`);
         break;
       case "elite":
-        conditions.push(sql`${bestScore} >= 60 AND ${bestScore} < 80`);
+        conditions.push(sql`${bestScore} >= 55 AND ${bestScore} < 75`);
         break;
-      case "veteran":
-        conditions.push(sql`${bestScore} >= 40 AND ${bestScore} < 60`);
+      case "established":
+        conditions.push(sql`${bestScore} >= 35 AND ${bestScore} < 55`);
         break;
       case "roster":
-        conditions.push(sql`${bestScore} IS NOT NULL AND ${bestScore} < 40`);
+        conditions.push(sql`${bestScore} IS NOT NULL AND ${bestScore} < 35`);
         break;
     }
   }
