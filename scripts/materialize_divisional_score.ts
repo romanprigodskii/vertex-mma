@@ -402,7 +402,16 @@ async function main() {
       0,
       Number(r.raw_current_excl_cp) + currentCp * 0.1,
     );
-    const rawCurrent = rawPreAge * (1 + Number(r.age_factor));
+    // Wave 54: sample-size credibility — mild damping for thin résumés,
+    // keyed on bouts IN THIS division (the divisional score's confidence
+    // depends on divisional sample, not career). Mirrors the global
+    // view's current-credibility formula (0.85 floor, full by 12).
+    const credCurrent = Math.min(
+      1.0,
+      0.85 + 0.15 * Math.min(1.0, r.bouts_in_division / 12.0),
+    );
+    const rawCurrent =
+      rawPreAge * (1 + Number(r.age_factor)) * credCurrent;
     const multiplied = applyCurve(rawCurrent);
     // Wave 31.8: graduated skid penalty, matching the global view's
     // Wave 30 ladder. Top-down — 3-of-3 catches first, so the lighter
