@@ -1,0 +1,352 @@
+"use server";
+
+import { and, eq, sql } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
+
+import {
+  CARD_THEME_BACKGROUNDS,
+  CARD_THEME_COLORS,
+  CARD_THEME_FONTS,
+  WEIGHT_CLASSES,
+} from "@/lib/card-theme";
+import { db } from "@/lib/db";
+import {
+  fightCard,
+  fightCardLike,
+  type FightCardBout,
+} from "@/lib/db/schema/cards";
+import { userProfile } from "@/lib/db/schema/users";
+import { searchFighters } from "@/lib/fighter-search";
+import { createClient } from "@/lib/supabase/server";
+import { slugify } from "@/lib/utils";
+
+const TITLE_MIN = 3;
+const TITLE_MAX = 100;
+const SUBTITLE_MAX = 120;
+const MIN_BOUTS = 1;
+const MAX_BOUTS = 15;
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const WEIGHT_SET = new Set<string>(WEIGHT_CLASSES);
+
+async function getMyProfileId(): Promise<string | null> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+  const rows = await db
+    .select({ id: userProfile.id })
+    .from(userProfile)
+    .where(eq(userProfile.authUserId, user.id))
+    .limit(1);
+  return rows[0]?.id ?? null;
+}
+
+export type PickerFighter = {
+  id: string;
+  name: string;
+  nickname: string | null;
+  photo_thumbnail_url: string | null;
+  weight_class: string | null;
+};
+
+export async function searchFightersForPicker(
+  query: string,
+): Promise<PickerFighter[]> {
+  if (!query.trim()) return [];
+  const results = await searchFighters(query, 8);
+  return results.map((r) => ({
+    id: r.id,
+    name: r.name_en,
+    nickname: r.nickname,
+    photo_thumbnail_url: r.photo_thumbnail_url,
+    weight_class: r.weight_class_primary,
+  }));
+}
+
+/** Clamp a free-text theme value to a known registry id. */
+function clampToRegistry(
+  value: string,
+  allowed: ReadonlyArray<{ id: string }>,
+  fallback: string,
+): string {
+  return allowed.some((a) => a.id === value) ? value : fallback;
+}
+
+function parseBouts(raw: string): FightCardBout[] | null {
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return null;
+    const out: FightCardBout[] = [];
+    parsed.forEach((b, i) => {
+      if (typeof b !== "object" || b === null) return;
+      const rec = b as Record<string, unknown>;
+      if (
+        typeof rec.fighterAId === "string" &&
+        typeof rec.fighterBId === "string" &&
+        typeof rec.weightClass === "string"
+      ) {
+        out.push({
+          fighterAId: rec.fighterAId,
+          fighterBId: rec.fighterBId,
+          weightClass: rec.weightClass,
+          isMain: rec.isMain === true,
+          order: i,
+        });
+      }
+    });
+    return out;
+  } catch {
+    return null;
+  }
+}
+
+function validateBouts(
+  bouts: FightCardBout[] | null,
+): { error: string } | { bouts: FightCardBout[] } {
+  if (!bouts || bouts.length < MIN_BOUTS) {
+    return { error: `Add at least ${MIN_BOUTS} bout.` };
+  }
+  if (bouts.length > MAX_BOUTS) {
+    return { error: `Max ${MAX_BOUTS} bouts per card.` };
+  }
+  for (const b of bouts) {
+    if (!UUID_RE.test(b.fighterAId) || !UUID_RE.test(b.fighterBId)) {
+      return { error: "Every bout needs two fighters." };
+    }
+    if (b.fighterAId === b.fighterBId) {
+      return { error: "A fighter can't be booked against themselves." };
+    }
+    if (!WEIGHT_SET.has(b.weightClass)) {
+      return { error: "Each bout needs a valid weight class." };
+    }
+  }
+  if (bouts.filter((b) => b.isMain).length > 1) {
+    return { error: "Only one bout can be the main event." };
+  }
+  // Normalize `order` to 0..N-1 in array order.
+  return { bouts: bouts.map((b, i) => ({ ...b, order: i })) };
+}
+
+type CardFields = {
+  title: string;
+  subtitle: string | null;
+  themeColor: string;
+  titleFont: string;
+  backgroundId: string;
+  isPublic: boolean;
+  bouts: FightCardBout[];
+};
+
+function readCardForm(
+  formData: FormData,
+): { error: string } | { fields: CardFields } {
+  const title = String(formData.get("title") ?? "").trim();
+  const subtitle = String(formData.get("subtitle") ?? "").trim();
+
+  if (title.length < TITLE_MIN || title.length > TITLE_MAX) {
+    return { error: `Title must be ${TITLE_MIN}–${TITLE_MAX} characters.` };
+  }
+  if (subtitle.length > SUBTITLE_MAX) {
+    return { error: `Subtitle must be under ${SUBTITLE_MAX} characters.` };
+  }
+
+  const validated = validateBouts(
+    parseBouts(String(formData.get("bouts") ?? "")),
+  );
+  if ("error" in validated) return { error: validated.error };
+
+  return {
+    fields: {
+      title,
+      subtitle: subtitle || null,
+      themeColor: clampToRegistry(
+        String(formData.get("themeColor") ?? ""),
+        CARD_THEME_COLORS,
+        "primary",
+      ),
+      titleFont: clampToRegistry(
+        String(formData.get("titleFont") ?? ""),
+        CARD_THEME_FONTS,
+        "display",
+      ),
+      backgroundId: clampToRegistry(
+        String(formData.get("backgroundId") ?? ""),
+        CARD_THEME_BACKGROUNDS,
+        "default",
+      ),
+      isPublic: String(formData.get("isPublic") ?? "true") === "true",
+      bouts: validated.bouts,
+    },
+  };
+}
+
+/** A title-derived slug plus a short random tail, checked for collisions. */
+async function uniqueSlug(title: string): Promise<string> {
+  const base = slugify(title).slice(0, 60) || "fight-card";
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const candidate = `${base}-${Math.random().toString(36).slice(2, 8)}`;
+    const existing = await db
+      .select({ id: fightCard.id })
+      .from(fightCard)
+      .where(eq(fightCard.slug, candidate))
+      .limit(1);
+    if (existing.length === 0) return candidate;
+  }
+  return `${base}-${Date.now().toString(36)}`;
+}
+
+export async function createFightCardAction(
+  formData: FormData,
+): Promise<{ error?: string; slug?: string }> {
+  const myId = await getMyProfileId();
+  if (!myId) return { error: "Not signed in." };
+
+  const parsed = readCardForm(formData);
+  if ("error" in parsed) return { error: parsed.error };
+  const f = parsed.fields;
+
+  const slug = await uniqueSlug(f.title);
+  await db.insert(fightCard).values({
+    userId: myId,
+    slug,
+    title: f.title,
+    subtitle: f.subtitle,
+    themeColor: f.themeColor,
+    titleFont: f.titleFont,
+    backgroundId: f.backgroundId,
+    isPublic: f.isPublic,
+    bouts: f.bouts,
+  });
+
+  revalidatePath("/cards");
+  return { slug };
+}
+
+export async function updateFightCardAction(
+  cardId: string,
+  formData: FormData,
+): Promise<{ error?: string; slug?: string }> {
+  const myId = await getMyProfileId();
+  if (!myId) return { error: "Not signed in." };
+  if (!UUID_RE.test(cardId)) return { error: "Card not found." };
+
+  const existing = await db
+    .select({
+      id: fightCard.id,
+      userId: fightCard.userId,
+      slug: fightCard.slug,
+    })
+    .from(fightCard)
+    .where(eq(fightCard.id, cardId))
+    .limit(1);
+  if (existing.length === 0) return { error: "Card not found." };
+  if (existing[0].userId !== myId) return { error: "Not your card." };
+
+  const parsed = readCardForm(formData);
+  if ("error" in parsed) return { error: parsed.error };
+  const f = parsed.fields;
+
+  // The slug is generated once at creation and never changes, so links
+  // already shared keep resolving.
+  await db
+    .update(fightCard)
+    .set({
+      title: f.title,
+      subtitle: f.subtitle,
+      themeColor: f.themeColor,
+      titleFont: f.titleFont,
+      backgroundId: f.backgroundId,
+      isPublic: f.isPublic,
+      bouts: f.bouts,
+      updatedAt: new Date(),
+    })
+    .where(eq(fightCard.id, cardId));
+
+  revalidatePath("/cards");
+  revalidatePath(`/cards/${existing[0].slug}`);
+  return { slug: existing[0].slug };
+}
+
+export async function deleteFightCardAction(
+  cardId: string,
+): Promise<{ error?: string; success?: boolean }> {
+  const myId = await getMyProfileId();
+  if (!myId) return { error: "Not signed in." };
+  if (!UUID_RE.test(cardId)) return { error: "Card not found." };
+
+  const existing = await db
+    .select({ id: fightCard.id, userId: fightCard.userId })
+    .from(fightCard)
+    .where(eq(fightCard.id, cardId))
+    .limit(1);
+  if (existing.length === 0) return { error: "Card not found." };
+  if (existing[0].userId !== myId) return { error: "Not your card." };
+
+  // FK cascade drops fight_card_like rows.
+  await db.delete(fightCard).where(eq(fightCard.id, cardId));
+
+  revalidatePath("/cards");
+  return { success: true };
+}
+
+export async function toggleLikeAction(
+  cardId: string,
+): Promise<{ error?: string; liked?: boolean; likeCount?: number }> {
+  const myId = await getMyProfileId();
+  if (!myId) return { error: "Sign in to like cards." };
+  if (!UUID_RE.test(cardId)) return { error: "Card not found." };
+
+  const card = await db
+    .select({ id: fightCard.id, slug: fightCard.slug })
+    .from(fightCard)
+    .where(eq(fightCard.id, cardId))
+    .limit(1);
+  if (card.length === 0) return { error: "Card not found." };
+
+  const existing = await db
+    .select({ userId: fightCardLike.userId })
+    .from(fightCardLike)
+    .where(
+      and(
+        eq(fightCardLike.userId, myId),
+        eq(fightCardLike.fightCardId, cardId),
+      ),
+    )
+    .limit(1);
+
+  const liked = existing.length === 0;
+  if (liked) {
+    await db
+      .insert(fightCardLike)
+      .values({ userId: myId, fightCardId: cardId })
+      .onConflictDoNothing();
+  } else {
+    await db
+      .delete(fightCardLike)
+      .where(
+        and(
+          eq(fightCardLike.userId, myId),
+          eq(fightCardLike.fightCardId, cardId),
+        ),
+      );
+  }
+
+  // Recompute the denormalized counter from the join table — race-safe.
+  const countRows = (await db.execute<{ c: number }>(sql`
+    SELECT COUNT(*)::int AS c
+    FROM fight_card_like
+    WHERE fight_card_id = ${cardId}::uuid
+  `)) as unknown as Array<{ c: number }>;
+  const likeCount = countRows[0]?.c ?? 0;
+  await db
+    .update(fightCard)
+    .set({ likeCount })
+    .where(eq(fightCard.id, cardId));
+
+  revalidatePath("/cards");
+  revalidatePath(`/cards/${card[0].slug}`);
+  return { liked, likeCount };
+}
