@@ -404,10 +404,14 @@ async function main() {
     );
     const rawCurrent = rawPreAge * (1 + Number(r.age_factor));
     const multiplied = applyCurve(rawCurrent);
-    // Wave 31.5: skid penalty stays at -25 at losses_last_3 ≥ 3 (graduated
-    // skid is a separate parity item for divisional). Fresh-loss flat
-    // penalty only fires when skid didn't catch.
-    const skidPenalty = r.losses_last_3 >= 3 ? 25 : 0;
+    // Wave 31.8: graduated skid penalty, matching the global view's
+    // Wave 30 ladder. Top-down — 3-of-3 catches first, so the lighter
+    // branches only fire when a full skid isn't already present.
+    // Fresh-loss flat penalty only fires when no skid caught.
+    let skidPenalty = 0;
+    if (r.losses_last_3 >= 3) skidPenalty = 25;
+    else if (r.losses_last_5 >= 3) skidPenalty = 15;
+    else if (r.losses_last_3 >= 2) skidPenalty = 10;
     const freshLossPenalty =
       skidPenalty === 0 && r.most_recent_is_loss ? 5 : 0;
     const vertexScore = Math.max(
