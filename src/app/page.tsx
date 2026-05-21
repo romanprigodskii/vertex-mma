@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import Link from "next/link";
 
 import { Container } from "@/components/layout/container";
@@ -6,10 +7,7 @@ import { Navbar } from "@/components/layout/navbar";
 import { MarketCard } from "@/components/markets/market-card";
 import { RankingCard } from "@/components/rankings/ranking-card";
 import { getCurrentUser } from "@/lib/auth";
-import {
-  CATALOG_DEFAULT_LIMIT,
-  searchFightersWithFilters,
-} from "@/lib/fighter-search";
+import { db } from "@/lib/db";
 import { listOpenMarkets } from "@/lib/markets";
 import { listRecentRankings } from "@/lib/rankings";
 
@@ -21,21 +19,45 @@ export const metadata = {
     "Vertex score for every active UFC fighter, community rankings, and virtual coin betting markets.",
 };
 
-async function getTopFighters(limit: number) {
-  // Reuse the canonical catalog query so the returned shape matches
-  // FighterCard's expected props exactly.
-  const page = await searchFightersWithFilters({
-    status: "active",
-    sort: "vertex_current",
-    tier: "all",
-    champion: "all",
-    gender: "all",
-    hasPhoto: false,
-    hallOfFame: false,
-    limit,
-    offset: 0,
-  });
-  return page.fighters.slice(0, limit);
+type TopFighter = {
+  id: string;
+  slug: string;
+  name_en: string;
+  photo_thumbnail_url: string | null;
+  photo_url: string | null;
+  division: string | null;
+  score: number | null;
+};
+
+async function getTopFighters(limit: number): Promise<TopFighter[]> {
+  // Headline score = the fighter's divisional score in their current
+  // division (Wave 14B.2 — the same number the profile hero shows),
+  // falling back to the global vertex_score when no divisional row
+  // exists. Sort AND display by that one canonical number so the home
+  // list never contradicts the profile (e.g. Pereira 80 LHW, not the
+  // global 85).
+  const result = await db.execute<TopFighter>(sql`
+    SELECT
+      f.id::text AS id,
+      f.slug,
+      f.name_en,
+      f.photo_thumbnail_url,
+      f.photo_url,
+      COALESCE(f.current_division, f.weight_class_primary::text) AS division,
+      COALESCE(fds.vertex_score, f.vertex_score) AS score
+    FROM fighter_with_stats f
+    LEFT JOIN fighter_divisional_score fds
+      ON fds.fighter_id = f.id
+      AND fds.division::text = f.current_division
+      AND fds.in_active_ranking = true
+    WHERE f.roster_status = 'active'
+      AND COALESCE(fds.vertex_score, f.vertex_score) IS NOT NULL
+    ORDER BY
+      COALESCE(fds.vertex_score, f.vertex_score) DESC,
+      f.bout_count DESC
+    LIMIT ${limit}
+  `);
+  return [...(result as unknown as TopFighter[])];
 }
 
 export default async function HomePage() {
@@ -45,9 +67,6 @@ export default async function HomePage() {
     listOpenMarkets(6),
     listRecentRankings(3),
   ]);
-
-  // limit unused
-  void CATALOG_DEFAULT_LIMIT;
 
   return (
     <>
@@ -143,12 +162,12 @@ export default async function HomePage() {
                           {f.name_en}
                         </p>
                         <p className="font-mono text-[11px] uppercase tracking-widest text-foreground-subtle">
-                          {f.weight_class_primary?.replace(/_/g, " ") ?? "—"}
+                          {f.division?.replace(/_/g, " ") ?? "—"}
                         </p>
                       </div>
                       <div className="shrink-0 text-right">
                         <p className="font-display text-2xl tabular text-foreground">
-                          {f.vertex_score ?? "—"}
+                          {f.score ?? "—"}
                         </p>
                         <p className="font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
                           Vertex
