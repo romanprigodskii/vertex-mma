@@ -20,6 +20,7 @@ import { StrikingHeatmap } from "@/components/fighter/detail/StrikingHeatmap";
 import { Container } from "@/components/layout/container";
 import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
+import { NewsRow } from "@/components/news/news-row";
 import { CHAMPION_BY_SLUG } from "@/lib/champions";
 import { computeAttributes } from "@/lib/fighter-attributes";
 import {
@@ -31,6 +32,7 @@ import {
   getFighterBySlug,
   getGlobalScoreComponents,
 } from "@/lib/fighter-detail";
+import { listNewsForFighter } from "@/lib/news";
 import { getPeakVertex } from "@/lib/score-history";
 import { getSimilarFighters } from "@/lib/similar-fighters";
 
@@ -104,6 +106,7 @@ export default async function FighterDetailPage({ params }: PageProps) {
     divisionalScores,
     globalComponents,
     peakVertex,
+    fighterNews,
   ] = await Promise.all([
     getFighterBoutRounds(fighter.id),
     getFightHistory(fighter.id),
@@ -111,6 +114,7 @@ export default async function FighterDetailPage({ params }: PageProps) {
     getDivisionalScores(fighter.id),
     getGlobalScoreComponents(fighter.id),
     getPeakVertex(fighter.id),
+    listNewsForFighter(fighter.id, 6),
   ]);
 
   const championEntry = CHAMPION_BY_SLUG.get(slug) ?? null;
@@ -324,6 +328,22 @@ export default async function FighterDetailPage({ params }: PageProps) {
         >
           <FightHistoryList history={history} />
         </Section>
+
+        {fighterNews.length > 0 ? (
+          <Section
+            label="In the news"
+            explainer="Recent MMA headlines that mention this fighter."
+            className="mt-16 sm:mt-20"
+          >
+            <ul className="mx-auto flex max-w-3xl flex-col gap-3">
+              {fighterNews.map((item) => (
+                <li key={item.id}>
+                  <NewsRow item={item} />
+                </li>
+              ))}
+            </ul>
+          </Section>
+        ) : null}
 
         <Section
           label="Similar fighters"

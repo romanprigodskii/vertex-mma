@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from html import unescape
 
 import feedparser
 from selectolax.parser import HTMLParser
@@ -50,16 +51,17 @@ def parse_feed(xml: str) -> list[NewsEntry]:
     entries: list[NewsEntry] = []
     for raw in parsed.entries:
         url = (raw.get("link") or "").strip()
-        title = (raw.get("title") or "").strip()
+        title = unescape((raw.get("title") or "").strip())
         if not url or not title:
             continue
+        author = raw.get("author")
         entries.append(
             NewsEntry(
                 external_id=(raw.get("id") or None),
                 url=url,
                 title=title,
                 body=_clean_text(raw.get("summary")),
-                author=(raw.get("author") or None),
+                author=(unescape(author).strip() or None) if author else None,
                 published_at=_entry_published(raw),
             )
         )

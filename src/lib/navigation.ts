@@ -9,6 +9,7 @@ export type NavSection = {
 export const NAV_SECTIONS: NavSection[] = [
   { href: "/fighters", label: "Fighters" },
   { href: "/events", label: "Events" },
+  { href: "/news", label: "News" },
   { href: "/markets", label: "Markets" },
   { href: "/predictions", label: "Predictions" },
   { href: "/simulator", label: "Simulator" },
