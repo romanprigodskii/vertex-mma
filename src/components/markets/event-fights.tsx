@@ -133,13 +133,19 @@ function FightRow({ bout }: { bout: EventMarketsGroup["bouts"][number] }) {
           </div>
         ) : null}
       </summary>
-      {others.length > 0 ? (
-        <div className="border-t border-foreground/[0.06] bg-background-base/30 px-4">
-          {others.map((m) => (
-            <MarketSection key={m.id} market={m} defaultOpen={false} />
-          ))}
-        </div>
-      ) : null}
+      <div className="border-t border-foreground/[0.06] bg-background-base/30 px-4">
+        {others.map((m) => (
+          <MarketSection key={m.id} market={m} defaultOpen={false} />
+        ))}
+        <Link
+          href={`/markets/fight/${bout.bout_id}`}
+          prefetch={false}
+          className="flex items-center gap-1 border-t border-foreground/[0.07] py-2.5 font-sans text-xs text-primary hover:underline"
+        >
+          Full fight page
+          <ChevronRight className="h-3.5 w-3.5" aria-hidden />
+        </Link>
+      </div>
     </details>
   );
 }
