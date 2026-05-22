@@ -34,90 +34,50 @@ function aggregate(
   return { head, body, legs, total: head + body + legs };
 }
 
+/**
+ * Zone fill — one clean hue per side (gold for landed, red for absorbed)
+ * at an opacity that scales with the zone's share of the total, normalised
+ * so the most-struck zone reads at full intensity. An opacity ramp on a
+ * single hue avoids the muddy mid-tones a lightness ramp produced.
+ */
 function zoneFill(
-  pct: number,
+  share: number,
+  maxShare: number,
   side: "landed" | "absorbed",
 ): string {
-  // Tint scales with relative share within the silhouette. Landed → gold ramp,
-  // absorbed → muted-red ramp.
-  if (pct === 0)
-    return side === "landed"
-      ? "oklch(0.20 0.02 240 / 0.9)"
-      : "oklch(0.20 0.02 240 / 0.9)";
-  if (side === "landed") {
-    if (pct < 0.15) return "oklch(0.40 0.04 70 / 0.6)";
-    if (pct < 0.30) return "oklch(0.55 0.10 70 / 0.7)";
-    if (pct < 0.50) return "oklch(0.68 0.14 70 / 0.85)";
-    return "oklch(0.78 0.15 70)"; // gold full
-  }
-  if (pct < 0.15) return "oklch(0.32 0.04 27 / 0.55)";
-  if (pct < 0.30) return "oklch(0.40 0.10 27 / 0.7)";
-  if (pct < 0.50) return "oklch(0.48 0.14 27 / 0.85)";
-  return "oklch(0.55 0.18 27)"; // muted-red full
+  if (maxShare <= 0) return "oklch(0.26 0.015 250 / 0.85)";
+  const base = side === "landed" ? "0.82 0.16 75" : "0.62 0.21 25";
+  const intensity = Math.max(0, Math.min(1, share / maxShare));
+  const opacity = 0.28 + 0.72 * intensity;
+  return `oklch(${base} / ${opacity.toFixed(3)})`;
 }
 
-/**
- * Per-zone stat drawn on the silhouette itself: zone label, the strike
- * count (prominent), and the share %. A dark stroke halo keeps the text
- * legible over any zone fill — gold, red, or the dark "no strikes" tint.
- */
-function ZoneStat({
+const FIGURE_STROKE = "oklch(0.44 0.015 250)";
+
+/** One bold, halo-outlined strike count, centred on a zone. */
+function ZoneNumber({
   cx,
   cy,
-  label,
-  count,
-  pct,
-  total,
+  value,
 }: {
   cx: number;
   cy: number;
-  label: string;
-  count: number;
-  pct: number;
-  total: number;
+  value: number;
 }) {
   return (
-    <g
+    <text
+      x={cx}
+      y={cy}
+      textAnchor="middle"
+      dominantBaseline="central"
+      fill="oklch(0.99 0 0)"
       stroke="oklch(0.14 0.01 240)"
+      strokeWidth={3.5}
       strokeLinejoin="round"
-      style={{ paintOrder: "stroke" }}
+      style={{ paintOrder: "stroke", fontSize: 19, fontWeight: 700 }}
     >
-      <text
-        x={cx}
-        y={cy - 9}
-        textAnchor="middle"
-        dominantBaseline="central"
-        fill="oklch(0.98 0 0)"
-        strokeWidth={2.5}
-        style={{ fontSize: 8, letterSpacing: "0.14em" }}
-      >
-        {label}
-      </text>
-      <text
-        x={cx}
-        y={cy + 6}
-        textAnchor="middle"
-        dominantBaseline="central"
-        fill="oklch(0.98 0 0)"
-        strokeWidth={3.5}
-        style={{ fontSize: 16, fontWeight: 700 }}
-      >
-        {formatNumber(count)}
-      </text>
-      {total > 0 ? (
-        <text
-          x={cx}
-          y={cy + 20}
-          textAnchor="middle"
-          dominantBaseline="central"
-          fill="oklch(0.98 0 0 / 0.82)"
-          strokeWidth={2.5}
-          style={{ fontSize: 8, fontWeight: 600 }}
-        >
-          {Math.round(pct * 100)}%
-        </text>
-      ) : null}
-    </g>
+      {formatNumber(value)}
+    </text>
   );
 }
 
@@ -133,6 +93,7 @@ function Silhouette({
   const headPct = totals.total ? totals.head / totals.total : 0;
   const bodyPct = totals.total ? totals.body / totals.total : 0;
   const legsPct = totals.total ? totals.legs / totals.total : 0;
+  const maxPct = Math.max(headPct, bodyPct, legsPct);
 
   return (
     <div className="flex flex-col items-center gap-3">
@@ -140,84 +101,31 @@ function Silhouette({
         {title}
       </p>
       <svg
-        viewBox="0 0 200 400"
-        className="h-auto w-full max-w-[200px]"
+        viewBox="0 0 200 470"
+        className="h-auto w-full max-w-[190px]"
         role="img"
         aria-label={`${title} per-zone heatmap`}
       >
-        {/* Head — circle. */}
-        <circle
-          cx={100}
-          cy={56}
-          r={36}
-          fill={zoneFill(headPct, side)}
-          stroke="oklch(0.30 0.01 240)"
-          strokeWidth={1}
-        />
-        {/* Body — single rounded path with slightly wider shoulders so the
-            torso reads as a body, not a floating brick. No arms; we only
-            have head/body/legs data, and detached arm shapes were
-            visually noisy. */}
-        <path
-          d="M62 110
-             Q50 116 50 134
-             L50 252
-             Q50 264 62 264
-             L138 264
-             Q150 264 150 252
-             L150 134
-             Q150 116 138 110
-             Z"
-          fill={zoneFill(bodyPct, side)}
-          stroke="oklch(0.30 0.01 240)"
-          strokeWidth={1}
-        />
-        {/* Legs — two long rounded rectangles. */}
-        <rect
-          x={60}
-          y={268}
-          width={36}
-          height={120}
-          rx={14}
-          fill={zoneFill(legsPct, side)}
-          stroke="oklch(0.30 0.01 240)"
-          strokeWidth={1}
-        />
-        <rect
-          x={104}
-          y={268}
-          width={36}
-          height={120}
-          rx={14}
-          fill={zoneFill(legsPct, side)}
-          stroke="oklch(0.30 0.01 240)"
-          strokeWidth={1}
-        />
-        {/* Per-zone count + share, drawn on the silhouette itself. */}
-        <ZoneStat
-          cx={100}
-          cy={56}
-          label="HEAD"
-          count={totals.head}
-          pct={headPct}
-          total={totals.total}
-        />
-        <ZoneStat
-          cx={100}
-          cy={188}
-          label="BODY"
-          count={totals.body}
-          pct={bodyPct}
-          total={totals.total}
-        />
-        <ZoneStat
-          cx={100}
-          cy={330}
-          label="LEGS"
-          count={totals.legs}
-          pct={legsPct}
-          total={totals.total}
-        />
+        {/* One connected figure: legs first, the torso overlapping their
+            tops at the hip, the head + neck on top — so the silhouette
+            reads as a single person, not stacked primitives. */}
+        <g stroke={FIGURE_STROKE} strokeWidth={1.5} strokeLinejoin="round">
+          <g fill={zoneFill(legsPct, maxPct, side)}>
+            <path d="M 72 314 L 100 314 L 96 442 Q 96 454 85 454 Q 74 454 74 442 Z" />
+            <path d="M 102 314 L 130 314 L 128 442 Q 128 454 117 454 Q 106 454 106 442 Z" />
+          </g>
+          <path
+            d="M 70 110 C 55 112 47 125 47 147 C 51 210 64 270 73 300 L 69 323 L 131 323 L 127 300 C 136 270 149 210 153 147 C 153 125 145 112 130 110 Z"
+            fill={zoneFill(bodyPct, maxPct, side)}
+          />
+          <g fill={zoneFill(headPct, maxPct, side)}>
+            <rect x={86} y={80} width={28} height={36} rx={9} />
+            <circle cx={100} cy={54} r={36} />
+          </g>
+        </g>
+        <ZoneNumber cx={100} cy={54} value={totals.head} />
+        <ZoneNumber cx={100} cy={212} value={totals.body} />
+        <ZoneNumber cx={100} cy={384} value={totals.legs} />
       </svg>
 
       <ul className="w-full max-w-[220px] text-xs">
@@ -247,8 +155,8 @@ function Silhouette({
 }
 
 /**
- * Two silhouettes side-by-side: where the fighter lands strikes (gold ramp)
- * and where opponents land strikes on them (red ramp). Pure SVG, no client JS.
+ * Two silhouettes side-by-side: where the fighter lands strikes (gold) and
+ * where opponents land strikes on them (red). Pure SVG, no client JS.
  */
 export function StrikingHeatmap({ boutRounds }: StrikingHeatmapProps) {
   if (boutRounds.length === 0) {
