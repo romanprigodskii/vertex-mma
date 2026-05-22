@@ -56,6 +56,71 @@ function zoneFill(
   return "oklch(0.55 0.18 27)"; // muted-red full
 }
 
+/**
+ * Per-zone stat drawn on the silhouette itself: zone label, the strike
+ * count (prominent), and the share %. A dark stroke halo keeps the text
+ * legible over any zone fill — gold, red, or the dark "no strikes" tint.
+ */
+function ZoneStat({
+  cx,
+  cy,
+  label,
+  count,
+  pct,
+  total,
+}: {
+  cx: number;
+  cy: number;
+  label: string;
+  count: number;
+  pct: number;
+  total: number;
+}) {
+  return (
+    <g
+      stroke="oklch(0.14 0.01 240)"
+      strokeLinejoin="round"
+      style={{ paintOrder: "stroke" }}
+    >
+      <text
+        x={cx}
+        y={cy - 9}
+        textAnchor="middle"
+        dominantBaseline="central"
+        fill="oklch(0.98 0 0)"
+        strokeWidth={2.5}
+        style={{ fontSize: 8, letterSpacing: "0.14em" }}
+      >
+        {label}
+      </text>
+      <text
+        x={cx}
+        y={cy + 6}
+        textAnchor="middle"
+        dominantBaseline="central"
+        fill="oklch(0.98 0 0)"
+        strokeWidth={3.5}
+        style={{ fontSize: 16, fontWeight: 700 }}
+      >
+        {formatNumber(count)}
+      </text>
+      {total > 0 ? (
+        <text
+          x={cx}
+          y={cy + 20}
+          textAnchor="middle"
+          dominantBaseline="central"
+          fill="oklch(0.98 0 0 / 0.82)"
+          strokeWidth={2.5}
+          style={{ fontSize: 8, fontWeight: 600 }}
+        >
+          {Math.round(pct * 100)}%
+        </text>
+      ) : null}
+    </g>
+  );
+}
+
 function Silhouette({
   title,
   totals,
@@ -128,37 +193,31 @@ function Silhouette({
           stroke="oklch(0.30 0.01 240)"
           strokeWidth={1}
         />
-        {/* Zone labels in-SVG so they stay aligned at small sizes. */}
-        <text
-          x={100}
-          y={60}
-          textAnchor="middle"
-          dominantBaseline="central"
-          fill="oklch(0.98 0 0)"
-          style={{ fontSize: 9, letterSpacing: "0.16em" }}
-        >
-          HEAD
-        </text>
-        <text
-          x={100}
-          y={188}
-          textAnchor="middle"
-          dominantBaseline="central"
-          fill="oklch(0.98 0 0)"
-          style={{ fontSize: 9, letterSpacing: "0.16em" }}
-        >
-          BODY
-        </text>
-        <text
-          x={100}
-          y={332}
-          textAnchor="middle"
-          dominantBaseline="central"
-          fill="oklch(0.98 0 0)"
-          style={{ fontSize: 9, letterSpacing: "0.16em" }}
-        >
-          LEGS
-        </text>
+        {/* Per-zone count + share, drawn on the silhouette itself. */}
+        <ZoneStat
+          cx={100}
+          cy={56}
+          label="HEAD"
+          count={totals.head}
+          pct={headPct}
+          total={totals.total}
+        />
+        <ZoneStat
+          cx={100}
+          cy={188}
+          label="BODY"
+          count={totals.body}
+          pct={bodyPct}
+          total={totals.total}
+        />
+        <ZoneStat
+          cx={100}
+          cy={330}
+          label="LEGS"
+          count={totals.legs}
+          pct={legsPct}
+          total={totals.total}
+        />
       </svg>
 
       <ul className="w-full max-w-[220px] text-xs">
