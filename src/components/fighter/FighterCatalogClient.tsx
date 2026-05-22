@@ -342,7 +342,7 @@ export function FighterCatalogClient({
                 variants={LIST_VARIANTS}
                 initial="hidden"
                 animate="show"
-                className="grid grid-cols-1 gap-4 lg:grid-cols-2"
+                className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-3"
               >
                 <AnimatePresence initial={false}>
                   {fighters.map((f, i) => (

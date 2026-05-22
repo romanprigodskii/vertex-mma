@@ -15,7 +15,7 @@ export function CatalogSkeleton({
 }: CatalogSkeletonProps) {
   return (
     <ul
-      className={cn("grid grid-cols-1 gap-4 lg:grid-cols-2", className)}
+      className={cn("grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-3", className)}
       aria-hidden
     >
       {Array.from({ length: count }).map((_, i) => (

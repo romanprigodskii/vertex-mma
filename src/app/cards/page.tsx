@@ -67,7 +67,7 @@ export default async function CardsListPage() {
           {myCards.length > 0 ? (
             <section className="mb-10">
               <h2 className={SECTION_LABEL}>Your cards</h2>
-              <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
                 {myCards.map((c) => (
                   <li key={c.id}>
                     <FightCardGridCard card={c} />
@@ -100,7 +100,7 @@ export default async function CardsListPage() {
                 </Link>
               </div>
             ) : (
-              <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
                 {communityCards.map((c) => (
                   <li key={c.id}>
                     <FightCardGridCard card={c} />

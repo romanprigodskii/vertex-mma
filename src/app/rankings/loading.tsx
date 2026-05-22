@@ -13,7 +13,7 @@ export default function RankingsLoading() {
             <div className="h-12 w-56 animate-pulse rounded bg-foreground/[0.05]" />
             <div className="mt-3 h-4 w-80 animate-pulse rounded bg-foreground/[0.05]" />
           </div>
-          <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
             {Array.from({ length: 6 }).map((_, i) => (
               <li
                 key={i}
