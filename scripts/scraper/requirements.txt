@@ -5,3 +5,4 @@ psycopg[binary]>=3.2
 python-dotenv>=1.0
 rich>=13.7
 tenacity>=8.2
+anthropic>=0.40

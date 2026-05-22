@@ -38,6 +38,7 @@
     "odds:scrape": "cd scripts/scraper && ./venv/bin/python scripts/08_scrape_bestfightodds.py",
     "odds:scrape:dry": "cd scripts/scraper && ./venv/bin/python scripts/08_scrape_bestfightodds.py --dry-run --limit 5",
     "news:scrape": "cd scripts/scraper && ./venv/bin/python scripts/09_scrape_news.py",
+    "news:classify": "cd scripts/scraper && ./venv/bin/python scripts/10_classify_news.py",
     "predictions:generate": "tsx scripts/generate_prediction_events.ts"
   },
   "dependencies": {

@@ -145,3 +145,131 @@ def mark_source_fetched(conn: psycopg.Connection, source_id: str) -> None:
             "UPDATE news_source SET last_fetched_at = now() WHERE id = %s::uuid",
             (source_id,),
         )
+
+
+@dataclass
+class UnprocessedItem:
+    id: str
+    title: str
+    body: str | None
+    source_base_confidence: float
+    source_is_trusted: bool
+
+
+def fetch_unprocessed(
+    conn: psycopg.Connection, limit: int = 500
+) -> list[UnprocessedItem]:
+    """News items not yet classified (processed_at IS NULL), newest first."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT ni.id::text, ni.title, ni.body,
+                   ns.base_confidence, ns.is_trusted
+            FROM news_item ni
+            JOIN news_source ns ON ns.id = ni.source_id
+            WHERE ni.processed_at IS NULL
+            ORDER BY ni.published_at DESC
+            LIMIT %s
+            """,
+            (limit,),
+        )
+        return [
+            UnprocessedItem(
+                id=r[0],
+                title=r[1],
+                body=r[2],
+                source_base_confidence=float(r[3]),
+                source_is_trusted=bool(r[4]),
+            )
+            for r in cur.fetchall()
+        ]
+
+
+def resolve_fighter_ids(
+    conn: psycopg.Connection,
+    names: list[str],
+    cache: dict[str, str | None],
+) -> list[str]:
+    """Fuzzy-match fighter names to fighter IDs via pg_trgm. The threshold is
+    deliberately high — a wrong link is worse than a missing one. `cache`
+    memoises lookups within a run (the same fighters recur across articles)."""
+    ids: list[str] = []
+    with conn.cursor() as cur:
+        for raw in names:
+            name = raw.strip()
+            if not name:
+                continue
+            if name not in cache:
+                cur.execute(
+                    """
+                    SELECT id::text
+                    FROM fighter
+                    WHERE similarity(name_en, %s) > 0.45
+                       OR lower(name_en) = lower(%s)
+                    ORDER BY (lower(name_en) = lower(%s)) DESC,
+                             similarity(name_en, %s) DESC
+                    LIMIT 1
+                    """,
+                    (name, name, name, name),
+                )
+                row = cur.fetchone()
+                cache[name] = row[0] if row else None
+            fid = cache[name]
+            if fid and fid not in ids:
+                ids.append(fid)
+    return ids
+
+
+def find_bout(
+    conn: psycopg.Connection, fighter_a: str, fighter_b: str
+) -> str | None:
+    """A bout between exactly these two fighters, preferring a scheduled one."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT b.id::text
+            FROM bout b
+            LEFT JOIN event e ON e.id = b.event_id
+            WHERE (b.fighter_a_id = %s::uuid AND b.fighter_b_id = %s::uuid)
+               OR (b.fighter_a_id = %s::uuid AND b.fighter_b_id = %s::uuid)
+            ORDER BY (b.status = 'scheduled') DESC, e.date DESC NULLS LAST
+            LIMIT 1
+            """,
+            (fighter_a, fighter_b, fighter_b, fighter_a),
+        )
+        row = cur.fetchone()
+        return row[0] if row else None
+
+
+def apply_classification(
+    conn: psycopg.Connection,
+    item_id: str,
+    *,
+    classification: str,
+    confidence: float,
+    fighter_ids: list[str],
+    bout_id: str | None,
+    status: str,
+) -> None:
+    """Write the classifier's verdict and mark the item processed."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE news_item SET
+                classification = %s::news_classification,
+                confidence = %s,
+                related_fighter_ids = %s::uuid[],
+                related_bout_id = %s::uuid,
+                status = %s::news_status,
+                processed_at = now()
+            WHERE id = %s::uuid
+            """,
+            (
+                classification,
+                confidence,
+                fighter_ids,
+                bout_id,
+                status,
+                item_id,
+            ),
+        )
