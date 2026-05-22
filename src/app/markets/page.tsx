@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Container } from "@/components/layout/container";
 import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
-import { EventMarketsAccordion } from "@/components/markets/event-markets-accordion";
+import { EventFights } from "@/components/markets/event-fights";
 import { getCurrentUser } from "@/lib/auth";
 import { listOpenMarketsByEvent } from "@/lib/markets";
 
@@ -24,18 +24,19 @@ export default async function MarketsPage() {
     <>
       <Navbar />
       <main className="flex-1">
-        <Container size="xl" className="py-10 md:py-14">
+        <Container size="lg" className="py-10 md:py-14">
           <header className="mb-8 flex flex-wrap items-baseline justify-between gap-3">
             <div>
               <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground-subtle">
                 Bookmaker
               </p>
               <h1 className="mt-2 font-display uppercase tracking-tight text-foreground text-h1">
-                Open markets
+                Markets
               </h1>
               <p className="mt-2 max-w-xl font-sans text-sm text-foreground-muted">
-                Bet virtual coins on upcoming UFC bouts. Prices are set by an
-                LMSR market maker — every trade nudges the implied odds.
+                Win odds on every upcoming bout — open a fight for its method,
+                round, and prop markets. Prices track real sportsbook odds and
+                move on every trade.
               </p>
             </div>
             {user ? (
@@ -64,7 +65,7 @@ export default async function MarketsPage() {
             )}
           </header>
 
-          <EventMarketsAccordion events={events} />
+          <EventFights events={events} />
         </Container>
       </main>
       <Footer />

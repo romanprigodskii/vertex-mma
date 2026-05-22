@@ -16,6 +16,7 @@ export const dynamic = "force-dynamic";
 
 interface PageProps {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ outcome?: string }>;
 }
 
 export async function generateMetadata({ params }: PageProps) {
@@ -49,10 +50,20 @@ export async function generateMetadata({ params }: PageProps) {
   };
 }
 
-export default async function MarketDetailPage({ params }: PageProps) {
+export default async function MarketDetailPage({
+  params,
+  searchParams,
+}: PageProps) {
   const { id } = await params;
+  const { outcome } = await searchParams;
   const market = await getMarketById(id);
   if (!market) notFound();
+
+  // Preselect the outcome when arriving from a Fonbet-style odds tile.
+  const initialOutcomeId =
+    outcome && market.outcomes.some((o) => o.id === outcome)
+      ? outcome
+      : undefined;
 
   const [user, externalOdds] = await Promise.all([
     getCurrentUser(),
@@ -194,7 +205,11 @@ export default async function MarketDetailPage({ params }: PageProps) {
                 Market is closed.
               </p>
             ) : user ? (
-              <BetForm market={market} userBalance={user.balanceCoins} />
+              <BetForm
+                market={market}
+                userBalance={user.balanceCoins}
+                initialOutcomeId={initialOutcomeId}
+              />
             ) : (
               <Link
                 href={`/signin?next=/markets/${market.id}`}

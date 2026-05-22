@@ -14,13 +14,16 @@ const INPUT_CLASS =
 interface Props {
   market: MarketDetail;
   userBalance: number;
+  initialOutcomeId?: string;
 }
 
 type Preview = { shares: number; cost: number; newPrice: number };
 
-export function BetForm({ market, userBalance }: Props) {
+export function BetForm({ market, userBalance, initialOutcomeId }: Props) {
   const router = useRouter();
-  const [outcomeId, setOutcomeId] = React.useState(market.outcomes[0]?.id ?? "");
+  const [outcomeId, setOutcomeId] = React.useState(
+    initialOutcomeId ?? market.outcomes[0]?.id ?? "",
+  );
   const [coins, setCoins] = React.useState<string>("100");
   const [preview, setPreview] = React.useState<Preview | null>(null);
   const [pending, setPending] = React.useState(false);
