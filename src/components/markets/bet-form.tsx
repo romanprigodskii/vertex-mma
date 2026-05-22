@@ -4,6 +4,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 
 import { placeBetAction, previewBetCost } from "@/app/markets/actions";
+import { Select } from "@/components/ui/select";
 import { priceToDecimalOdds } from "@/lib/lmsr";
 import type { MarketDetail } from "@/lib/markets";
 
@@ -86,18 +87,19 @@ export function BetForm({ market, userBalance }: Props) {
       </h3>
 
       <div className="flex flex-col gap-3 sm:flex-row">
-        <select
+        <Select
           value={outcomeId}
-          onChange={(e) => setOutcomeId(e.target.value)}
-          className={`${INPUT_CLASS} sm:min-w-[220px]`}
-        >
-          {market.outcomes.map((o) => (
-            <option key={o.id} value={o.id}>
-              {o.label} · {(o.current_price * 100).toFixed(1)}% ·{" "}
-              {priceToDecimalOdds(o.current_price)}x
-            </option>
-          ))}
-        </select>
+          onChange={setOutcomeId}
+          ariaLabel="Bet outcome"
+          className="sm:min-w-[220px]"
+          options={market.outcomes.map((o) => ({
+            value: o.id,
+            label: o.label,
+            hint: `${(o.current_price * 100).toFixed(1)}% · ${priceToDecimalOdds(
+              o.current_price,
+            )}x`,
+          }))}
+        />
 
         <input
           type="number"
