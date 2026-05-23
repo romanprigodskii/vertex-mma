@@ -82,14 +82,25 @@ export default async function FightMarketsPage({ params }: PageProps) {
             {fight.is_title_fight ? " · Title fight" : ""}
           </p>
 
-          <div className="mt-8 rounded-md border border-foreground/10 bg-background-elevated/30 px-4">
-            {fight.markets.map((m) => (
-              <MarketSection key={m.id} market={m} defaultOpen />
-            ))}
-          </div>
-          <p className="mt-2 font-sans text-[11px] text-foreground-subtle">
-            Tap any odds to place a bet.
-          </p>
+          {fight.markets.length === 0 ? (
+            <div className="mt-8 rounded-md border border-dashed border-foreground/15 bg-background-elevated/20 px-6 py-12 text-center">
+              <p className="font-sans text-sm text-foreground-muted">
+                No live odds for this fight yet — check back closer to the
+                event.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="mt-8 rounded-md border border-foreground/10 bg-background-elevated/30 px-4">
+                {fight.markets.map((m) => (
+                  <MarketSection key={m.id} market={m} defaultOpen />
+                ))}
+              </div>
+              <p className="mt-2 font-sans text-[11px] text-foreground-subtle">
+                Tap any odds to place a bet.
+              </p>
+            </>
+          )}
 
           {externalOdds ? (
             <SportsbookConsensus

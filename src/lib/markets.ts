@@ -5,6 +5,21 @@ import { db } from "@/lib/db";
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/**
+ * A market with uniform initial LMSR prices reads as "no real odds yet" —
+ * before any trade or external-odds sync, every outcome sits at exactly
+ * 1 / N (6.00 for method, 4.00 for round, 2.00 for two-outcome props).
+ * Hiding those rather than presenting system placeholders that look like
+ * real odds but aren't.
+ */
+function hasMeaningfulOdds(
+  outcomes: ReadonlyArray<{ current_price: number }>,
+): boolean {
+  if (outcomes.length < 2) return false;
+  const first = outcomes[0].current_price;
+  return outcomes.some((o) => Math.abs(o.current_price - first) > 0.005);
+}
+
 export type MarketCardOutcome = {
   id: string;
   label: string;
@@ -73,7 +88,9 @@ export async function listOpenMarkets(limit = 50): Promise<MarketListItem[]> {
     ORDER BY m.closes_at ASC, m.type ASC
     LIMIT ${limit}
   `);
-  return rows as unknown as MarketListItem[];
+  return (rows as unknown as MarketListItem[]).filter((m) =>
+    hasMeaningfulOdds(m.outcomes),
+  );
 }
 
 export type EventMarketsGroup = {
@@ -250,7 +267,23 @@ export async function listOpenMarketsByEvent(
     evt.total_markets++;
   }
 
-  return Array.from(eventMap.values()).slice(0, limit);
+  // Drop markets with the uniform LMSR initial price; drop bouts (and
+  // events) left with nothing meaningful to show.
+  for (const evt of eventMap.values()) {
+    evt.bouts = evt.bouts
+      .map((b) => ({
+        ...b,
+        markets: b.markets.filter((m) => hasMeaningfulOdds(m.outcomes)),
+      }))
+      .filter((b) => b.markets.length > 0);
+    evt.total_markets = evt.bouts.reduce(
+      (sum, b) => sum + b.markets.length,
+      0,
+    );
+  }
+  return Array.from(eventMap.values())
+    .filter((e) => e.bouts.length > 0)
+    .slice(0, limit);
 }
 
 export type MarketOutcomeRow = {
@@ -533,6 +566,14 @@ export async function getFightMarkets(
 
   if (rows.length === 0) return null;
   const f = rows[0];
+  const markets = rows
+    .map((r) => ({
+      id: r.market_id,
+      type: r.market_type,
+      question: r.market_question,
+      outcomes: r.outcomes_json ?? [],
+    }))
+    .filter((m) => hasMeaningfulOdds(m.outcomes));
   return {
     bout_id: f.bout_id,
     event_name: f.event_name,
@@ -547,11 +588,6 @@ export async function getFightMarkets(
     fighter_a_slug: f.fighter_a_slug,
     fighter_b_name: f.fighter_b_name,
     fighter_b_slug: f.fighter_b_slug,
-    markets: rows.map((r) => ({
-      id: r.market_id,
-      type: r.market_type,
-      question: r.market_question,
-      outcomes: r.outcomes_json ?? [],
-    })),
+    markets,
   };
 }
