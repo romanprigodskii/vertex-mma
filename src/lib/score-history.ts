@@ -202,8 +202,12 @@ export async function getPeakVertex(
   if (!anchorBout) return null;
   const endingBoutBase = endingRow ? hydrate(endingRow) : null;
 
-  const currentScore =
-    combined.current_score ?? combined.all_time_score ?? null;
+  // Keep `currentScore` strictly `vertex_score`. Falling back to all-time
+  // for retired/inactive fighters made the Peak Vertex panel read as if
+  // they had only dropped a few points; the UI now treats `null` as 0
+  // so the displayed "vs current" delta reflects the full drop from
+  // peak — i.e. how much they've fallen on the whole rating.
+  const currentScore = combined.current_score ?? null;
 
   return {
     peak: peakRow.vertex_score,
