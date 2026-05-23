@@ -5,6 +5,7 @@ import { Container } from "@/components/layout/container";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { NavSections } from "@/components/layout/nav-sections";
 import { NavbarNotifications } from "@/components/layout/navbar-notifications";
+import { NavbarSearch } from "@/components/layout/navbar-search";
 import { NavbarUserMenu } from "@/components/layout/navbar-user-menu";
 import type { CurrentUser } from "@/lib/auth";
 import type { NotificationRow } from "@/lib/notifications";
@@ -40,6 +41,7 @@ export function NavbarInner({
           <Logo />
           <NavSections />
           <div className="flex items-center gap-2">
+            <NavbarSearch />
             {user ? (
               <>
                 <div className="hidden h-9 items-center gap-1.5 rounded-md border border-foreground/15 bg-background-elevated px-3 text-sm tabular sm:inline-flex">

@@ -58,23 +58,33 @@ async function getMyProfileId(): Promise<string | null> {
 
 export type PickerFighter = {
   id: string;
+  slug: string;
   name: string;
   nickname: string | null;
   photo_thumbnail_url: string | null;
   weight_class: string | null;
+  wins_total: number | null;
+  losses_total: number | null;
+  draws_total: number | null;
+  vertex_score_all_time: number | null;
 };
 
 export async function searchFightersForPicker(
   query: string,
 ): Promise<PickerFighter[]> {
   if (!query.trim()) return [];
-  const results = await searchFighters(query, 8);
+  const results = await searchFighters(query, 10);
   return results.map((r) => ({
     id: r.id,
+    slug: r.slug,
     name: r.name_en,
     nickname: r.nickname,
     photo_thumbnail_url: r.photo_thumbnail_url,
     weight_class: r.weight_class_primary,
+    wins_total: r.wins_total,
+    losses_total: r.losses_total,
+    draws_total: r.draws_total,
+    vertex_score_all_time: r.vertex_score_all_time,
   }));
 }
 

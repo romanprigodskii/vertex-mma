@@ -12,9 +12,15 @@ import { cn } from "@/lib/utils";
 
 interface PickedFighter {
   id: string;
+  slug: string;
   name: string;
+  nickname: string | null;
   photo_thumbnail_url: string | null;
   weight_class: string | null;
+  wins_total: number | null;
+  losses_total: number | null;
+  draws_total: number | null;
+  vertex_score_all_time: number | null;
 }
 
 const GAMEPLAN_MAX = 500;
@@ -177,6 +183,10 @@ function PickerSlot({
   }, [query]);
 
   if (picked) {
+    const record =
+      picked.wins_total != null && picked.losses_total != null
+        ? `${picked.wins_total}-${picked.losses_total}-${picked.draws_total ?? 0}`
+        : null;
     return (
       <div
         className={cn(
@@ -192,11 +202,11 @@ function PickerSlot({
             <img
               src={picked.photo_thumbnail_url}
               alt={picked.name}
-              className="h-12 w-12 shrink-0 rounded-sm border border-foreground/15 object-cover"
+              className="h-14 w-14 shrink-0 rounded-sm border border-foreground/15 object-cover"
             />
           ) : (
             <div
-              className="h-12 w-12 shrink-0 rounded-sm bg-foreground/[0.05]"
+              className="h-14 w-14 shrink-0 rounded-sm bg-foreground/[0.05]"
               aria-hidden
             />
           )}
@@ -204,10 +214,26 @@ function PickerSlot({
             <p className="truncate font-display text-lg uppercase tracking-tight text-foreground">
               {picked.name}
             </p>
+            {picked.nickname ? (
+              <p className="truncate font-sans text-xs italic text-foreground-muted">
+                &ldquo;{picked.nickname}&rdquo;
+              </p>
+            ) : null}
             <p className="mt-0.5 font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
               {picked.weight_class?.replace(/_/g, " ") ?? "—"}
+              {record ? ` · ${record}` : ""}
             </p>
           </div>
+          {picked.vertex_score_all_time != null ? (
+            <div className="shrink-0 rounded-sm border border-primary/40 bg-primary/10 px-2 py-1 text-center font-mono tabular text-foreground">
+              <div className="text-[9px] uppercase tracking-widest text-foreground-subtle">
+                All-time
+              </div>
+              <div className="text-sm font-semibold">
+                {Math.round(picked.vertex_score_all_time)}
+              </div>
+            </div>
+          ) : null}
         </div>
         <button
           type="button"
@@ -240,7 +266,7 @@ function PickerSlot({
         </p>
       ) : null}
       {visible.length > 0 ? (
-        <ul className="mt-2 flex max-h-56 flex-col overflow-y-auto">
+        <ul className="mt-2 flex max-h-80 flex-col overflow-y-auto">
           {visible.map((r) => (
             <li key={r.id}>
               <button
@@ -248,36 +274,50 @@ function PickerSlot({
                 onClick={() => {
                   onPick({
                     id: r.id,
+                    slug: r.slug,
                     name: r.name,
+                    nickname: r.nickname,
                     photo_thumbnail_url: r.photo_thumbnail_url,
                     weight_class: r.weight_class,
+                    wins_total: r.wins_total,
+                    losses_total: r.losses_total,
+                    draws_total: r.draws_total,
+                    vertex_score_all_time: r.vertex_score_all_time,
                   });
                   setQuery("");
                   setResults([]);
                 }}
-                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left hover:bg-foreground/[0.05]"
+                className="flex w-full items-center gap-2.5 rounded-sm px-2 py-2 text-left transition-colors hover:bg-foreground/[0.05]"
               >
                 {r.photo_thumbnail_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={r.photo_thumbnail_url}
                     alt=""
-                    className="h-8 w-8 shrink-0 rounded-sm object-cover"
+                    className="h-10 w-10 shrink-0 rounded-sm border border-foreground/10 object-cover"
                   />
                 ) : (
                   <div
-                    className="h-8 w-8 shrink-0 rounded-sm bg-foreground/[0.05]"
+                    className="h-10 w-10 shrink-0 rounded-sm bg-foreground/[0.05]"
                     aria-hidden
                   />
                 )}
                 <span className="min-w-0 flex-1">
-                  <p className="truncate font-sans text-sm text-foreground">
+                  <p className="truncate font-sans text-sm font-medium text-foreground">
                     {r.name}
                   </p>
-                  <p className="font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
-                    {r.weight_class ?? "—"}
+                  <p className="truncate font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
+                    {r.weight_class?.replace(/_/g, " ") ?? "—"}
+                    {r.wins_total != null && r.losses_total != null
+                      ? ` · ${r.wins_total}-${r.losses_total}-${r.draws_total ?? 0}`
+                      : ""}
                   </p>
                 </span>
+                {r.vertex_score_all_time != null ? (
+                  <span className="shrink-0 rounded-sm border border-foreground/15 bg-foreground/[0.05] px-1.5 py-0.5 font-mono text-[11px] tabular text-foreground">
+                    {Math.round(r.vertex_score_all_time)}
+                  </span>
+                ) : null}
               </button>
             </li>
           ))}

@@ -17,15 +17,18 @@ export type FighterSearchResult = {
   wins_total: number | null;
   losses_total: number | null;
   draws_total: number | null;
+  vertex_score_all_time: number | null;
   similarity: number;
 };
 
 /**
  * Fuzzy search fighters by name, nickname, or alias using pg_trgm similarity().
  *
- * Trigram similarity falls in [0, 1]; results are ordered DESC. Substring ILIKE
- * matches always qualify so exact-substring hits don't get dropped by the 0.3
- * similarity threshold.
+ * Substring ILIKE matches qualify a row regardless of the 0.3 trigram floor.
+ * Results are ordered by all-time Vertex score DESC so a search for "jones"
+ * surfaces Jon Jones above lower-ranked "Jone*" matches; similarity is the
+ * secondary sort so an unscored exact match still ranks above a weak match
+ * that happens to have a score.
  */
 export async function searchFighters(
   query: string,
@@ -35,48 +38,50 @@ export async function searchFighters(
   if (!trimmed) return [];
 
   const result = await db.execute<FighterSearchResult>(sql`
-    SELECT DISTINCT ON (f.id)
-      f.id::text AS id,
-      f.slug,
-      f.name_en,
-      f.name_ru,
-      f.nickname,
-      f.photo_url,
-      f.photo_silhouette_url,
-      f.photo_thumbnail_url,
-      f.weight_class_primary::text,
-      f.country_code,
-      fsa.wins_total,
-      fsa.losses_total,
-      fsa.draws_total,
-      GREATEST(
-        similarity(f.name_en, ${trimmed}),
-        similarity(COALESCE(f.nickname, ''), ${trimmed}),
-        COALESCE((
-          SELECT MAX(similarity(fa.alias, ${trimmed}))
-          FROM fighter_alias fa
-          WHERE fa.fighter_id = f.id
-        ), 0)
-      )::float AS similarity
-    FROM fighter f
-    LEFT JOIN fighter_stats_aggregate fsa ON fsa.fighter_id = f.id
-    WHERE
-      f.name_en ILIKE ${"%" + trimmed + "%"}
-      OR f.nickname ILIKE ${"%" + trimmed + "%"}
-      OR similarity(f.name_en, ${trimmed}) > 0.3
-      OR similarity(COALESCE(f.nickname, ''), ${trimmed}) > 0.3
-      OR EXISTS (
-        SELECT 1 FROM fighter_alias fa2
-        WHERE fa2.fighter_id = f.id
-          AND similarity(fa2.alias, ${trimmed}) > 0.3
-      )
-    ORDER BY f.id, similarity DESC
+    SELECT * FROM (
+      SELECT DISTINCT ON (f.id)
+        f.id::text AS id,
+        f.slug,
+        f.name_en,
+        f.name_ru,
+        f.nickname,
+        f.photo_url,
+        f.photo_silhouette_url,
+        f.photo_thumbnail_url,
+        f.weight_class_primary::text AS weight_class_primary,
+        f.country_code,
+        fsa.wins_total,
+        fsa.losses_total,
+        fsa.draws_total,
+        f.vertex_score_all_time,
+        GREATEST(
+          similarity(f.name_en, ${trimmed}),
+          similarity(COALESCE(f.nickname, ''), ${trimmed}),
+          COALESCE((
+            SELECT MAX(similarity(fa.alias, ${trimmed}))
+            FROM fighter_alias fa
+            WHERE fa.fighter_id = f.id
+          ), 0)
+        )::float AS similarity
+      FROM fighter f
+      LEFT JOIN fighter_stats_aggregate fsa ON fsa.fighter_id = f.id
+      WHERE
+        f.name_en ILIKE ${"%" + trimmed + "%"}
+        OR f.nickname ILIKE ${"%" + trimmed + "%"}
+        OR similarity(f.name_en, ${trimmed}) > 0.3
+        OR similarity(COALESCE(f.nickname, ''), ${trimmed}) > 0.3
+        OR EXISTS (
+          SELECT 1 FROM fighter_alias fa2
+          WHERE fa2.fighter_id = f.id
+            AND similarity(fa2.alias, ${trimmed}) > 0.3
+        )
+      ORDER BY f.id, similarity DESC
+    ) sub
+    ORDER BY vertex_score_all_time DESC NULLS LAST, similarity DESC
     LIMIT ${limit}
   `);
 
-  // postgres-js returns rows as the array itself.
-  const rows = result as unknown as FighterSearchResult[];
-  return [...rows].sort((a, b) => b.similarity - a.similarity);
+  return [...(result as unknown as FighterSearchResult[])];
 }
 
 /* -------------------------------------------------------------------------- */
