@@ -8,12 +8,12 @@ import {
   searchFightersForPicker,
 } from "@/app/rankings/actions";
 import { runSimulationAction } from "@/app/simulator/actions";
-import {
-  DualScore,
-  FighterResultCard,
-} from "@/components/fighter/fighter-result-card";
+import { FighterResultCard } from "@/components/fighter/fighter-result-card";
 import { cn } from "@/lib/utils";
-import { TIER_STYLES, type VertexTier } from "@/lib/vertex-tier";
+import {
+  type ChampionStatus,
+  type VertexTier,
+} from "@/lib/vertex-tier";
 
 interface PickedFighter {
   id: string;
@@ -29,6 +29,7 @@ interface PickedFighter {
   vertex_score_all_time: number | null;
   ufc_bouts: number;
   tier: VertexTier;
+  championStatus: ChampionStatus;
 }
 
 const GAMEPLAN_MAX = 500;
@@ -190,68 +191,18 @@ function PickerSlot({
   }, [query]);
 
   if (picked) {
-    const style = TIER_STYLES[picked.tier];
-    const record =
-      picked.wins_total != null && picked.losses_total != null
-        ? `${picked.wins_total}-${picked.losses_total}-${picked.draws_total ?? 0}`
-        : null;
     return (
-      <div
-        className={cn(
-          "relative overflow-hidden rounded-md border border-foreground/15 p-4",
-        )}
-      >
-        <div
-          className="pointer-events-none absolute inset-0"
-          style={{
-            background: `linear-gradient(135deg, ${style.gradientFrom}, ${style.gradientTo})`,
-          }}
-          aria-hidden
-        />
-        <p className="relative font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
+      <div className="flex flex-col gap-2">
+        <p className="font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
           {label}
         </p>
-        <div className="relative mt-2 flex items-center gap-3">
-          {picked.photo_thumbnail_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={picked.photo_thumbnail_url}
-              alt={picked.name}
-              className="h-16 w-16 shrink-0 rounded-sm border border-foreground/15 object-cover"
-            />
-          ) : (
-            <div
-              className="h-16 w-16 shrink-0 rounded-sm bg-foreground/[0.05]"
-              aria-hidden
-            />
-          )}
-          <div className="min-w-0 flex-1">
-            <p className="truncate font-display text-lg uppercase tracking-tight text-foreground">
-              {picked.name}
-            </p>
-            {picked.nickname ? (
-              <p className="truncate font-sans text-xs italic text-foreground-muted">
-                &ldquo;{picked.nickname}&rdquo;
-              </p>
-            ) : null}
-            <p className="mt-0.5 font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
-              {picked.weight_class?.replace(/_/g, " ") ?? "—"}
-              {record ? ` · ${record}` : ""}
-              {picked.ufc_bouts > 0 ? ` · ${picked.ufc_bouts} UFC` : ""}
-            </p>
-          </div>
-          <DualScore
-            current={picked.vertex_score}
-            allTime={picked.vertex_score_all_time}
-            scoreColor={style.scoreColor}
-            borderColor={style.badgeBorder}
-            size="lg"
-          />
+        <div className="ring-2 ring-primary/40 ring-offset-2 ring-offset-background-base rounded-md">
+          <FighterResultCard fighter={picked} />
         </div>
         <button
           type="button"
           onClick={() => onPick(null)}
-          className="relative mt-3 font-sans text-xs text-streak-loss hover:underline"
+          className="self-start font-sans text-xs text-streak-loss hover:underline"
         >
           Clear
         </button>
@@ -285,7 +236,7 @@ function PickerSlot({
               Top fighters · all-time
             </p>
           ) : null}
-          <ul className="flex max-h-96 flex-col gap-1.5 overflow-y-auto pr-1">
+          <ul className="grid max-h-[34rem] grid-cols-1 gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
             {visible.map((r) => (
               <li key={r.id}>
                 <FighterResultCard
@@ -305,6 +256,7 @@ function PickerSlot({
                       vertex_score_all_time: r.vertex_score_all_time,
                       ufc_bouts: r.ufc_bouts,
                       tier: r.tier,
+                      championStatus: r.championStatus,
                     });
                     setQuery("");
                     setResults([]);

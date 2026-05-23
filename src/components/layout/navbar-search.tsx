@@ -105,7 +105,7 @@ export function NavbarSearch() {
                       Top fighters · all-time
                     </p>
                   ) : null}
-                  <ul className="flex flex-col gap-1.5">
+                  <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                     {results.map((r) => (
                       <li key={r.id}>
                         <FighterResultCard

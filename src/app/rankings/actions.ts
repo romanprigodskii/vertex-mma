@@ -12,7 +12,11 @@ import {
 import { userProfile } from "@/lib/db/schema/users";
 import { searchFighters, topFightersByAllTime } from "@/lib/fighter-search";
 import { createClient } from "@/lib/supabase/server";
-import { classifyFighter, type VertexTier } from "@/lib/vertex-tier";
+import {
+  classifyFighter,
+  type ChampionStatus,
+  type VertexTier,
+} from "@/lib/vertex-tier";
 
 const TITLE_MIN = 3;
 const TITLE_MAX = 100;
@@ -74,6 +78,9 @@ export type PickerFighter = {
    *  so client cards can apply the canonical gradient + colour without
    *  importing the championship-history data table. */
   tier: VertexTier;
+  /** Pre-computed champion status so cards can render a Crown badge for
+   *  active / dominant champions without bundling championship-history. */
+  championStatus: ChampionStatus;
 };
 
 export async function searchFightersForPicker(
@@ -85,26 +92,30 @@ export async function searchFightersForPicker(
   const results = trimmed
     ? await searchFighters(trimmed, 10)
     : await topFightersByAllTime(10);
-  return results.map((r) => ({
-    id: r.id,
-    slug: r.slug,
-    name: r.name_en,
-    nickname: r.nickname,
-    photo_thumbnail_url: r.photo_thumbnail_url,
-    weight_class: r.weight_class_primary,
-    wins_total: r.wins_total,
-    losses_total: r.losses_total,
-    draws_total: r.draws_total,
-    vertex_score: r.vertex_score,
-    vertex_score_all_time: r.vertex_score_all_time,
-    ufc_bouts: r.ufc_bouts,
-    tier: classifyFighter({
+  return results.map((r) => {
+    const classification = classifyFighter({
       slug: r.slug,
       vertexScore: r.vertex_score,
       vertexScoreAllTime: r.vertex_score_all_time,
       ufcBouts: r.ufc_bouts,
-    }).tier,
-  }));
+    });
+    return {
+      id: r.id,
+      slug: r.slug,
+      name: r.name_en,
+      nickname: r.nickname,
+      photo_thumbnail_url: r.photo_thumbnail_url,
+      weight_class: r.weight_class_primary,
+      wins_total: r.wins_total,
+      losses_total: r.losses_total,
+      draws_total: r.draws_total,
+      vertex_score: r.vertex_score,
+      vertex_score_all_time: r.vertex_score_all_time,
+      ufc_bouts: r.ufc_bouts,
+      tier: classification.tier,
+      championStatus: classification.championStatus,
+    };
+  });
 }
 
 function validateEntries(
