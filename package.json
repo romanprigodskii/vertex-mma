@@ -40,6 +40,8 @@
     "odds:sync": "pnpm odds:scrape && tsx scripts/sync_market_odds.ts",
     "news:scrape": "cd scripts/scraper && ./venv/bin/python scripts/09_scrape_news.py",
     "news:classify": "cd scripts/scraper && ./venv/bin/python scripts/10_classify_news.py",
+    "news:rephrase": "cd scripts/scraper && ./venv/bin/python scripts/11_rephrase_news.py",
+    "news:ingest": "pnpm news:scrape && pnpm news:classify && pnpm news:rephrase",
     "predictions:generate": "tsx scripts/generate_prediction_events.ts"
   },
   "dependencies": {
