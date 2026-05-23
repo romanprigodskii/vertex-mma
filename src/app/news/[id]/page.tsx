@@ -45,7 +45,7 @@ export default async function NewsArticlePage({ params }: PageProps) {
     <>
       <Navbar />
       <main className="flex-1">
-        <Container size="md" className="py-10 md:py-14">
+        <Container size="sm" className="py-10 md:py-14">
           <Link
             href="/news"
             prefetch={false}
