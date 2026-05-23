@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Search, X } from "lucide-react";
 
@@ -9,6 +8,7 @@ import {
   type PickerFighter,
   searchFightersForPicker,
 } from "@/app/rankings/actions";
+import { FighterResultCard } from "@/components/fighter/fighter-result-card";
 
 /**
  * Site-wide fighter search reachable from the navbar. Opens a Radix dialog
@@ -99,55 +99,14 @@ export function NavbarSearch() {
                   Searching…
                 </p>
               ) : results.length > 0 ? (
-                <ul className="divide-y divide-foreground/[0.06]">
+                <ul className="flex flex-col gap-1.5 p-2">
                   {results.map((r) => (
                     <li key={r.id}>
-                      <Link
+                      <FighterResultCard
+                        fighter={r}
                         href={`/fighters/${r.slug}`}
-                        prefetch={false}
                         onClick={() => setOpen(false)}
-                        className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-foreground/[0.04]"
-                      >
-                        {r.photo_thumbnail_url ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={r.photo_thumbnail_url}
-                            alt=""
-                            className="h-12 w-12 shrink-0 rounded-sm border border-foreground/10 object-cover"
-                          />
-                        ) : (
-                          <div
-                            className="h-12 w-12 shrink-0 rounded-sm bg-foreground/[0.05]"
-                            aria-hidden
-                          />
-                        )}
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate font-display text-base uppercase tracking-tight text-foreground">
-                            {r.name}
-                          </p>
-                          {r.nickname ? (
-                            <p className="truncate font-sans text-xs italic text-foreground-muted">
-                              &ldquo;{r.nickname}&rdquo;
-                            </p>
-                          ) : null}
-                          <p className="truncate font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
-                            {r.weight_class?.replace(/_/g, " ") ?? "—"}
-                            {r.wins_total != null && r.losses_total != null
-                              ? ` · ${r.wins_total}-${r.losses_total}-${r.draws_total ?? 0}`
-                              : ""}
-                          </p>
-                        </div>
-                        {r.vertex_score_all_time != null ? (
-                          <div className="shrink-0 rounded-sm border border-foreground/15 bg-foreground/[0.05] px-2 py-1 text-center font-mono tabular text-foreground">
-                            <div className="text-[9px] uppercase tracking-widest text-foreground-subtle">
-                              All-time
-                            </div>
-                            <div className="text-sm font-semibold">
-                              {Math.round(r.vertex_score_all_time)}
-                            </div>
-                          </div>
-                        ) : null}
-                      </Link>
+                      />
                     </li>
                   ))}
                 </ul>

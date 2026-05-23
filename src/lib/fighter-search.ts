@@ -17,7 +17,9 @@ export type FighterSearchResult = {
   wins_total: number | null;
   losses_total: number | null;
   draws_total: number | null;
+  vertex_score: number | null;
   vertex_score_all_time: number | null;
+  ufc_bouts: number;
   similarity: number;
 };
 
@@ -50,10 +52,12 @@ export async function searchFighters(
         f.photo_thumbnail_url,
         f.weight_class_primary::text AS weight_class_primary,
         f.country_code,
-        fsa.wins_total,
-        fsa.losses_total,
-        fsa.draws_total,
+        COALESCE(f.wins_total, 0) AS wins_total,
+        COALESCE(f.losses_total, 0) AS losses_total,
+        COALESCE(f.draws_total, 0) AS draws_total,
+        f.vertex_score,
         f.vertex_score_all_time,
+        COALESCE(f.ufc_total, 0)::int AS ufc_bouts,
         GREATEST(
           similarity(f.name_en, ${trimmed}),
           similarity(COALESCE(f.nickname, ''), ${trimmed}),
@@ -63,8 +67,7 @@ export async function searchFighters(
             WHERE fa.fighter_id = f.id
           ), 0)
         )::float AS similarity
-      FROM fighter f
-      LEFT JOIN fighter_stats_aggregate fsa ON fsa.fighter_id = f.id
+      FROM fighter_with_stats f
       WHERE
         f.name_en ILIKE ${"%" + trimmed + "%"}
         OR f.nickname ILIKE ${"%" + trimmed + "%"}

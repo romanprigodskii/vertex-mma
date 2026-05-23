@@ -12,6 +12,7 @@ import {
 import { userProfile } from "@/lib/db/schema/users";
 import { searchFighters } from "@/lib/fighter-search";
 import { createClient } from "@/lib/supabase/server";
+import { classifyFighter, type VertexTier } from "@/lib/vertex-tier";
 
 const TITLE_MIN = 3;
 const TITLE_MAX = 100;
@@ -66,7 +67,13 @@ export type PickerFighter = {
   wins_total: number | null;
   losses_total: number | null;
   draws_total: number | null;
+  vertex_score: number | null;
   vertex_score_all_time: number | null;
+  ufc_bouts: number;
+  /** Pre-computed tier (apex / elite / established / roster / unranked)
+   *  so client cards can apply the canonical gradient + colour without
+   *  importing the championship-history data table. */
+  tier: VertexTier;
 };
 
 export async function searchFightersForPicker(
@@ -84,7 +91,15 @@ export async function searchFightersForPicker(
     wins_total: r.wins_total,
     losses_total: r.losses_total,
     draws_total: r.draws_total,
+    vertex_score: r.vertex_score,
     vertex_score_all_time: r.vertex_score_all_time,
+    ufc_bouts: r.ufc_bouts,
+    tier: classifyFighter({
+      slug: r.slug,
+      vertexScore: r.vertex_score,
+      vertexScoreAllTime: r.vertex_score_all_time,
+      ufcBouts: r.ufc_bouts,
+    }).tier,
   }));
 }
 
