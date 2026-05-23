@@ -34,6 +34,12 @@ export function NewsRow({ item }: { item: NewsFeedItem }) {
         />
       </Link>
 
+      {item.snippet ? (
+        <p className="mt-2 line-clamp-2 font-sans text-sm text-foreground-muted">
+          {item.snippet}
+        </p>
+      ) : null}
+
       {item.fighters.length > 0 ? (
         <div className="mt-2.5 flex flex-wrap gap-1.5">
           {item.fighters.map((f) => (

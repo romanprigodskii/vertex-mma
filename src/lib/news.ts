@@ -51,12 +51,26 @@ function decodeEntities(text: string): string {
   });
 }
 
+/** A short teaser for the feed list — first sentence or ~180 chars of body. */
+function bodySnippet(body: string | null): string | null {
+  if (!body) return null;
+  const t = body.trim();
+  if (!t) return null;
+  if (t.length <= 200) return t;
+  const period = t.indexOf(". ");
+  if (period >= 80 && period <= 220) return t.slice(0, period + 1);
+  const cut = t.slice(0, 200);
+  const lastSpace = cut.lastIndexOf(" ");
+  return (lastSpace > 100 ? cut.slice(0, lastSpace) : cut).trim() + "…";
+}
+
 export type NewsFighter = { id: string; slug: string; name: string };
 
 export type NewsFeedItem = {
   id: string;
   url: string;
   title: string;
+  snippet: string | null;
   published_at: string;
   classification: string;
   source_name: string;
@@ -72,6 +86,7 @@ type FeedRow = {
   id: string;
   url: string;
   title: string;
+  body_rephrased: string | null;
   published_at: string;
   classification: string | null;
   related_fighter_ids: string[] | null;
@@ -108,6 +123,7 @@ function toFeedItem(row: FeedRow, fighters: NewsFighter[]): NewsFeedItem {
     id: row.id,
     url: row.url,
     title: decodeEntities(row.title),
+    snippet: bodySnippet(row.body_rephrased),
     published_at: row.published_at,
     classification: row.classification ?? "general_news",
     source_name: row.source_name,
@@ -120,6 +136,7 @@ const FEED_SELECT = sql`
     ni.id::text AS id,
     ni.url,
     ni.title,
+    ni.body_rephrased,
     ni.published_at::text AS published_at,
     ni.classification::text AS classification,
     ni.related_fighter_ids,
