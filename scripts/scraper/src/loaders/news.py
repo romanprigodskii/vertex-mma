@@ -273,3 +273,43 @@ def apply_classification(
                 item_id,
             ),
         )
+
+
+@dataclass
+class UnrephrasedItem:
+    id: str
+    title: str
+    body: str | None
+
+
+def fetch_unrephrased(
+    conn: psycopg.Connection, limit: int = 300
+) -> list[UnrephrasedItem]:
+    """Approved news items not yet rephrased, newest first."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT id::text, title, body
+            FROM news_item
+            WHERE status IN ('approved', 'auto_approved')
+              AND body_rephrased IS NULL
+            ORDER BY published_at DESC
+            LIMIT %s
+            """,
+            (limit,),
+        )
+        return [
+            UnrephrasedItem(id=r[0], title=r[1], body=r[2])
+            for r in cur.fetchall()
+        ]
+
+
+def save_rephrase(
+    conn: psycopg.Connection, item_id: str, body_rephrased: str
+) -> None:
+    """Store the Haiku-rephrased body for a news item."""
+    with conn.cursor() as cur:
+        cur.execute(
+            "UPDATE news_item SET body_rephrased = %s WHERE id = %s::uuid",
+            (body_rephrased, item_id),
+        )

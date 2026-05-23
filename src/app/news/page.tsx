@@ -58,7 +58,7 @@ export default async function NewsPage({ searchParams }: PageProps) {
       : null;
 
   const [items, counts] = await Promise.all([
-    listNewsFeed({ classification: active ?? undefined, limit: 80 }),
+    listNewsFeed({ classification: active ?? undefined, limit: 150 }),
     getNewsClassificationCounts(),
   ]);
   const total = counts.reduce((sum, c) => sum + c.count, 0);

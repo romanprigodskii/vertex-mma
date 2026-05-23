@@ -132,7 +132,7 @@ const FEED_SELECT = sql`
 export async function listNewsFeed(
   opts: { classification?: string; limit?: number } = {},
 ): Promise<NewsFeedItem[]> {
-  const limit = Math.min(120, Math.max(1, opts.limit ?? 60));
+  const limit = Math.min(200, Math.max(1, opts.limit ?? 150));
   const cls =
     opts.classification && opts.classification in NEWS_CLASSIFICATION_LABELS
       ? opts.classification
@@ -192,4 +192,76 @@ export async function listNewsForFighter(
     LIMIT ${Math.min(20, Math.max(1, limit))}
   `)) as unknown as FeedRow[];
   return rows.map((r) => toFeedItem(r, []));
+}
+
+export type NewsItemDetail = {
+  id: string;
+  url: string;
+  title: string;
+  body: string | null;
+  body_rephrased: string | null;
+  published_at: string;
+  classification: string;
+  source_name: string;
+  source_url: string | null;
+  fighters: NewsFighter[];
+};
+
+type DetailRow = {
+  id: string;
+  url: string;
+  title: string;
+  body: string | null;
+  body_rephrased: string | null;
+  published_at: string;
+  classification: string | null;
+  related_fighter_ids: string[] | null;
+  source_name: string;
+  source_url: string | null;
+};
+
+/** A single approved news item with everything the article page needs. */
+export async function getNewsItemById(
+  id: string,
+): Promise<NewsItemDetail | null> {
+  if (!UUID_RE.test(id)) return null;
+  const rows = (await db.execute<DetailRow>(sql`
+    SELECT
+      ni.id::text AS id,
+      ni.url,
+      ni.title,
+      ni.body,
+      ni.body_rephrased,
+      ni.published_at::text AS published_at,
+      ni.classification::text AS classification,
+      ni.related_fighter_ids,
+      ns.name AS source_name,
+      ns.url AS source_url
+    FROM news_item ni
+    JOIN news_source ns ON ns.id = ni.source_id
+    WHERE ni.id = ${id}::uuid
+      AND ni.status IN ('approved', 'auto_approved')
+    LIMIT 1
+  `)) as unknown as DetailRow[];
+
+  if (rows.length === 0) return null;
+  const r = rows[0];
+
+  const fighterMap = await resolveNewsFighters(r.related_fighter_ids ?? []);
+  const fighters = (r.related_fighter_ids ?? [])
+    .map((fid) => fighterMap.get(fid))
+    .filter((f): f is NewsFighter => f !== undefined);
+
+  return {
+    id: r.id,
+    url: r.url,
+    title: decodeEntities(r.title),
+    body: r.body,
+    body_rephrased: r.body_rephrased,
+    published_at: r.published_at,
+    classification: r.classification ?? "general_news",
+    source_name: r.source_name,
+    source_url: r.source_url,
+    fighters,
+  };
 }

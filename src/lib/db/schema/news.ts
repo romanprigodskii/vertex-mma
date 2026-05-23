@@ -46,6 +46,7 @@ export const newsItem = pgTable(
 
     title: text("title").notNull(),
     body: text("body"),
+    bodyRephrased: text("body_rephrased"),
     author: text("author"),
 
     publishedAt: timestamp("published_at", { withTimezone: true }).notNull(),

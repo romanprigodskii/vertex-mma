@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ExternalLink } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 
 import { NewsClassificationBadge } from "@/components/news/news-classification-badge";
 import type { NewsFeedItem } from "@/lib/news";
@@ -22,18 +22,17 @@ export function NewsRow({ item }: { item: NewsFeedItem }) {
         <span className="shrink-0 tabular">{date}</span>
       </div>
 
-      <a
-        href={item.url}
-        target="_blank"
-        rel="noopener noreferrer"
+      <Link
+        href={`/news/${item.id}`}
+        prefetch={false}
         className="mt-2 flex items-start gap-1.5 font-sans text-base font-medium text-foreground hover:text-primary"
       >
         <span>{item.title}</span>
-        <ExternalLink
+        <ChevronRight
           className="mt-1 h-3.5 w-3.5 shrink-0 text-foreground-subtle"
           aria-hidden
         />
-      </a>
+      </Link>
 
       {item.fighters.length > 0 ? (
         <div className="mt-2.5 flex flex-wrap gap-1.5">
