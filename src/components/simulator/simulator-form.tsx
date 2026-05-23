@@ -173,11 +173,10 @@ function PickerSlot({
   queryRef.current = query;
 
   React.useEffect(() => {
-    if (!query.trim()) {
-      setResults([]);
-      return;
-    }
     const snap = query;
+    // No debounce on the initial empty-query top-fighters load; a short
+    // debounce while the user is typing.
+    const delay = snap.trim() ? 200 : 0;
     const t = setTimeout(async () => {
       setPending(true);
       try {
@@ -186,7 +185,7 @@ function PickerSlot({
       } finally {
         if (queryRef.current === snap) setPending(false);
       }
-    }, 200);
+    }, delay);
     return () => clearTimeout(t);
   }, [query]);
 
@@ -280,34 +279,45 @@ function PickerSlot({
         </p>
       ) : null}
       {visible.length > 0 ? (
-        <ul className="mt-2 flex max-h-96 flex-col gap-1.5 overflow-y-auto pr-1">
-          {visible.map((r) => (
-            <li key={r.id}>
-              <FighterResultCard
-                fighter={r}
-                onClick={() => {
-                  onPick({
-                    id: r.id,
-                    slug: r.slug,
-                    name: r.name,
-                    nickname: r.nickname,
-                    photo_thumbnail_url: r.photo_thumbnail_url,
-                    weight_class: r.weight_class,
-                    wins_total: r.wins_total,
-                    losses_total: r.losses_total,
-                    draws_total: r.draws_total,
-                    vertex_score: r.vertex_score,
-                    vertex_score_all_time: r.vertex_score_all_time,
-                    ufc_bouts: r.ufc_bouts,
-                    tier: r.tier,
-                  });
-                  setQuery("");
-                  setResults([]);
-                }}
-              />
-            </li>
-          ))}
-        </ul>
+        <div className="mt-2">
+          {!query.trim() ? (
+            <p className="mb-1.5 font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
+              Top fighters · all-time
+            </p>
+          ) : null}
+          <ul className="flex max-h-96 flex-col gap-1.5 overflow-y-auto pr-1">
+            {visible.map((r) => (
+              <li key={r.id}>
+                <FighterResultCard
+                  fighter={r}
+                  onClick={() => {
+                    onPick({
+                      id: r.id,
+                      slug: r.slug,
+                      name: r.name,
+                      nickname: r.nickname,
+                      photo_thumbnail_url: r.photo_thumbnail_url,
+                      weight_class: r.weight_class,
+                      wins_total: r.wins_total,
+                      losses_total: r.losses_total,
+                      draws_total: r.draws_total,
+                      vertex_score: r.vertex_score,
+                      vertex_score_all_time: r.vertex_score_all_time,
+                      ufc_bouts: r.ufc_bouts,
+                      tier: r.tier,
+                    });
+                    setQuery("");
+                    setResults([]);
+                  }}
+                />
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : query.trim() && !pending ? (
+        <p className="mt-2 font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
+          No fighters found.
+        </p>
       ) : null}
     </div>
   );

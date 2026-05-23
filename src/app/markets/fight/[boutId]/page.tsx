@@ -79,6 +79,10 @@ export default async function FightMarketsPage({ params }: PageProps) {
           <p className="mt-2 font-mono text-[11px] uppercase tracking-widest text-foreground-subtle">
             {tag ? `${tag} · ` : ""}
             {fight.weight_class.replace(/_/g, " ")}
+            {" · "}
+            {fight.is_main_event || fight.is_title_fight
+              ? "5 rounds"
+              : "3 rounds"}
             {fight.is_title_fight ? " · Title fight" : ""}
           </p>
 

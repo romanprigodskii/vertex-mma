@@ -111,6 +111,8 @@ function FightRow({ bout }: { bout: EventMarketsGroup["bouts"][number] }) {
             <p className="truncate font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
               {tag ? `${tag} · ` : ""}
               {bout.weight_class.replace(/_/g, " ")}
+              {" · "}
+              {bout.is_main_event || bout.is_title_fight ? "5R" : "3R"}
               {bout.is_title_fight ? " · Title" : ""}
               {others.length > 0 ? ` · +${others.length} more` : ""}
             </p>

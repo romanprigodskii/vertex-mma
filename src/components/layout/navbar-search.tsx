@@ -25,11 +25,11 @@ export function NavbarSearch() {
   queryRef.current = query;
 
   React.useEffect(() => {
-    if (!query.trim()) {
-      setResults([]);
-      return;
-    }
+    if (!open) return;
     const snap = query;
+    // Empty query (initial open) loads top-by-all-time suggestions
+    // immediately; user typing gets a short debounce.
+    const delay = snap.trim() ? 180 : 0;
     const t = setTimeout(async () => {
       setPending(true);
       try {
@@ -38,9 +38,9 @@ export function NavbarSearch() {
       } finally {
         if (queryRef.current === snap) setPending(false);
       }
-    }, 180);
+    }, delay);
     return () => clearTimeout(t);
-  }, [query]);
+  }, [query, open]);
 
   React.useEffect(() => {
     if (!open) {
@@ -93,30 +93,37 @@ export function NavbarSearch() {
                 <X className="h-4 w-4" aria-hidden />
               </DialogPrimitive.Close>
             </div>
-            <div className="max-h-[60vh] overflow-y-auto">
+            <div className="max-h-[60vh] overflow-y-auto p-2">
               {pending ? (
-                <p className="px-4 py-3 font-mono text-[11px] uppercase tracking-widest text-foreground-subtle">
+                <p className="px-2 py-1 font-mono text-[11px] uppercase tracking-widest text-foreground-subtle">
                   Searching…
                 </p>
               ) : results.length > 0 ? (
-                <ul className="flex flex-col gap-1.5 p-2">
-                  {results.map((r) => (
-                    <li key={r.id}>
-                      <FighterResultCard
-                        fighter={r}
-                        href={`/fighters/${r.slug}`}
-                        onClick={() => setOpen(false)}
-                      />
-                    </li>
-                  ))}
-                </ul>
+                <>
+                  {!query.trim() ? (
+                    <p className="mb-1.5 px-1 font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
+                      Top fighters · all-time
+                    </p>
+                  ) : null}
+                  <ul className="flex flex-col gap-1.5">
+                    {results.map((r) => (
+                      <li key={r.id}>
+                        <FighterResultCard
+                          fighter={r}
+                          href={`/fighters/${r.slug}`}
+                          onClick={() => setOpen(false)}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                </>
               ) : query.trim() ? (
-                <p className="px-4 py-3 font-mono text-[11px] uppercase tracking-widest text-foreground-subtle">
+                <p className="px-2 py-1 font-mono text-[11px] uppercase tracking-widest text-foreground-subtle">
                   No fighters found.
                 </p>
               ) : (
-                <p className="px-4 py-3 font-mono text-[11px] uppercase tracking-widest text-foreground-subtle">
-                  Type a name, nickname, or alias to search the UFC roster.
+                <p className="px-2 py-1 font-mono text-[11px] uppercase tracking-widest text-foreground-subtle">
+                  Type to find any fighter on the UFC roster.
                 </p>
               )}
             </div>

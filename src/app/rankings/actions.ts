@@ -10,7 +10,7 @@ import {
   customRankingEntry,
 } from "@/lib/db/schema/rankings";
 import { userProfile } from "@/lib/db/schema/users";
-import { searchFighters } from "@/lib/fighter-search";
+import { searchFighters, topFightersByAllTime } from "@/lib/fighter-search";
 import { createClient } from "@/lib/supabase/server";
 import { classifyFighter, type VertexTier } from "@/lib/vertex-tier";
 
@@ -79,8 +79,12 @@ export type PickerFighter = {
 export async function searchFightersForPicker(
   query: string,
 ): Promise<PickerFighter[]> {
-  if (!query.trim()) return [];
-  const results = await searchFighters(query, 10);
+  const trimmed = query.trim();
+  // Empty query returns the top all-time fighters as suggestions so the
+  // picker / navbar Find dialog never opens to a blank surface.
+  const results = trimmed
+    ? await searchFighters(trimmed, 10)
+    : await topFightersByAllTime(10);
   return results.map((r) => ({
     id: r.id,
     slug: r.slug,

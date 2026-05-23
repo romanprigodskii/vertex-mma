@@ -87,6 +87,41 @@ export async function searchFighters(
   return [...(result as unknown as FighterSearchResult[])];
 }
 
+/**
+ * Highest all-time Vertex Score fighters, irrespective of query. Powers the
+ * empty-state suggestions in the simulator picker and the navbar Find dialog
+ * so neither surface looks bare before the user types.
+ */
+export async function topFightersByAllTime(
+  limit = 10,
+): Promise<FighterSearchResult[]> {
+  const result = await db.execute<FighterSearchResult>(sql`
+    SELECT
+      f.id::text AS id,
+      f.slug,
+      f.name_en,
+      f.name_ru,
+      f.nickname,
+      f.photo_url,
+      f.photo_silhouette_url,
+      f.photo_thumbnail_url,
+      f.weight_class_primary::text AS weight_class_primary,
+      f.country_code,
+      COALESCE(f.wins_total, 0) AS wins_total,
+      COALESCE(f.losses_total, 0) AS losses_total,
+      COALESCE(f.draws_total, 0) AS draws_total,
+      f.vertex_score,
+      f.vertex_score_all_time,
+      COALESCE(f.ufc_total, 0)::int AS ufc_bouts,
+      0::float AS similarity
+    FROM fighter_with_stats f
+    WHERE f.vertex_score_all_time IS NOT NULL
+    ORDER BY f.vertex_score_all_time DESC, COALESCE(f.ufc_total, 0) DESC
+    LIMIT ${limit}
+  `);
+  return [...(result as unknown as FighterSearchResult[])];
+}
+
 /* -------------------------------------------------------------------------- */
 /*                     Catalog search with combined filters                    */
 /* -------------------------------------------------------------------------- */
