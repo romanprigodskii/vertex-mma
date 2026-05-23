@@ -42,6 +42,7 @@
     "news:classify": "cd scripts/scraper && ./venv/bin/python scripts/10_classify_news.py",
     "news:rephrase": "cd scripts/scraper && ./venv/bin/python scripts/11_rephrase_news.py",
     "news:ingest": "pnpm news:scrape && pnpm news:classify && pnpm news:rephrase",
+    "news:watch": "tsx scripts/news_watch.ts",
     "predictions:generate": "tsx scripts/generate_prediction_events.ts"
   },
   "dependencies": {

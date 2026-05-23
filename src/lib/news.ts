@@ -149,7 +149,7 @@ const FEED_SELECT = sql`
 export async function listNewsFeed(
   opts: { classification?: string; limit?: number } = {},
 ): Promise<NewsFeedItem[]> {
-  const limit = Math.min(200, Math.max(1, opts.limit ?? 150));
+  const limit = Math.min(300, Math.max(1, opts.limit ?? 200));
   const cls =
     opts.classification && opts.classification in NEWS_CLASSIFICATION_LABELS
       ? opts.classification
