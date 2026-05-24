@@ -41,10 +41,10 @@ SELECT_CANDIDATES = """
         OR length(body) < 400
         OR (
           (
-            title ILIKE '%result%'
-            OR title ILIKE '%live blog%'
-            OR title ILIKE '%play-by-play%'
-            OR title ILIKE '%recap%'
+            title ILIKE %s
+            OR title ILIKE %s
+            OR title ILIKE %s
+            OR title ILIKE %s
           )
           AND published_at > now() - interval '48 hours'
         )
@@ -52,6 +52,8 @@ SELECT_CANDIDATES = """
     ORDER BY published_at DESC
     LIMIT %s
 """
+
+LIVE_PATTERNS = ("%result%", "%live blog%", "%play-by-play%", "%recap%")
 
 UPDATE_BODY = """
     UPDATE news_item
@@ -67,7 +69,7 @@ def run() -> dict[str, int]:
 
     with get_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute(SELECT_CANDIDATES, (LIMIT,))
+            cur.execute(SELECT_CANDIDATES, (*LIVE_PATTERNS, LIMIT))
             items = cur.fetchall()
         log.info(f"article extract: {len(items)} candidate(s)")
         if not items:
