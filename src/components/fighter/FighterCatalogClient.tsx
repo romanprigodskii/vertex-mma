@@ -108,7 +108,12 @@ export function FighterCatalogClient({
   const [error, setError] = React.useState<string | null>(null);
 
   const inflightKeyRef = React.useRef<string>(filtersKey(initialFilters));
-  const initialKeyRef = React.useRef<string>(filtersKey(initialFilters));
+  // Skip the filter-change effect on the very first render (SSR already
+  // produced data for the initial filter set). On every subsequent
+  // change — INCLUDING returning to the initial set, e.g. flipping sort
+  // back to vertex_current after vertex_all_time — we must re-fetch so
+  // the displayed order matches the active sort.
+  const isFirstRender = React.useRef(true);
 
   // ---------- Search input → filters (debounced 250ms) ----------
   React.useEffect(() => {
@@ -132,7 +137,8 @@ export function FighterCatalogClient({
   // ---------- Filter-change fetch ----------
   React.useEffect(() => {
     const key = filtersKey(filters);
-    if (key === initialKeyRef.current) {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
       inflightKeyRef.current = key;
       return;
     }
