@@ -37,6 +37,16 @@ const NAMED_ENTITIES: Record<string, string> = {
   ndash: "–",
 };
 
+/** Strip the "Video:" / "VIDEO:" prefix (or " video:" inline) from a title.
+ *  We don't embed source video, so titles like "Video: X demolishes Y" set
+ *  a false expectation; cleaning them lets the article read as text recap. */
+export function cleanNewsTitle(title: string): string {
+  return title
+    .replace(/^(?:Video|VIDEO):\s*/i, "")
+    .replace(/\s+(?:video|VIDEO):\s+/g, ": ")
+    .trim();
+}
+
 /** Decode HTML entities — some feeds leave `&#43;` / `&amp;` in headlines. */
 function decodeEntities(text: string): string {
   return text.replace(/&(#x?[0-9a-f]+|[a-z0-9]+);/gi, (match, ent: string) => {
@@ -122,7 +132,7 @@ function toFeedItem(row: FeedRow, fighters: NewsFighter[]): NewsFeedItem {
   return {
     id: row.id,
     url: row.url,
-    title: decodeEntities(row.title),
+    title: cleanNewsTitle(decodeEntities(row.title)),
     snippet: bodySnippet(row.body_rephrased),
     published_at: row.published_at,
     classification: row.classification ?? "general_news",
@@ -272,7 +282,7 @@ export async function getNewsItemById(
   return {
     id: r.id,
     url: r.url,
-    title: decodeEntities(r.title),
+    title: cleanNewsTitle(decodeEntities(r.title)),
     body: r.body,
     body_rephrased: r.body_rephrased,
     published_at: r.published_at,

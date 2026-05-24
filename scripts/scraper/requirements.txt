@@ -6,3 +6,4 @@ python-dotenv>=1.0
 rich>=13.7
 tenacity>=8.2
 anthropic>=0.40
+trafilatura>=2.0

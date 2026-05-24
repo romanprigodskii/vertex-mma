@@ -38,10 +38,19 @@ has withdrawn or been pulled.
 - bout_changed: a booked fight's details changed — an opponent swap, a new \
 date, or a weight-class change.
 - weigh_in: weigh-in results or coverage; a fighter making or missing weight.
-- result: the outcome of a fight that has already happened (who won, and how).
+- result: the OUTCOME of a fight that has already happened. The article must \
+describe what actually occurred — who won, by what method (KO, TKO, submission, \
+decision), and ideally the round. Live blogs and play-by-play recaps of a \
+completed event also qualify. \
+DO NOT use `result` for: analysts predicting fights ("X picks Y to win", \
+"Sonnen says…"), fighters calling out a future opponent, interviews about \
+future fights, opinion / analysis columns, power-rankings articles, or any \
+item where no fight has actually been fought yet. Those go in `general_news`.
 - general_news: MMA news that fits none of the above — signings, contract \
-news, retirements, rankings, interviews, injuries not tied to a specific \
-cancelled bout, press conferences, business and promotion news.
+news, retirements, ranking changes, interviews, injuries not tied to a \
+specific cancelled bout, press conferences, business and promotion news, \
+analyst predictions, opinion / analysis pieces, callouts that aren't a \
+confirmed booking.
 - rumor: unconfirmed or speculative reporting — wording like "targeted", "in \
 talks", "expected to", "could", "rumored", "reportedly being discussed".
 - unrelated: not MMA news — another sport with no MMA connection, or off-topic.
@@ -52,8 +61,10 @@ fits better).
 
 Fighters: list the MMA fighters the item is primarily about — the people \
 fighting or the main subject — by their common full names (e.g. "Jon Jones", \
-"Israel Adesanya"). Do not list coaches, executives, or fighters mentioned \
-only in passing. Empty list when there are none. At most four.
+"Israel Adesanya"). Do not list coaches, executives, analysts/pundits, or \
+fighters mentioned only in passing. For an analyst-prediction piece, do NOT \
+list the analyst — list the fighters the prediction is about. Empty list when \
+there are none. At most four.
 
 Confidence: 0.0-1.0 — how sure you are of the category. Use lower values for \
 ambiguous or thinly-sourced items.
