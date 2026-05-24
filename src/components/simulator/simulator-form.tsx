@@ -8,9 +8,15 @@ import {
   searchFightersForPicker,
 } from "@/app/rankings/actions";
 import { runSimulationAction } from "@/app/simulator/actions";
-import { FighterResultCard } from "@/components/fighter/fighter-result-card";
+import { Crown } from "lucide-react";
+
+import {
+  DualScore,
+  FighterResultCard,
+} from "@/components/fighter/fighter-result-card";
 import { cn } from "@/lib/utils";
 import {
+  TIER_STYLES,
   type ChampionStatus,
   type VertexTier,
 } from "@/lib/vertex-tier";
@@ -191,13 +197,87 @@ function PickerSlot({
   }, [query]);
 
   if (picked) {
+    const style = TIER_STYLES[picked.tier];
+    const record =
+      picked.wins_total != null && picked.losses_total != null
+        ? `${picked.wins_total}-${picked.losses_total}${
+            picked.draws_total ? `-${picked.draws_total}` : ""
+          }`
+        : null;
+    const isChamp =
+      picked.championStatus === "active" ||
+      picked.championStatus === "dominant";
+    const initials = picked.name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((w) => w[0])
+      .join("")
+      .toUpperCase();
     return (
       <div className="flex flex-col gap-2">
         <p className="font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
           {label}
         </p>
-        <div className="ring-2 ring-primary/40 ring-offset-2 ring-offset-background-base rounded-md">
-          <FighterResultCard fighter={picked} />
+        <div className="relative overflow-hidden rounded-md border-2 border-primary/45">
+          <div
+            className="pointer-events-none absolute inset-0"
+            style={{
+              background: `linear-gradient(135deg, ${style.gradientFrom}, ${style.gradientTo})`,
+            }}
+            aria-hidden
+          />
+          <div className="relative flex items-stretch gap-3 p-3 sm:gap-4 sm:p-4">
+            <div className="relative h-28 w-24 shrink-0 overflow-hidden rounded-sm border border-foreground/20 sm:h-32 sm:w-28">
+              {picked.photo_thumbnail_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={picked.photo_thumbnail_url}
+                  alt={picked.name}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center font-display text-2xl text-foreground-subtle">
+                  {initials}
+                </div>
+              )}
+              {isChamp ? (
+                <div
+                  className="absolute right-1 top-1 flex items-center gap-0.5 rounded-sm bg-background-base/75 px-1 py-0.5 backdrop-blur-sm"
+                  style={{ color: "oklch(0.85 0.18 75)" }}
+                  title="Champion"
+                >
+                  <Crown className="h-2.5 w-2.5" aria-hidden />
+                </div>
+              ) : null}
+            </div>
+            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+              <p className="truncate font-display text-base uppercase tracking-tight text-foreground sm:text-lg">
+                {picked.name}
+              </p>
+              {picked.nickname ? (
+                <p className="truncate font-sans text-[10px] italic text-foreground-muted sm:text-xs">
+                  &ldquo;{picked.nickname}&rdquo;
+                </p>
+              ) : null}
+              <p className="font-display text-2xl leading-none tabular text-foreground sm:text-3xl">
+                {record ?? "—"}
+              </p>
+              <p className="truncate font-mono text-[9px] uppercase tracking-widest text-foreground-subtle sm:text-[10px]">
+                {picked.weight_class?.replace(/_/g, " ") ?? "—"}
+                {picked.ufc_bouts > 0 ? ` · ${picked.ufc_bouts} UFC` : ""}
+              </p>
+              <div className="mt-auto pt-1">
+                <DualScore
+                  current={picked.vertex_score}
+                  allTime={picked.vertex_score_all_time}
+                  scoreColor={style.scoreColor}
+                  borderColor={style.badgeBorder}
+                  size="md"
+                />
+              </div>
+            </div>
+          </div>
         </div>
         <button
           type="button"
