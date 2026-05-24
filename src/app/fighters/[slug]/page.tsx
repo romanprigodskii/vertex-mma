@@ -223,7 +223,12 @@ export default async function FighterDetailPage({ params }: PageProps) {
           ) : null}
           {peakVertex ? (
             <div className="mt-6">
-              <PeakVertex info={peakVertex} />
+              {/* Override currentScore with the same divisional-aware
+                  value the header circles show, so the "vs current"
+                  delta matches what the user sees up top. */}
+              <PeakVertex
+                info={{ ...peakVertex, currentScore: heroCurrentScore }}
+              />
             </div>
           ) : null}
         </Container>
