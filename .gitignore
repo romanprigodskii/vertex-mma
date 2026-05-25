@@ -64,3 +64,7 @@ imports/ufc_rankings_raw/
 
 # One-off importer/scraper logs land alongside their script
 scripts/*.log
+
+# Design exploration artifacts — standalone preview HTML rendered by
+# the impeccable skill. Kept local for visual comparison; not shipped.
+/design-preview.html
