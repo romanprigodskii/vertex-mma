@@ -1,5 +1,11 @@
 import type { Metadata } from "next";
-import { Bebas_Neue, Inter, JetBrains_Mono } from "next/font/google";
+import {
+  Antonio,
+  Bebas_Neue,
+  Inter,
+  JetBrains_Mono,
+  Manrope,
+} from "next/font/google";
 import "./globals.css";
 
 import { ScrollToTopOnNav } from "@/components/layout/scroll-to-top-on-nav";
@@ -19,6 +25,20 @@ const inter = Inter({
 
 const jetbrainsMono = JetBrains_Mono({
   variable: "--font-mono-jetbrains",
+  subsets: ["latin"],
+  display: "swap",
+});
+
+const antonio = Antonio({
+  variable: "--font-broadcast-display-antonio",
+  weight: ["500", "600", "700"],
+  subsets: ["latin"],
+  display: "swap",
+});
+
+const manrope = Manrope({
+  variable: "--font-broadcast-body-manrope",
+  weight: ["400", "500"],
   subsets: ["latin"],
   display: "swap",
 });
@@ -51,7 +71,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${bebasNeue.variable} ${inter.variable} ${jetbrainsMono.variable} h-full`}
+      className={`${bebasNeue.variable} ${inter.variable} ${jetbrainsMono.variable} ${antonio.variable} ${manrope.variable} h-full`}
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col bg-background-base text-foreground font-sans antialiased">
