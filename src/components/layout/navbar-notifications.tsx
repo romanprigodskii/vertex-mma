@@ -56,12 +56,12 @@ export function NavbarNotifications({
         }
         aria-haspopup="menu"
         aria-expanded={open}
-        className="relative rounded-sm p-1.5 text-foreground-muted transition-colors hover:bg-foreground/[0.05] hover:text-foreground"
+        className="relative rounded-sm p-1.5 text-fg-muted transition-colors duration-(--motion-fast) ease-out-soft hover:bg-fg/[0.05] hover:text-fg"
       >
         <Bell className="h-5 w-5" />
         {initialUnreadCount > 0 ? (
           <span
-            className="absolute right-0.5 top-0.5 h-2 w-2 rounded-full bg-primary"
+            className="absolute right-0.5 top-0.5 h-2 w-2 rounded-full bg-fg"
             aria-hidden
           />
         ) : null}
@@ -69,22 +69,20 @@ export function NavbarNotifications({
       {open ? (
         <div
           role="menu"
-          className="absolute right-0 top-full z-50 mt-1 w-80 max-w-[90vw] rounded-md border border-foreground/10 bg-background-elevated shadow-lg"
+          className="absolute right-0 top-full z-50 mt-1 w-80 max-w-[90vw] rounded-md border border-edge bg-surface-elevated shadow-lg"
         >
-          <div className="flex items-baseline justify-between border-b border-foreground/10 px-3 py-2">
-            <p className="font-display text-xs uppercase tracking-widest text-foreground-muted">
-              Notifications
-            </p>
+          <div className="flex items-baseline justify-between border-b border-edge px-3 py-2">
+            <p className="type-meta text-xs text-fg-muted">Notifications</p>
             <Link
               href="/notifications"
               onClick={() => setOpen(false)}
-              className="font-sans text-xs text-primary hover:underline"
+              className="type-body text-xs text-fg hover:underline"
             >
               See all
             </Link>
           </div>
           {initialRecent.length === 0 ? (
-            <p className="px-3 py-6 text-center font-sans text-xs text-foreground-muted">
+            <p className="type-body px-3 py-6 text-center text-xs text-fg-muted">
               All caught up.
             </p>
           ) : (
@@ -96,24 +94,24 @@ export function NavbarNotifications({
                       href={n.link}
                       onClick={() => setOpen(false)}
                       prefetch={false}
-                      className="block border-b border-foreground/[0.06] px-3 py-2 hover:bg-foreground/[0.03]"
+                      className="block border-b border-fg/[0.06] px-3 py-2 transition-colors duration-(--motion-fast) ease-out-soft hover:bg-fg/[0.03]"
                     >
-                      <p className="font-sans text-sm text-foreground line-clamp-1">
+                      <p className="type-body line-clamp-1 text-sm text-fg">
                         {n.title}
                       </p>
                       {n.body ? (
-                        <p className="mt-0.5 font-sans text-xs text-foreground-muted line-clamp-1">
+                        <p className="type-body mt-0.5 line-clamp-1 text-xs text-fg-muted">
                           {n.body}
                         </p>
                       ) : null}
                     </Link>
                   ) : (
-                    <div className="border-b border-foreground/[0.06] px-3 py-2">
-                      <p className="font-sans text-sm text-foreground line-clamp-1">
+                    <div className="border-b border-fg/[0.06] px-3 py-2">
+                      <p className="type-body line-clamp-1 text-sm text-fg">
                         {n.title}
                       </p>
                       {n.body ? (
-                        <p className="mt-0.5 font-sans text-xs text-foreground-muted line-clamp-1">
+                        <p className="type-body mt-0.5 line-clamp-1 text-xs text-fg-muted">
                           {n.body}
                         </p>
                       ) : null}

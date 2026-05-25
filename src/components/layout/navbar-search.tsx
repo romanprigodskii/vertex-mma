@@ -55,12 +55,10 @@ export function NavbarSearch() {
         <button
           type="button"
           aria-label="Find a fighter"
-          className="hidden h-9 items-center gap-1.5 rounded-md border border-foreground/15 bg-background-elevated px-3 transition-colors hover:border-foreground/30 sm:inline-flex"
+          className="hidden h-9 items-center gap-1.5 rounded-md border border-edge bg-surface-elevated px-3 transition-colors duration-(--motion-fast) ease-out-soft hover:border-edge-strong sm:inline-flex"
         >
-          <Search className="h-4 w-4 text-foreground-subtle" aria-hidden />
-          <span className="font-mono text-[11px] uppercase tracking-widest text-foreground-muted">
-            Find
-          </span>
+          <Search className="h-4 w-4 text-fg-subtle" aria-hidden />
+          <span className="type-meta text-[11px] text-fg-muted">Find</span>
         </button>
       </DialogPrimitive.Trigger>
       <DialogPrimitive.Portal>
@@ -72,10 +70,10 @@ export function NavbarSearch() {
           <DialogPrimitive.Description className="sr-only">
             Search the UFC roster by name, nickname, or alias.
           </DialogPrimitive.Description>
-          <div className="overflow-hidden rounded-md border border-foreground/15 bg-background-base shadow-2xl">
-            <div className="flex items-center gap-2 border-b border-foreground/[0.08] px-4 py-3">
+          <div className="overflow-hidden rounded-md border border-edge-strong bg-surface-base shadow-2xl">
+            <div className="flex items-center gap-2 border-b border-fg/[0.08] px-4 py-3">
               <Search
-                className="h-4 w-4 text-foreground-subtle"
+                className="h-4 w-4 text-fg-subtle"
                 aria-hidden
               />
               <input
@@ -84,24 +82,24 @@ export function NavbarSearch() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Find a fighter…"
-                className="flex-1 bg-transparent font-sans text-base text-foreground placeholder:text-foreground-subtle focus:outline-none"
+                className="type-body flex-1 bg-transparent text-base text-fg placeholder:text-fg-subtle focus:outline-none"
               />
               <DialogPrimitive.Close
                 aria-label="Close search"
-                className="text-foreground-subtle hover:text-foreground"
+                className="text-fg-subtle transition-colors duration-(--motion-fast) ease-out-soft hover:text-fg"
               >
                 <X className="h-4 w-4" aria-hidden />
               </DialogPrimitive.Close>
             </div>
             <div className="max-h-[60vh] overflow-y-auto p-2">
               {pending ? (
-                <p className="px-2 py-1 font-mono text-[11px] uppercase tracking-widest text-foreground-subtle">
+                <p className="type-meta px-2 py-1 text-[11px] text-fg-subtle">
                   Searching…
                 </p>
               ) : results.length > 0 ? (
                 <>
                   {!query.trim() ? (
-                    <p className="mb-1.5 px-1 font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
+                    <p className="type-meta mb-1.5 px-1 text-[10px] text-fg-subtle">
                       Top fighters · all-time
                     </p>
                   ) : null}
@@ -118,11 +116,11 @@ export function NavbarSearch() {
                   </ul>
                 </>
               ) : query.trim() ? (
-                <p className="px-2 py-1 font-mono text-[11px] uppercase tracking-widest text-foreground-subtle">
+                <p className="type-meta px-2 py-1 text-[11px] text-fg-subtle">
                   No fighters found.
                 </p>
               ) : (
-                <p className="px-2 py-1 font-mono text-[11px] uppercase tracking-widest text-foreground-subtle">
+                <p className="type-meta px-2 py-1 text-[11px] text-fg-subtle">
                   Type to find any fighter on the UFC roster.
                 </p>
               )}

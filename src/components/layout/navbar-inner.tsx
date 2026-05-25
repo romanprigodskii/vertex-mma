@@ -21,11 +21,10 @@ function Logo() {
   return (
     <Link
       href="/"
-      className="select-none font-display text-2xl leading-none tracking-wider"
+      className="select-none font-broadcast-display text-2xl font-bold uppercase leading-none tracking-wider text-fg"
       aria-label="Vertex MMA — home"
     >
-      <span className="text-primary">V</span>
-      <span className="text-foreground">ERTEX</span>
+      VERTEX
     </Link>
   );
 }
@@ -36,7 +35,7 @@ export function NavbarInner({
   recentNotifications,
 }: Props) {
   return (
-    <header className="sticky top-0 z-40 border-b border-foreground/[0.06] bg-background-base/85 backdrop-blur-md">
+    <header className="sticky top-0 z-40 border-b border-fg/[0.06] bg-surface-base/85 backdrop-blur-md">
       <Container size="xl">
         <div className="flex h-14 items-center justify-between gap-4 md:h-16 md:gap-6">
           <Logo />
@@ -45,9 +44,9 @@ export function NavbarInner({
             <NavbarSearch />
             {user ? (
               <>
-                <div className="hidden h-9 items-center gap-1.5 rounded-md border border-foreground/15 bg-background-elevated px-3 text-sm tabular sm:inline-flex">
-                  <Coins className="h-4 w-4 text-gold" aria-hidden />
-                  <span className="text-foreground-muted">
+                <div className="hidden h-9 items-center gap-1.5 rounded-md border border-edge bg-surface-elevated px-3 type-num text-sm sm:inline-flex">
+                  <Coins className="h-4 w-4 text-fg-muted" aria-hidden />
+                  <span className="text-fg-muted">
                     {formatCoins(user.balanceCoins)}
                   </span>
                 </div>
@@ -60,7 +59,7 @@ export function NavbarInner({
             ) : (
               <Link
                 href="/signin"
-                className="hidden font-sans text-sm uppercase tracking-widest text-foreground-muted transition-colors hover:text-foreground md:inline"
+                className="type-label hidden text-sm text-fg-muted transition-colors duration-(--motion-fast) ease-out-soft hover:text-fg md:inline"
               >
                 Sign in
               </Link>
