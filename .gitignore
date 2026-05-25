@@ -67,4 +67,4 @@ scripts/*.log
 
 # Design exploration artifacts — standalone preview HTML rendered by
 # the impeccable skill. Kept local for visual comparison; not shipped.
-/design-preview.html
+/design-preview*.html
