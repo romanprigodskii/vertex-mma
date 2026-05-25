@@ -1,6 +1,5 @@
 import Image from "next/image";
 
-import { getAvatarBg, getAvatarInitials } from "@/lib/avatar-palette";
 import { cn } from "@/lib/utils";
 
 type AvatarSize = "sm" | "md" | "lg" | "xl" | "2xl";
@@ -31,6 +30,32 @@ const INITIAL_TEXT_PX: Record<AvatarSize, string> = {
   "2xl": "text-[48px]",
 };
 
+// MMA-appropriate dark palette in OKLCH. Each is dark enough that white initials
+// stay readable while still feeling distinct from background-elevated.
+const PALETTE: readonly string[] = [
+  "oklch(0.35 0.12 27)", // red-deep
+  "oklch(0.35 0.10 70)", // gold-deep
+  "oklch(0.30 0.08 250)", // blue-deep
+  "oklch(0.30 0.10 310)", // purple-deep
+  "oklch(0.30 0.10 150)", // green-deep
+  "oklch(0.25 0.02 240)", // neutral-deep
+];
+
+function getColorForName(name: string): string {
+  let hash = 0;
+  for (let i = 0; i < name.length; i += 1) {
+    hash = (hash + name.charCodeAt(i)) | 0;
+  }
+  return PALETTE[Math.abs(hash) % PALETTE.length];
+}
+
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
 /**
  * Photo when available, otherwise a consistently-colored initials tile.
  * Replaces the old silhouette-SVG fallback — every fighter renders something.
@@ -45,7 +70,7 @@ export function FighterAvatar({
 }: FighterAvatarProps) {
   const dimension = PX[size];
   const wrapperClass = cn(
-    "relative shrink-0 overflow-hidden rounded-md border border-edge",
+    "relative shrink-0 overflow-hidden rounded-md border border-foreground/10",
     className,
   );
 
@@ -72,8 +97,8 @@ export function FighterAvatar({
     );
   }
 
-  const color = getAvatarBg(name);
-  const initials = getAvatarInitials(name);
+  const color = getColorForName(name);
+  const initials = getInitials(name);
   return (
     <div
       className={wrapperClass}
@@ -86,7 +111,7 @@ export function FighterAvatar({
     >
       <span
         className={cn(
-          "absolute inset-0 flex items-center justify-center font-broadcast-display font-bold uppercase tracking-wider text-fg-muted",
+          "absolute inset-0 flex items-center justify-center font-display uppercase tracking-wider text-foreground/90",
           INITIAL_TEXT_PX[size],
         )}
       >

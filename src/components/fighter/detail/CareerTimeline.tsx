@@ -227,26 +227,14 @@ export function CareerTimeline({ bouts }: CareerTimelineProps) {
     [],
   );
 
-  // After mount, centre the most recent fight in the viewport. For
-  // active fighters whose last bout is recent that lands near the
-  // "today" marker; for retired fighters (Khabib, GSP, …) it centres on
-  // their actual last activity so the empty post-career space doesn't
-  // dominate the view. User can drag freely either direction from
-  // there. Run once after the first paint.
+  // After mount, scroll fully to the end so the most recent fights and
+  // the "today" marker are in view — a career reads newest-first. Setting
+  // scrollLeft past the maximum clamps automatically.
   React.useEffect(() => {
     if (!scrollRef.current) return;
-    if (bouts.length === 0) {
-      scrollRef.current.scrollLeft = scrollRef.current.scrollWidth;
-      return;
-    }
-    const sortedAsc = [...bouts].sort((a, b) =>
-      a.event_date.localeCompare(b.event_date),
-    );
-    const lastX = xForDateMs(
-      new Date(sortedAsc[sortedAsc.length - 1].event_date).getTime(),
-    );
-    const viewportW = scrollRef.current.clientWidth;
-    scrollRef.current.scrollLeft = Math.max(0, lastX - viewportW / 2);
+    scrollRef.current.scrollLeft = scrollRef.current.scrollWidth;
+    // Run once after the first paint — subsequent re-renders should
+    // preserve whatever the user has scrolled to.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

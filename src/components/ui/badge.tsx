@@ -16,20 +16,17 @@ const badgeVariants = cva(
         success: "border-transparent bg-success/15 text-success",
         danger: "border-transparent bg-danger/15 text-danger",
         outline: "border-border-strong bg-transparent text-foreground",
-        // Account-tier variants — subtle gradient using the account-
-        // tier tokens. Variant keys renamed from tier-* to account-tier-*
-        // in the rebrand so the tier-* namespace belongs to the fighter
-        // tier system (see vertex-tier.ts). Token values unchanged.
-        "account-tier-bronze":
-          "border-transparent bg-gradient-to-br from-account-tier-bronze to-account-tier-bronze/70 text-foreground",
-        "account-tier-silver":
-          "border-transparent bg-gradient-to-br from-account-tier-silver to-account-tier-silver/70 text-background-base",
-        "account-tier-gold":
-          "border-transparent bg-gradient-to-br from-account-tier-gold to-account-tier-gold/70 text-gold-foreground",
-        "account-tier-diamond":
-          "border-transparent bg-gradient-to-br from-account-tier-diamond to-account-tier-diamond/70 text-background-base",
-        "account-tier-champion":
-          "border-transparent bg-gradient-to-br from-account-tier-champion to-account-tier-champion/70 text-foreground",
+        // Tier variants — subtle gradient using the tier token
+        "tier-bronze":
+          "border-transparent bg-gradient-to-br from-tier-bronze to-tier-bronze/70 text-foreground",
+        "tier-silver":
+          "border-transparent bg-gradient-to-br from-tier-silver to-tier-silver/70 text-background-base",
+        "tier-gold":
+          "border-transparent bg-gradient-to-br from-tier-gold to-tier-gold/70 text-gold-foreground",
+        "tier-diamond":
+          "border-transparent bg-gradient-to-br from-tier-diamond to-tier-diamond/70 text-background-base",
+        "tier-champion":
+          "border-transparent bg-gradient-to-br from-tier-champion to-tier-champion/70 text-foreground",
       },
       size: {
         sm: "h-5 px-1.5 text-[10px]",

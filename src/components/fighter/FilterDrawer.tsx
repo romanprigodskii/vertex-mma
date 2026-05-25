@@ -50,16 +50,16 @@ export function FilterDrawer({
         <button
           type="button"
           className={cn(
-            "type-body inline-flex h-10 items-center gap-2 rounded-md border border-edge bg-surface-elevated px-3 text-sm text-fg",
-            "hover:bg-surface-overlay transition-colors duration-(--motion-fast) ease-out-soft",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface-base",
+            "inline-flex h-10 items-center gap-2 rounded-md border border-border bg-background-elevated px-3 text-sm text-foreground",
+            "hover:bg-background-overlay transition-colors",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background-base",
             triggerClassName,
           )}
         >
-          <SlidersHorizontal className="h-4 w-4 text-fg-muted" />
+          <SlidersHorizontal className="h-4 w-4 text-foreground-muted" />
           Filters
           {count > 0 ? (
-            <span className="ml-1 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-fg px-1.5 font-mono text-[10px] text-surface-base">
+            <span className="ml-1 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-primary px-1.5 font-mono text-[10px] text-primary-foreground">
               {count}
             </span>
           ) : null}
@@ -69,7 +69,7 @@ export function FilterDrawer({
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay
           className={cn(
-            "fixed inset-0 z-50 bg-surface-base/70 backdrop-blur-sm",
+            "fixed inset-0 z-50 bg-background-base/70 backdrop-blur-sm",
             "data-[state=open]:animate-in data-[state=closed]:animate-out",
             "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
           )}
@@ -77,18 +77,18 @@ export function FilterDrawer({
         <DialogPrimitive.Content
           className={cn(
             "fixed inset-y-0 right-0 z-50 flex w-full max-w-sm flex-col",
-            "border-l border-edge bg-surface-base shadow-elevation-2",
+            "border-l border-border bg-background-base shadow-elevation-2",
             "data-[state=open]:animate-in data-[state=closed]:animate-out",
             "data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right",
             "duration-200",
           )}
         >
-          <header className="flex items-center justify-between gap-2 border-b border-edge px-4 py-3">
-            <DialogPrimitive.Title className="type-label text-xl text-fg">
+          <header className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
+            <DialogPrimitive.Title className="font-display text-xl uppercase tracking-wide text-foreground">
               Filters
             </DialogPrimitive.Title>
             <DialogPrimitive.Close
-              className="inline-flex h-8 w-8 items-center justify-center rounded-md text-fg-muted transition-colors duration-(--motion-fast) ease-out-soft hover:bg-fg/[0.05] hover:text-fg"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-md text-foreground-muted hover:bg-background-elevated hover:text-foreground transition-colors"
               aria-label="Close filters"
             >
               <X className="h-4 w-4" />
@@ -105,7 +105,7 @@ export function FilterDrawer({
             />
           </div>
 
-          <footer className="flex items-center gap-2 border-t border-edge bg-surface-base px-4 py-3">
+          <footer className="flex items-center gap-2 border-t border-border bg-background-base px-4 py-3">
             <Button
               variant="outline"
               size="sm"

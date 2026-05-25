@@ -72,13 +72,13 @@ const COLOR_GROUPS: Array<{ title: string; swatches: Swatch[] }> = [
     ],
   },
   {
-    title: "Account tier",
+    title: "Tier",
     swatches: [
-      { name: "account-tier-bronze", varName: "--color-account-tier-bronze", className: "bg-account-tier-bronze", foreground: "text-foreground" },
-      { name: "account-tier-silver", varName: "--color-account-tier-silver", className: "bg-account-tier-silver", foreground: "text-background-base" },
-      { name: "account-tier-gold", varName: "--color-account-tier-gold", className: "bg-account-tier-gold", foreground: "text-gold-foreground" },
-      { name: "account-tier-diamond", varName: "--color-account-tier-diamond", className: "bg-account-tier-diamond", foreground: "text-background-base" },
-      { name: "account-tier-champion", varName: "--color-account-tier-champion", className: "bg-account-tier-champion", foreground: "text-foreground" },
+      { name: "tier-bronze", varName: "--color-tier-bronze", className: "bg-tier-bronze", foreground: "text-foreground" },
+      { name: "tier-silver", varName: "--color-tier-silver", className: "bg-tier-silver", foreground: "text-background-base" },
+      { name: "tier-gold", varName: "--color-tier-gold", className: "bg-tier-gold", foreground: "text-gold-foreground" },
+      { name: "tier-diamond", varName: "--color-tier-diamond", className: "bg-tier-diamond", foreground: "text-background-base" },
+      { name: "tier-champion", varName: "--color-tier-champion", className: "bg-tier-champion", foreground: "text-foreground" },
     ],
   },
 ];
@@ -409,11 +409,11 @@ export default function Home() {
                 Tiers
               </h4>
               <div className="flex flex-wrap gap-2">
-                <Badge variant="account-tier-bronze">Bronze</Badge>
-                <Badge variant="account-tier-silver">Silver</Badge>
-                <Badge variant="account-tier-gold">Gold</Badge>
-                <Badge variant="account-tier-diamond">Diamond</Badge>
-                <Badge variant="account-tier-champion">Champion</Badge>
+                <Badge variant="tier-bronze">Bronze</Badge>
+                <Badge variant="tier-silver">Silver</Badge>
+                <Badge variant="tier-gold">Gold</Badge>
+                <Badge variant="tier-diamond">Diamond</Badge>
+                <Badge variant="tier-champion">Champion</Badge>
               </div>
             </div>
             <div>

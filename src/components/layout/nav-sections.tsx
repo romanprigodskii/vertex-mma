@@ -25,16 +25,16 @@ export function NavSections() {
             key={s.href}
             href={s.href}
             className={cn(
-              "type-label relative rounded-sm px-3 py-1.5 text-sm transition-colors duration-(--motion-fast) ease-out-soft",
+              "relative rounded-sm px-3 py-1.5 font-sans text-sm uppercase tracking-widest transition-colors",
               active
-                ? "text-fg"
-                : "text-fg-muted hover:text-fg",
+                ? "text-foreground"
+                : "text-foreground-muted hover:text-foreground",
             )}
           >
             {s.label}
             {active ? (
               <span
-                className="absolute inset-x-3 -bottom-[15px] h-0.5 bg-accent"
+                className="absolute inset-x-3 -bottom-[15px] h-0.5 bg-primary"
                 aria-hidden
               />
             ) : null}

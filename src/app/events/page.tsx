@@ -79,7 +79,7 @@ export default async function EventsListPage({ searchParams }: PageProps) {
               No events.
             </p>
           ) : (
-            <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+            <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {events.map((e) => {
                 const dateLabel = new Date(e.date).toLocaleDateString("en-US", {
                   month: "short",

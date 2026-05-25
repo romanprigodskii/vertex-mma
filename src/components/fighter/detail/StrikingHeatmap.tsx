@@ -34,60 +34,26 @@ function aggregate(
   return { head, body, legs, total: head + body + legs };
 }
 
-/**
- * Zone fill — one clean hue per side (gold for landed, red for absorbed)
- * at an opacity that scales with the zone's share of the total, normalised
- * so the most-struck zone reads at full intensity. An opacity ramp on a
- * single hue avoids the muddy mid-tones a lightness ramp produced.
- */
 function zoneFill(
-  share: number,
-  maxShare: number,
+  pct: number,
   side: "landed" | "absorbed",
 ): string {
-  if (maxShare <= 0) return "oklch(0.26 0.015 250 / 0.85)";
-  const base = side === "landed" ? "0.82 0.16 75" : "0.62 0.21 25";
-  const intensity = Math.max(0, Math.min(1, share / maxShare));
-  const opacity = 0.28 + 0.72 * intensity;
-  return `oklch(${base} / ${opacity.toFixed(3)})`;
-}
-
-/** Dark chip with the strike count — readable on any zone colour. */
-function NumberChip({
-  cx,
-  cy,
-  value,
-}: {
-  cx: number;
-  cy: number;
-  value: number;
-}) {
-  const label = formatNumber(value);
-  const w = Math.max(38, 14 + label.length * 9);
-  return (
-    <g transform={`translate(${cx}, ${cy})`}>
-      <rect
-        x={-w / 2}
-        y={-12}
-        width={w}
-        height={24}
-        rx={6}
-        fill="oklch(0.14 0.01 240 / 0.94)"
-        stroke="oklch(0.5 0.015 250 / 0.45)"
-        strokeWidth={0.75}
-      />
-      <text
-        x={0}
-        y={1}
-        textAnchor="middle"
-        dominantBaseline="central"
-        fill="oklch(0.99 0 0)"
-        style={{ fontSize: 14, fontWeight: 700 }}
-      >
-        {label}
-      </text>
-    </g>
-  );
+  // Tint scales with relative share within the silhouette. Landed → gold ramp,
+  // absorbed → muted-red ramp.
+  if (pct === 0)
+    return side === "landed"
+      ? "oklch(0.20 0.02 240 / 0.9)"
+      : "oklch(0.20 0.02 240 / 0.9)";
+  if (side === "landed") {
+    if (pct < 0.15) return "oklch(0.40 0.04 70 / 0.6)";
+    if (pct < 0.30) return "oklch(0.55 0.10 70 / 0.7)";
+    if (pct < 0.50) return "oklch(0.68 0.14 70 / 0.85)";
+    return "oklch(0.78 0.15 70)"; // gold full
+  }
+  if (pct < 0.15) return "oklch(0.32 0.04 27 / 0.55)";
+  if (pct < 0.30) return "oklch(0.40 0.10 27 / 0.7)";
+  if (pct < 0.50) return "oklch(0.48 0.14 27 / 0.85)";
+  return "oklch(0.55 0.18 27)"; // muted-red full
 }
 
 function Silhouette({
@@ -102,7 +68,6 @@ function Silhouette({
   const headPct = totals.total ? totals.head / totals.total : 0;
   const bodyPct = totals.total ? totals.body / totals.total : 0;
   const legsPct = totals.total ? totals.legs / totals.total : 0;
-  const maxPct = Math.max(headPct, bodyPct, legsPct);
 
   return (
     <div className="flex flex-col items-center gap-3">
@@ -110,31 +75,90 @@ function Silhouette({
         {title}
       </p>
       <svg
-        viewBox="0 0 200 470"
-        className="h-auto w-full max-w-[190px]"
+        viewBox="0 0 200 400"
+        className="h-auto w-full max-w-[200px]"
         role="img"
         aria-label={`${title} per-zone heatmap`}
       >
-        {/* Three colored zones meeting at clean horizontal boundaries —
-            head (with a tapered neck) flows into shoulders at y=110, the
-            torso ends with a slight crotch dip where the legs begin at
-            y=314. No strokes, so adjacent zones read as a continuous
-            body instead of stacked primitives. */}
-        <g fill={zoneFill(legsPct, maxPct, side)}>
-          <path d="M 70 314 L 96 314 L 92 442 Q 92 454 81 454 Q 70 454 70 442 Z" />
-          <path d="M 104 314 L 130 314 L 130 442 Q 130 454 119 454 Q 108 454 108 442 Z" />
-        </g>
-        <path
-          d="M 70 110 C 55 112 47 125 47 147 C 51 210 64 270 73 300 L 72 314 C 82 316 92 316 100 316 C 108 316 118 316 128 314 L 127 300 C 136 270 149 210 153 147 C 153 125 145 112 130 110 Z"
-          fill={zoneFill(bodyPct, maxPct, side)}
+        {/* Head — circle. */}
+        <circle
+          cx={100}
+          cy={56}
+          r={36}
+          fill={zoneFill(headPct, side)}
+          stroke="oklch(0.30 0.01 240)"
+          strokeWidth={1}
         />
-        <g fill={zoneFill(headPct, maxPct, side)}>
-          <path d="M 90 80 C 85 90 75 100 70 110 L 130 110 C 125 100 115 90 110 80 Z" />
-          <circle cx={100} cy={50} r={32} />
-        </g>
-        <NumberChip cx={100} cy={50} value={totals.head} />
-        <NumberChip cx={100} cy={210} value={totals.body} />
-        <NumberChip cx={100} cy={385} value={totals.legs} />
+        {/* Body — single rounded path with slightly wider shoulders so the
+            torso reads as a body, not a floating brick. No arms; we only
+            have head/body/legs data, and detached arm shapes were
+            visually noisy. */}
+        <path
+          d="M62 110
+             Q50 116 50 134
+             L50 252
+             Q50 264 62 264
+             L138 264
+             Q150 264 150 252
+             L150 134
+             Q150 116 138 110
+             Z"
+          fill={zoneFill(bodyPct, side)}
+          stroke="oklch(0.30 0.01 240)"
+          strokeWidth={1}
+        />
+        {/* Legs — two long rounded rectangles. */}
+        <rect
+          x={60}
+          y={268}
+          width={36}
+          height={120}
+          rx={14}
+          fill={zoneFill(legsPct, side)}
+          stroke="oklch(0.30 0.01 240)"
+          strokeWidth={1}
+        />
+        <rect
+          x={104}
+          y={268}
+          width={36}
+          height={120}
+          rx={14}
+          fill={zoneFill(legsPct, side)}
+          stroke="oklch(0.30 0.01 240)"
+          strokeWidth={1}
+        />
+        {/* Zone labels in-SVG so they stay aligned at small sizes. */}
+        <text
+          x={100}
+          y={60}
+          textAnchor="middle"
+          dominantBaseline="central"
+          fill="oklch(0.98 0 0)"
+          style={{ fontSize: 9, letterSpacing: "0.16em" }}
+        >
+          HEAD
+        </text>
+        <text
+          x={100}
+          y={188}
+          textAnchor="middle"
+          dominantBaseline="central"
+          fill="oklch(0.98 0 0)"
+          style={{ fontSize: 9, letterSpacing: "0.16em" }}
+        >
+          BODY
+        </text>
+        <text
+          x={100}
+          y={332}
+          textAnchor="middle"
+          dominantBaseline="central"
+          fill="oklch(0.98 0 0)"
+          style={{ fontSize: 9, letterSpacing: "0.16em" }}
+        >
+          LEGS
+        </text>
       </svg>
 
       <ul className="w-full max-w-[220px] text-xs">
@@ -164,8 +188,8 @@ function Silhouette({
 }
 
 /**
- * Two silhouettes side-by-side: where the fighter lands strikes (gold) and
- * where opponents land strikes on them (red). Pure SVG, no client JS.
+ * Two silhouettes side-by-side: where the fighter lands strikes (gold ramp)
+ * and where opponents land strikes on them (red ramp). Pure SVG, no client JS.
  */
 export function StrikingHeatmap({ boutRounds }: StrikingHeatmapProps) {
   if (boutRounds.length === 0) {

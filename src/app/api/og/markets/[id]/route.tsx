@@ -2,7 +2,6 @@ import { ImageResponse } from "next/og";
 
 import { getMarketById } from "@/lib/markets";
 import { OG_COLORS, OG_FONTS, OG_SIZE } from "@/lib/og";
-import { formatCoins } from "@/lib/utils";
 
 export const runtime = "nodejs";
 export const contentType = "image/png";
@@ -182,7 +181,7 @@ export async function GET(_req: Request, ctx: RouteContext) {
             textTransform: "uppercase",
           }}
         >
-          vertexmma.com / markets · {formatCoins(m.total_volume)} vol ·{" "}
+          vertexmma.com / markets · {m.total_volume.toLocaleString()} vol ·{" "}
           {m.unique_traders} trader{m.unique_traders === 1 ? "" : "s"}
         </div>
       </div>

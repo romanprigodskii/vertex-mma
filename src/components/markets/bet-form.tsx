@@ -4,7 +4,6 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 
 import { placeBetAction, previewBetCost } from "@/app/markets/actions";
-import { Select } from "@/components/ui/select";
 import { priceToDecimalOdds } from "@/lib/lmsr";
 import type { MarketDetail } from "@/lib/markets";
 
@@ -14,16 +13,13 @@ const INPUT_CLASS =
 interface Props {
   market: MarketDetail;
   userBalance: number;
-  initialOutcomeId?: string;
 }
 
 type Preview = { shares: number; cost: number; newPrice: number };
 
-export function BetForm({ market, userBalance, initialOutcomeId }: Props) {
+export function BetForm({ market, userBalance }: Props) {
   const router = useRouter();
-  const [outcomeId, setOutcomeId] = React.useState(
-    initialOutcomeId ?? market.outcomes[0]?.id ?? "",
-  );
+  const [outcomeId, setOutcomeId] = React.useState(market.outcomes[0]?.id ?? "");
   const [coins, setCoins] = React.useState<string>("100");
   const [preview, setPreview] = React.useState<Preview | null>(null);
   const [pending, setPending] = React.useState(false);
@@ -90,19 +86,18 @@ export function BetForm({ market, userBalance, initialOutcomeId }: Props) {
       </h3>
 
       <div className="flex flex-col gap-3 sm:flex-row">
-        <Select
+        <select
           value={outcomeId}
-          onChange={setOutcomeId}
-          ariaLabel="Bet outcome"
-          className="sm:min-w-[220px]"
-          options={market.outcomes.map((o) => ({
-            value: o.id,
-            label: o.label,
-            hint: `${(o.current_price * 100).toFixed(1)}% · ${priceToDecimalOdds(
-              o.current_price,
-            )}x`,
-          }))}
-        />
+          onChange={(e) => setOutcomeId(e.target.value)}
+          className={`${INPUT_CLASS} sm:min-w-[220px]`}
+        >
+          {market.outcomes.map((o) => (
+            <option key={o.id} value={o.id}>
+              {o.label} · {(o.current_price * 100).toFixed(1)}% ·{" "}
+              {priceToDecimalOdds(o.current_price)}x
+            </option>
+          ))}
+        </select>
 
         <input
           type="number"

@@ -17,7 +17,6 @@ import {
   type BoutFighter,
   FighterSlotPicker,
 } from "@/components/cards/fighter-slot-picker";
-import { Select, type SelectOption } from "@/components/ui/select";
 import {
   CARD_THEME_BACKGROUNDS,
   CARD_THEME_COLORS,
@@ -32,11 +31,6 @@ const LABEL =
   "font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted";
 const INPUT_CLASS =
   "w-full rounded-sm border border-foreground/15 bg-background-elevated/30 px-3 py-2 font-sans text-sm text-foreground focus:border-primary focus:outline-none";
-
-const WEIGHT_CLASS_OPTIONS: SelectOption[] = WEIGHT_CLASSES.map((wc) => ({
-  value: wc,
-  label: formatWeightClass(wc),
-}));
 
 export type FightCardFormBout = {
   fighterA: BoutFighter | null;
@@ -424,18 +418,24 @@ export function FightCardForm({
                 </div>
 
                 <div className="mt-3 flex flex-wrap items-center gap-4">
-                  <div className="flex items-center gap-2">
+                  <label className="flex items-center gap-2">
                     <span className="font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
                       Weight
                     </span>
-                    <Select
+                    <select
                       value={b.weightClass}
-                      onChange={(v) => patchBout(b.key, { weightClass: v })}
-                      options={WEIGHT_CLASS_OPTIONS}
-                      ariaLabel="Bout weight class"
-                      className="w-48"
-                    />
-                  </div>
+                      onChange={(e) =>
+                        patchBout(b.key, { weightClass: e.target.value })
+                      }
+                      className="rounded-sm border border-foreground/15 bg-background-elevated/30 px-2 py-1.5 font-sans text-sm text-foreground focus:border-primary focus:outline-none"
+                    >
+                      {WEIGHT_CLASSES.map((wc) => (
+                        <option key={wc} value={wc}>
+                          {formatWeightClass(wc)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
                   <label className="flex items-center gap-2">
                     <input
                       type="checkbox"

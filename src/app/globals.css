@@ -54,68 +54,12 @@
   --color-border: oklch(0.2 0.01 240);
   --color-border-strong: oklch(0.3 0.01 240);
 
-  /* Account tier (user progression: bronze → champion).
-     Renamed from --color-tier-* to free the tier-* namespace for the
-     fighter-tier tokens added in the rebrand. Consumed by badge.tsx +
-     the style guide; the broader account-tier surfaces (leaderboard
-     TierChip, profile tier-progress, daily-bonus) still render off
-     foreground tokens, not these — they're effectively dormant. See
-     TECH_DEBT.md for the deletion/consolidation plan. */
-  --color-account-tier-bronze: oklch(0.55 0.12 50);
-  --color-account-tier-silver: oklch(0.75 0.02 240);
-  --color-account-tier-gold: oklch(0.78 0.15 70);
-  --color-account-tier-diamond: oklch(0.75 0.15 200);
-  --color-account-tier-champion: oklch(0.55 0.25 320);
-
-  /* ============================================================
-     Sodium-night palette — rebrand role tokens. Coexists with the
-     legacy background-, foreground-, primary-, and streak-* tokens
-     above until per-surface migration completes. See TECH_DEBT.md for
-     the cleanup-phase deletion + rename plan.
-     ============================================================ */
-
-  /* Surfaces */
-  --color-surface-base: oklch(0.07 0.005 60);
-  --color-surface-elevated: oklch(0.11 0.007 60);
-  --color-surface-overlay: oklch(0.16 0.009 60);
-
-  /* Foreground — short "fg" namespace; renames to "foreground" at cleanup. */
-  --color-fg: oklch(0.97 0.005 80);
-  --color-fg-muted: oklch(0.68 0.01 60);
-  --color-fg-subtle: oklch(0.46 0.01 60);
-
-  /* Edges — "edge" namespace; renames to "border" at cleanup. */
-  --color-edge: oklch(0.2 0.008 60);
-  --color-edge-strong: oklch(0.3 0.01 60);
-
-  /* Accent — cyan-teal. Reserved for primary CTA, focus, the "live"
-     dot, the self-row pin, the today-line on the timeline. */
-  --color-accent: oklch(0.78 0.13 200);
-  --color-accent-hover: oklch(0.72 0.13 200);
-  --color-accent-soft: oklch(0.78 0.13 200 / 0.13);
-  --color-accent-ring: oklch(0.78 0.13 200 / 0.35);
-  --color-accent-foreground: oklch(0.12 0.05 200);
-
-  /* Result semantics — P/L colours tuned for WCAG AA on surface-base. */
-  --color-profit: oklch(0.74 0.17 145);
-  --color-loss: oklch(0.66 0.21 25);
-
-  /* Fighter tier — score-derived rank encoding (apex >=75, elite 55-74,
-     established 35-54, roster <35). Variant A from the tier-preview:
-     four retuned hues sitting on the warm Sodium surface, with the
-     roster slate warmed to surface-hue (60h) to harmonise instead of
-     the legacy 240h cold. Consumed by vertex-tier.ts as a name→token
-     map; resolves into FighterCard / fighter-result-card / ScoreShapes. */
-  --color-tier-apex: oklch(0.82 0.18 305);
-  --color-tier-elite: oklch(0.80 0.15 230);
-  --color-tier-established: oklch(0.74 0.06 195);
-  --color-tier-roster: oklch(0.60 0.02 60);
-
-  /* Champion — real-world belt signifier. Kept gold deliberately
-     (independent of brand chroma); tokenised so the two gold values
-     read from one source instead of being raw in CHAMPION_STYLES. */
-  --color-champion-active: oklch(0.92 0.18 78);
-  --color-champion-dominant: oklch(0.78 0.15 72);
+  /* Tier */
+  --color-tier-bronze: oklch(0.55 0.12 50);
+  --color-tier-silver: oklch(0.75 0.02 240);
+  --color-tier-gold: oklch(0.78 0.15 70);
+  --color-tier-diamond: oklch(0.75 0.15 200);
+  --color-tier-champion: oklch(0.55 0.25 320);
 
   /* ============================================================
      Typography
@@ -123,13 +67,6 @@
   --font-display: var(--font-display-bebas), "Bebas Neue", sans-serif;
   --font-sans: var(--font-sans-inter), "Inter", system-ui, sans-serif;
   --font-mono: var(--font-mono-jetbrains), "JetBrains Mono", monospace;
-
-  /* Broadcast type system — rebrand. Antonio (display) + Manrope (body).
-     Mono unchanged — JetBrains Mono survives both systems. */
-  --font-broadcast-display:
-    var(--font-broadcast-display-antonio), "Antonio", sans-serif;
-  --font-broadcast-body:
-    var(--font-broadcast-body-manrope), "Manrope", system-ui, sans-serif;
 
   --text-xs: 0.75rem;
   --text-xs--line-height: 1rem;
@@ -183,21 +120,11 @@
   /* ============================================================
      Shadows
      ============================================================ */
+  --shadow-glow-primary: 0 0 20px oklch(0.78 0.15 70 / 0.3);
+  --shadow-glow-gold: 0 0 20px oklch(0.78 0.15 70 / 0.3);
+  --shadow-glow-red-accent: 0 0 20px oklch(0.62 0.22 27 / 0.3);
   --shadow-elevation-1: 0 1px 2px oklch(0 0 0 / 0.4), 0 1px 3px oklch(0 0 0 / 0.25);
   --shadow-elevation-2: 0 4px 12px oklch(0 0 0 / 0.5), 0 2px 6px oklch(0 0 0 / 0.3);
-
-  /* ============================================================
-     Motion — rebrand. Sub-300ms ease-out per PRODUCT.md.
-     --ease-* generates Tailwind `ease-out-soft` / `ease-out-snap`
-     utilities. Duration tokens stand alone — reference via
-     `duration-(--motion-fast)` arbitrary-value syntax.
-     ============================================================ */
-  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
-  --ease-out-snap: cubic-bezier(0.16, 1, 0.3, 1);
-
-  --motion-fast: 120ms;
-  --motion-base: 180ms;
-  --motion-slow: 260ms;
 }
 
 /* ============================================================
@@ -205,71 +132,6 @@
    ============================================================ */
 
 @utility tabular {
-  font-feature-settings: "tnum";
-  font-variant-numeric: tabular-nums;
-}
-
-/* ============================================================
-   Type role utilities — rebrand. Each bundles family + weight +
-   tracking + (where appropriate) case. Composable with size tokens
-   (text-h1, text-sm, etc.) and with the `tabular` utility above.
-   ============================================================ */
-
-@utility type-display {
-  font-family: var(--font-broadcast-display);
-  font-weight: 700;
-  letter-spacing: -0.005em;
-  text-transform: uppercase;
-  line-height: 0.95;
-}
-
-@utility type-h1 {
-  font-family: var(--font-broadcast-display);
-  font-weight: 700;
-  letter-spacing: -0.005em;
-  text-transform: uppercase;
-}
-
-@utility type-h2 {
-  font-family: var(--font-broadcast-display);
-  font-weight: 700;
-  letter-spacing: 0;
-  text-transform: uppercase;
-}
-
-@utility type-h3 {
-  font-family: var(--font-broadcast-display);
-  font-weight: 600;
-  letter-spacing: 0;
-  text-transform: uppercase;
-}
-
-@utility type-body {
-  font-family: var(--font-broadcast-body);
-  font-weight: 400;
-  letter-spacing: 0;
-}
-
-@utility type-label {
-  font-family: var(--font-broadcast-body);
-  font-weight: 500;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-}
-
-@utility type-meta {
-  font-family: var(--font-mono);
-  font-weight: 500;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  font-feature-settings: "tnum";
-  font-variant-numeric: tabular-nums;
-}
-
-@utility type-num {
-  font-family: var(--font-mono);
-  font-weight: 500;
-  letter-spacing: 0;
   font-feature-settings: "tnum";
   font-variant-numeric: tabular-nums;
 }

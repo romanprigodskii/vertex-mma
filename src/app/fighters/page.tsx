@@ -86,23 +86,23 @@ export default async function FightersPage({ searchParams }: PageProps) {
 
 function CatalogHero({ totalAll }: { totalAll: number }) {
   return (
-    <section className="relative border-b border-edge">
+    <section className="relative border-b border-foreground/10">
       <Container size="xl" className="pb-16 pt-20 md:pt-24">
-        <p className="type-meta text-[11px] text-fg-subtle">
+        <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground-subtle">
           The roster
         </p>
-        <h1 className="type-display mt-3 text-hero text-fg">
+        <h1 className="mt-3 font-display uppercase tracking-[-0.01em] text-foreground text-hero">
           FIGHTERS
         </h1>
         <div className="mt-6 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <span className="font-broadcast-display text-[28px] font-bold leading-none tabular text-fg">
+          <span className="font-display text-[28px] leading-none text-primary">
             {formatNumber(totalAll)}
           </span>
-          <span className="type-body text-base text-fg-muted">
+          <span className="font-sans text-base text-foreground-muted">
             fighters indexed
           </span>
         </div>
-        <p className="type-meta mt-4 text-[11px] text-fg-muted">
+        <p className="mt-4 font-sans text-[11px] uppercase tracking-[0.24em] text-foreground-muted">
           8 Divisions · 12 Active Champions · UFC, 1993 → Today
         </p>
       </Container>

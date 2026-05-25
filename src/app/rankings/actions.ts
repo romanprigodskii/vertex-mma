@@ -10,13 +10,8 @@ import {
   customRankingEntry,
 } from "@/lib/db/schema/rankings";
 import { userProfile } from "@/lib/db/schema/users";
-import { searchFighters, topFightersByAllTime } from "@/lib/fighter-search";
+import { searchFighters } from "@/lib/fighter-search";
 import { createClient } from "@/lib/supabase/server";
-import {
-  classifyFighter,
-  type ChampionStatus,
-  type VertexTier,
-} from "@/lib/vertex-tier";
 
 const TITLE_MIN = 3;
 const TITLE_MAX = 100;
@@ -63,59 +58,24 @@ async function getMyProfileId(): Promise<string | null> {
 
 export type PickerFighter = {
   id: string;
-  slug: string;
   name: string;
   nickname: string | null;
   photo_thumbnail_url: string | null;
   weight_class: string | null;
-  wins_total: number | null;
-  losses_total: number | null;
-  draws_total: number | null;
-  vertex_score: number | null;
-  vertex_score_all_time: number | null;
-  ufc_bouts: number;
-  /** Pre-computed tier (apex / elite / established / roster / unranked)
-   *  so client cards can apply the canonical gradient + colour without
-   *  importing the championship-history data table. */
-  tier: VertexTier;
-  /** Pre-computed champion status so cards can render a Crown badge for
-   *  active / dominant champions without bundling championship-history. */
-  championStatus: ChampionStatus;
 };
 
 export async function searchFightersForPicker(
   query: string,
 ): Promise<PickerFighter[]> {
-  const trimmed = query.trim();
-  // Empty query returns the top all-time fighters as suggestions so the
-  // picker / navbar Find dialog never opens to a blank surface.
-  const results = trimmed
-    ? await searchFighters(trimmed, 10)
-    : await topFightersByAllTime(10);
-  return results.map((r) => {
-    const classification = classifyFighter({
-      slug: r.slug,
-      vertexScore: r.vertex_score,
-      vertexScoreAllTime: r.vertex_score_all_time,
-      ufcBouts: r.ufc_bouts,
-    });
-    return {
-      id: r.id,
-      slug: r.slug,
-      name: r.name_en,
-      nickname: r.nickname,
-      photo_thumbnail_url: r.photo_thumbnail_url,
-      weight_class: r.weight_class_primary,
-      wins_total: r.wins_total,
-      losses_total: r.losses_total,
-      draws_total: r.draws_total,
-      vertex_score: r.vertex_score,
-      vertex_score_all_time: r.vertex_score_all_time,
-      ufc_bouts: r.ufc_bouts,
-      tier: classification.tier,
-      championStatus: classification.championStatus,
-    };
-  });
+  if (!query.trim()) return [];
+  const results = await searchFighters(query, 8);
+  return results.map((r) => ({
+    id: r.id,
+    name: r.name_en,
+    nickname: r.nickname,
+    photo_thumbnail_url: r.photo_thumbnail_url,
+    weight_class: r.weight_class_primary,
+  }));
 }
 
 function validateEntries(

@@ -8,34 +8,13 @@ import {
   searchFightersForPicker,
 } from "@/app/rankings/actions";
 import { runSimulationAction } from "@/app/simulator/actions";
-import { Crown } from "lucide-react";
-
-import {
-  DualScore,
-  FighterResultCard,
-} from "@/components/fighter/fighter-result-card";
 import { cn } from "@/lib/utils";
-import {
-  TIER_STYLES,
-  type ChampionStatus,
-  type VertexTier,
-} from "@/lib/vertex-tier";
 
 interface PickedFighter {
   id: string;
-  slug: string;
   name: string;
-  nickname: string | null;
   photo_thumbnail_url: string | null;
   weight_class: string | null;
-  wins_total: number | null;
-  losses_total: number | null;
-  draws_total: number | null;
-  vertex_score: number | null;
-  vertex_score_all_time: number | null;
-  ufc_bouts: number;
-  tier: VertexTier;
-  championStatus: ChampionStatus;
 }
 
 const GAMEPLAN_MAX = 500;
@@ -180,10 +159,11 @@ function PickerSlot({
   queryRef.current = query;
 
   React.useEffect(() => {
+    if (!query.trim()) {
+      setResults([]);
+      return;
+    }
     const snap = query;
-    // No debounce on the initial empty-query top-fighters load; a short
-    // debounce while the user is typing.
-    const delay = snap.trim() ? 200 : 0;
     const t = setTimeout(async () => {
       setPending(true);
       try {
@@ -192,106 +172,47 @@ function PickerSlot({
       } finally {
         if (queryRef.current === snap) setPending(false);
       }
-    }, delay);
+    }, 200);
     return () => clearTimeout(t);
   }, [query]);
 
   if (picked) {
-    const style = TIER_STYLES[picked.tier];
-    const record =
-      picked.wins_total != null && picked.losses_total != null
-        ? `${picked.wins_total}-${picked.losses_total}${
-            picked.draws_total ? `-${picked.draws_total}` : ""
-          }`
-        : null;
-    const isChamp =
-      picked.championStatus === "active" ||
-      picked.championStatus === "dominant";
-    const initials = picked.name
-      .split(/\s+/)
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((w) => w[0])
-      .join("")
-      .toUpperCase();
-    const tierLabel = style.badgeText || null;
     return (
-      <div className="flex flex-col gap-2">
+      <div
+        className={cn(
+          "rounded-md border border-primary/40 bg-background-elevated/30 p-4",
+        )}
+      >
         <p className="font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
           {label}
         </p>
-        {/* Selected state: primary 2px border carries "picked". Tier
-            identity sits on a small text chip pinned to the photo — no
-            gradient wash on the panel surface. */}
-        <div className="relative overflow-hidden rounded-md border-2 border-primary/45">
-          <div className="relative flex items-stretch gap-3 p-3 sm:gap-4 sm:p-4">
-            <div className="relative h-28 w-24 shrink-0 overflow-hidden rounded-sm border border-foreground/20 sm:h-32 sm:w-28">
-              {picked.photo_thumbnail_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={picked.photo_thumbnail_url}
-                  alt={picked.name}
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center font-display text-2xl text-foreground-subtle">
-                  {initials}
-                </div>
-              )}
-              {tierLabel || isChamp ? (
-                <div className="absolute right-1 top-1 flex items-center gap-1">
-                  {tierLabel ? (
-                    <span
-                      className="rounded-sm bg-background-base/75 px-1.5 py-0.5 font-mono text-[8px] uppercase tracking-widest"
-                      style={{ color: style.scoreColor }}
-                    >
-                      {tierLabel}
-                    </span>
-                  ) : null}
-                  {isChamp ? (
-                    <span
-                      className="flex items-center rounded-sm bg-background-base/75 px-1 py-0.5"
-                      style={{ color: "oklch(0.85 0.18 75)" }}
-                      title="Champion"
-                    >
-                      <Crown className="h-2.5 w-2.5" aria-hidden />
-                    </span>
-                  ) : null}
-                </div>
-              ) : null}
-            </div>
-            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-              <p className="truncate font-display text-base uppercase tracking-tight text-foreground sm:text-lg">
-                {picked.name}
-              </p>
-              {picked.nickname ? (
-                <p className="truncate font-sans text-[10px] italic text-foreground-muted sm:text-xs">
-                  &ldquo;{picked.nickname}&rdquo;
-                </p>
-              ) : null}
-              <p className="font-display text-2xl leading-none tabular text-foreground sm:text-3xl">
-                {record ?? "—"}
-              </p>
-              <p className="truncate font-mono text-[9px] uppercase tracking-widest text-foreground-subtle sm:text-[10px]">
-                {picked.weight_class?.replace(/_/g, " ") ?? "—"}
-                {picked.ufc_bouts > 0 ? ` · ${picked.ufc_bouts} UFC` : ""}
-              </p>
-              <div className="mt-auto pt-1">
-                <DualScore
-                  current={picked.vertex_score}
-                  allTime={picked.vertex_score_all_time}
-                  scoreColor={style.scoreColor}
-                  borderColor={style.badgeBorder}
-                  size="md"
-                />
-              </div>
-            </div>
+        <div className="mt-2 flex items-center gap-3">
+          {picked.photo_thumbnail_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={picked.photo_thumbnail_url}
+              alt={picked.name}
+              className="h-12 w-12 shrink-0 rounded-sm border border-foreground/15 object-cover"
+            />
+          ) : (
+            <div
+              className="h-12 w-12 shrink-0 rounded-sm bg-foreground/[0.05]"
+              aria-hidden
+            />
+          )}
+          <div className="min-w-0 flex-1">
+            <p className="truncate font-display text-lg uppercase tracking-tight text-foreground">
+              {picked.name}
+            </p>
+            <p className="mt-0.5 font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
+              {picked.weight_class?.replace(/_/g, " ") ?? "—"}
+            </p>
           </div>
         </div>
         <button
           type="button"
           onClick={() => onPick(null)}
-          className="self-start font-sans text-xs text-streak-loss hover:underline"
+          className="mt-3 font-sans text-xs text-streak-loss hover:underline"
         >
           Clear
         </button>
@@ -319,46 +240,48 @@ function PickerSlot({
         </p>
       ) : null}
       {visible.length > 0 ? (
-        <div className="mt-2">
-          {!query.trim() ? (
-            <p className="mb-1.5 font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
-              Top fighters · all-time
-            </p>
-          ) : null}
-          <ul className="grid max-h-[34rem] grid-cols-1 gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
-            {visible.map((r) => (
-              <li key={r.id}>
-                <FighterResultCard
-                  fighter={r}
-                  onClick={() => {
-                    onPick({
-                      id: r.id,
-                      slug: r.slug,
-                      name: r.name,
-                      nickname: r.nickname,
-                      photo_thumbnail_url: r.photo_thumbnail_url,
-                      weight_class: r.weight_class,
-                      wins_total: r.wins_total,
-                      losses_total: r.losses_total,
-                      draws_total: r.draws_total,
-                      vertex_score: r.vertex_score,
-                      vertex_score_all_time: r.vertex_score_all_time,
-                      ufc_bouts: r.ufc_bouts,
-                      tier: r.tier,
-                      championStatus: r.championStatus,
-                    });
-                    setQuery("");
-                    setResults([]);
-                  }}
-                />
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : query.trim() && !pending ? (
-        <p className="mt-2 font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
-          No fighters found.
-        </p>
+        <ul className="mt-2 flex max-h-56 flex-col overflow-y-auto">
+          {visible.map((r) => (
+            <li key={r.id}>
+              <button
+                type="button"
+                onClick={() => {
+                  onPick({
+                    id: r.id,
+                    name: r.name,
+                    photo_thumbnail_url: r.photo_thumbnail_url,
+                    weight_class: r.weight_class,
+                  });
+                  setQuery("");
+                  setResults([]);
+                }}
+                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left hover:bg-foreground/[0.05]"
+              >
+                {r.photo_thumbnail_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={r.photo_thumbnail_url}
+                    alt=""
+                    className="h-8 w-8 shrink-0 rounded-sm object-cover"
+                  />
+                ) : (
+                  <div
+                    className="h-8 w-8 shrink-0 rounded-sm bg-foreground/[0.05]"
+                    aria-hidden
+                  />
+                )}
+                <span className="min-w-0 flex-1">
+                  <p className="truncate font-sans text-sm text-foreground">
+                    {r.name}
+                  </p>
+                  <p className="font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
+                    {r.weight_class ?? "—"}
+                  </p>
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
       ) : null}
     </div>
   );

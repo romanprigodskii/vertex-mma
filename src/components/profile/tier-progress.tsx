@@ -1,5 +1,4 @@
 import { nextTier, TIER_LABEL, type Tier } from "@/lib/tier";
-import { formatCoins } from "@/lib/utils";
 
 interface Props {
   currentTier: Tier;
@@ -23,7 +22,7 @@ export function TierProgress({ currentTier, totalEarned, isOwner }: Props) {
           {TIER_LABEL[currentTier]} → {TIER_LABEL[next.tier]}
         </p>
         <p className="font-mono text-[10px] tabular text-foreground-muted">
-          {formatCoins(toNext)} more coins
+          {toNext.toLocaleString()} more coins
         </p>
       </div>
       <div className="h-1.5 w-full overflow-hidden rounded-sm bg-foreground/[0.06]">
@@ -33,8 +32,8 @@ export function TierProgress({ currentTier, totalEarned, isOwner }: Props) {
         />
       </div>
       <p className="mt-2 font-sans text-[11px] text-foreground-subtle">
-        Lifetime earned: {formatCoins(totalEarned)} of{" "}
-        {formatCoins(next.threshold)}
+        Lifetime earned: {totalEarned.toLocaleString()} of{" "}
+        {next.threshold.toLocaleString()}
       </p>
     </div>
   );

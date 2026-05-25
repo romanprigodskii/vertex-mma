@@ -23,7 +23,7 @@ const STROKE = 4;
 const PAD = 8;
 const RADIUS = VIEWBOX / 2 - PAD;
 const CENTER = VIEWBOX / 2;
-const UNRANKED_STROKE = "var(--color-fg-subtle)";
+const UNRANKED_STROKE = "oklch(0.5 0.02 240)";
 const SUBLABEL: Record<"current" | "all_time", string> = {
   current: "CURRENT",
   all_time: "ALL-TIME",
@@ -114,8 +114,8 @@ function ScoreShape({
           dominantBaseline="middle"
           fill={textColor}
           fontSize={56}
-          fontWeight={700}
-          fontFamily="var(--font-broadcast-display)"
+          fontWeight={600}
+          fontFamily="var(--font-display)"
           style={{ fontVariantNumeric: "tabular-nums" }}
         >
           {displayScore(score)}
@@ -125,7 +125,7 @@ function ScoreShape({
           y={CENTER + 38}
           textAnchor="middle"
           dominantBaseline="middle"
-          fill="var(--color-fg-muted)"
+          fill="var(--color-foreground-muted, oklch(0.65 0.02 240))"
           fontSize={10}
           fontFamily="var(--font-mono)"
           letterSpacing="0.18em"
@@ -137,7 +137,7 @@ function ScoreShape({
         <span
           aria-hidden
           style={{ color: championStyle.crownColor }}
-          className="pointer-events-none absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 flex h-9 w-9 items-center justify-center rounded-full border border-fg/15 bg-surface-base shadow-sm"
+          className="pointer-events-none absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 flex h-9 w-9 items-center justify-center rounded-full border border-foreground/15 bg-background-base shadow-sm"
           title={championStyle.label}
         >
           <Crown className="h-6 w-6" />

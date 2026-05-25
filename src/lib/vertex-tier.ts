@@ -108,61 +108,56 @@ export interface TierStyle {
   scoreColor: string;
 }
 
-// Tier visual values now resolve to @theme tokens (see globals.css —
-// --color-tier-apex / -elite / -established / -roster). Variant A from
-// the tier-direction preview: four retuned hues sitting on the warm
-// Sodium surface, roster warmed to surface hue.
-//
-// scoreColor and badgeBorder are the only fields the live components
-// (FighterCard, fighter-result-card, ScoreShapes) consume. The other
-// fields (badgeBg / badgeTextColor / gradientFrom / gradientTo) are
-// retained for back-compat with any older callers and now alias to
-// the same per-tier token; their pre-rebrand lightness/chroma
-// variations were never read off the live surface.
+// Explicit per-tier OKLCH triples (no color-mix). Each tier reads as a
+// distinct hue on dark backgrounds:
+//   Apex        purple/violet  — GOAT territory
+//   Elite       blue           — championship class
+//   Established  teal-grey     — solid pro
+//   Roster      slate          — long-tail roster
 export const TIER_STYLES: Record<VertexTier, TierStyle> = {
   apex: {
     tier: "apex",
     label: "Apex",
     badgeText: "APEX",
-    badgeBg: "var(--color-tier-apex)",
-    badgeTextColor: "var(--color-tier-apex)",
-    badgeBorder: "var(--color-tier-apex)",
-    gradientFrom: "var(--color-tier-apex)",
-    gradientTo: "var(--color-tier-apex)",
-    scoreColor: "var(--color-tier-apex)",
+    badgeBg: "oklch(0.30 0.18 295)",
+    badgeTextColor: "oklch(0.92 0.10 295)",
+    badgeBorder: "oklch(0.55 0.20 295)",
+    gradientFrom: "oklch(0.45 0.22 295 / 0.18)",
+    gradientTo: "oklch(0.45 0.22 295 / 0)",
+    scoreColor: "oklch(0.85 0.18 295)",
   },
   elite: {
     tier: "elite",
     label: "Elite",
     badgeText: "ELITE",
-    badgeBg: "var(--color-tier-elite)",
-    badgeTextColor: "var(--color-tier-elite)",
-    badgeBorder: "var(--color-tier-elite)",
-    gradientFrom: "var(--color-tier-elite)",
-    gradientTo: "var(--color-tier-elite)",
-    scoreColor: "var(--color-tier-elite)",
+    badgeBg: "oklch(0.28 0.14 235)",
+    badgeTextColor: "oklch(0.88 0.10 235)",
+    badgeBorder: "oklch(0.55 0.18 235)",
+    gradientFrom: "oklch(0.45 0.18 235 / 0.16)",
+    gradientTo: "oklch(0.45 0.18 235 / 0)",
+    scoreColor: "oklch(0.82 0.16 235)",
   },
   established: {
     tier: "established",
     label: "Established",
     badgeText: "ESTABLISHED",
-    badgeBg: "var(--color-tier-established)",
-    badgeTextColor: "var(--color-tier-established)",
-    badgeBorder: "var(--color-tier-established)",
-    gradientFrom: "var(--color-tier-established)",
-    gradientTo: "var(--color-tier-established)",
-    scoreColor: "var(--color-tier-established)",
+    badgeBg: "oklch(0.28 0.05 200)",
+    badgeTextColor: "oklch(0.78 0.06 200)",
+    badgeBorder: "oklch(0.45 0.07 200)",
+    gradientFrom: "oklch(0.50 0.08 200 / 0.12)",
+    gradientTo: "oklch(0.50 0.08 200 / 0)",
+    scoreColor: "oklch(0.75 0.07 200)",
   },
   roster: {
     tier: "roster",
     label: "Roster",
     badgeText: "ROSTER",
-    badgeBg: "var(--color-tier-roster)",
-    badgeTextColor: "var(--color-tier-roster)",
-    badgeBorder: "var(--color-tier-roster)",
-    gradientFrom: "var(--color-tier-roster)",
-    gradientTo: "var(--color-tier-roster)",
-    scoreColor: "var(--color-tier-roster)",
+    badgeBg: "oklch(0.22 0.01 240)",
+    badgeTextColor: "oklch(0.65 0.02 240)",
+    badgeBorder: "oklch(0.35 0.02 240)",
+    gradientFrom: "oklch(0.45 0.02 240 / 0.08)",
+    gradientTo: "oklch(0.45 0.02 240 / 0)",
+    scoreColor: "oklch(0.62 0.03 240)",
   },
   unranked: {
     tier: "unranked",
@@ -182,48 +177,60 @@ export function getTierStyle(tier: VertexTier): TierStyle {
 }
 
 // =====================================================================
-// Champion visual config (border + crown)
+// Champion visual config (border + glow + crown)
 // =====================================================================
 
 export interface ChampionStyle {
   status: ChampionStatus;
   label: string;
-  /** Gold border colour, used as a fallback for the 2× double-champion
-   *  badge edge in FighterCard. */
+  // Deprecated as of Wave 6F — champion visual moved to gradient density +
+  // warm tint in FighterCard. Retained on the type for potential future
+  // surfaces (event hero, share preview) that may want the bordered look.
   borderColor: string;
+  borderWidth: number;
+  /** Outer-glow OKLCH (with alpha) or null. Deprecated as of Wave 6F. */
+  glowColor: string | null;
+  /** Box-shadow size template, e.g. "0 0 32px". Deprecated as of Wave 6F. */
+  glowSize: string | null;
   badgeText: string;
   hasCrown: boolean;
   /** Crown icon fill — null when no crown. */
   crownColor: string | null;
 }
 
-// Champion gold survives the rebrand as a real-world belt signifier
-// (intentional override of "kill all amber"). Active and dominant
-// now resolve to @theme tokens — see --color-champion-active and
-// --color-champion-dominant in globals.css. Former stays on its raw
-// antique-gold value because nothing reads it visibly today (former
-// has hasCrown: false, so the borderColor is never painted).
+// Active vs. Dominant vs. Former: each step down one tier reduces border
+// width, glow size, and crown brightness so the visual hierarchy is
+// readable at a glance even before the user reads the score.
 export const CHAMPION_STYLES: Record<ChampionStatus, ChampionStyle> = {
   active: {
     status: "active",
     label: "Active Champion",
-    borderColor: "var(--color-champion-active)",
+    borderColor: "oklch(0.85 0.18 75)", // bright vibrant gold
+    borderWidth: 4,
+    glowColor: "oklch(0.82 0.18 75 / 0.5)",
+    glowSize: "0 0 32px",
     badgeText: "ACTIVE CHAMPION",
     hasCrown: true,
-    crownColor: "var(--color-champion-active)",
+    crownColor: "oklch(0.92 0.18 78)",
   },
   dominant: {
     status: "dominant",
     label: "Dominant Champion",
-    borderColor: "var(--color-champion-dominant)",
+    borderColor: "oklch(0.72 0.15 70)", // standard gold
+    borderWidth: 2,
+    glowColor: "oklch(0.70 0.13 70 / 0.25)",
+    glowSize: "0 0 18px",
     badgeText: "DOMINANT CHAMPION",
     hasCrown: true,
-    crownColor: "var(--color-champion-dominant)",
+    crownColor: "oklch(0.78 0.15 72)",
   },
   former: {
     status: "former",
     label: "Former Champion",
-    borderColor: "oklch(0.55 0.08 75)", // antique faded gold (unused at render time)
+    borderColor: "oklch(0.55 0.08 75)", // antique faded gold
+    borderWidth: 1,
+    glowColor: null,
+    glowSize: null,
     badgeText: "FORMER CHAMPION",
     hasCrown: false,
     crownColor: null,
@@ -232,6 +239,9 @@ export const CHAMPION_STYLES: Record<ChampionStatus, ChampionStyle> = {
     status: "none",
     label: "",
     borderColor: "transparent",
+    borderWidth: 0,
+    glowColor: null,
+    glowSize: null,
     badgeText: "",
     hasCrown: false,
     crownColor: null,
@@ -254,4 +264,27 @@ export function classifyAndStyle(args: ClassifyArgs): {
     tierStyle: getTierStyle(classification.tier),
     championStyle: getChampionStyle(classification.championStatus),
   };
+}
+
+/**
+ * Multiply the alpha channel of an OKLCH(L C h / a) color string. Clamps to
+ * [0, 1]. Returns the input unchanged when no alpha is present (no-op for
+ * `transparent`, named colors, or hex). Used by FighterCard to deepen the
+ * tier gradient for champions without recoloring the hue (Wave 6F).
+ *
+ * Input forms supported:
+ *   oklch(0.45 0.22 295 / 0.18)
+ *   oklch(0.45 0.22 295 / .18)
+ *   oklch(0.45 0.22 295 / 18%)
+ */
+export function boostAlpha(color: string, factor: number): string {
+  const m = color.match(
+    /^oklch\(\s*([^\s)]+)\s+([^\s)]+)\s+([^\s)]+)\s*\/\s*([0-9.]+)(%?)\s*\)$/i,
+  );
+  if (!m) return color;
+  const [, l, c, h, alphaStr, pct] = m;
+  const base = pct === "%" ? Number(alphaStr) / 100 : Number(alphaStr);
+  if (!Number.isFinite(base)) return color;
+  const next = Math.min(1, Math.max(0, base * factor));
+  return `oklch(${l} ${c} ${h} / ${next.toFixed(3)})`;
 }

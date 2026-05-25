@@ -2,7 +2,6 @@ import Image from "next/image";
 
 import { BmfBadge } from "@/components/fighter/detail/BmfBadge";
 import { TrophyBadge } from "@/components/fighter/detail/TrophyBadge";
-import { getAvatarBg, getAvatarInitials } from "@/lib/avatar-palette";
 import { type ChampionEntry } from "@/lib/champions";
 import type { FighterDetail } from "@/lib/fighter-detail";
 import { getCountryFlag } from "@/lib/fighter-helpers";
@@ -41,6 +40,28 @@ function computeAge(dob: string | null): number | null {
   return age;
 }
 
+const HERO_PALETTE: readonly string[] = [
+  "oklch(0.35 0.12 27)",
+  "oklch(0.35 0.10 70)",
+  "oklch(0.30 0.08 250)",
+  "oklch(0.30 0.10 310)",
+  "oklch(0.30 0.10 150)",
+  "oklch(0.25 0.02 240)",
+];
+
+function hashColor(name: string): string {
+  let h = 0;
+  for (let i = 0; i < name.length; i += 1) h = (h + name.charCodeAt(i)) | 0;
+  return HERO_PALETTE[Math.abs(h) % HERO_PALETTE.length];
+}
+
+function initialsOf(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
 function HeroPhoto({
   name,
   photoUrl,
@@ -54,7 +75,7 @@ function HeroPhoto({
     "relative aspect-[3/4] w-full overflow-hidden rounded-md",
     "lg:aspect-auto lg:h-[480px] lg:w-[360px]",
     isChampion
-      ? "border-2 border-primary/40"
+      ? "border-2 border-primary/40 shadow-glow-primary"
       : "border border-foreground/10",
   );
   if (photoUrl) {
@@ -72,13 +93,13 @@ function HeroPhoto({
     );
   }
   return (
-    <div className={wrapper} style={{ backgroundColor: getAvatarBg(name) }}>
+    <div className={wrapper} style={{ backgroundColor: hashColor(name) }}>
       <span
-        className="absolute inset-0 flex items-center justify-center font-broadcast-display font-bold uppercase tracking-wider text-fg"
+        className="absolute inset-0 flex items-center justify-center font-display uppercase tracking-wider text-foreground/90"
         style={{ fontSize: "clamp(80px, 14vw, 156px)" }}
         aria-hidden
       >
-        {getAvatarInitials(name)}
+        {initialsOf(name)}
       </span>
     </div>
   );

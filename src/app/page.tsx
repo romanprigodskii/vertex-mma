@@ -203,7 +203,7 @@ export default async function HomePage() {
                 .
               </p>
             ) : (
-              <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+              <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {topMarkets.map((m) => (
                   <li key={m.id}>
                     <MarketCard market={m} />
@@ -239,7 +239,7 @@ export default async function HomePage() {
                 .
               </p>
             ) : (
-              <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+              <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {recentRankings.map((r) => (
                   <li key={r.id}>
                     <RankingCard ranking={r} />

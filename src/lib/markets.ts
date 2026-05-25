@@ -5,23 +5,7 @@ import { db } from "@/lib/db";
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/**
- * A market with uniform initial LMSR prices reads as "no real odds yet" —
- * before any trade or external-odds sync, every outcome sits at exactly
- * 1 / N (6.00 for method, 4.00 for round, 2.00 for two-outcome props).
- * Hiding those rather than presenting system placeholders that look like
- * real odds but aren't.
- */
-function hasMeaningfulOdds(
-  outcomes: ReadonlyArray<{ current_price: number }>,
-): boolean {
-  if (outcomes.length < 2) return false;
-  const first = outcomes[0].current_price;
-  return outcomes.some((o) => Math.abs(o.current_price - first) > 0.005);
-}
-
 export type MarketCardOutcome = {
-  id: string;
   label: string;
   order_index: number;
   current_price: number;
@@ -68,7 +52,6 @@ export async function listOpenMarkets(limit = 50): Promise<MarketListItem[]> {
         (
           SELECT json_agg(
             json_build_object(
-              'id', id::text,
               'label', label,
               'order_index', order_index,
               'current_price', current_price::float
@@ -88,9 +71,7 @@ export async function listOpenMarkets(limit = 50): Promise<MarketListItem[]> {
     ORDER BY m.closes_at ASC, m.type ASC
     LIMIT ${limit}
   `);
-  return (rows as unknown as MarketListItem[]).filter((m) =>
-    hasMeaningfulOdds(m.outcomes),
-  );
+  return rows as unknown as MarketListItem[];
 }
 
 export type EventMarketsGroup = {
@@ -180,7 +161,6 @@ export async function listOpenMarketsByEvent(
       COALESCE(
         (
           SELECT json_agg(json_build_object(
-            'id', mo.id::text,
             'label', mo.label,
             'order_index', mo.order_index,
             'current_price', mo.current_price::float
@@ -267,23 +247,7 @@ export async function listOpenMarketsByEvent(
     evt.total_markets++;
   }
 
-  // Drop markets with the uniform LMSR initial price; drop bouts (and
-  // events) left with nothing meaningful to show.
-  for (const evt of eventMap.values()) {
-    evt.bouts = evt.bouts
-      .map((b) => ({
-        ...b,
-        markets: b.markets.filter((m) => hasMeaningfulOdds(m.outcomes)),
-      }))
-      .filter((b) => b.markets.length > 0);
-    evt.total_markets = evt.bouts.reduce(
-      (sum, b) => sum + b.markets.length,
-      0,
-    );
-  }
-  return Array.from(eventMap.values())
-    .filter((e) => e.bouts.length > 0)
-    .slice(0, limit);
+  return Array.from(eventMap.values()).slice(0, limit);
 }
 
 export type MarketOutcomeRow = {
@@ -472,122 +436,4 @@ export async function listMyBets(userProfileId: string): Promise<MyBetRow[]> {
     ORDER BY bt.created_at DESC
   `);
   return rows as unknown as MyBetRow[];
-}
-
-export type FightMarket = {
-  id: string;
-  type: string;
-  question: string;
-  outcomes: MarketCardOutcome[];
-};
-
-export type FightMarkets = {
-  bout_id: string;
-  event_name: string;
-  event_slug: string;
-  event_date: string;
-  closes_at: string;
-  weight_class: string;
-  is_main_event: boolean;
-  is_co_main_event: boolean;
-  is_title_fight: boolean;
-  fighter_a_name: string;
-  fighter_a_slug: string;
-  fighter_b_name: string;
-  fighter_b_slug: string;
-  markets: FightMarket[];
-};
-
-type FightMarketRow = {
-  bout_id: string;
-  event_name: string;
-  event_slug: string;
-  event_date: string;
-  closes_at: string;
-  weight_class: string;
-  is_main_event: boolean;
-  is_co_main_event: boolean;
-  is_title_fight: boolean;
-  fighter_a_name: string;
-  fighter_a_slug: string;
-  fighter_b_name: string;
-  fighter_b_slug: string;
-  market_id: string;
-  market_type: string;
-  market_question: string;
-  outcomes_json: MarketCardOutcome[];
-};
-
-/** Every open market for one bout, ordered winner -> method -> round ->
- *  distance -> prop. Powers the Fonbet-style per-fight view. */
-export async function getFightMarkets(
-  boutId: string,
-): Promise<FightMarkets | null> {
-  if (!UUID_RE.test(boutId)) return null;
-  const rows = (await db.execute<FightMarketRow>(sql`
-    SELECT
-      b.id::text AS bout_id,
-      e.name AS event_name,
-      e.slug AS event_slug,
-      e.date::text AS event_date,
-      m.closes_at::text AS closes_at,
-      b.weight_class::text AS weight_class,
-      b.is_main_event,
-      b.is_co_main_event,
-      b.is_title_fight,
-      fa.name_en AS fighter_a_name,
-      fa.slug AS fighter_a_slug,
-      fb.name_en AS fighter_b_name,
-      fb.slug AS fighter_b_slug,
-      m.id::text AS market_id,
-      m.type::text AS market_type,
-      m.question AS market_question,
-      COALESCE(
-        (
-          SELECT json_agg(json_build_object(
-            'id', mo.id::text,
-            'label', mo.label,
-            'order_index', mo.order_index,
-            'current_price', mo.current_price::float
-          ) ORDER BY mo.order_index)
-          FROM market_outcome mo
-          WHERE mo.market_id = m.id
-        ),
-        '[]'::json
-      ) AS outcomes_json
-    FROM market m
-    JOIN bout b ON b.id = m.bout_id
-    JOIN event e ON e.id = b.event_id
-    JOIN fighter fa ON fa.id = b.fighter_a_id
-    JOIN fighter fb ON fb.id = b.fighter_b_id
-    WHERE m.bout_id = ${boutId}::uuid AND m.status = 'open'
-    ORDER BY m.type ASC
-  `)) as unknown as FightMarketRow[];
-
-  if (rows.length === 0) return null;
-  const f = rows[0];
-  const markets = rows
-    .map((r) => ({
-      id: r.market_id,
-      type: r.market_type,
-      question: r.market_question,
-      outcomes: r.outcomes_json ?? [],
-    }))
-    .filter((m) => hasMeaningfulOdds(m.outcomes));
-  return {
-    bout_id: f.bout_id,
-    event_name: f.event_name,
-    event_slug: f.event_slug,
-    event_date: f.event_date,
-    closes_at: f.closes_at,
-    weight_class: f.weight_class,
-    is_main_event: f.is_main_event,
-    is_co_main_event: f.is_co_main_event,
-    is_title_fight: f.is_title_fight,
-    fighter_a_name: f.fighter_a_name,
-    fighter_a_slug: f.fighter_a_slug,
-    fighter_b_name: f.fighter_b_name,
-    fighter_b_slug: f.fighter_b_slug,
-    markets,
-  };
 }

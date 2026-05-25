@@ -108,12 +108,7 @@ export function FighterCatalogClient({
   const [error, setError] = React.useState<string | null>(null);
 
   const inflightKeyRef = React.useRef<string>(filtersKey(initialFilters));
-  // Skip the filter-change effect on the very first render (SSR already
-  // produced data for the initial filter set). On every subsequent
-  // change — INCLUDING returning to the initial set, e.g. flipping sort
-  // back to vertex_current after vertex_all_time — we must re-fetch so
-  // the displayed order matches the active sort.
-  const isFirstRender = React.useRef(true);
+  const initialKeyRef = React.useRef<string>(filtersKey(initialFilters));
 
   // ---------- Search input → filters (debounced 250ms) ----------
   React.useEffect(() => {
@@ -137,8 +132,7 @@ export function FighterCatalogClient({
   // ---------- Filter-change fetch ----------
   React.useEffect(() => {
     const key = filtersKey(filters);
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
+    if (key === initialKeyRef.current) {
       inflightKeyRef.current = key;
       return;
     }
@@ -242,7 +236,7 @@ export function FighterCatalogClient({
   return (
     <div className="flex flex-col gap-6">
       {/* Sticky controls bar */}
-      <div className="sticky top-16 z-30 -mx-4 border-b border-edge bg-surface-base/90 px-4 py-3 backdrop-blur-md sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+      <div className="sticky top-16 z-30 -mx-4 border-b border-foreground/10 bg-background-base/90 px-4 py-3 backdrop-blur-md sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <div className="min-w-0 flex-1 sm:max-w-[360px]">
             <SearchBar
@@ -256,13 +250,13 @@ export function FighterCatalogClient({
               loading={searching}
             />
           </div>
-          <p className="type-body hidden sm:block whitespace-nowrap text-xs text-fg-muted">
+          <p className="hidden sm:block whitespace-nowrap font-sans text-xs text-foreground-muted">
             Showing{" "}
-            <span className="font-mono tabular text-fg">
+            <span className="font-mono tabular text-foreground">
               {formatNumber(fighters.length)}
             </span>{" "}
             of{" "}
-            <span className="font-mono tabular text-fg">
+            <span className="font-mono tabular text-foreground">
               {formatNumber(total)}
             </span>
           </p>
@@ -285,12 +279,12 @@ export function FighterCatalogClient({
           </div>
         </div>
         {activeCount > 0 ? (
-          <p className="type-meta mt-2 text-[10px] text-fg-subtle">
+          <p className="mt-2 font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
             {activeCount} filter{activeCount === 1 ? "" : "s"} active ·{" "}
             <button
               type="button"
               onClick={onClear}
-              className="text-fg hover:underline"
+              className="text-primary hover:underline"
             >
               clear all
             </button>
@@ -316,18 +310,18 @@ export function FighterCatalogClient({
         {/* Roster column */}
         <div className="min-w-0 flex-1">
           {error ? (
-            <div className="type-body mb-3 rounded-md border border-loss/40 bg-loss/10 px-4 py-3 text-sm text-fg">
+            <div className="mb-3 rounded-md border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-foreground">
               {error}
             </div>
           ) : null}
 
           {/* Roster header above the catalog list. */}
-          <div className="mb-3 mt-2 flex items-baseline justify-between gap-3 border-b border-edge px-1 pb-3 sm:mt-4 sm:px-2">
-            <p className="type-meta text-[11px] text-fg-muted">
+          <div className="mb-3 mt-2 flex items-baseline justify-between gap-3 border-b border-foreground/10 px-1 pb-3 sm:mt-4 sm:px-2">
+            <p className="font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
               Roster
             </p>
-            <p className="type-meta text-[11px] text-fg-subtle">
-              <span className="font-mono tabular text-fg">
+            <p className="font-sans text-[11px] uppercase tracking-widest text-foreground-subtle">
+              <span className="font-mono tabular text-foreground">
                 {formatNumber(total)}
               </span>{" "}
               of{" "}
@@ -348,7 +342,7 @@ export function FighterCatalogClient({
                 variants={LIST_VARIANTS}
                 initial="hidden"
                 animate="show"
-                className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-3"
+                className="grid grid-cols-1 gap-4 lg:grid-cols-2"
               >
                 <AnimatePresence initial={false}>
                   {fighters.map((f, i) => (
@@ -375,7 +369,7 @@ export function FighterCatalogClient({
               </motion.ul>
 
               <div className="mt-10 flex flex-col items-center gap-3 text-center">
-                <p className="type-meta text-[10px] text-fg-subtle">
+                <p className="font-mono text-[10px] uppercase tracking-widest text-foreground-subtle tabular">
                   Loaded {formatNumber(fighters.length)} of{" "}
                   {formatNumber(total)}
                 </p>
@@ -389,7 +383,7 @@ export function FighterCatalogClient({
                     Load more
                   </Button>
                 ) : fighters.length > 0 ? (
-                  <p className="type-body text-xs text-fg-subtle">
+                  <p className="text-xs text-foreground-subtle">
                     End of results
                   </p>
                 ) : null}

@@ -103,28 +103,6 @@ function FighterSilhouette({
           fill="currentColor"
           opacity={legsO}
         />
-        {/* Strike counts on the silhouette itself — dark halo keeps them
-            legible at any zone opacity. */}
-        {[
-          { value: map.head, y: 22 },
-          { value: map.body, y: 86 },
-          { value: map.legs, y: 163 },
-        ].map((zone) => (
-          <text
-            key={zone.y}
-            x={40}
-            y={zone.y}
-            textAnchor="middle"
-            dominantBaseline="central"
-            fill="oklch(0.98 0 0)"
-            stroke="oklch(0.14 0.01 240)"
-            strokeWidth={2.6}
-            strokeLinejoin="round"
-            style={{ paintOrder: "stroke", fontSize: 12, fontWeight: 700 }}
-          >
-            {zone.value}
-          </text>
-        ))}
       </svg>
       <dl className="grid w-full max-w-[140px] grid-cols-2 gap-x-3 gap-y-1 font-mono text-xs tabular">
         <dt className="text-foreground-subtle">Head</dt>

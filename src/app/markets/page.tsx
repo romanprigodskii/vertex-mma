@@ -3,10 +3,9 @@ import Link from "next/link";
 import { Container } from "@/components/layout/container";
 import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
-import { EventFights } from "@/components/markets/event-fights";
+import { EventMarketsAccordion } from "@/components/markets/event-markets-accordion";
 import { getCurrentUser } from "@/lib/auth";
 import { listOpenMarketsByEvent } from "@/lib/markets";
-import { formatCoins } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -25,19 +24,18 @@ export default async function MarketsPage() {
     <>
       <Navbar />
       <main className="flex-1">
-        <Container size="lg" className="py-10 md:py-14">
+        <Container size="xl" className="py-10 md:py-14">
           <header className="mb-8 flex flex-wrap items-baseline justify-between gap-3">
             <div>
               <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground-subtle">
                 Bookmaker
               </p>
               <h1 className="mt-2 font-display uppercase tracking-tight text-foreground text-h1">
-                Markets
+                Open markets
               </h1>
               <p className="mt-2 max-w-xl font-sans text-sm text-foreground-muted">
-                Win odds on every upcoming bout — open a fight for its method,
-                round, and prop markets. Prices track real sportsbook odds and
-                move on every trade.
+                Bet virtual coins on upcoming UFC bouts. Prices are set by an
+                LMSR market maker — every trade nudges the implied odds.
               </p>
             </div>
             {user ? (
@@ -46,7 +44,7 @@ export default async function MarketsPage() {
                   Your balance
                 </p>
                 <p className="font-display text-2xl tabular text-foreground">
-                  {formatCoins(user.balanceCoins)}{" "}
+                  {user.balanceCoins.toLocaleString()}{" "}
                   <span className="text-sm text-foreground-muted">coins</span>
                 </p>
                 <Link
@@ -66,7 +64,7 @@ export default async function MarketsPage() {
             )}
           </header>
 
-          <EventFights events={events} />
+          <EventMarketsAccordion events={events} />
         </Container>
       </main>
       <Footer />

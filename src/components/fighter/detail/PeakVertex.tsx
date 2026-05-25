@@ -45,11 +45,8 @@ interface PeakVertexProps {
  */
 export function PeakVertex({ info }: PeakVertexProps) {
   const { peak, peakDate, anchorBout, endingBout, currentScore } = info;
-  // Null current (no recent UFC activity) counts as 0 — the user sees the
-  // full peak as the drop, not a misleadingly small delta vs all-time.
-  const effectiveCurrent = currentScore ?? 0;
-  const delta = effectiveCurrent - peak;
-  const isAtPeak = endingBout == null && delta === 0;
+  const delta = currentScore != null ? currentScore - peak : null;
+  const isAtPeak = endingBout == null;
 
   return (
     <section
@@ -70,7 +67,7 @@ export function PeakVertex({ info }: PeakVertexProps) {
           <span className="font-display tabular text-5xl leading-none text-foreground">
             {peak}
           </span>
-          {delta !== 0 ? (
+          {delta != null && delta !== 0 ? (
             <span
               className={
                 "font-sans text-xs " +
@@ -79,11 +76,11 @@ export function PeakVertex({ info }: PeakVertexProps) {
             >
               {delta > 0 ? `+${delta}` : delta} vs current
             </span>
-          ) : (
+          ) : delta === 0 ? (
             <span className="font-sans text-xs text-foreground-muted">
               currently at peak
             </span>
-          )}
+          ) : null}
         </div>
 
         <div className="min-w-[200px] flex-1 space-y-2 font-sans text-sm">

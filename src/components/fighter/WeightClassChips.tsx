@@ -20,17 +20,17 @@ export function WeightClassChips({ selected, onToggle }: WeightClassChipsProps) 
             onClick={() => onToggle(wc.id)}
             aria-pressed={isActive}
             className={cn(
-              "type-label inline-flex h-6 items-center gap-1 rounded-sm border px-1.5 text-[11px] transition-colors duration-(--motion-fast) ease-out-soft",
+              "inline-flex h-6 items-center gap-1 rounded-sm border px-1.5 text-[11px] transition-colors",
               isActive
-                ? "border-fg/40 bg-fg/[0.08] text-fg"
-                : "border-edge bg-transparent text-fg-muted hover:border-edge-strong hover:text-fg",
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-foreground/10 bg-transparent text-foreground-muted hover:border-foreground/30 hover:text-foreground",
             )}
           >
             <span className="truncate">{wc.label}</span>
             <span
               className={cn(
                 "font-mono text-[9px]",
-                isActive ? "opacity-75" : "text-fg-subtle",
+                isActive ? "opacity-75" : "text-foreground-subtle",
               )}
             >
               {wc.limitLb}

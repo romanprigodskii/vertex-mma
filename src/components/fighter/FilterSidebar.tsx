@@ -78,19 +78,19 @@ function Section({
 }) {
   const [open, setOpen] = React.useState(defaultOpen);
   return (
-    <div className="border-b border-fg/[0.06] last:border-b-0">
+    <div className="border-b border-foreground/[0.06] last:border-b-0">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         className="flex w-full items-center justify-between gap-2 py-2.5 text-left"
       >
-        <span className="type-label text-[11px] text-fg-muted">
+        <span className="font-sans text-[11px] font-medium uppercase tracking-[0.16em] text-foreground-muted">
           {title}
         </span>
         <ChevronDown
           className={cn(
-            "h-3.5 w-3.5 text-fg-subtle transition-transform duration-(--motion-fast) ease-out-soft",
+            "h-3.5 w-3.5 text-foreground-subtle transition-transform duration-150",
             open ? "rotate-0" : "-rotate-90",
           )}
           aria-hidden
@@ -118,14 +118,12 @@ function ToggleRow({
   onChange: (next: boolean) => void;
 }) {
   return (
-    <label className="type-body flex cursor-pointer items-center justify-between gap-3 py-1.5 text-xs text-fg-muted transition-colors duration-(--motion-fast) ease-out-soft hover:text-fg">
+    <label className="flex cursor-pointer items-center justify-between gap-3 py-1.5 text-xs text-foreground-muted hover:text-foreground transition-colors">
       <span>{label}</span>
       <span
         className={cn(
-          "relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors duration-(--motion-fast) ease-out-soft",
-          checked
-            ? "bg-fg"
-            : "border border-edge bg-surface-overlay",
+          "relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors",
+          checked ? "bg-primary" : "bg-background-overlay border border-border",
         )}
       >
         <input
@@ -137,10 +135,8 @@ function ToggleRow({
         <span
           aria-hidden
           className={cn(
-            "inline-block h-3.5 w-3.5 rounded-full shadow transition-transform",
-            checked
-              ? "translate-x-[18px] bg-surface-base"
-              : "translate-x-[3px] bg-fg-muted",
+            "inline-block h-3.5 w-3.5 rounded-full bg-foreground shadow transition-transform",
+            checked ? "translate-x-[18px]" : "translate-x-[3px]",
           )}
         />
       </span>
@@ -173,7 +169,7 @@ export function FilterSidebar({
   return (
     <aside
       className={cn(
-        "flex flex-col text-fg",
+        "flex flex-col text-foreground",
         dense ? "text-xs" : "text-sm",
         className,
       )}
@@ -181,15 +177,15 @@ export function FilterSidebar({
       {resultCount ? (
         <div
           className={cn(
-            "flex items-baseline justify-between gap-2 border-b border-edge",
+            "flex items-baseline justify-between gap-2 border-b border-foreground/10",
             dense ? "mb-1 pb-2.5" : "mb-2 pb-3",
           )}
         >
-          <p className="type-meta text-[11px] text-fg-subtle">
-            <span className="font-mono tabular text-fg">
+          <p className="font-sans text-[11px] uppercase tracking-widest text-foreground-subtle">
+            <span className="font-mono tabular text-foreground">
               {formatNumber(resultCount.shown)}
             </span>
-            <span className="mx-1 text-fg-subtle/50">/</span>
+            <span className="mx-1 text-foreground-subtle/50">/</span>
             <span className="font-mono tabular">
               {formatNumber(resultCount.total)}
             </span>

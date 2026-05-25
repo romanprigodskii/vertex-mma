@@ -11,7 +11,6 @@ import {
 } from "lucide-react";
 
 import type { CurrentUser } from "@/lib/auth";
-import { formatCoins } from "@/lib/utils";
 
 export function NavbarUserMenu({ user }: { user: CurrentUser }) {
   const [open, setOpen] = React.useState(false);
@@ -35,44 +34,44 @@ export function NavbarUserMenu({ user }: { user: CurrentUser }) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex h-9 items-center gap-2 rounded-md border border-edge bg-surface-elevated px-1.5 pr-3 text-fg-muted transition-colors duration-(--motion-fast) ease-out-soft hover:border-edge-strong hover:text-fg"
+        className="inline-flex h-9 items-center gap-2 rounded-md border border-foreground/15 bg-background-elevated px-1.5 pr-3 text-foreground-muted transition-colors hover:border-foreground/25 hover:text-foreground"
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label="Account menu"
       >
-        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-fg/10 type-display text-[11px] text-fg">
+        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/15 font-display text-[11px] uppercase text-primary">
           {initials}
         </span>
-        <span className="type-body hidden max-w-[8rem] truncate text-sm text-fg sm:inline">
+        <span className="hidden max-w-[8rem] truncate font-sans text-sm text-foreground sm:inline">
           {user.username}
         </span>
       </button>
       {open ? (
         <div
           role="menu"
-          className="absolute right-0 top-full z-50 mt-1 w-56 rounded-md border border-edge bg-surface-elevated p-1 shadow-lg"
+          className="absolute right-0 top-full z-50 mt-1 w-56 rounded-md border border-foreground/15 bg-background-elevated p-1 shadow-lg"
         >
           <div className="px-2 py-1.5">
-            <p className="type-body truncate text-sm text-fg">
+            <p className="truncate font-sans text-sm text-foreground">
               {user.displayName ?? user.username}
             </p>
-            <p className="type-meta truncate text-[10px] text-fg-subtle">
+            <p className="truncate font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
               @{user.username}
             </p>
           </div>
-          <div className="mx-1 my-1 flex items-center gap-1.5 rounded-sm bg-surface-base/40 px-2 py-1.5">
-            <Coins className="h-4 w-4 text-fg" aria-hidden />
-            <span className="type-num text-sm text-fg">
-              {formatCoins(user.balanceCoins)}
+          <div className="mx-1 my-1 flex items-center gap-1.5 rounded-sm bg-background-base/40 px-2 py-1.5">
+            <Coins className="h-4 w-4 text-gold" aria-hidden />
+            <span className="font-sans text-sm tabular text-foreground">
+              {user.balanceCoins.toLocaleString()}
             </span>
-            <span className="type-meta ml-auto text-[9px] text-fg-subtle">
+            <span className="ml-auto font-mono text-[9px] uppercase tracking-widest text-foreground-subtle">
               {user.tier}
             </span>
           </div>
           <Link
             href={`/profile/${user.username}`}
             onClick={() => setOpen(false)}
-            className="type-body flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-fg transition-colors duration-(--motion-fast) ease-out-soft hover:bg-fg/[0.05]"
+            className="flex items-center gap-2 rounded-sm px-2 py-1.5 font-sans text-sm text-foreground hover:bg-foreground/[0.05]"
           >
             <UserCircle className="h-4 w-4" />
             Profile
@@ -80,7 +79,7 @@ export function NavbarUserMenu({ user }: { user: CurrentUser }) {
           <Link
             href="/me/bets"
             onClick={() => setOpen(false)}
-            className="type-body flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-fg transition-colors duration-(--motion-fast) ease-out-soft hover:bg-fg/[0.05]"
+            className="flex items-center gap-2 rounded-sm px-2 py-1.5 font-sans text-sm text-foreground hover:bg-foreground/[0.05]"
           >
             <Coins className="h-4 w-4" />
             My bets
@@ -88,7 +87,7 @@ export function NavbarUserMenu({ user }: { user: CurrentUser }) {
           <Link
             href="/me/predictions"
             onClick={() => setOpen(false)}
-            className="type-body flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-fg transition-colors duration-(--motion-fast) ease-out-soft hover:bg-fg/[0.05]"
+            className="flex items-center gap-2 rounded-sm px-2 py-1.5 font-sans text-sm text-foreground hover:bg-foreground/[0.05]"
           >
             <ListChecks className="h-4 w-4" />
             My predictions
@@ -96,16 +95,16 @@ export function NavbarUserMenu({ user }: { user: CurrentUser }) {
           <Link
             href="/settings"
             onClick={() => setOpen(false)}
-            className="type-body flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-fg transition-colors duration-(--motion-fast) ease-out-soft hover:bg-fg/[0.05]"
+            className="flex items-center gap-2 rounded-sm px-2 py-1.5 font-sans text-sm text-foreground hover:bg-foreground/[0.05]"
           >
             <SettingsIcon className="h-4 w-4" />
             Settings
           </Link>
-          <hr className="my-1 border-edge" />
+          <hr className="my-1 border-foreground/10" />
           <form action="/auth/signout" method="post">
             <button
               type="submit"
-              className="type-body flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm text-fg transition-colors duration-(--motion-fast) ease-out-soft hover:bg-fg/[0.05]"
+              className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left font-sans text-sm text-foreground hover:bg-foreground/[0.05]"
             >
               <LogOut className="h-4 w-4" />
               Sign out

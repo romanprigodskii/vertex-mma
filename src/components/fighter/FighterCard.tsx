@@ -7,7 +7,7 @@ import { WEIGHT_CLASSES } from "@/lib/constants";
 import { getCountryFlag } from "@/lib/fighter-helpers";
 import type { FighterCatalogRow } from "@/lib/fighter-search";
 import { cn } from "@/lib/utils";
-import { classifyAndStyle } from "@/lib/vertex-tier";
+import { boostAlpha, classifyAndStyle } from "@/lib/vertex-tier";
 
 const WEIGHT_LABELS: Record<string, string> = Object.fromEntries(
   WEIGHT_CLASSES.map((w) => [w.id, w.label]),
@@ -41,7 +41,7 @@ interface FighterCardProps {
 }
 
 function StanceIcon({ stance }: { stance: string | null }) {
-  const cls = "h-3.5 w-3.5 text-fg-subtle";
+  const cls = "h-3.5 w-3.5 text-foreground-subtle";
   if (stance === "orthodox") return <ArrowRight className={cls} aria-hidden />;
   if (stance === "southpaw")
     return (
@@ -58,9 +58,9 @@ function streakClassFor(
   type: "W" | "L" | null,
   count: number,
 ): string {
-  if (!type || count < 1) return "text-fg-muted";
-  if (type === "W") return "text-profit";
-  return "text-loss";
+  if (!type || count < 1) return "text-foreground-muted";
+  if (type === "W") return "text-streak-win";
+  return "text-streak-loss";
 }
 
 export function FighterCard({
@@ -135,11 +135,19 @@ export function FighterCard({
       : `Last: ${fighter.last_fight_result}`
     : "Last: —";
 
-  // Tier identity is now carried by the score+label chip in the
-  // bottom-right (tier-coloured number + tier-text badge) plus the
-  // Crown overlay for champions — no full-card gradient wash.
+  // Wave 6F: champions get a denser tier gradient (alpha boost + extended
+  // stop) plus a subtle warm gold tint at the bottom 25% of the card —
+  // replacing the previous yellow border + glow. Conveys "champion" via
+  // fill intensity (FIFA/EA UFC convention) rather than a competing border.
+  const gradientFrom = isChampion
+    ? boostAlpha(tierStyle.gradientFrom, 2.2)
+    : tierStyle.gradientFrom;
+  const gradientStop = isChampion ? "90%" : "70%";
+  const tierGradient = `linear-gradient(180deg, ${gradientFrom} 0%, ${tierStyle.gradientTo} ${gradientStop})`;
   const cardBase =
-    "color-mix(in oklch, var(--color-surface-elevated) 30%, transparent)";
+    "color-mix(in oklch, var(--color-background-elevated) 30%, transparent)";
+  const goldTint =
+    "linear-gradient(0deg, oklch(0.7 0.15 80 / 0.12) 0%, oklch(0.7 0.15 80 / 0) 25%)";
 
   return (
     <Link
@@ -148,15 +156,17 @@ export function FighterCard({
       style={{
         background:
           tierStyle.tier === "unranked"
-            ? "color-mix(in oklch, var(--color-surface-elevated) 18%, transparent)"
-            : cardBase,
+            ? "oklch(0.12 0.008 240 / 0.3)"
+            : isChampion
+              ? `${tierGradient}, ${goldTint}, ${cardBase}`
+              : `${tierGradient}, ${cardBase}`,
       }}
       className={cn(
-        "group relative flex min-h-[168px] gap-4 rounded-lg border border-edge p-4",
-        "transition-[background-color] duration-(--motion-fast) ease-out-soft",
-        "hover:bg-fg/[0.02]",
-        "focus-visible:outline-none focus-visible:bg-fg/[0.02]",
-        "focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface-base",
+        "group relative flex min-h-[168px] gap-4 rounded-lg border border-foreground/10 p-4",
+        "transition-[background-color] duration-200 ease-out",
+        "hover:bg-foreground/[0.02]",
+        "focus-visible:outline-none focus-visible:bg-foreground/[0.02]",
+        "focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background-base",
         className,
       )}
       aria-label={`${fighter.name_en}${
@@ -184,7 +194,7 @@ export function FighterCard({
             // For double champions the 2× badge needs that corner; the
             // crown shifts back up to top-right to make room.
             className={cn(
-              "absolute flex h-5 w-5 items-center justify-center rounded-full border border-fg/15 bg-surface-base shadow-sm",
+              "absolute flex h-5 w-5 items-center justify-center rounded-full border border-foreground/15 bg-background-base shadow-sm",
               classification.isDoubleChampion
                 ? "-right-1 -top-1"
                 : "-bottom-1 -right-1",
@@ -202,7 +212,7 @@ export function FighterCard({
               borderColor:
                 championStyle.crownColor ?? championStyle.borderColor,
             }}
-            className="absolute -bottom-1 -right-1 inline-flex items-center justify-center rounded-full border bg-surface-base px-1.5 py-0.5 font-broadcast-display font-bold tabular text-[10px] leading-none"
+            className="absolute -bottom-1 -right-1 inline-flex items-center justify-center rounded-full border bg-background-base px-1.5 py-0.5 font-display text-[10px] tabular leading-none"
           >
             2×
           </span>
@@ -213,15 +223,15 @@ export function FighterCard({
       <div className="flex min-w-0 flex-1 flex-col justify-between">
         <div className="flex min-w-0 flex-col">
           {showRank && rank ? (
-            <p className="type-meta text-[10px] text-fg-subtle">
+            <p className="font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
               #{rank}
             </p>
           ) : null}
-          <h3 className="line-clamp-2 break-words font-broadcast-display text-2xl font-bold uppercase leading-tight tracking-tight text-fg sm:text-[28px]">
+          <h3 className="truncate font-display text-2xl uppercase leading-tight tracking-tight text-foreground sm:text-[28px]">
             {fighter.name_en}
           </h3>
           {hasNickname ? (
-            <p className="truncate type-body text-[13px] italic leading-snug text-fg-muted">
+            <p className="truncate font-sans text-[13px] italic leading-snug text-foreground-muted">
               &ldquo;{fighter.nickname}&rdquo;
             </p>
           ) : null}
@@ -234,13 +244,8 @@ export function FighterCard({
         </div>
 
         <div className="mt-2 flex flex-col gap-1.5">
-          <div className="h-px w-full bg-fg/[0.07]" aria-hidden />
-          <p
-            className={cn(
-              "type-body flex items-center gap-1.5 truncate text-[11px] text-fg-muted",
-              showTierBadge && "pr-[140px]",
-            )}
-          >
+          <div className="h-px w-full bg-foreground/[0.07]" aria-hidden />
+          <p className="flex items-center gap-1.5 truncate font-sans text-[11px] text-foreground-muted">
             <span aria-hidden className="text-[14px] leading-none">
               {flag}
             </span>
@@ -249,21 +254,16 @@ export function FighterCard({
             ) : (
               <span className="uppercase tracking-wide opacity-60">—</span>
             )}
-            <span aria-hidden className="text-fg-subtle/40">
+            <span aria-hidden className="text-foreground-subtle/40">
               ·
             </span>
             <span className="font-mono tabular">{fighter.bout_count}</span>
             <span>fights</span>
           </p>
-          <p
-            className={cn(
-              "type-body flex items-center gap-1.5 truncate text-[11px] text-fg-muted",
-              showTierBadge && "pr-[140px]",
-            )}
-          >
+          <p className="flex items-center gap-1.5 truncate font-sans text-[11px] text-foreground-muted">
             <StanceIcon stance={fighter.stance} />
             <span>{stanceText}</span>
-            <span aria-hidden className="text-fg-subtle/40">
+            <span aria-hidden className="text-foreground-subtle/40">
               ·
             </span>
             <span
@@ -274,7 +274,7 @@ export function FighterCard({
             >
               {streakLabel}
             </span>
-            <span aria-hidden className="text-fg-subtle/40">
+            <span aria-hidden className="text-foreground-subtle/40">
               ·
             </span>
             <span className="font-mono tabular">{lastFightLabel}</span>
@@ -284,39 +284,35 @@ export function FighterCard({
 
       {/* Record column */}
       <div className="flex flex-col items-end gap-1 pl-1">
-        <span className="font-broadcast-display text-3xl font-bold leading-none tabular tracking-tight text-fg sm:text-[32px]">
+        <span className="font-display text-3xl leading-none tabular tracking-tight text-foreground sm:text-[32px]">
           {record}
         </span>
-        <span className="h-px w-6 bg-fg/[0.1]" aria-hidden />
-        <span className="type-num text-xs text-fg-muted">{winRate}</span>
+        <span className="h-px w-6 bg-foreground/[0.1]" aria-hidden />
+        <span className="font-mono text-xs tabular text-foreground-muted">
+          {winRate}
+        </span>
         {ncs > 0 ? (
-          <span className="type-body text-[10px] uppercase tracking-wider text-fg-subtle">
+          <span className="font-sans text-[10px] uppercase tracking-wider text-foreground-subtle">
             · {ncs} NC
           </span>
         ) : null}
       </div>
 
-      {/* Tier score chip — tier-coloured number paired with the tier-text
-          badge, on its own dark-chip backing so it doesn't float now that
-          the full-card gradient wash is gone. Hidden for unranked. */}
+      {/* Large tier-coloured score, bottom-right of the card. Replaces the
+          small badge (Wave 3.5 step 6A.2) — the tier gradient + this number
+          carry the tier signal together. Hidden for unranked fighters. */}
       {showTierBadge && displayScore != null ? (
-        <div
+        <span
           aria-hidden
-          className="pointer-events-none absolute bottom-3 right-3 inline-flex select-none items-baseline gap-2 rounded-sm border border-edge bg-surface-elevated/70 px-2 py-1"
+          className="pointer-events-none absolute bottom-3 right-4 select-none font-display tabular leading-none"
+          style={{
+            fontSize: 32,
+            color: tierStyle.scoreColor,
+            textShadow: "0 1px 8px oklch(0 0 0 / 0.55)",
+          }}
         >
-          <span
-            className="type-meta text-[9px]"
-            style={{ color: tierStyle.scoreColor }}
-          >
-            {tierStyle.badgeText}
-          </span>
-          <span
-            className="type-num leading-none"
-            style={{ fontSize: 26, color: tierStyle.scoreColor }}
-          >
-            {displayScore}
-          </span>
-        </div>
+          {displayScore}
+        </span>
       ) : null}
       {/* Wave 14B.2: provisional badge — surfaces "≤4 bouts in this
           division" for divisional rating display. Anchored just above the
@@ -325,7 +321,7 @@ export function FighterCard({
       {isProvisional ? (
         <span
           aria-label="Provisional rating — fewer than 5 bouts in this division"
-          className="type-meta pointer-events-none absolute bottom-12 right-4 select-none rounded-sm border border-edge bg-surface-elevated/85 px-1.5 py-0.5 text-[9px] text-fg-muted"
+          className="pointer-events-none absolute bottom-12 right-4 select-none rounded-sm border border-foreground/15 bg-background-elevated/85 px-1.5 py-0.5 font-sans text-[9px] uppercase tracking-widest text-foreground-muted"
         >
           Prov
         </span>
