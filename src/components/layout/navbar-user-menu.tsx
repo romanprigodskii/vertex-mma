@@ -61,7 +61,7 @@ export function NavbarUserMenu({ user }: { user: CurrentUser }) {
             </p>
           </div>
           <div className="mx-1 my-1 flex items-center gap-1.5 rounded-sm bg-surface-base/40 px-2 py-1.5">
-            <Coins className="h-4 w-4 text-fg-muted" aria-hidden />
+            <Coins className="h-4 w-4 text-fg" aria-hidden />
             <span className="type-num text-sm text-fg">
               {formatCoins(user.balanceCoins)}
             </span>

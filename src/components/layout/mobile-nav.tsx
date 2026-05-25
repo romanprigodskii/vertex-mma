@@ -78,7 +78,7 @@ export function MobileNav({ user }: { user: CurrentUser | null }) {
             {user ? (
               <>
                 <div className="mb-3 flex items-center gap-2 rounded-sm bg-surface-base/40 px-3 py-2">
-                  <Coins className="h-4 w-4 text-fg-muted" aria-hidden />
+                  <Coins className="h-4 w-4 text-fg" aria-hidden />
                   <span className="type-num text-sm text-fg">
                     {formatCoins(user.balanceCoins)}
                   </span>

@@ -217,7 +217,7 @@ export function FighterCard({
               #{rank}
             </p>
           ) : null}
-          <h3 className="truncate font-broadcast-display text-2xl font-bold uppercase leading-tight tracking-tight text-fg sm:text-[28px]">
+          <h3 className="line-clamp-2 break-words font-broadcast-display text-2xl font-bold uppercase leading-tight tracking-tight text-fg sm:text-[28px]">
             {fighter.name_en}
           </h3>
           {hasNickname ? (
@@ -235,7 +235,12 @@ export function FighterCard({
 
         <div className="mt-2 flex flex-col gap-1.5">
           <div className="h-px w-full bg-fg/[0.07]" aria-hidden />
-          <p className="type-body flex items-center gap-1.5 truncate text-[11px] text-fg-muted">
+          <p
+            className={cn(
+              "type-body flex items-center gap-1.5 truncate text-[11px] text-fg-muted",
+              showTierBadge && "pr-[140px]",
+            )}
+          >
             <span aria-hidden className="text-[14px] leading-none">
               {flag}
             </span>
@@ -250,7 +255,12 @@ export function FighterCard({
             <span className="font-mono tabular">{fighter.bout_count}</span>
             <span>fights</span>
           </p>
-          <p className="type-body flex items-center gap-1.5 truncate text-[11px] text-fg-muted">
+          <p
+            className={cn(
+              "type-body flex items-center gap-1.5 truncate text-[11px] text-fg-muted",
+              showTierBadge && "pr-[140px]",
+            )}
+          >
             <StanceIcon stance={fighter.stance} />
             <span>{stanceText}</span>
             <span aria-hidden className="text-fg-subtle/40">

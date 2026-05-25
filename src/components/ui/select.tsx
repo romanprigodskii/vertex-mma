@@ -55,22 +55,20 @@ export function Select<T extends string>({
           aria-label={ariaLabel}
           disabled={disabled}
           className={cn(
-            "inline-flex h-9 w-full items-center justify-between gap-2 rounded-md border border-border bg-background-base pl-3 pr-2 text-xs text-foreground",
-            "transition-colors hover:bg-foreground/[0.04]",
-            "focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30",
+            "type-body inline-flex h-9 w-full items-center justify-between gap-2 rounded-md border border-edge bg-surface-base pl-3 pr-2 text-xs text-fg",
+            "transition-colors duration-(--motion-fast) ease-out-soft hover:bg-fg/[0.04]",
+            "focus:border-edge-strong focus:outline-none focus:ring-2 focus:ring-fg/20",
             "disabled:cursor-not-allowed disabled:opacity-50",
             className,
           )}
         >
-          <span
-            className={cn("truncate", !current && "text-foreground-subtle")}
-          >
+          <span className={cn("truncate", !current && "text-fg-subtle")}>
             {current?.label ?? placeholder}
           </span>
           <ChevronDown
             aria-hidden
             className={cn(
-              "h-3.5 w-3.5 shrink-0 text-foreground-subtle transition-transform",
+              "h-3.5 w-3.5 shrink-0 text-fg-subtle transition-transform duration-(--motion-fast) ease-out-soft",
               open && "rotate-180",
             )}
           />
@@ -83,7 +81,7 @@ export function Select<T extends string>({
           className={cn(
             "z-50 w-[var(--radix-popover-trigger-width)] min-w-[200px]",
             "max-h-[min(340px,var(--radix-popover-content-available-height))] overflow-y-auto",
-            "rounded-md border border-foreground/15 bg-background-overlay p-1 shadow-elevation-2",
+            "rounded-md border border-edge bg-surface-overlay p-1 shadow-elevation-2",
             "data-[state=open]:animate-in data-[state=closed]:animate-out",
             "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
           )}
@@ -100,16 +98,16 @@ export function Select<T extends string>({
                       setOpen(false);
                     }}
                     className={cn(
-                      "flex w-full items-center justify-between gap-2 rounded-sm px-3 py-2 text-left font-sans text-xs transition-colors",
+                      "type-body flex w-full items-center justify-between gap-2 rounded-sm px-3 py-2 text-left text-xs transition-colors duration-(--motion-fast) ease-out-soft",
                       isSelected
-                        ? "bg-primary/15 text-foreground"
-                        : "text-foreground-muted hover:bg-foreground/[0.05] hover:text-foreground",
+                        ? "bg-fg/[0.08] text-fg"
+                        : "text-fg-muted hover:bg-fg/[0.05] hover:text-fg",
                     )}
                   >
                     <span className="flex min-w-0 flex-col">
                       <span className="truncate">{opt.label}</span>
                       {opt.hint ? (
-                        <span className="truncate font-mono text-[10px] text-foreground-subtle">
+                        <span className="truncate font-mono text-[10px] text-fg-subtle">
                           {opt.hint}
                         </span>
                       ) : null}
@@ -117,7 +115,7 @@ export function Select<T extends string>({
                     {isSelected ? (
                       <Check
                         aria-hidden
-                        className="h-3.5 w-3.5 shrink-0 text-primary"
+                        className="h-3.5 w-3.5 shrink-0 text-fg"
                       />
                     ) : null}
                   </button>

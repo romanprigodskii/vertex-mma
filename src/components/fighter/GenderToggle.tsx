@@ -31,10 +31,10 @@ export function GenderToggle({ value, onChange }: GenderToggleProps) {
             aria-checked={isActive}
             onClick={() => onChange(opt.id)}
             className={cn(
-              "inline-flex h-7 items-center justify-center rounded-sm border px-2 text-[11px] transition-colors",
+              "type-label inline-flex h-7 items-center justify-center rounded-sm border px-2 text-[11px] transition-colors duration-(--motion-fast) ease-out-soft",
               isActive
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-foreground/10 bg-transparent text-foreground-muted hover:border-foreground/30 hover:text-foreground",
+                ? "border-fg/40 bg-fg/[0.08] text-fg"
+                : "border-edge bg-transparent text-fg-muted hover:border-edge-strong hover:text-fg",
             )}
           >
             {opt.label}

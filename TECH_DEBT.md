@@ -140,12 +140,16 @@ during their respective rebrand-migration waves.
   Route through `--color-profit` / `--color-loss` (the new
   result-semantic tokens) when the timeline surface migrates.
 
-- **`src/components/fighter/FighterAvatar.tsx`** and
+- ~~**`src/components/fighter/FighterAvatar.tsx`** and
   **`src/components/fighter/detail/FighterHero.tsx`** — both define an
   `AVATAR_BG_PALETTE` array of 6 deterministic deep tints. The arrays
   are identical between the two files. Pull into a shared module under
-  `src/lib/` (e.g. `src/lib/avatar-palette.ts`). This is independent of
-  the rebrand and can ship sooner.
+  `src/lib/` (e.g. `src/lib/avatar-palette.ts`).~~ **Done in the
+  catalog polish pass.** The shared module now lives at
+  `src/lib/avatar-palette.ts`. The palette also neutralised — the
+  saturated red/gold/blue/purple/green tints became a 4-step neutral
+  Sodium-tinted dark ramp (the red one was falsely echoing the
+  loss-red semantic on real catalog data).
 
 - **`src/components/fighter/fighter-result-card.tsx`** — inline OKLCH
   gradient + colour values bypass tokens (e.g.

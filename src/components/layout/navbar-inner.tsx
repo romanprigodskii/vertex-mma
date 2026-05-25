@@ -45,8 +45,8 @@ export function NavbarInner({
             {user ? (
               <>
                 <div className="hidden h-9 items-center gap-1.5 rounded-md border border-edge bg-surface-elevated px-3 type-num text-sm sm:inline-flex">
-                  <Coins className="h-4 w-4 text-fg-muted" aria-hidden />
-                  <span className="text-fg-muted">
+                  <Coins className="h-4 w-4 text-fg" aria-hidden />
+                  <span className="text-fg">
                     {formatCoins(user.balanceCoins)}
                   </span>
                 </div>

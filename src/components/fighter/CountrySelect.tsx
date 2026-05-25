@@ -44,7 +44,7 @@ export function CountrySelect({
       <div className="relative">
         <Search
           aria-hidden
-          className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-foreground-subtle"
+          className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-fg-subtle"
         />
         <input
           type="text"
@@ -52,10 +52,10 @@ export function CountrySelect({
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Find country…"
           className={cn(
-            "h-7 w-full rounded-sm border border-foreground/10 bg-background-base pl-7 pr-2 text-[11px] text-foreground",
-            "placeholder:text-foreground-subtle",
-            "focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/40",
-            "transition-colors",
+            "type-body h-7 w-full rounded-sm border border-edge bg-surface-base pl-7 pr-2 text-[11px] text-fg",
+            "placeholder:text-fg-subtle",
+            "focus:outline-none focus:border-edge-strong focus:ring-1 focus:ring-fg/20",
+            "transition-colors duration-(--motion-fast) ease-out-soft",
           )}
           aria-label="Search countries"
         />
@@ -63,7 +63,9 @@ export function CountrySelect({
 
       <ul className="max-h-64 space-y-0.5 overflow-y-auto pr-1">
         {visibleCountries.length === 0 ? (
-          <li className="px-1 py-2 text-xs text-foreground-subtle">No match</li>
+          <li className="type-body px-1 py-2 text-xs text-fg-subtle">
+            No match
+          </li>
         ) : (
           visibleCountries.map((c) => {
             const isActive = selected.includes(c.code);
@@ -74,18 +76,18 @@ export function CountrySelect({
                   onClick={() => onToggle(c.code)}
                   aria-pressed={isActive}
                   className={cn(
-                    "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-colors",
+                    "type-body flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-colors duration-(--motion-fast) ease-out-soft",
                     isActive
-                      ? "bg-primary/15 text-foreground"
-                      : "text-foreground-muted hover:bg-background-elevated hover:text-foreground",
+                      ? "bg-fg/[0.08] text-fg"
+                      : "text-fg-muted hover:bg-fg/[0.04] hover:text-fg",
                   )}
                 >
                   <span
                     className={cn(
                       "flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border",
                       isActive
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-border-strong",
+                        ? "border-fg bg-fg text-surface-base"
+                        : "border-edge-strong",
                     )}
                     aria-hidden
                   >
@@ -97,7 +99,7 @@ export function CountrySelect({
                   <span className="font-mono uppercase tracking-wider">
                     {c.code}
                   </span>
-                  <span className="ml-auto font-mono text-[10px] text-foreground-subtle tabular">
+                  <span className="ml-auto font-mono text-[10px] tabular text-fg-subtle">
                     {c.count}
                   </span>
                 </button>
@@ -111,7 +113,7 @@ export function CountrySelect({
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
-          className="text-xs text-foreground-muted hover:text-foreground transition-colors"
+          className="type-body text-xs text-fg-muted transition-colors duration-(--motion-fast) ease-out-soft hover:text-fg"
         >
           {expanded
             ? "Show less"
