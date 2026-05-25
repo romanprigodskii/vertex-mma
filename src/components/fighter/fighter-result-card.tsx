@@ -87,7 +87,7 @@ export function FighterResultCard({ fighter, onClick, href }: Props) {
 
   const inner = (
     <>
-      <div className="relative aspect-square w-full overflow-hidden bg-foreground/[0.04]">
+      <div className="relative aspect-square w-full overflow-hidden bg-fg/[0.04]">
         {fighter.photo_thumbnail_url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -96,7 +96,7 @@ export function FighterResultCard({ fighter, onClick, href }: Props) {
             className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center font-display text-4xl tracking-widest text-foreground-subtle">
+          <div className="flex h-full w-full items-center justify-center font-broadcast-display text-4xl font-bold uppercase tracking-widest text-fg-subtle">
             {initials(fighter.name)}
           </div>
         )}
@@ -104,18 +104,20 @@ export function FighterResultCard({ fighter, onClick, href }: Props) {
           className="pointer-events-none absolute inset-x-0 bottom-0 h-1/3"
           style={{
             background:
-              "linear-gradient(180deg, transparent, oklch(0.14 0.01 240 / 0.7))",
+              "linear-gradient(180deg, transparent, color-mix(in oklch, var(--color-surface-base) 70%, transparent))",
           }}
           aria-hidden
         />
         {/* Top-right photo corner: tier text chip + (optional) crown mark.
             Crown is icon-only — no "Champion" label, no backdrop-blur — so
-            the corner reads as one quiet identity chip, not two stacked pills. */}
+            the corner reads as one quiet identity chip, not two stacked pills.
+            Crown uses the active-champion gold token; the card does not
+            differentiate active/dominant here (FighterCard does). */}
         {tierLabel || isChamp ? (
           <div className="absolute right-1.5 top-1.5 flex items-center gap-1">
             {tierLabel ? (
               <span
-                className="rounded-sm bg-background-base/75 px-1.5 py-0.5 font-mono text-[8px] uppercase tracking-widest"
+                className="type-meta rounded-sm bg-surface-base/75 px-1.5 py-0.5 text-[8px]"
                 style={{ color: style.scoreColor }}
               >
                 {tierLabel}
@@ -123,8 +125,7 @@ export function FighterResultCard({ fighter, onClick, href }: Props) {
             ) : null}
             {isChamp ? (
               <span
-                className="flex items-center rounded-sm bg-background-base/75 px-1 py-0.5"
-                style={{ color: "oklch(0.85 0.18 75)" }}
+                className="flex items-center rounded-sm bg-surface-base/75 px-1 py-0.5 text-champion-active"
                 title="Champion"
               >
                 <Crown className="h-2.5 w-2.5" aria-hidden />
@@ -135,21 +136,21 @@ export function FighterResultCard({ fighter, onClick, href }: Props) {
       </div>
 
       <div className="relative flex flex-1 flex-col gap-1 px-3 py-2.5">
-        <p className="truncate font-display text-sm uppercase tracking-tight text-foreground">
+        <p className="truncate font-broadcast-display text-sm font-bold uppercase tracking-tight text-fg">
           {fighter.name}
         </p>
         {fighter.nickname ? (
-          <p className="-mt-1 truncate font-sans text-[10px] italic text-foreground-muted">
+          <p className="type-body -mt-1 truncate text-[10px] italic text-fg-muted">
             &ldquo;{fighter.nickname}&rdquo;
           </p>
         ) : null}
         <p
-          className="font-display text-xl leading-none tabular text-foreground"
-          style={{ color: record ? undefined : "var(--foreground-subtle)" }}
+          className="font-broadcast-display text-xl font-bold leading-none tabular text-fg"
+          style={{ color: record ? undefined : "var(--color-fg-subtle)" }}
         >
           {record ?? "—"}
         </p>
-        <p className="truncate font-mono text-[9px] uppercase tracking-widest text-foreground-subtle">
+        <p className="type-meta truncate text-[9px] text-fg-subtle">
           {shortWeight(fighter.weight_class)}
           {fighter.ufc_bouts > 0 ? ` · ${fighter.ufc_bouts} UFC` : ""}
         </p>
@@ -168,12 +169,13 @@ export function FighterResultCard({ fighter, onClick, href }: Props) {
 
   const baseClass =
     "group relative flex h-full w-full flex-col overflow-hidden rounded-md border text-left";
-  const interactiveClass = " transition-colors";
+  const interactiveClass =
+    " transition-colors duration-(--motion-fast) ease-out-soft";
   // Tier identity carried by a 1px tier-coloured edge — replaces the
-  // full-card gradient wash. Unranked falls back to the neutral border.
+  // full-card gradient wash. Unranked falls back to the neutral edge.
   const edgeStyle: CSSProperties =
     fighter.tier === "unranked"
-      ? { borderColor: "var(--color-foreground-10, oklch(1 0 0 / 0.15))" }
+      ? { borderColor: "var(--color-edge)" }
       : { borderColor: style.badgeBorder };
 
   if (href) {
@@ -279,19 +281,20 @@ function ScoreCell({
         cellClass +
         " " +
         (tone === "primary"
-          ? "bg-foreground/[0.06]"
-          : "border-l border-foreground/10 bg-background-base/40")
+          ? "bg-fg/[0.06]"
+          : "border-l border-edge bg-surface-base/40")
       }
     >
       <span
         className={
-          "font-display font-semibold tabular leading-none " + numberClass
+          "font-broadcast-display font-bold tabular leading-none " +
+          numberClass
         }
         style={{ color: value != null ? color : undefined }}
       >
         {value != null ? Math.round(value) : "—"}
       </span>
-      <span className="mt-0.5 text-[8px] uppercase tracking-widest text-foreground-subtle">
+      <span className="type-meta mt-0.5 text-[8px] text-fg-subtle">
         {label}
       </span>
     </div>

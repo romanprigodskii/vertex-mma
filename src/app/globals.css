@@ -54,12 +54,18 @@
   --color-border: oklch(0.2 0.01 240);
   --color-border-strong: oklch(0.3 0.01 240);
 
-  /* Tier */
-  --color-tier-bronze: oklch(0.55 0.12 50);
-  --color-tier-silver: oklch(0.75 0.02 240);
-  --color-tier-gold: oklch(0.78 0.15 70);
-  --color-tier-diamond: oklch(0.75 0.15 200);
-  --color-tier-champion: oklch(0.55 0.25 320);
+  /* Account tier (user progression: bronze → champion).
+     Renamed from --color-tier-* to free the tier-* namespace for the
+     fighter-tier tokens added in the rebrand. Consumed by badge.tsx +
+     the style guide; the broader account-tier surfaces (leaderboard
+     TierChip, profile tier-progress, daily-bonus) still render off
+     foreground tokens, not these — they're effectively dormant. See
+     TECH_DEBT.md for the deletion/consolidation plan. */
+  --color-account-tier-bronze: oklch(0.55 0.12 50);
+  --color-account-tier-silver: oklch(0.75 0.02 240);
+  --color-account-tier-gold: oklch(0.78 0.15 70);
+  --color-account-tier-diamond: oklch(0.75 0.15 200);
+  --color-account-tier-champion: oklch(0.55 0.25 320);
 
   /* ============================================================
      Sodium-night palette — rebrand role tokens. Coexists with the
@@ -93,6 +99,23 @@
   /* Result semantics — P/L colours tuned for WCAG AA on surface-base. */
   --color-profit: oklch(0.74 0.17 145);
   --color-loss: oklch(0.66 0.21 25);
+
+  /* Fighter tier — score-derived rank encoding (apex >=75, elite 55-74,
+     established 35-54, roster <35). Variant A from the tier-preview:
+     four retuned hues sitting on the warm Sodium surface, with the
+     roster slate warmed to surface-hue (60h) to harmonise instead of
+     the legacy 240h cold. Consumed by vertex-tier.ts as a name→token
+     map; resolves into FighterCard / fighter-result-card / ScoreShapes. */
+  --color-tier-apex: oklch(0.82 0.18 305);
+  --color-tier-elite: oklch(0.80 0.15 230);
+  --color-tier-established: oklch(0.74 0.06 195);
+  --color-tier-roster: oklch(0.60 0.02 60);
+
+  /* Champion — real-world belt signifier. Kept gold deliberately
+     (independent of brand chroma); tokenised so the two gold values
+     read from one source instead of being raw in CHAMPION_STYLES. */
+  --color-champion-active: oklch(0.92 0.18 78);
+  --color-champion-dominant: oklch(0.78 0.15 72);
 
   /* ============================================================
      Typography

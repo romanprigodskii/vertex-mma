@@ -108,56 +108,61 @@ export interface TierStyle {
   scoreColor: string;
 }
 
-// Explicit per-tier OKLCH triples (no color-mix). Each tier reads as a
-// distinct hue on dark backgrounds:
-//   Apex        purple/violet  — GOAT territory
-//   Elite       blue           — championship class
-//   Established  teal-grey     — solid pro
-//   Roster      slate          — long-tail roster
+// Tier visual values now resolve to @theme tokens (see globals.css —
+// --color-tier-apex / -elite / -established / -roster). Variant A from
+// the tier-direction preview: four retuned hues sitting on the warm
+// Sodium surface, roster warmed to surface hue.
+//
+// scoreColor and badgeBorder are the only fields the live components
+// (FighterCard, fighter-result-card, ScoreShapes) consume. The other
+// fields (badgeBg / badgeTextColor / gradientFrom / gradientTo) are
+// retained for back-compat with any older callers and now alias to
+// the same per-tier token; their pre-rebrand lightness/chroma
+// variations were never read off the live surface.
 export const TIER_STYLES: Record<VertexTier, TierStyle> = {
   apex: {
     tier: "apex",
     label: "Apex",
     badgeText: "APEX",
-    badgeBg: "oklch(0.30 0.18 295)",
-    badgeTextColor: "oklch(0.92 0.10 295)",
-    badgeBorder: "oklch(0.55 0.20 295)",
-    gradientFrom: "oklch(0.45 0.22 295 / 0.18)",
-    gradientTo: "oklch(0.45 0.22 295 / 0)",
-    scoreColor: "oklch(0.85 0.18 295)",
+    badgeBg: "var(--color-tier-apex)",
+    badgeTextColor: "var(--color-tier-apex)",
+    badgeBorder: "var(--color-tier-apex)",
+    gradientFrom: "var(--color-tier-apex)",
+    gradientTo: "var(--color-tier-apex)",
+    scoreColor: "var(--color-tier-apex)",
   },
   elite: {
     tier: "elite",
     label: "Elite",
     badgeText: "ELITE",
-    badgeBg: "oklch(0.28 0.14 235)",
-    badgeTextColor: "oklch(0.88 0.10 235)",
-    badgeBorder: "oklch(0.55 0.18 235)",
-    gradientFrom: "oklch(0.45 0.18 235 / 0.16)",
-    gradientTo: "oklch(0.45 0.18 235 / 0)",
-    scoreColor: "oklch(0.82 0.16 235)",
+    badgeBg: "var(--color-tier-elite)",
+    badgeTextColor: "var(--color-tier-elite)",
+    badgeBorder: "var(--color-tier-elite)",
+    gradientFrom: "var(--color-tier-elite)",
+    gradientTo: "var(--color-tier-elite)",
+    scoreColor: "var(--color-tier-elite)",
   },
   established: {
     tier: "established",
     label: "Established",
     badgeText: "ESTABLISHED",
-    badgeBg: "oklch(0.28 0.05 200)",
-    badgeTextColor: "oklch(0.78 0.06 200)",
-    badgeBorder: "oklch(0.45 0.07 200)",
-    gradientFrom: "oklch(0.50 0.08 200 / 0.12)",
-    gradientTo: "oklch(0.50 0.08 200 / 0)",
-    scoreColor: "oklch(0.75 0.07 200)",
+    badgeBg: "var(--color-tier-established)",
+    badgeTextColor: "var(--color-tier-established)",
+    badgeBorder: "var(--color-tier-established)",
+    gradientFrom: "var(--color-tier-established)",
+    gradientTo: "var(--color-tier-established)",
+    scoreColor: "var(--color-tier-established)",
   },
   roster: {
     tier: "roster",
     label: "Roster",
     badgeText: "ROSTER",
-    badgeBg: "oklch(0.22 0.01 240)",
-    badgeTextColor: "oklch(0.65 0.02 240)",
-    badgeBorder: "oklch(0.35 0.02 240)",
-    gradientFrom: "oklch(0.45 0.02 240 / 0.08)",
-    gradientTo: "oklch(0.45 0.02 240 / 0)",
-    scoreColor: "oklch(0.62 0.03 240)",
+    badgeBg: "var(--color-tier-roster)",
+    badgeTextColor: "var(--color-tier-roster)",
+    badgeBorder: "var(--color-tier-roster)",
+    gradientFrom: "var(--color-tier-roster)",
+    gradientTo: "var(--color-tier-roster)",
+    scoreColor: "var(--color-tier-roster)",
   },
   unranked: {
     tier: "unranked",
@@ -192,27 +197,33 @@ export interface ChampionStyle {
   crownColor: string | null;
 }
 
+// Champion gold survives the rebrand as a real-world belt signifier
+// (intentional override of "kill all amber"). Active and dominant
+// now resolve to @theme tokens — see --color-champion-active and
+// --color-champion-dominant in globals.css. Former stays on its raw
+// antique-gold value because nothing reads it visibly today (former
+// has hasCrown: false, so the borderColor is never painted).
 export const CHAMPION_STYLES: Record<ChampionStatus, ChampionStyle> = {
   active: {
     status: "active",
     label: "Active Champion",
-    borderColor: "oklch(0.85 0.18 75)", // bright vibrant gold
+    borderColor: "var(--color-champion-active)",
     badgeText: "ACTIVE CHAMPION",
     hasCrown: true,
-    crownColor: "oklch(0.92 0.18 78)",
+    crownColor: "var(--color-champion-active)",
   },
   dominant: {
     status: "dominant",
     label: "Dominant Champion",
-    borderColor: "oklch(0.72 0.15 70)", // standard gold
+    borderColor: "var(--color-champion-dominant)",
     badgeText: "DOMINANT CHAMPION",
     hasCrown: true,
-    crownColor: "oklch(0.78 0.15 72)",
+    crownColor: "var(--color-champion-dominant)",
   },
   former: {
     status: "former",
     label: "Former Champion",
-    borderColor: "oklch(0.55 0.08 75)", // antique faded gold
+    borderColor: "oklch(0.55 0.08 75)", // antique faded gold (unused at render time)
     badgeText: "FORMER CHAMPION",
     hasCrown: false,
     crownColor: null,

@@ -27,8 +27,12 @@ this cleanup pass becomes possible.
 - `--color-streak-win`, `--color-streak-loss`
 - `--color-border`, `--color-border-strong`
 
-Tier tokens (`--color-tier-*`) stay until the tier system is rethought
-in its own pass.
+Fighter-tier tokens (`--color-tier-apex/-elite/-established/-roster`) and
+champion tokens (`--color-champion-active/-dominant`) stay — they were
+added in the fighter-card migration as part of the rebrand, not legacy.
+
+Account-tier tokens (`--color-account-tier-bronze/-silver/-gold/-diamond/-champion`)
+have their own cleanup item below — see the "Account-tier rename" section.
 
 `--color-submission` and `--color-knockdown` (round-by-round bars) should
 be reviewed against the Sodium palette during cleanup; they may need
@@ -89,6 +93,42 @@ etc.) reference `--font-broadcast-display` directly; update those
 references to `--font-display` in the same pass.
 
 ---
+
+## Account-tier rename (logged during fighter-card migration)
+
+The fighter-card pass renamed the existing `--color-tier-bronze/-silver/-gold/-diamond/-champion`
+tokens to `--color-account-tier-*` to free the `tier-*` namespace for the
+score-derived fighter tier system (`--color-tier-apex/-elite/-established/-roster`).
+Badge variants were renamed in lockstep: `tier-bronze` → `account-tier-bronze`
+(and the four siblings).
+
+The rename is mechanical; **the account-tier visual surfaces themselves were
+not migrated to Sodium tokens in this pass** because they barely render the
+account tier as colour anywhere in the live UI:
+
+- `leaderboard-table.tsx`'s `TierChip` already opted out of the tier palette
+  in the Phase 1 leaderboard migration — *"no invented per-tier colour, the
+  tier vocabulary is account-tier, not fighter-tier"*. Reads from neutral
+  foreground tokens.
+- `profile/tier-progress.tsx` displays tier *labels* and a progress bar, no
+  account-tier chroma.
+- `daily-bonus-button.tsx` only consumes the tier numeric thresholds.
+- `style/page.tsx` is the only place that actively paints the account-tier
+  hues — and only in the documented design-system swatch grid.
+
+Cleanup options for a future pass:
+
+1. **Delete the account-tier tokens entirely** (only consumed by Badge
+   variants no live surface uses) — simplest. Badge tier variants would go
+   with them; surfaces that grow a need for account-tier colour later can
+   reach for the new fighter-tier palette or introduce a fresh system.
+2. **Keep but retune for Sodium** if account-tier surfaces ever need real
+   colour (e.g. profile flair / unlock celebrations). The current bronze/
+   silver/gold/diamond/champion values were tuned for the legacy cool-blue
+   palette and may read off on the warm surface.
+
+Default expectation: option 1 when no surface has reached for them across a
+full Sodium migration cycle.
 
 ## Out-of-scope colour leaks (logged during Phase 1 token audit)
 
