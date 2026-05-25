@@ -6,6 +6,7 @@ import { Navbar } from "@/components/layout/navbar";
 import { EventFights } from "@/components/markets/event-fights";
 import { getCurrentUser } from "@/lib/auth";
 import { listOpenMarketsByEvent } from "@/lib/markets";
+import { formatCoins } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -45,7 +46,7 @@ export default async function MarketsPage() {
                   Your balance
                 </p>
                 <p className="font-display text-2xl tabular text-foreground">
-                  {user.balanceCoins.toLocaleString()}{" "}
+                  {formatCoins(user.balanceCoins)}{" "}
                   <span className="text-sm text-foreground-muted">coins</span>
                 </p>
                 <Link

@@ -8,7 +8,7 @@ import { Coins, LogOut, Menu, X } from "lucide-react";
 
 import type { CurrentUser } from "@/lib/auth";
 import { NAV_SECTIONS } from "@/lib/navigation";
-import { cn } from "@/lib/utils";
+import { cn, formatCoins } from "@/lib/utils";
 
 export function MobileNav({ user }: { user: CurrentUser | null }) {
   const [open, setOpen] = React.useState(false);
@@ -80,7 +80,7 @@ export function MobileNav({ user }: { user: CurrentUser | null }) {
                 <div className="mb-3 flex items-center gap-2 rounded-sm bg-background-base/40 px-3 py-2">
                   <Coins className="h-4 w-4 text-gold" aria-hidden />
                   <span className="font-sans text-sm tabular text-foreground">
-                    {user.balanceCoins.toLocaleString()}
+                    {formatCoins(user.balanceCoins)}
                   </span>
                   <span className="ml-auto font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
                     {user.tier}

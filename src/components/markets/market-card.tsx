@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { priceToDecimalOdds } from "@/lib/lmsr";
 import type { MarketCardOutcome, MarketListItem } from "@/lib/markets";
+import { formatCoins } from "@/lib/utils";
 
 const TYPE_LABEL: Record<string, string> = {
   winner: "Winner",
@@ -46,7 +47,7 @@ export function MarketCard({ market }: { market: MarketListItem }) {
       <MarketBody market={market} />
 
       <p className="mt-3 font-mono text-[10px] tabular text-foreground-subtle">
-        Vol {market.total_volume.toLocaleString()} ·{" "}
+        Vol {formatCoins(market.total_volume)} ·{" "}
         {market.unique_traders} trader
         {market.unique_traders === 1 ? "" : "s"}
       </p>

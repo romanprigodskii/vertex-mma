@@ -7,6 +7,7 @@ import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
 import { getCurrentUser } from "@/lib/auth";
 import { listMyBets } from "@/lib/markets";
+import { formatCoins } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -39,7 +40,7 @@ export default async function MyBetsPage() {
           <p className="mt-2 font-sans text-sm text-foreground-muted">
             Balance:{" "}
             <span className="text-foreground">
-              {user.balanceCoins.toLocaleString()} coins
+              {formatCoins(user.balanceCoins)} coins
             </span>
           </p>
 
@@ -82,7 +83,7 @@ export default async function MyBetsPage() {
                     </div>
                     <div className="shrink-0 text-right">
                       <p className="font-mono text-sm tabular text-foreground-muted">
-                        -{b.coins_spent.toLocaleString()}c →{" "}
+                        -{formatCoins(b.coins_spent)}c →{" "}
                         {b.shares_bought.toFixed(1)} shares
                       </p>
                       {b.resolved_at ? (
@@ -91,12 +92,12 @@ export default async function MyBetsPage() {
                         // ternary would have shown "Lost" incorrectly.
                         b.market_status === "cancelled" ? (
                           <p className="font-mono text-xs tabular text-foreground-muted">
-                            Refunded · {(b.payout ?? 0).toLocaleString()}c
+                            Refunded · {formatCoins(b.payout ?? 0)}c
                             returned
                           </p>
                         ) : b.is_winning ? (
                           <p className="font-mono text-xs tabular text-streak-win">
-                            Won · +{(b.payout ?? 0).toLocaleString()}c
+                            Won · +{formatCoins(b.payout ?? 0)}c
                           </p>
                         ) : (
                           <p className="font-mono text-xs tabular text-streak-loss">

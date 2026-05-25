@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 
 import type { CurrentUser } from "@/lib/auth";
+import { formatCoins } from "@/lib/utils";
 
 export function NavbarUserMenu({ user }: { user: CurrentUser }) {
   const [open, setOpen] = React.useState(false);
@@ -62,7 +63,7 @@ export function NavbarUserMenu({ user }: { user: CurrentUser }) {
           <div className="mx-1 my-1 flex items-center gap-1.5 rounded-sm bg-background-base/40 px-2 py-1.5">
             <Coins className="h-4 w-4 text-gold" aria-hidden />
             <span className="font-sans text-sm tabular text-foreground">
-              {user.balanceCoins.toLocaleString()}
+              {formatCoins(user.balanceCoins)}
             </span>
             <span className="ml-auto font-mono text-[9px] uppercase tracking-widest text-foreground-subtle">
               {user.tier}

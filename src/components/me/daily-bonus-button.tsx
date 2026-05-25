@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { claimDailyBonusAction } from "@/app/me/actions";
 import { dailyBonusAmount } from "@/lib/tier";
+import { formatCoins } from "@/lib/utils";
 
 const COOLDOWN_HOURS = 20;
 
@@ -39,7 +40,7 @@ export function DailyBonusButton({ lastDailyBonusAt, tier }: Props) {
       setFeedback(res.error);
       return;
     }
-    let msg = `+${res.awarded?.toLocaleString() ?? amount} coins claimed!`;
+    let msg = `+${formatCoins(res.awarded ?? amount)} coins claimed!`;
     if (res.newlyUnlocked && res.newlyUnlocked.length > 0) {
       msg += ` Unlocked: ${res.newlyUnlocked.join(", ")}`;
     }
@@ -65,7 +66,7 @@ export function DailyBonusButton({ lastDailyBonusAt, tier }: Props) {
         disabled={pending}
         className="rounded-sm bg-primary px-4 py-2 font-display text-sm uppercase tracking-widest text-background-base hover:opacity-90 disabled:opacity-50"
       >
-        {pending ? "Claiming…" : `Claim daily +${amount.toLocaleString()}`}
+        {pending ? "Claiming…" : `Claim daily +${formatCoins(amount)}`}
       </button>
       {feedback ? (
         <p className="mt-2 font-sans text-sm text-streak-win">{feedback}</p>

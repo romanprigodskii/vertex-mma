@@ -11,6 +11,7 @@ import { ShareButton } from "@/components/share/share-button";
 import { getCurrentUser } from "@/lib/auth";
 import { priceToDecimalOdds } from "@/lib/lmsr";
 import { getBoutExternalOdds, getMarketById } from "@/lib/markets";
+import { formatCoins } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -235,7 +236,7 @@ export default async function MarketDetailPage({
                 Volume
               </dt>
               <dd className="mt-1 font-display text-xl tabular text-foreground">
-                {market.total_volume.toLocaleString()}
+                {formatCoins(market.total_volume)}
               </dd>
             </div>
             <div className="rounded-md border border-foreground/10 bg-background-elevated/30 px-4 py-3">

@@ -9,6 +9,7 @@ import { NavbarSearch } from "@/components/layout/navbar-search";
 import { NavbarUserMenu } from "@/components/layout/navbar-user-menu";
 import type { CurrentUser } from "@/lib/auth";
 import type { NotificationRow } from "@/lib/notifications";
+import { formatCoins } from "@/lib/utils";
 
 interface Props {
   user: CurrentUser | null;
@@ -47,7 +48,7 @@ export function NavbarInner({
                 <div className="hidden h-9 items-center gap-1.5 rounded-md border border-foreground/15 bg-background-elevated px-3 text-sm tabular sm:inline-flex">
                   <Coins className="h-4 w-4 text-gold" aria-hidden />
                   <span className="text-foreground-muted">
-                    {user.balanceCoins.toLocaleString()}
+                    {formatCoins(user.balanceCoins)}
                   </span>
                 </div>
                 <NavbarNotifications

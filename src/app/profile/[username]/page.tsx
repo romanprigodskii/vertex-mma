@@ -15,6 +15,7 @@ import {
   listUserAchievements,
 } from "@/lib/achievements";
 import { getCurrentUser, getUserProfileByUsername } from "@/lib/auth";
+import { formatNumber } from "@/lib/format";
 import { listRankingsByUser } from "@/lib/rankings";
 import { listUserSimulations } from "@/lib/simulations";
 import { isTier } from "@/lib/tier";
@@ -290,7 +291,7 @@ function Stat({ label, value }: { label: string; value: number }) {
         {label}
       </dt>
       <dd className="mt-1 font-display text-2xl tabular text-foreground">
-        {value.toLocaleString()}
+        {formatNumber(value)}
       </dd>
     </div>
   );
