@@ -31,15 +31,14 @@ export default async function LeaderboardPage({ searchParams }: PageProps) {
       <main className="flex-1">
         <Container size="xl" className="py-10 md:py-14">
           <header className="mb-8">
-            <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground-subtle">
+            <p className="type-meta text-[11px] text-fg-subtle">
               Community
             </p>
-            <h1 className="mt-2 font-display uppercase tracking-tight text-foreground text-h1">
+            <h1 className="mt-2 type-h1 text-h1 text-fg">
               Leaderboard
             </h1>
-            <p className="mt-2 max-w-xl font-sans text-sm text-foreground-muted">
-              Top Vertex MMA bettors and listmakers. Pick a sort to switch
-              the ordering — every row links to that user&apos;s profile.
+            <p className="mt-2 max-w-xl type-body text-sm text-fg-muted">
+              Top Vertex MMA bettors and listmakers.
             </p>
           </header>
           <LeaderboardTable rows={rows} activeSort={sort} />
