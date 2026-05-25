@@ -1,5 +1,6 @@
 "use client";
 
+import type { CSSProperties } from "react";
 import Link from "next/link";
 import { Crown } from "lucide-react";
 
@@ -65,8 +66,10 @@ function initials(name: string): string {
 
 /**
  * Vertical poster-style fighter card for search surfaces. Photo on top,
- * info stacked below over a tier-coloured gradient, dual CUR/ALL score
- * chip pinned to the bottom. Champions wear a crown badge.
+ * info stacked below on a flat surface, dual CUR/ALL score chip pinned
+ * to the bottom. Tier is signalled by a small text chip on the photo and
+ * a 1px tier-coloured edge on the card; champions wear an icon-only
+ * crown next to the tier chip.
  */
 export function FighterResultCard({ fighter, onClick, href }: Props) {
   const style = TIER_STYLES[fighter.tier];
@@ -80,16 +83,10 @@ export function FighterResultCard({ fighter, onClick, href }: Props) {
     fighter.championStatus === "active" ||
     fighter.championStatus === "dominant";
 
+  const tierLabel = style.badgeText || null;
+
   const inner = (
     <>
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={{
-          background: `linear-gradient(180deg, ${style.gradientFrom}, ${style.gradientTo})`,
-        }}
-        aria-hidden
-      />
-
       <div className="relative aspect-square w-full overflow-hidden bg-foreground/[0.04]">
         {fighter.photo_thumbnail_url ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -111,13 +108,28 @@ export function FighterResultCard({ fighter, onClick, href }: Props) {
           }}
           aria-hidden
         />
-        {isChamp ? (
-          <div
-            className="absolute right-1.5 top-1.5 flex items-center gap-1 rounded-sm bg-background-base/75 px-1.5 py-0.5 font-mono text-[8px] uppercase tracking-widest backdrop-blur-sm"
-            style={{ color: "oklch(0.85 0.18 75)" }}
-          >
-            <Crown className="h-2.5 w-2.5" aria-hidden />
-            Champion
+        {/* Top-right photo corner: tier text chip + (optional) crown mark.
+            Crown is icon-only — no "Champion" label, no backdrop-blur — so
+            the corner reads as one quiet identity chip, not two stacked pills. */}
+        {tierLabel || isChamp ? (
+          <div className="absolute right-1.5 top-1.5 flex items-center gap-1">
+            {tierLabel ? (
+              <span
+                className="rounded-sm bg-background-base/75 px-1.5 py-0.5 font-mono text-[8px] uppercase tracking-widest"
+                style={{ color: style.scoreColor }}
+              >
+                {tierLabel}
+              </span>
+            ) : null}
+            {isChamp ? (
+              <span
+                className="flex items-center rounded-sm bg-background-base/75 px-1 py-0.5"
+                style={{ color: "oklch(0.85 0.18 75)" }}
+                title="Champion"
+              >
+                <Crown className="h-2.5 w-2.5" aria-hidden />
+              </span>
+            ) : null}
           </div>
         ) : null}
       </div>
@@ -155,8 +167,14 @@ export function FighterResultCard({ fighter, onClick, href }: Props) {
   );
 
   const baseClass =
-    "group relative flex h-full w-full flex-col overflow-hidden rounded-md border border-foreground/15 text-left";
-  const interactiveClass = " transition-colors hover:border-foreground/35";
+    "group relative flex h-full w-full flex-col overflow-hidden rounded-md border text-left";
+  const interactiveClass = " transition-colors";
+  // Tier identity carried by a 1px tier-coloured edge — replaces the
+  // full-card gradient wash. Unranked falls back to the neutral border.
+  const edgeStyle: CSSProperties =
+    fighter.tier === "unranked"
+      ? { borderColor: "var(--color-foreground-10, oklch(1 0 0 / 0.15))" }
+      : { borderColor: style.badgeBorder };
 
   if (href) {
     return (
@@ -165,6 +183,7 @@ export function FighterResultCard({ fighter, onClick, href }: Props) {
         prefetch={false}
         onClick={onClick}
         className={baseClass + interactiveClass}
+        style={edgeStyle}
       >
         {inner}
       </Link>
@@ -176,13 +195,18 @@ export function FighterResultCard({ fighter, onClick, href }: Props) {
         type="button"
         onClick={onClick}
         className={baseClass + interactiveClass}
+        style={edgeStyle}
       >
         {inner}
       </button>
     );
   }
   // Static (e.g. simulator "picked" panel).
-  return <div className={baseClass}>{inner}</div>;
+  return (
+    <div className={baseClass} style={edgeStyle}>
+      {inner}
+    </div>
+  );
 }
 
 /** Side-by-side CUR / ALL chip with a tier-coloured border + numbers.

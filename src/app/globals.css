@@ -120,9 +120,6 @@
   /* ============================================================
      Shadows
      ============================================================ */
-  --shadow-glow-primary: 0 0 20px oklch(0.78 0.15 70 / 0.3);
-  --shadow-glow-gold: 0 0 20px oklch(0.78 0.15 70 / 0.3);
-  --shadow-glow-red-accent: 0 0 20px oklch(0.62 0.22 27 / 0.3);
   --shadow-elevation-1: 0 1px 2px oklch(0 0 0 / 0.4), 0 1px 3px oklch(0 0 0 / 0.25);
   --shadow-elevation-2: 0 4px 12px oklch(0 0 0 / 0.5), 0 2px 6px oklch(0 0 0 / 0.3);
 }

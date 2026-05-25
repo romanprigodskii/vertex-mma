@@ -177,38 +177,26 @@ export function getTierStyle(tier: VertexTier): TierStyle {
 }
 
 // =====================================================================
-// Champion visual config (border + glow + crown)
+// Champion visual config (border + crown)
 // =====================================================================
 
 export interface ChampionStyle {
   status: ChampionStatus;
   label: string;
-  // Deprecated as of Wave 6F — champion visual moved to gradient density +
-  // warm tint in FighterCard. Retained on the type for potential future
-  // surfaces (event hero, share preview) that may want the bordered look.
+  /** Gold border colour, used as a fallback for the 2× double-champion
+   *  badge edge in FighterCard. */
   borderColor: string;
-  borderWidth: number;
-  /** Outer-glow OKLCH (with alpha) or null. Deprecated as of Wave 6F. */
-  glowColor: string | null;
-  /** Box-shadow size template, e.g. "0 0 32px". Deprecated as of Wave 6F. */
-  glowSize: string | null;
   badgeText: string;
   hasCrown: boolean;
   /** Crown icon fill — null when no crown. */
   crownColor: string | null;
 }
 
-// Active vs. Dominant vs. Former: each step down one tier reduces border
-// width, glow size, and crown brightness so the visual hierarchy is
-// readable at a glance even before the user reads the score.
 export const CHAMPION_STYLES: Record<ChampionStatus, ChampionStyle> = {
   active: {
     status: "active",
     label: "Active Champion",
     borderColor: "oklch(0.85 0.18 75)", // bright vibrant gold
-    borderWidth: 4,
-    glowColor: "oklch(0.82 0.18 75 / 0.5)",
-    glowSize: "0 0 32px",
     badgeText: "ACTIVE CHAMPION",
     hasCrown: true,
     crownColor: "oklch(0.92 0.18 78)",
@@ -217,9 +205,6 @@ export const CHAMPION_STYLES: Record<ChampionStatus, ChampionStyle> = {
     status: "dominant",
     label: "Dominant Champion",
     borderColor: "oklch(0.72 0.15 70)", // standard gold
-    borderWidth: 2,
-    glowColor: "oklch(0.70 0.13 70 / 0.25)",
-    glowSize: "0 0 18px",
     badgeText: "DOMINANT CHAMPION",
     hasCrown: true,
     crownColor: "oklch(0.78 0.15 72)",
@@ -228,9 +213,6 @@ export const CHAMPION_STYLES: Record<ChampionStatus, ChampionStyle> = {
     status: "former",
     label: "Former Champion",
     borderColor: "oklch(0.55 0.08 75)", // antique faded gold
-    borderWidth: 1,
-    glowColor: null,
-    glowSize: null,
     badgeText: "FORMER CHAMPION",
     hasCrown: false,
     crownColor: null,
@@ -239,9 +221,6 @@ export const CHAMPION_STYLES: Record<ChampionStatus, ChampionStyle> = {
     status: "none",
     label: "",
     borderColor: "transparent",
-    borderWidth: 0,
-    glowColor: null,
-    glowSize: null,
     badgeText: "",
     hasCrown: false,
     crownColor: null,
@@ -264,27 +243,4 @@ export function classifyAndStyle(args: ClassifyArgs): {
     tierStyle: getTierStyle(classification.tier),
     championStyle: getChampionStyle(classification.championStatus),
   };
-}
-
-/**
- * Multiply the alpha channel of an OKLCH(L C h / a) color string. Clamps to
- * [0, 1]. Returns the input unchanged when no alpha is present (no-op for
- * `transparent`, named colors, or hex). Used by FighterCard to deepen the
- * tier gradient for champions without recoloring the hue (Wave 6F).
- *
- * Input forms supported:
- *   oklch(0.45 0.22 295 / 0.18)
- *   oklch(0.45 0.22 295 / .18)
- *   oklch(0.45 0.22 295 / 18%)
- */
-export function boostAlpha(color: string, factor: number): string {
-  const m = color.match(
-    /^oklch\(\s*([^\s)]+)\s+([^\s)]+)\s+([^\s)]+)\s*\/\s*([0-9.]+)(%?)\s*\)$/i,
-  );
-  if (!m) return color;
-  const [, l, c, h, alphaStr, pct] = m;
-  const base = pct === "%" ? Number(alphaStr) / 100 : Number(alphaStr);
-  if (!Number.isFinite(base)) return color;
-  const next = Math.min(1, Math.max(0, base * factor));
-  return `oklch(${l} ${c} ${h} / ${next.toFixed(3)})`;
 }

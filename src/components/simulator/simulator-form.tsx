@@ -214,19 +214,16 @@ function PickerSlot({
       .map((w) => w[0])
       .join("")
       .toUpperCase();
+    const tierLabel = style.badgeText || null;
     return (
       <div className="flex flex-col gap-2">
         <p className="font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
           {label}
         </p>
+        {/* Selected state: primary 2px border carries "picked". Tier
+            identity sits on a small text chip pinned to the photo — no
+            gradient wash on the panel surface. */}
         <div className="relative overflow-hidden rounded-md border-2 border-primary/45">
-          <div
-            className="pointer-events-none absolute inset-0"
-            style={{
-              background: `linear-gradient(135deg, ${style.gradientFrom}, ${style.gradientTo})`,
-            }}
-            aria-hidden
-          />
           <div className="relative flex items-stretch gap-3 p-3 sm:gap-4 sm:p-4">
             <div className="relative h-28 w-24 shrink-0 overflow-hidden rounded-sm border border-foreground/20 sm:h-32 sm:w-28">
               {picked.photo_thumbnail_url ? (
@@ -241,13 +238,25 @@ function PickerSlot({
                   {initials}
                 </div>
               )}
-              {isChamp ? (
-                <div
-                  className="absolute right-1 top-1 flex items-center gap-0.5 rounded-sm bg-background-base/75 px-1 py-0.5 backdrop-blur-sm"
-                  style={{ color: "oklch(0.85 0.18 75)" }}
-                  title="Champion"
-                >
-                  <Crown className="h-2.5 w-2.5" aria-hidden />
+              {tierLabel || isChamp ? (
+                <div className="absolute right-1 top-1 flex items-center gap-1">
+                  {tierLabel ? (
+                    <span
+                      className="rounded-sm bg-background-base/75 px-1.5 py-0.5 font-mono text-[8px] uppercase tracking-widest"
+                      style={{ color: style.scoreColor }}
+                    >
+                      {tierLabel}
+                    </span>
+                  ) : null}
+                  {isChamp ? (
+                    <span
+                      className="flex items-center rounded-sm bg-background-base/75 px-1 py-0.5"
+                      style={{ color: "oklch(0.85 0.18 75)" }}
+                      title="Champion"
+                    >
+                      <Crown className="h-2.5 w-2.5" aria-hidden />
+                    </span>
+                  ) : null}
                 </div>
               ) : null}
             </div>

@@ -75,7 +75,7 @@ function HeroPhoto({
     "relative aspect-[3/4] w-full overflow-hidden rounded-md",
     "lg:aspect-auto lg:h-[480px] lg:w-[360px]",
     isChampion
-      ? "border-2 border-primary/40 shadow-glow-primary"
+      ? "border-2 border-primary/40"
       : "border border-foreground/10",
   );
   if (photoUrl) {

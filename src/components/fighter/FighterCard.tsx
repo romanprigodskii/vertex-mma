@@ -7,7 +7,7 @@ import { WEIGHT_CLASSES } from "@/lib/constants";
 import { getCountryFlag } from "@/lib/fighter-helpers";
 import type { FighterCatalogRow } from "@/lib/fighter-search";
 import { cn } from "@/lib/utils";
-import { boostAlpha, classifyAndStyle } from "@/lib/vertex-tier";
+import { classifyAndStyle } from "@/lib/vertex-tier";
 
 const WEIGHT_LABELS: Record<string, string> = Object.fromEntries(
   WEIGHT_CLASSES.map((w) => [w.id, w.label]),
@@ -135,19 +135,11 @@ export function FighterCard({
       : `Last: ${fighter.last_fight_result}`
     : "Last: —";
 
-  // Wave 6F: champions get a denser tier gradient (alpha boost + extended
-  // stop) plus a subtle warm gold tint at the bottom 25% of the card —
-  // replacing the previous yellow border + glow. Conveys "champion" via
-  // fill intensity (FIFA/EA UFC convention) rather than a competing border.
-  const gradientFrom = isChampion
-    ? boostAlpha(tierStyle.gradientFrom, 2.2)
-    : tierStyle.gradientFrom;
-  const gradientStop = isChampion ? "90%" : "70%";
-  const tierGradient = `linear-gradient(180deg, ${gradientFrom} 0%, ${tierStyle.gradientTo} ${gradientStop})`;
+  // Tier identity is now carried by the score+label chip in the
+  // bottom-right (tier-coloured number + tier-text badge) plus the
+  // Crown overlay for champions — no full-card gradient wash.
   const cardBase =
     "color-mix(in oklch, var(--color-background-elevated) 30%, transparent)";
-  const goldTint =
-    "linear-gradient(0deg, oklch(0.7 0.15 80 / 0.12) 0%, oklch(0.7 0.15 80 / 0) 25%)";
 
   return (
     <Link
@@ -157,9 +149,7 @@ export function FighterCard({
         background:
           tierStyle.tier === "unranked"
             ? "oklch(0.12 0.008 240 / 0.3)"
-            : isChampion
-              ? `${tierGradient}, ${goldTint}, ${cardBase}`
-              : `${tierGradient}, ${cardBase}`,
+            : cardBase,
       }}
       className={cn(
         "group relative flex min-h-[168px] gap-4 rounded-lg border border-foreground/10 p-4",
@@ -298,21 +288,27 @@ export function FighterCard({
         ) : null}
       </div>
 
-      {/* Large tier-coloured score, bottom-right of the card. Replaces the
-          small badge (Wave 3.5 step 6A.2) — the tier gradient + this number
-          carry the tier signal together. Hidden for unranked fighters. */}
+      {/* Tier score chip — tier-coloured number paired with the tier-text
+          badge, on its own dark-chip backing so it doesn't float now that
+          the full-card gradient wash is gone. Hidden for unranked. */}
       {showTierBadge && displayScore != null ? (
-        <span
+        <div
           aria-hidden
-          className="pointer-events-none absolute bottom-3 right-4 select-none font-display tabular leading-none"
-          style={{
-            fontSize: 32,
-            color: tierStyle.scoreColor,
-            textShadow: "0 1px 8px oklch(0 0 0 / 0.55)",
-          }}
+          className="pointer-events-none absolute bottom-3 right-3 inline-flex select-none items-baseline gap-2 rounded-sm border border-foreground/10 bg-background-elevated/70 px-2 py-1"
         >
-          {displayScore}
-        </span>
+          <span
+            className="font-mono text-[9px] uppercase tracking-widest"
+            style={{ color: tierStyle.scoreColor }}
+          >
+            {tierStyle.badgeText}
+          </span>
+          <span
+            className="font-display tabular leading-none"
+            style={{ fontSize: 26, color: tierStyle.scoreColor }}
+          >
+            {displayScore}
+          </span>
+        </div>
       ) : null}
       {/* Wave 14B.2: provisional badge — surfaces "≤4 bouts in this
           division" for divisional rating display. Anchored just above the

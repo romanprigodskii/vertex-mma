@@ -235,35 +235,20 @@ export default async function FighterDetailPage({ params }: PageProps) {
 
         {/* Quick-action CTAs */}
         <Container size="xl" className="pt-6">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Link
-              href={`/fighters/${slug}/card`}
-              prefetch={false}
-              className="group flex flex-wrap items-center justify-between gap-3 rounded-md border border-primary/30 bg-primary/[0.04] px-4 py-3 transition-colors hover:border-primary/55 hover:bg-primary/[0.08]"
-            >
-              <span className="font-sans text-[11px] uppercase tracking-[0.22em] text-primary">
-                Collectible holographic card
-              </span>
-              <span className="flex items-center gap-1.5 font-sans text-xs text-foreground transition-transform group-hover:translate-x-0.5">
-                <span>Open card view</span>
-                <ChevronRight className="h-3.5 w-3.5" aria-hidden />
-              </span>
-            </Link>
-            <Link
-              href={`/fighters/compare?a=${slug}`}
-              prefetch={false}
-              className="group flex flex-wrap items-center justify-between gap-3 rounded-md border border-foreground/15 bg-foreground/[0.02] px-4 py-3 transition-colors hover:border-foreground/35 hover:bg-foreground/[0.05]"
-            >
-              <span className="flex items-center gap-2 font-sans text-[11px] uppercase tracking-[0.22em] text-foreground-muted">
-                <ArrowLeftRight className="h-3.5 w-3.5" aria-hidden />
-                Compare with another fighter
-              </span>
-              <span className="flex items-center gap-1.5 font-sans text-xs text-foreground transition-transform group-hover:translate-x-0.5">
-                <span>Open compare</span>
-                <ChevronRight className="h-3.5 w-3.5" aria-hidden />
-              </span>
-            </Link>
-          </div>
+          <Link
+            href={`/fighters/compare?a=${slug}`}
+            prefetch={false}
+            className="group flex flex-wrap items-center justify-between gap-3 rounded-md border border-foreground/15 bg-foreground/[0.02] px-4 py-3 transition-colors hover:border-foreground/35 hover:bg-foreground/[0.05]"
+          >
+            <span className="flex items-center gap-2 font-sans text-[11px] uppercase tracking-[0.22em] text-foreground-muted">
+              <ArrowLeftRight className="h-3.5 w-3.5" aria-hidden />
+              Compare with another fighter
+            </span>
+            <span className="flex items-center gap-1.5 font-sans text-xs text-foreground transition-transform group-hover:translate-x-0.5">
+              <span>Open compare</span>
+              <ChevronRight className="h-3.5 w-3.5" aria-hidden />
+            </span>
+          </Link>
         </Container>
 
         <Section
