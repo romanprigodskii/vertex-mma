@@ -42,6 +42,7 @@ import {
   CHAMPIONSHIP_HISTORY,
   type ChampionshipReign,
 } from "../src/lib/championship-history";
+import { TITLE_CHALLENGES } from "../src/lib/title-challenger-history";
 
 const url = process.env.DATABASE_URL;
 if (!url) throw new Error("DATABASE_URL not set");
@@ -95,6 +96,10 @@ interface AnchorRow {
   as_of_date: string;
   vertex_score: number;
   raw_current: number;
+  // Wave 53/54/55 all-time formula replayed as-of-anchor. Same gate as
+  // vertex_score (ufc_bouts >= 3) — when the gate doesn't fire we never
+  // push the anchor row at all, so this is always set on inserted rows.
+  vertex_score_all_time: number;
 }
 
 // =====================================================================
@@ -460,6 +465,13 @@ interface CumulativeStats {
   opp_kd: number; // kd_received input
   fight_seconds: number;
   bout_count: number;
+  // Wave 31.7+: extras for the all-time per-anchor replay.
+  control_seconds: number; // performance_diff control component
+  total_kd: number; // finishing_dominance KD term
+  total_sa: number; // finishing_dominance sub-attempts term
+  ko_wins: number; // finishing_dominance ko_wins
+  sub_wins: number; // finishing_dominance sub_wins
+  total_wins: number; // ko_rate / sub_rate denominator
 }
 
 function defensiveVulnerability(c: CumulativeStats): number {
@@ -573,6 +585,173 @@ function skidAndFreshLoss(
     if (b0.is_win === false && !isNoContest(b0)) fresh = 5;
   }
   return Math.max(0, Math.min(100, multiplied - skid - fresh));
+}
+
+// =====================================================================
+// All-time formula helpers (Wave 53/54/55) — date-anchored replay.
+// =====================================================================
+
+function isKoWin(b: BoutRow): boolean {
+  if (b.is_win !== true) return false;
+  const m = (b.method ?? "").toLowerCase();
+  if (m.startsWith("ko") || m.startsWith("tko")) return true;
+  if (b.method == null && b.f_knockdowns > 0) return true;
+  return false;
+}
+
+function isSubWin(b: BoutRow): boolean {
+  if (b.is_win !== true) return false;
+  const m = (b.method ?? "").toLowerCase();
+  if (m.startsWith("sub")) return true;
+  if (b.method == null && b.f_sub_attempts > 0) return true;
+  return false;
+}
+
+/** Career quality_wins (no decay). Sum of opp_tier_value across wins,
+ *  capped at 100 (the same cap the production batch job applies to
+ *  fighter.quality_wins_score before the +30 undefeated bonus). The
+ *  undefeated bonus is intentionally skipped here — it shifts the
+ *  all-time score by at most ~7 points for a handful of fighters and
+ *  requires per-anchor "real loss" tracking that doesn't add useful
+ *  signal to the chart. */
+function computeCareerQualityWins(bouts: BoutRow[]): number {
+  let sum = 0;
+  for (const b of bouts) {
+    if (b.is_win === true) sum += b.opp_tier_value;
+  }
+  return Math.min(100, sum);
+}
+
+/** championship_pedigree replay — mirrors scripts/compute_championship_pedigree.ts
+ *  but filtered to reigns/challenges that closed (or started) by anchor date. */
+function computeCareerCp(
+  slug: string,
+  asOfDate: Date,
+  lastBoutDate: Date | null,
+): number {
+  const reigns = CHAMPIONSHIP_HISTORY.filter(
+    (r) => r.slug === slug && parseDate(r.startDate) <= asOfDate,
+  );
+  if (reigns.length === 0) {
+    const lostChallenges = TITLE_CHALLENGES.filter(
+      (c) => c.slug === slug && parseDate(c.date) <= asOfDate,
+    );
+    return lostChallenges.length > 0 ? 40 : 0;
+  }
+  // Active reign on anchor date?
+  const active = reigns.find(
+    (r) => r.endDate == null || parseDate(r.endDate) > asOfDate,
+  );
+  if (active) {
+    const interimOnly = reigns.every((r) => r.isInterim === true);
+    return interimOnly ? 90 : 100;
+  }
+  // Former champ as of anchor.
+  const interimOnly = reigns.every((r) => r.isInterim === true);
+  if (interimOnly) return 70;
+  // Sticky-100 (Wave 6E.2, 36mo bound Wave 13.1).
+  const closed = reigns
+    .filter(
+      (r) => r.endDate != null && parseDate(r.endDate) <= asOfDate,
+    )
+    .sort((a, b) => (b.endDate ?? "").localeCompare(a.endDate ?? ""));
+  if (closed.length > 0) {
+    const recent = closed[0];
+    if (
+      recent.endReason === "vacated" ||
+      recent.endReason === "stripped"
+    ) {
+      const monthsSince = monthsBetween(
+        asOfDate,
+        parseDate(recent.endDate!),
+      );
+      if (monthsSince <= 36) {
+        if (
+          lastBoutDate == null ||
+          lastBoutDate <= parseDate(recent.endDate!)
+        ) {
+          return 100;
+        }
+      }
+    }
+  }
+  return 80;
+}
+
+/** era_dominance_all_time = title_fight_count × 10 + (double champ ? 5 : 0),
+ *  capped at 100. Title fights = bouts in allUpTo flagged is_title_fight.
+ *  Double-champ check uses CHAMPIONSHIP_HISTORY filtered by anchor date so
+ *  early-career anchors don't get credit for a future second-belt run. */
+function computeCareerEraAllTime(
+  slug: string,
+  asOfDate: Date,
+  titleFightsUpToAnchor: number,
+): number {
+  const reigns = CHAMPIONSHIP_HISTORY.filter(
+    (r) => r.slug === slug && parseDate(r.startDate) <= asOfDate,
+  );
+  const divisions = new Set<string>();
+  for (const r of reigns) {
+    if (!r.isInterim) divisions.add(r.weightClass);
+  }
+  const doubleChamp = divisions.size >= 2 ? 5 : 0;
+  return Math.min(100, titleFightsUpToAnchor * 10 + doubleChamp);
+}
+
+/** performance_diff (career) from the SQL view. */
+function computeCareerPerformanceDiff(c: CumulativeStats): number {
+  if (c.fight_seconds === 0) return 50;
+  const slpm = (c.sig_landed / c.fight_seconds) * 60;
+  const sapm = (c.opp_sig_landed / c.fight_seconds) * 60;
+  const tdAvg = (c.td_landed / c.fight_seconds) * 900;
+  const tdDef =
+    c.opp_td_attempted > 0
+      ? 1.0 - c.opp_td_landed / c.opp_td_attempted
+      : 0.5; // COALESCE(td_def, 0.5) in the view.
+  const strikingScore = 50 + (slpm - sapm) * 20;
+  const ctlPerMin = (c.control_seconds / c.fight_seconds) * 60;
+  const ctlScore = Math.max(
+    0,
+    Math.min(100, 50 + (ctlPerMin - 15) * 2.6),
+  );
+  const tdScore = 50 + (tdAvg - (1 - tdDef) * 3) * 20;
+  const total = 0.45 * strikingScore + 0.35 * ctlScore + 0.2 * tdScore;
+  return Math.max(0, Math.min(100, Math.round(total)));
+}
+
+/** finishing_dominance_score from the SQL view. */
+function computeCareerFinishingDom(c: CumulativeStats): number {
+  if (c.fight_seconds === 0) return 0;
+  const koRate = c.total_wins > 0 ? c.ko_wins / c.total_wins : 0;
+  const subRate = c.total_wins > 0 ? c.sub_wins / c.total_wins : 0;
+  const score =
+    (c.total_kd / c.fight_seconds) * 900 * 10 +
+    (c.total_sa / c.fight_seconds) * 900 * 10 +
+    (c.ko_wins / c.fight_seconds) * 900 * 20 +
+    (c.sub_wins / c.fight_seconds) * 900 * 100 +
+    koRate * 25 +
+    subRate * 25;
+  return Math.max(0, Math.min(100, score));
+}
+
+/** total_loss_penalty — opp-tier-weighted, 0.35 floor, no time window. */
+function computeCareerLossPenalty(bouts: BoutRow[]): number {
+  let sum = 0;
+  for (const b of bouts) {
+    if (b.is_win !== false || isNoContest(b)) continue;
+    const severity = Math.max(
+      0.35,
+      Math.min(1.0, 1.0 - b.opp_tier_value / 30),
+    );
+    sum += 4 * severity;
+  }
+  return Math.min(100, Math.round(sum));
+}
+
+/** Wave 54 sample-size credibility for all-time legacy (0.62 floor,
+ *  full by 14 UFC bouts). */
+function credibilityAllTime(ufcBouts: number): number {
+  return Math.min(1.0, 0.62 + 0.38 * Math.min(1.0, ufcBouts / 14.0));
 }
 
 // =====================================================================
@@ -800,7 +979,20 @@ async function main() {
       opp_kd: 0,
       fight_seconds: 0,
       bout_count: 0,
+      control_seconds: 0,
+      total_kd: 0,
+      total_sa: 0,
+      ko_wins: 0,
+      sub_wins: 0,
+      total_wins: 0,
     };
+    // Running peak of vertex_score so far — feeds peak_career into the
+    // all-time formula. Updated AFTER vertex_score is computed for the
+    // current anchor (so peak_career at anchor i already includes i).
+    let peakSoFar = 0;
+    // Cumulative count of title fights up to (and including) the anchor —
+    // feeds era_dominance_all_time.
+    let titleFightCount = 0;
 
     for (let i = 0; i < allBoutsAsc.length; i++) {
       const anchor = allBoutsAsc[i];
@@ -819,6 +1011,13 @@ async function main() {
       cum.opp_kd += anchor.o_knockdowns;
       cum.fight_seconds += fs;
       cum.bout_count += 1;
+      cum.control_seconds += anchor.f_control_seconds;
+      cum.total_kd += anchor.f_knockdowns;
+      cum.total_sa += anchor.f_sub_attempts;
+      if (anchor.is_win === true) cum.total_wins += 1;
+      if (isKoWin(anchor)) cum.ko_wins += 1;
+      if (isSubWin(anchor)) cum.sub_wins += 1;
+      if (anchor.is_title_fight) titleFightCount += 1;
 
       // Skip computing score for bouts 0..1 — need ≥3 bouts (we're at
       // index i, so bouts count = i+1, gate is i+1 >= 3 → i >= 2).
@@ -870,12 +1069,59 @@ async function main() {
         continue;
       }
 
+      const clampedVertex = Math.max(
+        0,
+        Math.min(100, Math.round(vertexScore)),
+      );
+      // Update running peak BEFORE computing all-time so the current
+      // anchor's vertex_score is eligible to set a new high (matches the
+      // SQL's MAX(vertex_score) over fighter_score_history, which
+      // includes "today's" row when the fighter is at peak right now).
+      peakSoFar = Math.max(peakSoFar, clampedVertex);
+
+      // All-time replay (Wave 53/54/55). lastBoutDate for the sticky-CP
+      // rule is the previous anchor's event date — i.e. the most recent
+      // bout BEFORE this one — because the SQL's lastBoutDate is "the
+      // most recent completed bout when the CP function fires," which
+      // for our per-anchor replay is the bout that just finished. For
+      // the very first anchor (i = 0) there's no prior bout, so null.
+      const prevBoutDate =
+        i > 0 ? parseDate(allBoutsAsc[i - 1].event_date) : null;
+      const qwCareer = computeCareerQualityWins(allUpTo);
+      const cpCareer = computeCareerCp(
+        anchor.fighter_slug,
+        anchorDate,
+        prevBoutDate,
+      );
+      const eraAt = computeCareerEraAllTime(
+        anchor.fighter_slug,
+        anchorDate,
+        titleFightCount,
+      );
+      const perfCareer = computeCareerPerformanceDiff(cum);
+      const finishDom = computeCareerFinishingDom(cum);
+      const lossPenAt = computeCareerLossPenalty(allUpTo);
+      const credAt = credibilityAllTime(i + 1);
+      const rawAllTime =
+        (qwCareer * 0.24 +
+          cpCareer * 0.2 +
+          eraAt * 0.18 +
+          perfCareer * 0.12 +
+          finishDom * 0.16 +
+          peakSoFar * 0.1 -
+          lossPenAt * 0.1) *
+        credAt;
+      const vertexScoreAllTime = Math.max(0, Math.round(rawAllTime));
+
       anchors.push({
         fighter_id: fighterId,
         as_of_bout_id: anchor.bout_id,
         as_of_date: anchor.event_date,
-        vertex_score: Math.max(0, Math.min(100, Math.round(vertexScore))),
+        vertex_score: clampedVertex,
         raw_current: rawCurrent,
+        vertex_score_all_time: Number.isFinite(vertexScoreAllTime)
+          ? vertexScoreAllTime
+          : 0,
       });
     }
 
@@ -902,6 +1148,7 @@ async function main() {
         "as_of_date",
         "vertex_score",
         "raw_current",
+        "vertex_score_all_time",
       )}
     `;
     if ((i / CHUNK) % 5 === 0) {
@@ -946,6 +1193,57 @@ async function main() {
     const cur = (r.current_score ?? "—").toString().padStart(4);
     console.log(
       `${(i + 1).toString().padStart(2)}  ${name}  ${r.peak.toString().padStart(4)}  ${r.peak_date}  ${cur}`,
+    );
+  });
+
+  // Sanity for the new column — show the latest anchor's
+  // vertex_score_all_time next to the live fighter.vertex_score_all_time.
+  // Off-by-a-few is expected (we skip the +30 undefeated-bonus branch in
+  // quality_wins and use slightly different rounding paths) but the two
+  // numbers should sit in the same ballpark.
+  const allTimeAudit = await sql<
+    Array<{
+      name_en: string;
+      live_all_time: number | null;
+      latest_all_time: number | null;
+      latest_date: string;
+    }>
+  >`
+    WITH latest_anchor AS (
+      SELECT DISTINCT ON (fsh.fighter_id)
+        fsh.fighter_id,
+        fsh.vertex_score_all_time AS latest_all_time,
+        fsh.as_of_date::text       AS latest_date
+      FROM fighter_score_history fsh
+      ORDER BY fsh.fighter_id, fsh.as_of_date DESC, fsh.as_of_bout_id DESC
+    )
+    SELECT
+      f.name_en,
+      f.vertex_score_all_time AS live_all_time,
+      la.latest_all_time,
+      la.latest_date
+    FROM latest_anchor la
+    JOIN fighter f ON f.id = la.fighter_id
+    WHERE f.roster_status = 'active'
+      AND f.vertex_score_all_time IS NOT NULL
+    ORDER BY f.vertex_score_all_time DESC NULLS LAST
+    LIMIT 15
+  `;
+  console.log(
+    "\n=== TOP 15 active fighters: live all-time vs replayed latest anchor ===",
+  );
+  console.log(" #  name                              live  latest  Δ   on");
+  console.log("-".repeat(75));
+  allTimeAudit.forEach((r, i) => {
+    const name = r.name_en.padEnd(32);
+    const live = (r.live_all_time ?? "—").toString().padStart(4);
+    const latest = (r.latest_all_time ?? "—").toString().padStart(6);
+    const delta =
+      r.live_all_time != null && r.latest_all_time != null
+        ? (r.latest_all_time - r.live_all_time).toString().padStart(4)
+        : "   —";
+    console.log(
+      `${(i + 1).toString().padStart(2)}  ${name}  ${live}  ${latest}  ${delta}  ${r.latest_date}`,
     );
   });
 

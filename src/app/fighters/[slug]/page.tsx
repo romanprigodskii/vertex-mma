@@ -171,7 +171,7 @@ export default async function FighterDetailPage({ params }: PageProps) {
           {heroCurrentScore != null ? (
             <div className="flex items-center justify-center gap-3 sm:gap-6">
               <Link
-                href={`/fighters/${slug}/score-history`}
+                href={`/fighters/${slug}/score-history?mode=current`}
                 prefetch={false}
                 aria-label="Open per-bout current Vertex score history"
                 className="group block rounded-full outline-none ring-offset-2 ring-offset-background-base transition-transform hover:scale-[1.02] focus-visible:ring-2 focus-visible:ring-primary"
@@ -192,9 +192,9 @@ export default async function FighterDetailPage({ params }: PageProps) {
                 />
               </Link>
               <Link
-                href={`/fighters/${slug}/score-history`}
+                href={`/fighters/${slug}/score-history?mode=all_time`}
                 prefetch={false}
-                aria-label="Open per-bout all-time peak Vertex history"
+                aria-label="Open per-bout all-time Vertex history"
                 className="group block rounded-full outline-none ring-offset-2 ring-offset-background-base transition-transform hover:scale-[1.02] focus-visible:ring-2 focus-visible:ring-primary"
               >
                 <CircleScore
@@ -215,9 +215,9 @@ export default async function FighterDetailPage({ params }: PageProps) {
             // primary identity; skip the empty Current octagon entirely.
             <div className="flex items-center justify-center">
               <Link
-                href={`/fighters/${slug}/score-history`}
+                href={`/fighters/${slug}/score-history?mode=all_time`}
                 prefetch={false}
-                aria-label="Open per-bout all-time peak Vertex history"
+                aria-label="Open per-bout all-time Vertex history"
                 className="group block rounded-full outline-none ring-offset-2 ring-offset-background-base transition-transform hover:scale-[1.02] focus-visible:ring-2 focus-visible:ring-primary"
               >
                 <CircleScore

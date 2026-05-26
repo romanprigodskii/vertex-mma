@@ -457,6 +457,9 @@ export const fighterScoreHistory = pgTable(
     asOfDate: date("as_of_date").notNull(),
     vertexScore: smallint("vertex_score").notNull(),
     rawCurrent: real("raw_current").notNull(),
+    // Nullable: legacy rows + sub-3-bout careers don't carry an all-time
+    // value. Populated by scripts/compute_score_history.ts.
+    vertexScoreAllTime: smallint("vertex_score_all_time"),
   },
   (table) => [
     primaryKey({ columns: [table.fighterId, table.asOfBoutId] }),

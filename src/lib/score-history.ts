@@ -250,17 +250,17 @@ export interface ScoreHistoryPoint {
   method: string | null;
   /** Current-formula score as of this bout (already in the history table). */
   currentScore: number;
-  /** Running max of currentScore up to and including this bout. */
-  runningPeak: number;
+  /** Wave 53/54/55 all-time formula replayed as-of-bout. Null on the
+   *  rare anchor row missing the column (legacy data). */
+  allTimeScore: number | null;
 }
 
 /**
  * Full per-bout score progression for the score-history page. Returns
- * one point per anchor bout in chronological order. `runningPeak` is
- * computed in-application as a cumulative MAX — gives the "peak-so-far"
- * trajectory that drives the all-time formula's `peak_career` input,
- * which is the closest stand-in for an all-time-as-of-bout series until
- * a dedicated backfill exists.
+ * one point per anchor bout in chronological order. Both `currentScore`
+ * (Wave 31 replay) and `allTimeScore` (Wave 53/54/55 replay) come from
+ * the fighter_score_history table — populated by
+ * scripts/compute_score_history.ts.
  */
 export async function getScoreHistory(
   fighterId: string,
@@ -274,6 +274,7 @@ export async function getScoreHistory(
     winner_id: string | null;
     fighter_a_id: string;
     vertex_score: number;
+    vertex_score_all_time: number | null;
   };
   const rows = (await db.execute<Row>(sql`
     SELECT
@@ -285,6 +286,7 @@ export async function getScoreHistory(
       b.winner_id::text AS winner_id,
       b.fighter_a_id::text AS fighter_a_id,
       h.vertex_score AS vertex_score,
+      h.vertex_score_all_time AS vertex_score_all_time,
       CASE
         WHEN b.fighter_a_id::text = ${fighterId}
           THEN fb.name_en
@@ -306,9 +308,7 @@ export async function getScoreHistory(
     Row & { opponent_name: string; opponent_slug: string }
   >;
 
-  let peak = 0;
   return rows.map((r) => {
-    if (r.vertex_score > peak) peak = r.vertex_score;
     let result: "W" | "L" | "D" | "NC";
     if (r.winner_id == null) {
       const m = (r.method ?? "").toLowerCase();
@@ -328,7 +328,7 @@ export async function getScoreHistory(
       result,
       method: r.method,
       currentScore: r.vertex_score,
-      runningPeak: peak,
+      allTimeScore: r.vertex_score_all_time,
     };
   });
 }

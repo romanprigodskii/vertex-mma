@@ -51,25 +51,44 @@ function resultColor(r: "W" | "L" | "D" | "NC"): string {
 
 interface ScoreHistoryChartProps {
   history: ScoreHistoryPoint[];
+  mode: "current" | "all_time";
 }
 
-export function ScoreHistoryChart({ history }: ScoreHistoryChartProps) {
+function valueOf(
+  p: ScoreHistoryPoint,
+  mode: "current" | "all_time",
+): number | null {
+  return mode === "current" ? p.currentScore : p.allTimeScore;
+}
+
+export function ScoreHistoryChart({ history, mode }: ScoreHistoryChartProps) {
   const [hoverIdx, setHoverIdx] = React.useState<number | null>(null);
   const containerRef = React.useRef<SVGSVGElement | null>(null);
 
-  if (history.length === 0) {
+  // For all_time mode, drop rows missing the column (legacy / pre-backfill).
+  const points = React.useMemo(
+    () =>
+      mode === "all_time"
+        ? history.filter((p) => p.allTimeScore != null)
+        : history,
+    [history, mode],
+  );
+
+  if (points.length === 0) {
     return (
       <div className="rounded-md border border-dashed border-foreground/15 bg-background-elevated/20 px-6 py-12 text-center font-sans text-sm text-foreground-muted">
-        No score history available for this fighter.
+        {mode === "all_time"
+          ? "All-time replay not yet computed for this fighter — run the backfill script."
+          : "No score history available for this fighter."}
       </div>
     );
   }
 
-  const values = history.map((p) => p.currentScore);
+  const values = points.map((p) => valueOf(p, mode) ?? 0);
   const yMin = 0;
   const yMax = 100;
 
-  const n = history.length;
+  const n = points.length;
   // When n === 1 we still want a single visible dot at x-center.
   const xOf = (i: number): number => {
     if (n === 1) return PAD_L + PLOT_W / 2;
@@ -86,8 +105,12 @@ export function ScoreHistoryChart({ history }: ScoreHistoryChartProps) {
     ` L${xOf(n - 1).toFixed(2)},${yOf(0).toFixed(2)}` +
     ` L${xOf(0).toFixed(2)},${yOf(0).toFixed(2)} Z`;
 
-  const lineColor = "var(--color-primary)";
-  const fillColor = "color-mix(in oklch, var(--color-primary) 18%, transparent)";
+  const lineColor =
+    mode === "current" ? "var(--color-primary)" : "var(--color-foreground)";
+  const fillColor =
+    mode === "current"
+      ? "color-mix(in oklch, var(--color-primary) 18%, transparent)"
+      : "color-mix(in oklch, var(--color-foreground) 10%, transparent)";
 
   function onMove(e: React.PointerEvent<SVGSVGElement>) {
     const svg = containerRef.current;
@@ -103,8 +126,8 @@ export function ScoreHistoryChart({ history }: ScoreHistoryChartProps) {
     if (Number.isFinite(t)) setHoverIdx(Math.max(0, Math.min(n - 1, t)));
   }
 
-  const hoverPoint = hoverIdx != null ? history[hoverIdx] : null;
-  const hoverValue = hoverPoint ? hoverPoint.currentScore : null;
+  const hoverPoint = hoverIdx != null ? points[hoverIdx] : null;
+  const hoverValue = hoverPoint ? valueOf(hoverPoint, mode) : null;
 
   return (
     <div className="relative">
@@ -113,7 +136,11 @@ export function ScoreHistoryChart({ history }: ScoreHistoryChartProps) {
         viewBox={`0 0 ${W} ${H}`}
         className="block w-full h-auto cursor-crosshair"
         role="img"
-        aria-label="Current Vertex score per bout"
+        aria-label={
+          mode === "current"
+            ? "Current Vertex score per bout"
+            : "All-time Vertex score per bout"
+        }
         onPointerMove={onMove}
         onPointerLeave={() => setHoverIdx(null)}
       >
@@ -157,13 +184,15 @@ export function ScoreHistoryChart({ history }: ScoreHistoryChartProps) {
         />
 
         {/* per-bout dots, color-coded by result */}
-        {history.map((p, i) => {
+        {points.map((p, i) => {
           const isHover = i === hoverIdx;
+          const v = valueOf(p, mode);
+          if (v == null) return null;
           return (
             <circle
               key={p.boutId}
               cx={xOf(i)}
-              cy={yOf(p.currentScore)}
+              cy={yOf(v)}
               r={isHover ? 5 : 3}
               fill="var(--color-background-base)"
               stroke={resultColor(p.result)}
@@ -195,7 +224,7 @@ export function ScoreHistoryChart({ history }: ScoreHistoryChartProps) {
           fontSize={10}
           fontFamily="var(--font-mono)"
         >
-          {formatDate(history[0].eventDate)}
+          {formatDate(points[0].eventDate)}
         </text>
         {n > 1 ? (
           <text
@@ -206,7 +235,7 @@ export function ScoreHistoryChart({ history }: ScoreHistoryChartProps) {
             fontSize={10}
             fontFamily="var(--font-mono)"
           >
-            {formatDate(history[n - 1].eventDate)}
+            {formatDate(points[n - 1].eventDate)}
           </text>
         ) : null}
       </svg>
