@@ -51,10 +51,9 @@ function resultColor(r: "W" | "L" | "D" | "NC"): string {
 
 interface ScoreHistoryChartProps {
   history: ScoreHistoryPoint[];
-  mode: "current" | "all_time";
 }
 
-export function ScoreHistoryChart({ history, mode }: ScoreHistoryChartProps) {
+export function ScoreHistoryChart({ history }: ScoreHistoryChartProps) {
   const [hoverIdx, setHoverIdx] = React.useState<number | null>(null);
   const containerRef = React.useRef<SVGSVGElement | null>(null);
 
@@ -66,9 +65,7 @@ export function ScoreHistoryChart({ history, mode }: ScoreHistoryChartProps) {
     );
   }
 
-  const values = history.map((p) =>
-    mode === "current" ? p.currentScore : p.runningPeak,
-  );
+  const values = history.map((p) => p.currentScore);
   const yMin = 0;
   const yMax = 100;
 
@@ -89,12 +86,8 @@ export function ScoreHistoryChart({ history, mode }: ScoreHistoryChartProps) {
     ` L${xOf(n - 1).toFixed(2)},${yOf(0).toFixed(2)}` +
     ` L${xOf(0).toFixed(2)},${yOf(0).toFixed(2)} Z`;
 
-  const lineColor =
-    mode === "current" ? "var(--color-primary)" : "var(--color-foreground)";
-  const fillColor =
-    mode === "current"
-      ? "color-mix(in oklch, var(--color-primary) 18%, transparent)"
-      : "color-mix(in oklch, var(--color-foreground) 10%, transparent)";
+  const lineColor = "var(--color-primary)";
+  const fillColor = "color-mix(in oklch, var(--color-primary) 18%, transparent)";
 
   function onMove(e: React.PointerEvent<SVGSVGElement>) {
     const svg = containerRef.current;
@@ -111,11 +104,7 @@ export function ScoreHistoryChart({ history, mode }: ScoreHistoryChartProps) {
   }
 
   const hoverPoint = hoverIdx != null ? history[hoverIdx] : null;
-  const hoverValue = hoverPoint
-    ? mode === "current"
-      ? hoverPoint.currentScore
-      : hoverPoint.runningPeak
-    : null;
+  const hoverValue = hoverPoint ? hoverPoint.currentScore : null;
 
   return (
     <div className="relative">
@@ -124,11 +113,7 @@ export function ScoreHistoryChart({ history, mode }: ScoreHistoryChartProps) {
         viewBox={`0 0 ${W} ${H}`}
         className="block w-full h-auto cursor-crosshair"
         role="img"
-        aria-label={
-          mode === "current"
-            ? "Current Vertex score per bout"
-            : "All-time peak Vertex score per bout"
-        }
+        aria-label="Current Vertex score per bout"
         onPointerMove={onMove}
         onPointerLeave={() => setHoverIdx(null)}
       >
@@ -178,7 +163,7 @@ export function ScoreHistoryChart({ history, mode }: ScoreHistoryChartProps) {
             <circle
               key={p.boutId}
               cx={xOf(i)}
-              cy={yOf(mode === "current" ? p.currentScore : p.runningPeak)}
+              cy={yOf(p.currentScore)}
               r={isHover ? 5 : 3}
               fill="var(--color-background-base)"
               stroke={resultColor(p.result)}
