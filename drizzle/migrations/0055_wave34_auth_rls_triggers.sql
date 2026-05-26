@@ -28,7 +28,6 @@ ALTER TABLE user_profile      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE transaction       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE fight_card        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE fight_card_like   ENABLE ROW LEVEL SECURITY;
-ALTER TABLE simulation        ENABLE ROW LEVEL SECURITY;
 
 -- user_profile: public read, update only own row
 DROP POLICY IF EXISTS "user_profile_select_all" ON user_profile;
@@ -82,29 +81,6 @@ CREATE POLICY "fight_card_like_insert_own" ON fight_card_like
 
 DROP POLICY IF EXISTS "fight_card_like_delete_own" ON fight_card_like;
 CREATE POLICY "fight_card_like_delete_own" ON fight_card_like
-  FOR DELETE USING (
-    user_id IN (SELECT id FROM user_profile WHERE auth_user_id = auth.uid())
-  );
-
--- simulation: owner-only. user_id is nullable in the schema (ON DELETE
--- SET NULL keeps orphaned sims around for analytics); orphan rows are
--- effectively system-private — only the server (service role) can read
--- them. Browser clients never see NULL-owner rows.
-DROP POLICY IF EXISTS "simulation_select_own" ON simulation;
-CREATE POLICY "simulation_select_own" ON simulation
-  FOR SELECT USING (
-    user_id IS NOT NULL AND
-    user_id IN (SELECT id FROM user_profile WHERE auth_user_id = auth.uid())
-  );
-
-DROP POLICY IF EXISTS "simulation_insert_own" ON simulation;
-CREATE POLICY "simulation_insert_own" ON simulation
-  FOR INSERT WITH CHECK (
-    user_id IN (SELECT id FROM user_profile WHERE auth_user_id = auth.uid())
-  );
-
-DROP POLICY IF EXISTS "simulation_delete_own" ON simulation;
-CREATE POLICY "simulation_delete_own" ON simulation
   FOR DELETE USING (
     user_id IN (SELECT id FROM user_profile WHERE auth_user_id = auth.uid())
   );
@@ -177,9 +153,9 @@ CREATE TRIGGER on_auth_user_created
 -- C) Trigger: cascade auth.users DELETE → user_profile DELETE
 -- ---------------------------------------------------------------------------
 --
--- Per-user dependent rows (transaction, simulation, fight_card,
--- fight_card_like, user_achievement) cascade through user_profile's FKs
--- on user_profile.id, so removing the profile row is sufficient.
+-- Per-user dependent rows (transaction, fight_card, fight_card_like,
+-- user_achievement) cascade through user_profile's FKs on user_profile.id,
+-- so removing the profile row is sufficient.
 
 CREATE OR REPLACE FUNCTION public.handle_user_delete()
 RETURNS TRIGGER

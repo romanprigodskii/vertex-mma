@@ -1,7 +1,6 @@
 /**
  * Applies drizzle/migrations/0055_wave34_auth_rls_triggers.sql:
- *   - RLS on user_profile / transaction / fight_card / fight_card_like /
- *     simulation
+ *   - RLS on user_profile / transaction / fight_card / fight_card_like
  *   - on_auth_user_created trigger (auth.users → user_profile)
  *   - on_auth_user_deleted trigger (auth.users delete cascade)
  *
@@ -31,7 +30,7 @@ async function main() {
     SELECT tablename, rowsecurity
     FROM pg_tables
     WHERE schemaname = 'public'
-      AND tablename IN ('user_profile','transaction','fight_card','fight_card_like','simulation')
+      AND tablename IN ('user_profile','transaction','fight_card','fight_card_like')
     ORDER BY tablename
   `;
   console.log("\nRLS status:");

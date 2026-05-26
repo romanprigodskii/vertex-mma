@@ -36,8 +36,8 @@ export function DeleteAccountSection() {
           Delete account
         </h3>
         <p className="mt-2 font-sans text-sm text-foreground-muted">
-          This permanently deletes your account, profile, simulations,
-          predictions, bets, and fight cards. This cannot be undone.
+          This permanently deletes your account, profile, predictions, bets,
+          and fight cards. This cannot be undone.
         </p>
         <button
           type="button"

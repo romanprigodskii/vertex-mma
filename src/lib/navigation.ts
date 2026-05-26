@@ -12,7 +12,6 @@ export const NAV_SECTIONS: NavSection[] = [
   { href: "/news", label: "News" },
   { href: "/markets", label: "Markets" },
   { href: "/predictions", label: "Predictions" },
-  { href: "/simulator", label: "Simulator" },
   { href: "/rankings", label: "Rankings" },
   { href: "/cards", label: "Cards" },
   { href: "/leaderboard", label: "Leaderboard" },
