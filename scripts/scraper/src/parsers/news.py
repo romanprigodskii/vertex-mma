@@ -1,12 +1,14 @@
 """Parse RSS / Atom feed XML into normalized news entries."""
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from html import unescape
 
 import feedparser
 from selectolax.parser import HTMLParser
+
+from ..ref_extractor import extract_refs
 
 # Feed summaries occasionally carry a whole article — keep enough text for
 # classification without bloating the row.
@@ -21,6 +23,7 @@ class NewsEntry:
     body: str | None
     author: str | None
     published_at: datetime
+    refs: list[dict] = field(default_factory=list)
 
 
 def _clean_text(html: str | None) -> str | None:
@@ -55,14 +58,16 @@ def parse_feed(xml: str) -> list[NewsEntry]:
         if not url or not title:
             continue
         author = raw.get("author")
+        summary_html = raw.get("summary")
         entries.append(
             NewsEntry(
                 external_id=(raw.get("id") or None),
                 url=url,
                 title=title,
-                body=_clean_text(raw.get("summary")),
+                body=_clean_text(summary_html),
                 author=(unescape(author).strip() or None) if author else None,
                 published_at=_entry_published(raw),
+                refs=extract_refs(summary_html),
             )
         )
     return entries

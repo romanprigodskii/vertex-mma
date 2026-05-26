@@ -1,6 +1,7 @@
 """Persist news sources and ingested news items."""
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 
 import psycopg
@@ -116,9 +117,10 @@ def upsert_news_items(
             cur.execute(
                 """
                 INSERT INTO news_item (
-                    source_id, external_id, url, title, body, author, published_at
+                    source_id, external_id, url, title, body, author,
+                    published_at, external_refs
                 )
-                VALUES (%s::uuid, %s, %s, %s, %s, %s, %s)
+                VALUES (%s::uuid, %s, %s, %s, %s, %s, %s, %s::jsonb)
                 ON CONFLICT (url) DO NOTHING
                 RETURNING id
                 """,
@@ -130,6 +132,7 @@ def upsert_news_items(
                     e.body,
                     e.author,
                     e.published_at,
+                    json.dumps(e.refs or []),
                 ),
             )
             if cur.fetchone() is not None:

@@ -15,11 +15,12 @@ it should land as `result`).
 """
 from __future__ import annotations
 
+import json
 import time
 
 import _path  # noqa: F401
 
-from src.article_extractor import extract_article
+from src.article_extractor import extract_article_full
 from src.db import get_connection
 from src.utils.logger import log
 
@@ -59,7 +60,8 @@ UPDATE_BODY = """
     UPDATE news_item
     SET body            = %s,
         body_rephrased  = NULL,
-        processed_at    = NULL
+        processed_at    = NULL,
+        external_refs   = %s::jsonb
     WHERE id = %s::uuid
 """
 
@@ -78,27 +80,32 @@ def run() -> dict[str, int]:
         for item_id, url, title, current_len in items:
             totals["checked"] += 1
             try:
-                body = extract_article(url)
+                result = extract_article_full(url)
             except Exception as exc:
                 log.warning(f"  fetch failed for {url}: {exc!r}")
                 totals["failed"] += 1
                 continue
 
-            if not body:
+            if not result:
                 log.info(f"  no body extracted from {url}")
                 totals["failed"] += 1
                 continue
 
-            if len(body) < current_len + MIN_GAIN_CHARS:
+            if len(result.body) < current_len + MIN_GAIN_CHARS:
                 totals["skipped_no_gain"] += 1
                 continue
 
             with conn.cursor() as cur:
-                cur.execute(UPDATE_BODY, (body, item_id))
+                cur.execute(
+                    UPDATE_BODY,
+                    (result.body, json.dumps(result.refs), item_id),
+                )
             conn.commit()
             totals["updated"] += 1
             log.info(
-                f"  updated [{title[:60]}]: {current_len} → {len(body)} chars"
+                f"  updated [{title[:60]}]: "
+                f"{current_len} → {len(result.body)} chars, "
+                f"{len(result.refs)} refs"
             )
 
             time.sleep(SLEEP_SECS)
