@@ -13,7 +13,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE}/fighters/compare`, lastModified: now, priority: 0.6 },
     { url: `${SITE}/events`, lastModified: now, priority: 0.8 },
     { url: `${SITE}/markets`, lastModified: now, priority: 0.8 },
-    { url: `${SITE}/predictions`, lastModified: now, priority: 0.8 },
     { url: `${SITE}/rankings`, lastModified: now, priority: 0.7 },
     { url: `${SITE}/leaderboard`, lastModified: now, priority: 0.7 },
     { url: `${SITE}/about`, lastModified: now, priority: 0.3 },
