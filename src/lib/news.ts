@@ -285,6 +285,29 @@ export async function listRelatedNews(opts: {
   );
 }
 
+/** Scan a body text for ANY fighter name in the catalog, not just the ones
+ *  the ingest tagged. Used to backfill the autolinker when news_item.related_
+ *  fighter_ids missed a mention (very common — ingest only catches obvious
+ *  references). SQL: scan fighter.name_en for substring match against the
+ *  body. Sequential scan on ~4k rows, fast enough for SSR. char_length >= 5
+ *  filters out short surnames that would over-match. */
+export async function detectMentionedFighters(
+  body: string,
+  excludeIds: Set<string>,
+): Promise<NewsFighter[]> {
+  if (!body || body.trim().length === 0) return [];
+  const rows = (await db.execute<{ id: string; slug: string; name: string }>(sql`
+    SELECT id::text AS id, slug, name_en AS name
+    FROM fighter
+    WHERE name_en IS NOT NULL
+      AND char_length(name_en) >= 5
+      AND ${body} ILIKE '%' || name_en || '%'
+    ORDER BY char_length(name_en) DESC
+    LIMIT 40
+  `)) as unknown as Array<{ id: string; slug: string; name: string }>;
+  return rows.filter((r) => !excludeIds.has(r.id));
+}
+
 /** Approved news mentioning a given fighter. Chips are omitted — the reader
  *  is already on that fighter's page. */
 export async function listNewsForFighter(

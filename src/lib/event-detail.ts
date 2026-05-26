@@ -210,6 +210,56 @@ export async function getEventBouts(eventId: string): Promise<EventBout[]> {
   return [...(result as unknown as EventBout[])];
 }
 
+export type MentionedEvent = {
+  id: string;
+  slug: string;
+  name: string;
+  short_name: string | null;
+  /** The actual text that was verified to be present in the body, e.g.,
+   *  "UFC 326" for an event whose full short_name is "UFC 326: Holloway
+   *  vs. Oliveira 2". Articles almost always cite events by the prefix,
+   *  not the full subtitle. */
+  match_text: string;
+};
+
+/** Scan body text for any event whose prefix (text before ":") appears as
+ *  a substring. Articles like "He lost to Caio Borralho at UFC 326" only
+ *  cite the prefix, so matching on the full short_name "UFC 326: Holloway
+ *  vs. Oliveira 2" would miss every real-world reference.
+ *
+ *  We return both `match_text` (the prefix that's actually in the body)
+ *  and the canonical `short_name`/`name` so the autolinker can prefer a
+ *  longer alias if the full string also happens to appear. */
+export async function detectMentionedEvents(
+  body: string,
+): Promise<MentionedEvent[]> {
+  if (!body || body.trim().length === 0) return [];
+  const rows = (await db.execute<MentionedEvent>(sql`
+    WITH candidate AS (
+      SELECT
+        e.id,
+        e.slug,
+        e.name,
+        e.short_name,
+        TRIM(split_part(COALESCE(e.short_name, e.name), ':', 1)) AS prefix
+      FROM event e
+      WHERE COALESCE(e.short_name, e.name) IS NOT NULL
+    )
+    SELECT
+      c.id::text AS id,
+      c.slug,
+      c.name,
+      c.short_name,
+      c.prefix AS match_text
+    FROM candidate c
+    WHERE char_length(c.prefix) >= 5
+      AND ${body} ILIKE '%' || c.prefix || '%'
+    ORDER BY char_length(c.prefix) DESC
+    LIMIT 20
+  `)) as unknown as MentionedEvent[];
+  return rows;
+}
+
 export type UpcomingEventSidebar = {
   id: string;
   slug: string;

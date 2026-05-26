@@ -15,11 +15,16 @@ import {
   SocialReactions,
   type SocialEmbedData,
 } from "@/components/news/social-embed";
-import { getNextUpcomingEventForSidebar } from "@/lib/event-detail";
 import {
+  detectMentionedEvents,
+  getNextUpcomingEventForSidebar,
+} from "@/lib/event-detail";
+import {
+  detectMentionedFighters,
   getNewsItemById,
   listLatestNewsExcluding,
   listRelatedNews,
+  type NewsFighter,
 } from "@/lib/news";
 import {
   autolinkParagraph,
@@ -61,7 +66,16 @@ export default async function NewsArticlePage({ params }: PageProps) {
   const item = await getNewsItemById(id);
   if (!item) notFound();
 
-  const [nextEvent, latestNews, related] = await Promise.all([
+  const body = item.body_rephrased ?? item.body ?? "";
+  const existingFighterIds = new Set(item.fighters.map((f) => f.id));
+
+  const [
+    nextEvent,
+    latestNews,
+    related,
+    detectedFighters,
+    mentionedEvents,
+  ] = await Promise.all([
     getNextUpcomingEventForSidebar(),
     listLatestNewsExcluding(item.id, 5),
     listRelatedNews({
@@ -70,7 +84,15 @@ export default async function NewsArticlePage({ params }: PageProps) {
       classification: item.classification,
       limit: 4,
     }),
+    detectMentionedFighters(body, existingFighterIds),
+    detectMentionedEvents(body),
   ]);
+
+  // Merge ingest-tagged fighters with runtime-detected ones. Ingest-tagged
+  // come first so they win the chip order; detected fighters fill in the
+  // gaps when the Python pipeline missed a mention (very common — only the
+  // first 1-2 names usually make it into related_fighter_ids).
+  const allFighters: NewsFighter[] = [...item.fighters, ...detectedFighters];
 
   const date = new Date(item.published_at).toLocaleDateString("en-US", {
     month: "long",
@@ -78,7 +100,6 @@ export default async function NewsArticlePage({ params }: PageProps) {
     year: "numeric",
   });
 
-  const body = item.body_rephrased ?? item.body ?? "";
   const paragraphs = body
     .split(/\n{2,}/)
     .map((p) => p.trim())
@@ -86,11 +107,6 @@ export default async function NewsArticlePage({ params }: PageProps) {
 
   const wordCount = body.split(/\s+/).filter(Boolean).length;
   const readMinutes = Math.max(1, Math.round(wordCount / 220));
-
-  const relatedHeading =
-    item.fighters.length > 0
-      ? `More about ${item.fighters[0].name}`
-      : "More like this";
 
   const inlineRefs = item.external_refs.filter((r) => r.role === "inline");
   const featuredRefs = item.external_refs.filter((r) => r.role === "featured");
@@ -147,7 +163,8 @@ export default async function NewsArticlePage({ params }: PageProps) {
                   {paragraphs.map((p, i) => {
                     const nodes = autolinkParagraph(
                       p,
-                      item.fighters,
+                      allFighters,
+                      mentionedEvents,
                       inlineRefs,
                     );
                     const after = featuredByParagraph.get(i) ?? [];
@@ -173,13 +190,13 @@ export default async function NewsArticlePage({ params }: PageProps) {
                 </p>
               )}
 
-              {item.fighters.length > 0 ? (
+              {allFighters.length > 0 ? (
                 <div className="mt-7">
                   <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.2em] text-foreground-subtle">
                     Fighters mentioned
                   </p>
                   <div className="flex flex-wrap gap-1.5">
-                    {item.fighters.map((f) => (
+                    {allFighters.map((f) => (
                       <Link
                         key={f.id}
                         href={`/fighters/${f.slug}`}
@@ -211,7 +228,7 @@ export default async function NewsArticlePage({ params }: PageProps) {
                 </a>
               </div>
 
-              <RelatedNews items={related} heading={relatedHeading} />
+              <RelatedNews items={related} heading="More news" />
 
               <NewsComments newsItemId={item.id} />
             </article>

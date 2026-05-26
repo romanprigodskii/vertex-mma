@@ -26,12 +26,10 @@ interface PageProps {
 function FilterChip({
   href,
   label,
-  count,
   active,
 }: {
   href: string;
   label: string;
-  count: number;
   active: boolean;
 }) {
   return (
@@ -44,8 +42,7 @@ function FilterChip({
           : "border-foreground/15 text-foreground-muted hover:bg-foreground/[0.05] hover:text-foreground",
       )}
     >
-      {label}{" "}
-      <span className="tabular text-foreground-subtle">{count}</span>
+      {label}
     </Link>
   );
 }
@@ -83,18 +80,12 @@ export default async function NewsPage({ searchParams }: PageProps) {
 
           {total > 0 ? (
             <div className="mb-6 flex flex-wrap gap-2">
-              <FilterChip
-                href="/news"
-                label="All"
-                count={total}
-                active={!active}
-              />
+              <FilterChip href="/news" label="All" active={!active} />
               {counts.map((c) => (
                 <FilterChip
                   key={c.classification}
                   href={`/news?classification=${c.classification}`}
                   label={formatNewsClassification(c.classification)}
-                  count={c.count}
                   active={active === c.classification}
                 />
               ))}
