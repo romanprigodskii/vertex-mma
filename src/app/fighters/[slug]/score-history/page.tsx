@@ -7,6 +7,7 @@ import { ScoreHistoryChart } from "@/components/fighter/detail/ScoreHistoryChart
 import { Container } from "@/components/layout/container";
 import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
+import { FighterSearchTrigger } from "@/components/search/fighter-search-palette";
 import { getFighterBySlug } from "@/lib/fighter-detail";
 import {
   getScoreHistory,
@@ -86,7 +87,10 @@ export default async function FighterScoreHistoryPage({
       <Navbar />
       <main className="flex-1">
         <div className="border-b border-foreground/[0.06]">
-          <Container size="xl" className="py-3">
+          <Container
+            size="xl"
+            className="flex items-center justify-between gap-3 py-3"
+          >
             <Link
               href={`/fighters/${fighter.slug}`}
               className="inline-flex items-center gap-1.5 font-sans text-sm text-foreground-muted transition-colors hover:text-primary"
@@ -94,6 +98,7 @@ export default async function FighterScoreHistoryPage({
               <ChevronLeft className="h-4 w-4" aria-hidden />
               Back to {fighter.name_en}
             </Link>
+            <FighterSearchTrigger />
           </Container>
         </div>
 
