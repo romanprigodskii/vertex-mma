@@ -30,7 +30,7 @@ export default async function MarketsPage() {
               <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground-subtle">
                 Bookmaker
               </p>
-              <h1 className="mt-2 font-sans font-bold uppercase tracking-tight text-foreground text-h1">
+              <h1 className="mt-2 font-display uppercase tracking-tight text-foreground text-h1">
                 Open markets
               </h1>
               <p className="mt-2 max-w-xl font-sans text-sm text-foreground-muted">
@@ -43,7 +43,7 @@ export default async function MarketsPage() {
                 <p className="font-mono text-[11px] uppercase tracking-widest text-foreground-subtle">
                   Your balance
                 </p>
-                <p className="font-sans font-bold text-2xl tabular text-foreground">
+                <p className="font-display text-2xl tabular text-foreground">
                   {user.balanceCoins.toLocaleString()}{" "}
                   <span className="text-sm text-foreground-muted">coins</span>
                 </p>
@@ -57,7 +57,7 @@ export default async function MarketsPage() {
             ) : (
               <Link
                 href="/signin?next=/markets"
-                className="rounded-sm border border-foreground/15 px-4 py-2 font-sans font-bold text-sm uppercase tracking-widest text-foreground-muted hover:bg-foreground/[0.05] hover:text-foreground"
+                className="rounded-sm border border-foreground/15 px-4 py-2 font-display text-sm uppercase tracking-widest text-foreground-muted hover:bg-foreground/[0.05] hover:text-foreground"
               >
                 Sign in to bet
               </Link>

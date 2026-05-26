@@ -26,7 +26,7 @@ export function ForgotPasswordForm() {
   if (success) {
     return (
       <div className="py-8 text-center">
-        <h1 className="font-sans font-bold text-3xl uppercase tracking-tight text-foreground">
+        <h1 className="font-display text-3xl uppercase tracking-tight text-foreground">
           Check your email
         </h1>
         <p className="mt-4 font-sans text-sm text-foreground-muted">
@@ -44,7 +44,7 @@ export function ForgotPasswordForm() {
 
   return (
     <>
-      <h1 className="font-sans font-bold text-3xl uppercase tracking-tight text-foreground sm:text-4xl">
+      <h1 className="font-display text-3xl uppercase tracking-tight text-foreground sm:text-4xl">
         Reset password
       </h1>
       <p className="mt-2 font-sans text-sm text-foreground-muted">
@@ -74,7 +74,7 @@ export function ForgotPasswordForm() {
         <button
           type="submit"
           disabled={pending}
-          className="mt-2 rounded-sm bg-primary px-4 py-2.5 font-sans font-bold text-sm uppercase tracking-widest text-background-base hover:opacity-90 disabled:opacity-50"
+          className="mt-2 rounded-sm bg-primary px-4 py-2.5 font-display text-sm uppercase tracking-widest text-background-base hover:opacity-90 disabled:opacity-50"
         >
           {pending ? "Sending…" : "Send reset link"}
         </button>

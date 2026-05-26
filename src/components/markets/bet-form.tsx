@@ -113,7 +113,7 @@ export function BetForm({ market, userBalance }: Props) {
         <button
           type="submit"
           disabled={pending || parsedCoins < 1 || parsedCoins > userBalance}
-          className="rounded-sm bg-primary px-4 py-2 font-sans font-bold text-sm uppercase tracking-widest text-background-base hover:opacity-90 disabled:opacity-50"
+          className="rounded-sm bg-primary px-4 py-2 font-display text-sm uppercase tracking-widest text-background-base hover:opacity-90 disabled:opacity-50"
         >
           {pending ? "Placing…" : "Place bet"}
         </button>

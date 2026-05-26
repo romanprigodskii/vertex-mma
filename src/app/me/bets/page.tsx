@@ -33,7 +33,7 @@ export default async function MyBetsPage() {
         </div>
 
         <Container size="lg" className="py-10 md:py-14">
-          <h1 className="font-sans font-bold text-3xl uppercase tracking-tight text-foreground sm:text-4xl">
+          <h1 className="font-display text-3xl uppercase tracking-tight text-foreground sm:text-4xl">
             My bets
           </h1>
           <p className="mt-2 font-sans text-sm text-foreground-muted">
@@ -45,7 +45,7 @@ export default async function MyBetsPage() {
 
           {bets.length === 0 ? (
             <div className="mt-10 rounded-md border border-dashed border-foreground/15 bg-background-elevated/20 px-6 py-16 text-center">
-              <p className="font-sans font-bold text-2xl uppercase tracking-tight text-foreground">
+              <p className="font-display text-2xl uppercase tracking-tight text-foreground">
                 No bets yet
               </p>
               <p className="mx-auto mt-3 max-w-md font-sans text-sm text-foreground-muted">
@@ -54,7 +54,7 @@ export default async function MyBetsPage() {
               </p>
               <Link
                 href="/markets"
-                className="mt-6 inline-block rounded-sm bg-primary px-4 py-2 font-sans font-bold text-sm uppercase tracking-widest text-background-base hover:opacity-90"
+                className="mt-6 inline-block rounded-sm bg-primary px-4 py-2 font-display text-sm uppercase tracking-widest text-background-base hover:opacity-90"
               >
                 Browse markets →
               </Link>

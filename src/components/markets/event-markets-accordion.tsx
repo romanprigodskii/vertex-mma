@@ -28,7 +28,7 @@ export function EventMarketsAccordion({
   if (events.length === 0) {
     return (
       <div className="rounded-md border border-dashed border-foreground/15 bg-background-elevated/20 px-6 py-16 text-center">
-        <p className="font-sans font-bold text-2xl uppercase tracking-tight text-foreground">
+        <p className="font-display text-2xl uppercase tracking-tight text-foreground">
           No open markets
         </p>
         <p className="mx-auto mt-3 max-w-md font-sans text-sm text-foreground-muted">
@@ -61,7 +61,7 @@ export function EventMarketsAccordion({
                 className="h-4 w-4 shrink-0 text-foreground-muted transition-transform group-open:rotate-90"
                 aria-hidden
               />
-              <h3 className="truncate font-sans font-bold text-lg uppercase tracking-tight text-foreground">
+              <h3 className="truncate font-display text-lg uppercase tracking-tight text-foreground">
                 {event.event_short_name ?? event.event_name}
               </h3>
             </div>
@@ -111,7 +111,7 @@ function BoutMarketsBlock({
   return (
     <div>
       <div className="mb-2 flex items-baseline justify-between gap-3">
-        <h4 className="font-sans font-bold text-base uppercase tracking-tight text-foreground">
+        <h4 className="font-display text-base uppercase tracking-tight text-foreground">
           {bout.fighter_a_name}{" "}
           <span className="text-foreground-subtle">vs</span>{" "}
           {bout.fighter_b_name}

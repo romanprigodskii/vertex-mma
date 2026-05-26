@@ -42,7 +42,7 @@ export default async function EventsListPage({ searchParams }: PageProps) {
             <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground-subtle">
               UFC
             </p>
-            <h1 className="mt-2 font-sans font-bold uppercase tracking-tight text-foreground text-h1">
+            <h1 className="mt-2 font-display uppercase tracking-tight text-foreground text-h1">
               Events
             </h1>
             <p className="mt-2 max-w-xl font-sans text-sm text-foreground-muted">
@@ -99,7 +99,7 @@ export default async function EventsListPage({ searchParams }: PageProps) {
                       <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-foreground-subtle">
                         {e.promotion.toUpperCase()} · {dateLabel}
                       </p>
-                      <h3 className="mt-2 font-sans font-bold text-lg uppercase tracking-tight text-foreground line-clamp-2">
+                      <h3 className="mt-2 font-display text-lg uppercase tracking-tight text-foreground line-clamp-2">
                         {e.short_name || e.name}
                       </h3>
                       {sub ? (

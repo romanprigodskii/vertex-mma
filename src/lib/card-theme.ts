@@ -30,6 +30,7 @@ export type CardThemeFont = {
 };
 
 export const CARD_THEME_FONTS: CardThemeFont[] = [
+  { id: "display", label: "Display", className: "font-display" },
   { id: "sans", label: "Sans", className: "font-sans" },
   { id: "mono", label: "Mono", className: "font-mono" },
 ];

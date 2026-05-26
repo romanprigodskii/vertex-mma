@@ -109,7 +109,7 @@ export function FightHistoryRow({ entry }: FightHistoryRowProps) {
           resultClass(entry.result),
         )}
       >
-        <span className="font-sans font-bold text-base tracking-wider">
+        <span className="font-display text-base tracking-wider">
           {entry.result}
         </span>
         <span className="text-foreground-subtle/40">·</span>

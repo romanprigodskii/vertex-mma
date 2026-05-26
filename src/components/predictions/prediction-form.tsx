@@ -153,7 +153,7 @@ export function PredictionForm({
             type="button"
             onClick={onSubmit}
             disabled={pending || picks.size === 0}
-            className="rounded-sm bg-primary px-5 py-2.5 font-sans font-bold text-sm uppercase tracking-widest text-background-base hover:opacity-90 disabled:opacity-50"
+            className="rounded-sm bg-primary px-5 py-2.5 font-display text-sm uppercase tracking-widest text-background-base hover:opacity-90 disabled:opacity-50"
           >
             {pending
               ? "Saving…"

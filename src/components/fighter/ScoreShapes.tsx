@@ -115,7 +115,7 @@ function ScoreShape({
           fill={textColor}
           fontSize={56}
           fontWeight={600}
-          fontFamily="var(--font-sans)"
+          fontFamily="var(--font-display)"
           style={{ fontVariantNumeric: "tabular-nums" }}
         >
           {displayScore(score)}

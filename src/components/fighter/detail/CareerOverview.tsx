@@ -32,7 +32,7 @@ function StatRow({
         {label}
       </dt>
       <dd className="text-right">
-        <span className="font-sans font-bold tabular text-xl text-foreground">
+        <span className="font-display tabular text-xl text-foreground">
           {value}
         </span>
         {detail ? (

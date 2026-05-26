@@ -84,11 +84,11 @@ const COLOR_GROUPS: Array<{ title: string; swatches: Swatch[] }> = [
 ];
 
 const TYPE_SCALE = [
-  { name: "text-9xl", className: "text-9xl font-sans font-bold" },
-  { name: "text-8xl", className: "text-8xl font-sans font-bold" },
-  { name: "text-7xl", className: "text-7xl font-sans font-bold" },
-  { name: "text-6xl", className: "text-6xl font-sans font-bold" },
-  { name: "text-5xl", className: "text-5xl font-sans font-bold" },
+  { name: "text-9xl", className: "text-9xl font-display" },
+  { name: "text-8xl", className: "text-8xl font-display" },
+  { name: "text-7xl", className: "text-7xl font-display" },
+  { name: "text-6xl", className: "text-6xl font-display" },
+  { name: "text-5xl", className: "text-5xl font-display" },
   { name: "text-4xl", className: "text-4xl" },
   { name: "text-3xl", className: "text-3xl" },
   { name: "text-2xl", className: "text-2xl" },
@@ -114,7 +114,7 @@ function Section({
     <section id={id} className="py-16 border-t border-border first:border-t-0">
       <Container size="xl">
         <div className="mb-8 flex flex-col gap-2">
-          <h2 className="font-sans font-bold text-4xl md:text-5xl tracking-wide text-foreground">
+          <h2 className="font-display text-4xl md:text-5xl tracking-wide text-foreground">
             {title}
           </h2>
           {description && (
@@ -139,7 +139,7 @@ export default function Home() {
               <Badge variant="primary" size="default">
                 Wave 1 — Design System
               </Badge>
-              <h1 className="font-sans font-bold text-7xl sm:text-8xl md:text-9xl tracking-wider leading-none">
+              <h1 className="font-display text-7xl sm:text-8xl md:text-9xl tracking-wider leading-none">
                 <span className="text-primary">V</span>
                 <span className="text-foreground">ERTEX</span>
               </h1>
@@ -203,7 +203,7 @@ export default function Home() {
         <Section
           id="typography"
           title="Typography"
-          description="Inter for UI and headlines, JetBrains Mono for numbers and code."
+          description="Bebas Neue for display, Inter for UI, JetBrains Mono for numbers and code."
         >
           <div className="grid gap-6 lg:grid-cols-2">
             <Card>
@@ -230,15 +230,15 @@ export default function Home() {
               <CardHeader>
                 <CardTitle>Families</CardTitle>
                 <CardDescription>
-                  font-sans, font-mono
+                  font-display, font-sans, font-mono
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
                   <p className="text-xs font-mono text-foreground-subtle mb-1">
-                    font-sans bold — Inter
+                    font-display — Bebas Neue
                   </p>
-                  <p className="font-sans font-bold text-5xl tracking-tight">
+                  <p className="font-display text-5xl tracking-wider">
                     Conor McGregor
                   </p>
                 </div>

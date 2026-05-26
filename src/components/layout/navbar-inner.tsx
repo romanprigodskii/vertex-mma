@@ -19,7 +19,7 @@ function Logo() {
   return (
     <Link
       href="/"
-      className="select-none font-sans font-bold text-2xl leading-none tracking-wider"
+      className="select-none font-display text-2xl leading-none tracking-wider"
       aria-label="Vertex MMA — home"
     >
       <span className="text-primary">V</span>

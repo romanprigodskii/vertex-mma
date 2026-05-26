@@ -45,7 +45,7 @@ export function ScoreCompare({
     <div className="mt-4 space-y-6">
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 text-center">
         <div>
-          <p className="font-sans font-bold text-3xl tabular text-foreground sm:text-4xl">
+          <p className="font-display text-3xl tabular text-foreground sm:text-4xl">
             {vertexA != null ? vertexA : vertexAllTimeA ?? "—"}
           </p>
           <p className="mt-0.5 font-sans text-[10px] uppercase tracking-widest text-foreground-subtle">
@@ -56,7 +56,7 @@ export function ScoreCompare({
           Vertex
         </p>
         <div>
-          <p className="font-sans font-bold text-3xl tabular text-foreground sm:text-4xl">
+          <p className="font-display text-3xl tabular text-foreground sm:text-4xl">
             {vertexB != null ? vertexB : vertexAllTimeB ?? "—"}
           </p>
           <p className="mt-0.5 font-sans text-[10px] uppercase tracking-widest text-foreground-subtle">

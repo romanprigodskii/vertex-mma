@@ -166,7 +166,7 @@ function BoutCard({ bout }: { bout: EventBout }) {
           align="left"
         />
         <div className="text-center sm:text-center">
-          <p className="font-sans font-bold text-lg uppercase tracking-widest text-foreground-subtle">
+          <p className="font-display text-lg uppercase tracking-widest text-foreground-subtle">
             vs
           </p>
           {bout.status === "completed" ? (
@@ -228,7 +228,7 @@ function FighterSide({
     >
       <span
         className={cn(
-          "font-sans font-bold text-lg uppercase leading-tight tracking-tight text-foreground sm:text-xl",
+          "font-display text-lg uppercase leading-tight tracking-tight text-foreground sm:text-xl",
           won ? "text-streak-win" : "",
           isNc ? "text-foreground-muted" : "",
           isDraw ? "text-foreground-muted" : "",
@@ -298,7 +298,7 @@ export default async function EventDetailPage({ params }: PageProps) {
             <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground-subtle">
               Event · {event.promotion.toUpperCase()}
             </p>
-            <h1 className="mt-3 font-sans font-bold uppercase tracking-tight text-foreground text-hero">
+            <h1 className="mt-3 font-display uppercase tracking-tight text-foreground text-hero">
               {event.short_name || event.name}
             </h1>
             <p className="mt-4 font-sans text-[11px] uppercase tracking-[0.22em] text-foreground-muted">

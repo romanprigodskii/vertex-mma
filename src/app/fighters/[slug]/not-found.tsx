@@ -19,7 +19,7 @@ export default function FighterNotFound() {
             404 · No such fighter
           </p>
           <h1
-            className="font-sans font-bold uppercase tracking-tight text-foreground leading-[0.9]"
+            className="font-display uppercase tracking-tight text-foreground leading-[0.9]"
             style={{ fontSize: "clamp(48px, 7vw, 96px)" }}
           >
             Fighter not found

@@ -13,7 +13,7 @@ export default function MarketNotFound() {
           <p className="font-mono text-xs uppercase tracking-widest text-foreground-subtle">
             404
           </p>
-          <h1 className="mt-2 font-sans font-bold text-3xl uppercase tracking-tight text-foreground">
+          <h1 className="mt-2 font-display text-3xl uppercase tracking-tight text-foreground">
             Market not found
           </h1>
           <p className="mt-4 font-sans text-sm text-foreground-muted">

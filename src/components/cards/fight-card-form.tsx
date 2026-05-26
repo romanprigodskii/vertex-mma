@@ -403,7 +403,7 @@ export function FightCardForm({
                     onClear={() => patchBout(b.key, { fighterA: null })}
                     excludedIds={usedFighterIds}
                   />
-                  <span className="hidden self-center font-sans font-bold text-sm text-foreground-subtle sm:block">
+                  <span className="hidden self-center font-display text-sm text-foreground-subtle sm:block">
                     VS
                   </span>
                   <FighterSlotPicker
@@ -474,7 +474,7 @@ export function FightCardForm({
           <button
             type="submit"
             disabled={pending}
-            className="rounded-sm bg-primary px-4 py-2.5 font-sans font-bold text-sm uppercase tracking-widest text-background-base hover:opacity-90 disabled:opacity-50"
+            className="rounded-sm bg-primary px-4 py-2.5 font-display text-sm uppercase tracking-widest text-background-base hover:opacity-90 disabled:opacity-50"
           >
             {pending
               ? "Saving…"

@@ -125,7 +125,7 @@ function PosterHeadliner({ bout }: { bout: PosterDisplayBout }) {
       </div>
       <div className="mt-4 grid grid-cols-[1fr_auto_1fr] items-center gap-2 sm:gap-5">
         <PosterFighterColumn fighter={bout.fighterA} align="right" />
-        <span className="font-sans font-bold text-2xl text-[var(--card-accent)] sm:text-4xl">
+        <span className="font-display text-2xl text-[var(--card-accent)] sm:text-4xl">
           VS
         </span>
         <PosterFighterColumn fighter={bout.fighterB} align="left" />
@@ -148,7 +148,7 @@ function PosterFighterColumn({
     return (
       <div className={cn("flex min-w-0 flex-col gap-2", alignClass)}>
         <div className="h-20 w-20 rounded-md border border-dashed border-foreground/20 bg-foreground/[0.03] sm:h-24 sm:w-24" />
-        <span className="font-sans font-bold text-base uppercase tracking-tight text-foreground-subtle">
+        <span className="font-display text-base uppercase tracking-tight text-foreground-subtle">
           TBD
         </span>
       </div>
@@ -156,7 +156,7 @@ function PosterFighterColumn({
   }
 
   const nameNode = (
-    <span className="font-sans font-bold text-base uppercase leading-tight tracking-tight text-foreground sm:text-xl">
+    <span className="font-display text-base uppercase leading-tight tracking-tight text-foreground sm:text-xl">
       {fighter.name}
     </span>
   );
@@ -175,7 +175,7 @@ function PosterFighterColumn({
           className="flex h-20 w-20 items-center justify-center rounded-md border border-foreground/15 bg-foreground/[0.04] sm:h-24 sm:w-24"
           aria-hidden
         >
-          <span className="font-sans font-bold text-3xl text-foreground-subtle">
+          <span className="font-display text-3xl text-foreground-subtle">
             {fighter.name.slice(0, 1)}
           </span>
         </div>
@@ -203,7 +203,7 @@ function PosterFighterColumn({
 function PosterUndercardRow({ bout }: { bout: PosterDisplayBout }) {
   return (
     <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 rounded-md border border-foreground/10 bg-background-base/40 px-3 py-2.5 sm:gap-3">
-      <span className="min-w-0 truncate text-right font-sans font-bold text-sm uppercase tracking-tight text-foreground sm:text-base">
+      <span className="min-w-0 truncate text-right font-display text-sm uppercase tracking-tight text-foreground sm:text-base">
         <FighterInline fighter={bout.fighterA} />
       </span>
       <span className="flex shrink-0 flex-col items-center leading-none">
@@ -214,7 +214,7 @@ function PosterUndercardRow({ bout }: { bout: PosterDisplayBout }) {
           {formatWeightClass(bout.weightClass)}
         </span>
       </span>
-      <span className="min-w-0 truncate font-sans font-bold text-sm uppercase tracking-tight text-foreground sm:text-base">
+      <span className="min-w-0 truncate font-display text-sm uppercase tracking-tight text-foreground sm:text-base">
         <FighterInline fighter={bout.fighterB} />
       </span>
     </div>

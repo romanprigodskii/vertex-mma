@@ -84,7 +84,7 @@ export function FilterDrawer({
           )}
         >
           <header className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
-            <DialogPrimitive.Title className="font-sans font-bold text-xl uppercase tracking-wide text-foreground">
+            <DialogPrimitive.Title className="font-display text-xl uppercase tracking-wide text-foreground">
               Filters
             </DialogPrimitive.Title>
             <DialogPrimitive.Close

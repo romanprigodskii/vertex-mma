@@ -19,7 +19,7 @@ export default function EventNotFound() {
             404 · No such event
           </p>
           <h1
-            className="font-sans font-bold uppercase tracking-tight text-foreground leading-[0.9]"
+            className="font-display uppercase tracking-tight text-foreground leading-[0.9]"
             style={{ fontSize: "clamp(40px, 6vw, 80px)" }}
           >
             Event not found

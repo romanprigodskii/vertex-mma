@@ -129,7 +129,7 @@ function JudgeCard({
             </td>
             <td
               className={cn(
-                "pt-3 text-right font-sans font-bold text-lg tabular",
+                "pt-3 text-right font-display text-lg tabular",
                 aWon ? "text-streak-win" : "text-foreground",
               )}
             >
@@ -137,7 +137,7 @@ function JudgeCard({
             </td>
             <td
               className={cn(
-                "pt-3 text-right font-sans font-bold text-lg tabular",
+                "pt-3 text-right font-display text-lg tabular",
                 bWon ? "text-streak-win" : "text-foreground",
               )}
             >

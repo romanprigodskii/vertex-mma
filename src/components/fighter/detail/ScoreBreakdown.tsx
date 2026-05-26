@@ -216,7 +216,7 @@ function BreakdownTable({
             >
               Final {curveMultiplier != null ? "(after curve, clamp 0-100)" : "(clamp 0-100)"}
             </td>
-            <td className="pt-3 text-right font-sans font-bold text-xl tabular text-foreground">
+            <td className="pt-3 text-right font-display text-xl tabular text-foreground">
               {finalScore != null ? finalScore : "—"}
             </td>
           </tr>

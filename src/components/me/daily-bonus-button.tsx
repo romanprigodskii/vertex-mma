@@ -63,7 +63,7 @@ export function DailyBonusButton({ lastDailyBonusAt, tier }: Props) {
         type="button"
         onClick={onClick}
         disabled={pending}
-        className="rounded-sm bg-primary px-4 py-2 font-sans font-bold text-sm uppercase tracking-widest text-background-base hover:opacity-90 disabled:opacity-50"
+        className="rounded-sm bg-primary px-4 py-2 font-display text-sm uppercase tracking-widest text-background-base hover:opacity-90 disabled:opacity-50"
       >
         {pending ? "Claiming…" : `Claim daily +${amount.toLocaleString()}`}
       </button>

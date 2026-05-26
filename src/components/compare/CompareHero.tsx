@@ -116,7 +116,7 @@ function HalfPhoto({ fighter, champion, align }: HalfPhotoProps) {
           aria-hidden
         >
           <span
-            className="font-sans font-bold uppercase tracking-wider text-foreground/40"
+            className="font-display uppercase tracking-wider text-foreground/40"
             style={{ fontSize: 220 }}
           >
             {initialsOf(fighter.name_en)}
@@ -167,7 +167,7 @@ function FighterIdentity({ fighter, champion, align }: IdentityProps) {
       ) : null}
 
       <h2
-        className="font-sans font-bold uppercase leading-[0.85] tracking-tight text-foreground"
+        className="font-display uppercase leading-[0.85] tracking-tight text-foreground"
         style={{ fontSize: "clamp(40px, 6.5vw, 88px)" }}
       >
         <span className="block">{first}</span>
@@ -200,7 +200,7 @@ function FighterIdentity({ fighter, champion, align }: IdentityProps) {
         )}
       >
         <span
-          className="font-sans font-bold tabular leading-none tracking-tight text-foreground"
+          className="font-display tabular leading-none tracking-tight text-foreground"
           style={{ fontSize: "clamp(36px, 4.5vw, 64px)" }}
         >
           {record}
@@ -237,7 +237,7 @@ function VsBlock() {
   return (
     <span
       aria-hidden
-      className="font-sans font-bold uppercase tracking-[0.05em] text-primary"
+      className="font-display uppercase tracking-[0.05em] text-primary"
       style={{
         fontSize: "clamp(96px, 14vw, 200px)",
         lineHeight: 1,
@@ -286,7 +286,7 @@ function MobileBanner({
           aria-hidden
         >
           <span
-            className="font-sans font-bold uppercase tracking-wider text-foreground/40"
+            className="font-display uppercase tracking-wider text-foreground/40"
             style={{ fontSize: 140 }}
           >
             {initialsOf(fighter.name_en)}
@@ -315,12 +315,12 @@ function MobileBanner({
           </span>
         ) : null}
         <p
-          className="font-sans font-bold uppercase leading-[0.9] tracking-tight text-foreground"
+          className="font-display uppercase leading-[0.9] tracking-tight text-foreground"
           style={{ fontSize: 30 }}
         >
           {fighter.name_en}
         </p>
-        <p className="font-sans font-bold tabular text-3xl leading-none text-foreground">
+        <p className="font-display tabular text-3xl leading-none text-foreground">
           {fighter.draws_total > 0
             ? `${fighter.wins_total}—${fighter.losses_total}—${fighter.draws_total}`
             : `${fighter.wins_total}—${fighter.losses_total}`}
@@ -464,7 +464,7 @@ export function CompareHero({ a, b, championA, championB }: CompareHeroProps) {
         <MobileBanner fighter={a} champion={championA} align="left" />
         <span
           aria-hidden
-          className="font-sans font-bold uppercase tracking-[0.05em] text-primary"
+          className="font-display uppercase tracking-[0.05em] text-primary"
           style={{
             fontSize: 64,
             lineHeight: 1,

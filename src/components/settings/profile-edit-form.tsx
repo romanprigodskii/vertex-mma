@@ -77,7 +77,7 @@ export function ProfileEditForm({
       <button
         type="submit"
         disabled={pending}
-        className="self-start rounded-sm bg-primary px-4 py-2 font-sans font-bold text-sm uppercase tracking-widest text-background-base hover:opacity-90 disabled:opacity-50"
+        className="self-start rounded-sm bg-primary px-4 py-2 font-display text-sm uppercase tracking-widest text-background-base hover:opacity-90 disabled:opacity-50"
       >
         {pending ? "Saving…" : "Save"}
       </button>

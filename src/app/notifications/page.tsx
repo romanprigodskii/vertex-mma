@@ -29,7 +29,7 @@ export default async function NotificationsPage() {
               <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground-subtle">
                 Inbox
               </p>
-              <h1 className="mt-2 font-sans font-bold uppercase tracking-tight text-foreground text-h1">
+              <h1 className="mt-2 font-display uppercase tracking-tight text-foreground text-h1">
                 Notifications
               </h1>
             </div>

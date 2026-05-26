@@ -87,7 +87,7 @@ export function StatCompareRow({
     <div className="grid grid-cols-[1fr_auto_2fr_auto_1fr] items-baseline gap-3 border-b border-foreground/[0.06] py-4 last:border-b-0 sm:gap-4 sm:py-5">
       <div
         className={cn(
-          "text-right font-sans font-bold tabular text-2xl tracking-tight sm:text-3xl",
+          "text-right font-display tabular text-2xl tracking-tight sm:text-3xl",
           aWon
             ? "text-streak-win"
             : tie
@@ -131,7 +131,7 @@ export function StatCompareRow({
       </div>
       <div
         className={cn(
-          "text-left font-sans font-bold tabular text-2xl tracking-tight sm:text-3xl",
+          "text-left font-display tabular text-2xl tracking-tight sm:text-3xl",
           bWon
             ? "text-streak-win"
             : tie
@@ -166,7 +166,7 @@ export function StatTextRow({
 }) {
   return (
     <div className="grid grid-cols-[1fr_auto_2fr_auto_1fr] items-baseline gap-3 border-b border-foreground/[0.06] py-4 last:border-b-0 sm:gap-4 sm:py-5">
-      <div className="text-right font-sans font-bold text-2xl uppercase tracking-tight text-foreground sm:text-3xl">
+      <div className="text-right font-display text-2xl uppercase tracking-tight text-foreground sm:text-3xl">
         {valueA ?? "—"}
         {noteA ? (
           <p className="font-sans text-[11px] uppercase tracking-widest text-foreground-subtle">
@@ -183,7 +183,7 @@ export function StatTextRow({
       <span aria-hidden className="text-foreground-subtle/30">
         ·
       </span>
-      <div className="text-left font-sans font-bold text-2xl uppercase tracking-tight text-foreground sm:text-3xl">
+      <div className="text-left font-display text-2xl uppercase tracking-tight text-foreground sm:text-3xl">
         {valueB ?? "—"}
         {noteB ? (
           <p className="font-sans text-[11px] uppercase tracking-widest text-foreground-subtle">

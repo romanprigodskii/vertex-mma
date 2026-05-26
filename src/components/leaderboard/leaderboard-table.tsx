@@ -44,7 +44,7 @@ export function LeaderboardTable({ rows, activeSort }: Props) {
 
       {rows.length === 0 ? (
         <div className="rounded-md border border-dashed border-foreground/15 bg-background-elevated/20 px-6 py-16 text-center">
-          <p className="font-sans font-bold text-2xl uppercase tracking-tight text-foreground">
+          <p className="font-display text-2xl uppercase tracking-tight text-foreground">
             No bettors with activity yet
           </p>
           <p className="mx-auto mt-3 max-w-md font-sans text-sm text-foreground-muted">
@@ -53,7 +53,7 @@ export function LeaderboardTable({ rows, activeSort }: Props) {
           </p>
           <Link
             href="/markets"
-            className="mt-6 inline-block rounded-sm bg-primary px-4 py-2 font-sans font-bold text-sm uppercase tracking-widest text-background-base hover:opacity-90"
+            className="mt-6 inline-block rounded-sm bg-primary px-4 py-2 font-display text-sm uppercase tracking-widest text-background-base hover:opacity-90"
           >
             Browse markets →
           </Link>
@@ -67,7 +67,7 @@ export function LeaderboardTable({ rows, activeSort }: Props) {
                 prefetch={false}
                 className="grid grid-cols-[2.5rem_2.5rem_1fr_auto] items-center gap-3 rounded-md border border-foreground/10 bg-background-elevated/30 px-3 py-2.5 transition-colors hover:bg-foreground/[0.04]"
               >
-                <span className="font-sans font-bold text-xl tabular text-foreground-subtle">
+                <span className="font-display text-xl tabular text-foreground-subtle">
                   #{r.rank}
                 </span>
                 {r.avatar_url ? (
@@ -78,7 +78,7 @@ export function LeaderboardTable({ rows, activeSort }: Props) {
                     className="h-9 w-9 rounded-full object-cover"
                   />
                 ) : (
-                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/15 font-sans font-bold text-xs uppercase text-primary">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/15 font-display text-xs uppercase text-primary">
                     {r.username.slice(0, 2)}
                   </span>
                 )}
@@ -93,17 +93,17 @@ export function LeaderboardTable({ rows, activeSort }: Props) {
                 </div>
                 <div className="shrink-0 text-right">
                   {activeSort === "volume" ? (
-                    <p className="font-sans font-bold text-lg tabular text-foreground">
+                    <p className="font-display text-lg tabular text-foreground">
                       {r.total_lost.toLocaleString()}
                     </p>
                   ) : activeSort === "achievements" ? (
-                    <p className="font-sans font-bold text-lg tabular text-foreground">
+                    <p className="font-display text-lg tabular text-foreground">
                       {r.achievement_count}
                     </p>
                   ) : (
                     <p
                       className={cn(
-                        "font-sans font-bold text-lg tabular",
+                        "font-display text-lg tabular",
                         r.profit > 0
                           ? "text-streak-win"
                           : r.profit < 0

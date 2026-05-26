@@ -60,7 +60,7 @@ function ResultRow({
               prefetch={false}
               title={`${r.result} vs ${r.opponent_name} (${r.event_date.slice(0, 10)})`}
               className={cn(
-                "flex h-8 w-8 items-center justify-center rounded-sm border font-sans font-bold text-sm tabular transition-colors hover:opacity-80",
+                "flex h-8 w-8 items-center justify-center rounded-sm border font-display text-sm tabular transition-colors hover:opacity-80",
                 resultClass(r.result),
               )}
             >
