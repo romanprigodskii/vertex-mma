@@ -261,6 +261,18 @@ export interface ScoreHistoryPoint {
  * (Wave 31 replay) and `allTimeScore` (Wave 53/54/55 replay) come from
  * the fighter_score_history table — populated by
  * scripts/compute_score_history.ts.
+ *
+ * The **latest anchor's** score is overridden with the live displayed
+ * value from `fighter` (the same number drawn in the octagon/circle on
+ * the profile). Earlier anchors compute time-windowed signals
+ * (activity, recent_form, layoff, recent_loss_penalty) as-of-bout-date,
+ * but the view that backs the profile column computes them as-of-today
+ * — so the replayed latest anchor naturally reads higher when the
+ * fighter has been idle since (e.g., Islam's activity score for the 12
+ * months ending Nov 2025 captures two championship bouts; the 12
+ * months ending today catches just one). Overriding only the last
+ * point keeps the chart's right edge consistent with the number the
+ * user just clicked on.
  */
 export async function getScoreHistory(
   fighterId: string,
@@ -308,7 +320,7 @@ export async function getScoreHistory(
     Row & { opponent_name: string; opponent_slug: string }
   >;
 
-  return rows.map((r) => {
+  const points: ScoreHistoryPoint[] = rows.map((r) => {
     let result: "W" | "L" | "D" | "NC";
     if (r.winner_id == null) {
       const m = (r.method ?? "").toLowerCase();
@@ -331,4 +343,25 @@ export async function getScoreHistory(
       allTimeScore: r.vertex_score_all_time,
     };
   });
+
+  if (points.length > 0) {
+    const liveRows = (await db.execute<{
+      cur: number | null;
+      at: number | null;
+    }>(sql`
+      SELECT
+        vertex_score             AS cur,
+        vertex_score_all_time    AS at
+      FROM fighter
+      WHERE id = ${fighterId}::uuid
+    `)) as unknown as Array<{ cur: number | null; at: number | null }>;
+    const live = liveRows[0];
+    if (live) {
+      const last = points[points.length - 1];
+      if (live.cur != null) last.currentScore = live.cur;
+      if (live.at != null) last.allTimeScore = live.at;
+    }
+  }
+
+  return points;
 }
