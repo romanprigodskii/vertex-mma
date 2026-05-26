@@ -3,6 +3,7 @@ import { Bebas_Neue, Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
 import { ScrollToTopOnNav } from "@/components/layout/scroll-to-top-on-nav";
+import { ThemeProvider } from "@/components/layout/theme-provider";
 import { FighterSearchPalette } from "@/components/search/fighter-search-palette";
 
 const bebasNeue = Bebas_Neue({
@@ -56,9 +57,11 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col bg-background-base text-foreground font-sans antialiased">
-        <ScrollToTopOnNav />
-        <FighterSearchPalette />
-        {children}
+        <ThemeProvider>
+          <ScrollToTopOnNav />
+          <FighterSearchPalette />
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

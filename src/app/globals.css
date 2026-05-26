@@ -140,6 +140,70 @@
    Base styles
    ============================================================ */
 
+/* ============================================================
+   Light theme overrides
+   ------------------------------------------------------------
+   The @theme block above stays the authoritative DARK palette
+   (= default). When data-theme="light" is set on <html>, we
+   re-bind every color token to a paper-leaning palette tuned for
+   light backgrounds — colder neutrals, darker gold so it still
+   reads against a light surface, and shadows with reduced alpha
+   since black-on-light shows up much more aggressively.
+   ============================================================ */
+:root[data-theme="light"] {
+  --color-background-base: oklch(0.985 0 0);
+  --color-background-elevated: oklch(0.965 0.003 240);
+  --color-background-overlay: oklch(0.945 0.005 240);
+
+  --color-foreground: oklch(0.185 0.005 240);
+  --color-foreground-muted: oklch(0.42 0.005 240);
+  --color-foreground-subtle: oklch(0.6 0.005 240);
+
+  /* Brand gold loses contrast against a near-white surface — push
+     luminance down and saturation up so it still reads as a brand
+     hit, not a wash. */
+  --color-primary: oklch(0.68 0.17 70);
+  --color-primary-hover: oklch(0.62 0.17 70);
+  --color-primary-foreground: oklch(0.99 0 0);
+  --color-gold: oklch(0.68 0.17 70);
+  --color-gold-foreground: oklch(0.99 0 0);
+
+  --color-red-accent: oklch(0.55 0.22 27);
+  --color-red-accent-hover: oklch(0.48 0.22 27);
+
+  --color-success: oklch(0.55 0.18 145);
+  --color-danger: oklch(0.5 0.22 27);
+  --color-danger-foreground: oklch(0.99 0 0);
+  --color-warning: oklch(0.68 0.18 70);
+  --color-info: oklch(0.5 0.16 230);
+
+  --color-streak-win: oklch(0.5 0.15 145);
+  --color-streak-loss: oklch(0.48 0.18 27);
+
+  --color-submission: oklch(0.52 0.14 250);
+  --color-knockdown: oklch(0.62 0.16 60);
+
+  --color-border: oklch(0.88 0.003 240);
+  --color-border-strong: oklch(0.78 0.005 240);
+
+  --color-tier-bronze: oklch(0.5 0.13 50);
+  --color-tier-silver: oklch(0.65 0.02 240);
+  --color-tier-gold: oklch(0.68 0.17 70);
+  --color-tier-diamond: oklch(0.6 0.15 200);
+  --color-tier-champion: oklch(0.48 0.25 320);
+
+  /* Black-on-light shadows need way less alpha than white-on-dark. */
+  --shadow-glow-primary: 0 0 18px oklch(0.68 0.17 70 / 0.32);
+  --shadow-glow-gold: 0 0 18px oklch(0.68 0.17 70 / 0.32);
+  --shadow-glow-red-accent: 0 0 18px oklch(0.55 0.22 27 / 0.28);
+  --shadow-elevation-1:
+    0 1px 2px oklch(0 0 0 / 0.06),
+    0 1px 3px oklch(0 0 0 / 0.05);
+  --shadow-elevation-2:
+    0 4px 14px oklch(0 0 0 / 0.08),
+    0 2px 6px oklch(0 0 0 / 0.06);
+}
+
 @layer base {
   * {
     border-color: var(--color-border);
@@ -149,6 +213,10 @@
     /* Smooth scroll disabled — Lenis will handle later */
     scroll-behavior: auto;
     color-scheme: dark;
+  }
+
+  html[data-theme="light"] {
+    color-scheme: light;
   }
 
   body {

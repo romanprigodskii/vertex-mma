@@ -6,6 +6,7 @@ import { MobileNav } from "@/components/layout/mobile-nav";
 import { NavSections } from "@/components/layout/nav-sections";
 import { NavbarNotifications } from "@/components/layout/navbar-notifications";
 import { NavbarUserMenu } from "@/components/layout/navbar-user-menu";
+import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { FighterSearchTrigger } from "@/components/search/fighter-search-palette";
 import type { CurrentUser } from "@/lib/auth";
 import type { NotificationRow } from "@/lib/notifications";
@@ -42,6 +43,7 @@ export function NavbarInner({
           <NavSections />
           <div className="flex items-center gap-2">
             <FighterSearchTrigger className="hidden lg:inline-flex" />
+            <ThemeToggle className="hidden md:inline-flex" />
             {user ? (
               <>
                 <div className="hidden h-9 items-center gap-1.5 rounded-md border border-foreground/15 bg-background-elevated px-3 text-sm tabular sm:inline-flex">
