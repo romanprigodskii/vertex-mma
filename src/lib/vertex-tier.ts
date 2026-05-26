@@ -108,56 +108,61 @@ export interface TierStyle {
   scoreColor: string;
 }
 
-// Explicit per-tier OKLCH triples (no color-mix). Each tier reads as a
-// distinct hue on dark backgrounds:
-//   Apex        purple/violet  — GOAT territory
-//   Elite       blue           — championship class
-//   Established  teal-grey     — solid pro
-//   Roster      slate          — long-tail roster
+// Tier gradients drive the card backgrounds and were tuned against the
+// dark surface — purple at 0.18 alpha disappears into a near-black bg, but
+// the same value lights up a near-white surface. We route every theme-
+// sensitive colour through a CSS variable so :root[data-theme="light"] can
+// dial it down without touching this file.
+//
+// Each tier reads as a distinct hue:
+//   Apex        purple/violet — GOAT territory
+//   Elite       blue          — championship class
+//   Established teal-grey     — solid pro
+//   Roster      slate         — long-tail roster
 export const TIER_STYLES: Record<VertexTier, TierStyle> = {
   apex: {
     tier: "apex",
     label: "Apex",
     badgeText: "APEX",
-    badgeBg: "oklch(0.30 0.18 295)",
-    badgeTextColor: "oklch(0.92 0.10 295)",
-    badgeBorder: "oklch(0.55 0.20 295)",
-    gradientFrom: "oklch(0.45 0.22 295 / 0.18)",
-    gradientTo: "oklch(0.45 0.22 295 / 0)",
-    scoreColor: "oklch(0.85 0.18 295)",
+    badgeBg: "var(--tier-apex-badge-bg)",
+    badgeTextColor: "var(--tier-apex-badge-text)",
+    badgeBorder: "var(--tier-apex-badge-border)",
+    gradientFrom: "var(--tier-apex-gradient-from)",
+    gradientTo: "var(--tier-apex-gradient-to)",
+    scoreColor: "var(--tier-apex-score)",
   },
   elite: {
     tier: "elite",
     label: "Elite",
     badgeText: "ELITE",
-    badgeBg: "oklch(0.28 0.14 235)",
-    badgeTextColor: "oklch(0.88 0.10 235)",
-    badgeBorder: "oklch(0.55 0.18 235)",
-    gradientFrom: "oklch(0.45 0.18 235 / 0.16)",
-    gradientTo: "oklch(0.45 0.18 235 / 0)",
-    scoreColor: "oklch(0.82 0.16 235)",
+    badgeBg: "var(--tier-elite-badge-bg)",
+    badgeTextColor: "var(--tier-elite-badge-text)",
+    badgeBorder: "var(--tier-elite-badge-border)",
+    gradientFrom: "var(--tier-elite-gradient-from)",
+    gradientTo: "var(--tier-elite-gradient-to)",
+    scoreColor: "var(--tier-elite-score)",
   },
   established: {
     tier: "established",
     label: "Established",
     badgeText: "ESTABLISHED",
-    badgeBg: "oklch(0.28 0.05 200)",
-    badgeTextColor: "oklch(0.78 0.06 200)",
-    badgeBorder: "oklch(0.45 0.07 200)",
-    gradientFrom: "oklch(0.50 0.08 200 / 0.12)",
-    gradientTo: "oklch(0.50 0.08 200 / 0)",
-    scoreColor: "oklch(0.75 0.07 200)",
+    badgeBg: "var(--tier-established-badge-bg)",
+    badgeTextColor: "var(--tier-established-badge-text)",
+    badgeBorder: "var(--tier-established-badge-border)",
+    gradientFrom: "var(--tier-established-gradient-from)",
+    gradientTo: "var(--tier-established-gradient-to)",
+    scoreColor: "var(--tier-established-score)",
   },
   roster: {
     tier: "roster",
     label: "Roster",
     badgeText: "ROSTER",
-    badgeBg: "oklch(0.22 0.01 240)",
-    badgeTextColor: "oklch(0.65 0.02 240)",
-    badgeBorder: "oklch(0.35 0.02 240)",
-    gradientFrom: "oklch(0.45 0.02 240 / 0.08)",
-    gradientTo: "oklch(0.45 0.02 240 / 0)",
-    scoreColor: "oklch(0.62 0.03 240)",
+    badgeBg: "var(--tier-roster-badge-bg)",
+    badgeTextColor: "var(--tier-roster-badge-text)",
+    badgeBorder: "var(--tier-roster-badge-border)",
+    gradientFrom: "var(--tier-roster-gradient-from)",
+    gradientTo: "var(--tier-roster-gradient-to)",
+    scoreColor: "var(--tier-roster-score)",
   },
   unranked: {
     tier: "unranked",

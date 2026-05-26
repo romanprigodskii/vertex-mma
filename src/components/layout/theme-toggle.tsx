@@ -25,7 +25,7 @@ export function ThemeToggle({ className }: { className?: string }) {
       }
       title={mounted ? `Switch to ${next} theme` : undefined}
       className={cn(
-        "inline-flex h-9 w-9 items-center justify-center rounded-md border border-foreground/15 bg-background-elevated text-foreground-muted transition-colors hover:border-foreground/30 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+        "inline-flex h-9 w-9 items-center justify-center rounded-md border border-foreground/20 bg-background-elevated text-foreground-muted transition-colors hover:border-foreground/40 hover:bg-foreground/[0.04] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
         className,
       )}
     >

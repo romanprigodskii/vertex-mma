@@ -147,7 +147,7 @@ export function FighterCard({
   const cardBase =
     "color-mix(in oklch, var(--color-background-elevated) 30%, transparent)";
   const goldTint =
-    "linear-gradient(0deg, oklch(0.7 0.15 80 / 0.12) 0%, oklch(0.7 0.15 80 / 0) 25%)";
+    "linear-gradient(0deg, var(--fighter-card-gold-tint) 0%, transparent 25%)";
 
   return (
     <Link
@@ -156,7 +156,7 @@ export function FighterCard({
       style={{
         background:
           tierStyle.tier === "unranked"
-            ? "oklch(0.12 0.008 240 / 0.3)"
+            ? "var(--fighter-card-unranked-bg)"
             : isChampion
               ? `${tierGradient}, ${goldTint}, ${cardBase}`
               : `${tierGradient}, ${cardBase}`,
