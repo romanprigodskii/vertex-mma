@@ -170,47 +170,68 @@ export default async function FighterDetailPage({ params }: PageProps) {
         <Container size="xl" className="pt-8">
           {heroCurrentScore != null ? (
             <div className="flex items-center justify-center gap-3 sm:gap-6">
-              <OctagonScore
-                score={heroCurrentScore}
-                scoreMode="current"
-                fighter={{
-                  slug: fighter.slug,
-                  // Wave 14B.2: classify the hero tier using the
-                  // divisional score (when available) so the colour ring
-                  // and number always agree. all_time stays global.
-                  vertexScore: heroCurrentScore,
-                  vertexScoreAllTime: fighter.vertex_score_all_time,
-                  ufcBouts: fighter.ufc_total,
-                }}
-                label="Current Vertex Score"
-              />
-              <CircleScore
-                score={fighter.vertex_score_all_time}
-                scoreMode="all_time"
-                fighter={{
-                  slug: fighter.slug,
-                  vertexScore: fighter.vertex_score,
-                  vertexScoreAllTime: fighter.vertex_score_all_time,
-                  ufcBouts: fighter.ufc_total,
-                }}
-                label="All-Time Vertex Score"
-              />
+              <Link
+                href={`/fighters/${slug}/score-history?mode=current`}
+                prefetch={false}
+                aria-label="Open per-bout current Vertex score history"
+                className="group block rounded-full outline-none ring-offset-2 ring-offset-background-base transition-transform hover:scale-[1.02] focus-visible:ring-2 focus-visible:ring-primary"
+              >
+                <OctagonScore
+                  score={heroCurrentScore}
+                  scoreMode="current"
+                  fighter={{
+                    slug: fighter.slug,
+                    // Wave 14B.2: classify the hero tier using the
+                    // divisional score (when available) so the colour
+                    // ring and number always agree. all_time stays global.
+                    vertexScore: heroCurrentScore,
+                    vertexScoreAllTime: fighter.vertex_score_all_time,
+                    ufcBouts: fighter.ufc_total,
+                  }}
+                  label="Current Vertex Score"
+                />
+              </Link>
+              <Link
+                href={`/fighters/${slug}/score-history?mode=all_time`}
+                prefetch={false}
+                aria-label="Open per-bout all-time peak Vertex history"
+                className="group block rounded-full outline-none ring-offset-2 ring-offset-background-base transition-transform hover:scale-[1.02] focus-visible:ring-2 focus-visible:ring-primary"
+              >
+                <CircleScore
+                  score={fighter.vertex_score_all_time}
+                  scoreMode="all_time"
+                  fighter={{
+                    slug: fighter.slug,
+                    vertexScore: fighter.vertex_score,
+                    vertexScoreAllTime: fighter.vertex_score_all_time,
+                    ufcBouts: fighter.ufc_total,
+                  }}
+                  label="All-Time Vertex Score"
+                />
+              </Link>
             </div>
           ) : (
             // Wave 29: retired (or <5-bout) fighter — All-Time is the
             // primary identity; skip the empty Current octagon entirely.
             <div className="flex items-center justify-center">
-              <CircleScore
-                score={fighter.vertex_score_all_time}
-                scoreMode="all_time"
-                fighter={{
-                  slug: fighter.slug,
-                  vertexScore: fighter.vertex_score,
-                  vertexScoreAllTime: fighter.vertex_score_all_time,
-                  ufcBouts: fighter.ufc_total,
-                }}
-                label="Vertex Score · All-Time"
-              />
+              <Link
+                href={`/fighters/${slug}/score-history?mode=all_time`}
+                prefetch={false}
+                aria-label="Open per-bout all-time peak Vertex history"
+                className="group block rounded-full outline-none ring-offset-2 ring-offset-background-base transition-transform hover:scale-[1.02] focus-visible:ring-2 focus-visible:ring-primary"
+              >
+                <CircleScore
+                  score={fighter.vertex_score_all_time}
+                  scoreMode="all_time"
+                  fighter={{
+                    slug: fighter.slug,
+                    vertexScore: fighter.vertex_score,
+                    vertexScoreAllTime: fighter.vertex_score_all_time,
+                    ufcBouts: fighter.ufc_total,
+                  }}
+                  label="Vertex Score · All-Time"
+                />
+              </Link>
             </div>
           )}
           {otherDivisionRows.length > 0 ? (
@@ -230,35 +251,20 @@ export default async function FighterDetailPage({ params }: PageProps) {
 
         {/* Quick-action CTAs */}
         <Container size="xl" className="pt-6">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Link
-              href={`/fighters/${slug}/card`}
-              prefetch={false}
-              className="group flex flex-wrap items-center justify-between gap-3 rounded-md border border-primary/30 bg-primary/[0.04] px-4 py-3 transition-colors hover:border-primary/55 hover:bg-primary/[0.08]"
-            >
-              <span className="font-sans text-[11px] uppercase tracking-[0.22em] text-primary">
-                Collectible holographic card
-              </span>
-              <span className="flex items-center gap-1.5 font-sans text-xs text-foreground transition-transform group-hover:translate-x-0.5">
-                <span>Open card view</span>
-                <ChevronRight className="h-3.5 w-3.5" aria-hidden />
-              </span>
-            </Link>
-            <Link
-              href={`/fighters/compare?a=${slug}`}
-              prefetch={false}
-              className="group flex flex-wrap items-center justify-between gap-3 rounded-md border border-foreground/15 bg-foreground/[0.02] px-4 py-3 transition-colors hover:border-foreground/35 hover:bg-foreground/[0.05]"
-            >
-              <span className="flex items-center gap-2 font-sans text-[11px] uppercase tracking-[0.22em] text-foreground-muted">
-                <ArrowLeftRight className="h-3.5 w-3.5" aria-hidden />
-                Compare with another fighter
-              </span>
-              <span className="flex items-center gap-1.5 font-sans text-xs text-foreground transition-transform group-hover:translate-x-0.5">
-                <span>Open compare</span>
-                <ChevronRight className="h-3.5 w-3.5" aria-hidden />
-              </span>
-            </Link>
-          </div>
+          <Link
+            href={`/fighters/compare?a=${slug}`}
+            prefetch={false}
+            className="group flex flex-wrap items-center justify-between gap-3 rounded-md border border-foreground/15 bg-foreground/[0.02] px-4 py-3 transition-colors hover:border-foreground/35 hover:bg-foreground/[0.05]"
+          >
+            <span className="flex items-center gap-2 font-sans text-[11px] uppercase tracking-[0.22em] text-foreground-muted">
+              <ArrowLeftRight className="h-3.5 w-3.5" aria-hidden />
+              Compare with another fighter
+            </span>
+            <span className="flex items-center gap-1.5 font-sans text-xs text-foreground transition-transform group-hover:translate-x-0.5">
+              <span>Open compare</span>
+              <ChevronRight className="h-3.5 w-3.5" aria-hidden />
+            </span>
+          </Link>
         </Container>
 
         <Section

@@ -44,9 +44,21 @@ interface PeakVertexProps {
  * show the delta below the bouts row.
  */
 export function PeakVertex({ info }: PeakVertexProps) {
-  const { peak, peakDate, anchorBout, endingBout, currentScore } = info;
+  const {
+    peak,
+    peakDate,
+    anchorBout,
+    lastPeakBout,
+    peakBoutCount,
+    endingBout,
+    currentScore,
+  } = info;
   const delta = currentScore != null ? currentScore - peak : null;
   const isAtPeak = endingBout == null;
+  const heldAcrossBouts = peakBoutCount > 1;
+  const dateRange = heldAcrossBouts
+    ? `${peakDate} → ${lastPeakBout.eventDate}`
+    : peakDate;
 
   return (
     <section
@@ -58,7 +70,7 @@ export function PeakVertex({ info }: PeakVertexProps) {
           Peak Vertex
         </h3>
         <span className="font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
-          {peakDate}
+          {dateRange}
         </span>
       </div>
 
@@ -67,6 +79,11 @@ export function PeakVertex({ info }: PeakVertexProps) {
           <span className="font-display tabular text-5xl leading-none text-foreground">
             {peak}
           </span>
+          {heldAcrossBouts ? (
+            <span className="font-sans text-xs text-foreground-muted">
+              held {peakBoutCount} bouts
+            </span>
+          ) : null}
           {delta != null && delta !== 0 ? (
             <span
               className={
@@ -86,7 +103,7 @@ export function PeakVertex({ info }: PeakVertexProps) {
         <div className="min-w-[200px] flex-1 space-y-2 font-sans text-sm">
           <div>
             <span className="text-[11px] uppercase tracking-widest text-foreground-subtle">
-              After
+              {heldAcrossBouts ? "From" : "After"}
             </span>
             <span className="ml-2 text-foreground-muted">
               <ResultPill result={anchorBout.result} />
@@ -103,6 +120,28 @@ export function PeakVertex({ info }: PeakVertexProps) {
               </span>
             </span>
           </div>
+
+          {heldAcrossBouts ? (
+            <div>
+              <span className="text-[11px] uppercase tracking-widest text-foreground-subtle">
+                Through
+              </span>
+              <span className="ml-2 text-foreground-muted">
+                <ResultPill result={lastPeakBout.result} />
+                <span className="ml-1.5">vs</span>{" "}
+                <Link
+                  href={`/fighters/${lastPeakBout.opponentSlug}`}
+                  className="text-foreground transition-colors hover:text-primary"
+                >
+                  {lastPeakBout.opponentName}
+                </Link>
+                <span className="text-foreground-subtle">
+                  {" · "}
+                  {methodLabel(lastPeakBout.method)}
+                </span>
+              </span>
+            </div>
+          ) : null}
 
           {endingBout ? (
             <div>
