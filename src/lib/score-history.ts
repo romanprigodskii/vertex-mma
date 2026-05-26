@@ -240,17 +240,24 @@ export async function getPeakVertex(
 }
 
 export interface ScoreHistoryPoint {
-  boutId: string;
+  /** Stable key for React. For bout points it's the bout id; for monthly
+   *  snapshots it's `monthly:<date>`. */
+  key: string;
+  kind: "bout" | "monthly";
+  boutId: string | null;
   eventDate: string;
+  /** Bout-row metadata. Null for monthly snapshots. */
   eventName: string | null;
   eventSlug: string | null;
-  opponentName: string;
-  opponentSlug: string;
-  result: "W" | "L" | "D" | "NC";
+  opponentName: string | null;
+  opponentSlug: string | null;
+  /** Bout result. Null for monthly snapshots — synthetic dates aren't
+   *  attached to an outcome. */
+  result: "W" | "L" | "D" | "NC" | null;
   method: string | null;
-  /** Current-formula score as of this bout (already in the history table). */
+  /** Current-formula score as of this date (already in the history table). */
   currentScore: number;
-  /** Wave 53/54/55 all-time formula replayed as-of-bout. Null on the
+  /** Wave 53/54/55 all-time formula replayed as-of-date. Null on the
    *  rare anchor row missing the column (legacy data). */
   allTimeScore: number | null;
 }
@@ -278,20 +285,24 @@ export async function getScoreHistory(
   fighterId: string,
 ): Promise<ScoreHistoryPoint[]> {
   type Row = {
-    bout_id: string;
+    bout_id: string | null;
     event_date: string;
+    kind: "bout" | "monthly";
     event_name: string | null;
     event_slug: string | null;
     method: string | null;
     winner_id: string | null;
-    fighter_a_id: string;
+    fighter_a_id: string | null;
     vertex_score: number;
     vertex_score_all_time: number | null;
+    opponent_name: string | null;
+    opponent_slug: string | null;
   };
   const rows = (await db.execute<Row>(sql`
     SELECT
       h.as_of_bout_id::text AS bout_id,
       h.as_of_date::text AS event_date,
+      h.kind AS kind,
       ev.name AS event_name,
       ev.slug AS event_slug,
       b.method::text AS method,
@@ -300,29 +311,31 @@ export async function getScoreHistory(
       h.vertex_score AS vertex_score,
       h.vertex_score_all_time AS vertex_score_all_time,
       CASE
+        WHEN b.id IS NULL THEN NULL
         WHEN b.fighter_a_id::text = ${fighterId}
           THEN fb.name_en
         ELSE fa.name_en
       END AS opponent_name,
       CASE
+        WHEN b.id IS NULL THEN NULL
         WHEN b.fighter_a_id::text = ${fighterId}
           THEN fb.slug
         ELSE fa.slug
       END AS opponent_slug
     FROM fighter_score_history h
-    JOIN bout b ON b.id = h.as_of_bout_id
-    JOIN event ev ON ev.id = b.event_id
-    JOIN fighter fa ON fa.id = b.fighter_a_id
-    JOIN fighter fb ON fb.id = b.fighter_b_id
+    LEFT JOIN bout b ON b.id = h.as_of_bout_id
+    LEFT JOIN event ev ON ev.id = b.event_id
+    LEFT JOIN fighter fa ON fa.id = b.fighter_a_id
+    LEFT JOIN fighter fb ON fb.id = b.fighter_b_id
     WHERE h.fighter_id = ${fighterId}::uuid
-    ORDER BY h.as_of_date ASC, h.as_of_bout_id ASC
-  `)) as unknown as Array<
-    Row & { opponent_name: string; opponent_slug: string }
-  >;
+    ORDER BY h.as_of_date ASC, h.kind ASC, h.as_of_bout_id ASC
+  `)) as unknown as Row[];
 
   const points: ScoreHistoryPoint[] = rows.map((r) => {
-    let result: "W" | "L" | "D" | "NC";
-    if (r.winner_id == null) {
+    let result: "W" | "L" | "D" | "NC" | null;
+    if (r.kind === "monthly") {
+      result = null;
+    } else if (r.winner_id == null) {
       const m = (r.method ?? "").toLowerCase();
       result = m.includes("no_contest") ? "NC" : "D";
     } else if (r.winner_id === fighterId) {
@@ -331,6 +344,11 @@ export async function getScoreHistory(
       result = "L";
     }
     return {
+      key:
+        r.kind === "monthly"
+          ? `monthly:${r.event_date.slice(0, 10)}`
+          : `bout:${r.bout_id}`,
+      kind: r.kind,
       boutId: r.bout_id,
       eventDate: r.event_date.slice(0, 10),
       eventName: r.event_name,

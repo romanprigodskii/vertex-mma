@@ -60,7 +60,7 @@ function methodLabel(method: string | null): string {
   return METHOD_SHORT[method] ?? method;
 }
 
-function resultClass(r: "W" | "L" | "D" | "NC"): string {
+function resultClass(r: "W" | "L" | "D" | "NC" | null): string {
   if (r === "W") return "text-streak-win";
   if (r === "L") return "text-streak-loss";
   return "text-foreground-muted";
@@ -77,10 +77,13 @@ export default async function FighterScoreHistoryPage({
   const mode = resolveMode(rawMode);
 
   const history = await getScoreHistory(fighter.id);
+  // The bouts list below only ever lists real bouts — monthly synthetic
+  // snapshots show up on the chart but aren't useful as table rows.
+  const boutHistory = history.filter((p) => p.kind === "bout");
   const modeHistory =
     mode === "all_time"
-      ? history.filter((p) => p.allTimeScore != null)
-      : history;
+      ? boutHistory.filter((p) => p.allTimeScore != null)
+      : boutHistory;
 
   return (
     <>
@@ -204,7 +207,7 @@ function HistoryTable({
           const delta = prevValue != null ? value - prevValue : null;
           return (
             <li
-              key={p.boutId}
+              key={p.key}
               className="flex flex-wrap items-baseline gap-x-4 gap-y-1 px-4 py-3 sm:px-5"
             >
               <span className="font-display tabular text-2xl leading-none text-foreground sm:text-3xl">
@@ -223,12 +226,16 @@ function HistoryTable({
               <span className="font-sans text-sm text-foreground-muted">
                 <span className={resultClass(p.result)}>{p.result}</span>{" "}
                 vs{" "}
-                <Link
-                  href={`/fighters/${p.opponentSlug}`}
-                  className="text-foreground transition-colors hover:text-primary"
-                >
-                  {p.opponentName}
-                </Link>
+                {p.opponentSlug ? (
+                  <Link
+                    href={`/fighters/${p.opponentSlug}`}
+                    className="text-foreground transition-colors hover:text-primary"
+                  >
+                    {p.opponentName}
+                  </Link>
+                ) : (
+                  <span className="text-foreground">{p.opponentName}</span>
+                )}
                 <span className="text-foreground-subtle">
                   {" · "}
                   {methodLabel(p.method)}

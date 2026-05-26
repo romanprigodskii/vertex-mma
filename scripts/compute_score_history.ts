@@ -44,10 +44,22 @@ import {
 } from "../src/lib/championship-history";
 import { TITLE_CHALLENGES } from "../src/lib/title-challenger-history";
 
-const url = process.env.DATABASE_URL;
+const url: string = process.env.DATABASE_URL ?? "";
 if (!url) throw new Error("DATABASE_URL not set");
 
 const sql = postgres(url, { prepare: false, max: 5 });
+
+// The "now" we replay against — used as the end date for the monthly
+// snapshots after each fighter's most recent bout. UTC midnight so the
+// step comparison with parseDate() bouts is timezone-stable.
+const TODAY: Date = (() => {
+  const env = process.env.TODAY;
+  if (env) return new Date(env.slice(0, 10) + "T00:00:00Z");
+  const now = new Date();
+  return new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+  );
+})();
 
 // =====================================================================
 // Types
@@ -92,8 +104,10 @@ interface BoutRow {
 
 interface AnchorRow {
   fighter_id: string;
-  as_of_bout_id: string;
+  /** NULL for kind='monthly' synthetic snapshots. */
+  as_of_bout_id: string | null;
   as_of_date: string;
+  kind: "bout" | "monthly";
   vertex_score: number;
   raw_current: number;
   // Wave 53/54/55 all-time formula replayed as-of-anchor. Same gate as
@@ -755,6 +769,158 @@ function credibilityAllTime(ufcBouts: number): number {
 }
 
 // =====================================================================
+// Per-anchor score computation — shared between bout anchors and
+// synthetic monthly snapshots. Pure function of the snapshot date plus
+// already-aggregated state.
+// =====================================================================
+
+interface AnchorComputeArgs {
+  asOfDate: Date;
+  asOfDateStr: string;
+  /** All bouts the fighter had through (and including) the most recent
+   *  bout BEFORE asOfDate. For a bout anchor this slice ends with the
+   *  anchor bout itself. For a monthly snapshot it ends with the last
+   *  bout before the snapshot date. */
+  allUpTo: BoutRow[];
+  /** Cumulative stats accumulated over allUpTo (the caller must have
+   *  added every bout in allUpTo into this object before calling). */
+  cum: CumulativeStats;
+  /** Most recent bout date before asOfDate — i.e. the last entry in
+   *  allUpTo. Used for the layoff term. For the first-anchor edge case
+   *  pass null. */
+  prevBoutDate: Date | null;
+  fighterSlug: string;
+  fighterDob: string | null;
+  peakSoFar: number;
+  titleFightCount: number;
+}
+
+interface AnchorComputeResult {
+  vertex_score: number;
+  raw_current: number;
+  vertex_score_all_time: number;
+}
+
+function computeAnchorScores(args: AnchorComputeArgs): AnchorComputeResult | null {
+  const {
+    asOfDate,
+    allUpTo,
+    cum,
+    prevBoutDate,
+    fighterSlug,
+    fighterDob,
+    peakSoFar,
+    titleFightCount,
+  } = args;
+  if (allUpTo.length < 3) return null;
+
+  const recentDesc = [...allUpTo].sort((a, b) => {
+    if (b.event_date !== a.event_date)
+      return b.event_date.localeCompare(a.event_date);
+    return b.bout_id.localeCompare(a.bout_id);
+  });
+
+  const qw = computeQualityWinsDecayed(allUpTo, asOfDate);
+  const fd = computeFinishingDomDecayed(allUpTo, asOfDate);
+  const form = computeRecentForm(recentDesc);
+  const activity = computeActivity(allUpTo, asOfDate);
+  const rlp = computeRecentLossPenalty(recentDesc, asOfDate);
+  const era = computeEraDom(allUpTo, asOfDate);
+  const perf = computePerfDiffCurrent(recentDesc);
+  const cp = computeCurrentCp(fighterSlug, asOfDate, recentDesc);
+  const dv = defensiveVulnerability(cum);
+  const af = ageFactor(fighterDob, asOfDate);
+  const lay = layoffPenalty(prevBoutDate, asOfDate);
+
+  const positives =
+    qw * 0.16 +
+    cp * 0.1 +
+    era * 0.06 +
+    perf * 0.16 +
+    fd * 0.1 +
+    activity * 0.12 +
+    form * 0.18;
+  const penalties = rlp * 0.2 + dv * 0.1 + lay;
+  const streakB = streakBonus(recentDesc);
+  const cred = credibilityCurrent(allUpTo.length);
+  const rawCurrent = Math.max(
+    0,
+    (positives - penalties + streakB) * (1 + af) * cred,
+  );
+
+  const multiplied = applyCurve(rawCurrent);
+  const vertexScoreRaw = skidAndFreshLoss(multiplied, recentDesc);
+  if (!Number.isFinite(rawCurrent) || !Number.isFinite(vertexScoreRaw)) {
+    return null;
+  }
+  const vertexScore = Math.max(0, Math.min(100, Math.round(vertexScoreRaw)));
+
+  // All-time replay — uses the running peak the caller passes in. The
+  // caller bumps peakSoFar with this anchor's vertex_score after this
+  // function returns (so the same anchor can establish a new peak that
+  // its own all-time score sees, matching SQL's MAX over the whole
+  // table). prevBoutDate doubles as the lastBoutDate for the sticky-CP
+  // rule — the most recent bout the fighter had before this snapshot.
+  const effectivePeak = Math.max(peakSoFar, vertexScore);
+  const qwCareer = computeCareerQualityWins(allUpTo);
+  const cpCareer = computeCareerCp(fighterSlug, asOfDate, prevBoutDate);
+  const eraAt = computeCareerEraAllTime(
+    fighterSlug,
+    asOfDate,
+    titleFightCount,
+  );
+  const perfCareer = computeCareerPerformanceDiff(cum);
+  const finishDom = computeCareerFinishingDom(cum);
+  const lossPenAt = computeCareerLossPenalty(allUpTo);
+  const credAt = credibilityAllTime(allUpTo.length);
+  const rawAllTime =
+    (qwCareer * 0.24 +
+      cpCareer * 0.2 +
+      eraAt * 0.18 +
+      perfCareer * 0.12 +
+      finishDom * 0.16 +
+      effectivePeak * 0.1 -
+      lossPenAt * 0.1) *
+    credAt;
+  const vertexScoreAllTime = Number.isFinite(rawAllTime)
+    ? Math.max(0, Math.round(rawAllTime))
+    : 0;
+
+  return {
+    vertex_score: vertexScore,
+    raw_current: rawCurrent,
+    vertex_score_all_time: vertexScoreAllTime,
+  };
+}
+
+// =====================================================================
+// Calendar helpers — monthly snapshots step at the first of each month.
+// =====================================================================
+
+function formatYmd(d: Date): string {
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function firstOfNextMonth(d: Date): Date {
+  // Always step forward to the 1st of the month strictly after d. If
+  // d is already the 1st of a month, the next snapshot is the 1st of
+  // the following month — we don't want to emit a monthly snapshot on
+  // the same day as the bout that closed the previous interval.
+  const y = d.getUTCFullYear();
+  const m = d.getUTCMonth();
+  return new Date(Date.UTC(y, m + 1, 1));
+}
+
+function nextMonth(d: Date): Date {
+  const y = d.getUTCFullYear();
+  const m = d.getUTCMonth();
+  return new Date(Date.UTC(y, m + 1, 1));
+}
+
+// =====================================================================
 // Main loop
 // =====================================================================
 
@@ -1019,110 +1185,71 @@ async function main() {
       if (isSubWin(anchor)) cum.sub_wins += 1;
       if (anchor.is_title_fight) titleFightCount += 1;
 
-      // Skip computing score for bouts 0..1 — need ≥3 bouts (we're at
-      // index i, so bouts count = i+1, gate is i+1 >= 3 → i >= 2).
-      if (i < 2) continue;
-
       const allUpTo = allBoutsAsc.slice(0, i + 1);
-      const recentDesc = [...allUpTo].sort((a, b) => {
-        if (b.event_date !== a.event_date) return b.event_date.localeCompare(a.event_date);
-        return b.bout_id.localeCompare(a.bout_id);
-      });
-
-      const qw = computeQualityWinsDecayed(allUpTo, anchorDate);
-      const fd = computeFinishingDomDecayed(allUpTo, anchorDate);
-      const form = computeRecentForm(recentDesc);
-      const activity = computeActivity(allUpTo, anchorDate);
-      const rlp = computeRecentLossPenalty(recentDesc, anchorDate);
-      const era = computeEraDom(allUpTo, anchorDate);
-      const perf = computePerfDiffCurrent(recentDesc);
-      const cp = computeCurrentCp(anchor.fighter_slug, anchorDate, recentDesc);
-      const dv = defensiveVulnerability(cum);
-      const af = ageFactor(anchor.fighter_dob, anchorDate);
-
-      // Layoff: months between THIS bout's date and the previous bout's date.
-      const prevDate = i > 0 ? parseDate(allBoutsAsc[i - 1].event_date) : null;
-      const lay = layoffPenalty(prevDate, anchorDate);
-
-      const positives =
-        qw * 0.16 +
-        cp * 0.10 +
-        era * 0.06 +
-        perf * 0.16 +
-        fd * 0.10 +
-        activity * 0.12 +
-        form * 0.18;
-      const penalties = rlp * 0.20 + dv * 0.10 + lay;
-      // Wave 32: win-streak bonus. Wave 54: sample-size credibility
-      // (ufc_bouts as of the anchor = i + 1).
-      const streakB = streakBonus(recentDesc);
-      const cred = credibilityCurrent(i + 1);
-      const rawCurrent = Math.max(
-        0,
-        (positives - penalties + streakB) * (1 + af) * cred,
-      );
-
-      const multiplied = applyCurve(rawCurrent);
-      const vertexScore = skidAndFreshLoss(multiplied, recentDesc);
-
-      if (!Number.isFinite(rawCurrent) || !Number.isFinite(vertexScore)) {
-        continue;
-      }
-
-      const clampedVertex = Math.max(
-        0,
-        Math.min(100, Math.round(vertexScore)),
-      );
-      // Update running peak BEFORE computing all-time so the current
-      // anchor's vertex_score is eligible to set a new high (matches the
-      // SQL's MAX(vertex_score) over fighter_score_history, which
-      // includes "today's" row when the fighter is at peak right now).
-      peakSoFar = Math.max(peakSoFar, clampedVertex);
-
-      // All-time replay (Wave 53/54/55). lastBoutDate for the sticky-CP
-      // rule is the previous anchor's event date — i.e. the most recent
-      // bout BEFORE this one — because the SQL's lastBoutDate is "the
-      // most recent completed bout when the CP function fires," which
-      // for our per-anchor replay is the bout that just finished. For
-      // the very first anchor (i = 0) there's no prior bout, so null.
       const prevBoutDate =
         i > 0 ? parseDate(allBoutsAsc[i - 1].event_date) : null;
-      const qwCareer = computeCareerQualityWins(allUpTo);
-      const cpCareer = computeCareerCp(
-        anchor.fighter_slug,
-        anchorDate,
-        prevBoutDate,
-      );
-      const eraAt = computeCareerEraAllTime(
-        anchor.fighter_slug,
-        anchorDate,
-        titleFightCount,
-      );
-      const perfCareer = computeCareerPerformanceDiff(cum);
-      const finishDom = computeCareerFinishingDom(cum);
-      const lossPenAt = computeCareerLossPenalty(allUpTo);
-      const credAt = credibilityAllTime(i + 1);
-      const rawAllTime =
-        (qwCareer * 0.24 +
-          cpCareer * 0.2 +
-          eraAt * 0.18 +
-          perfCareer * 0.12 +
-          finishDom * 0.16 +
-          peakSoFar * 0.1 -
-          lossPenAt * 0.1) *
-        credAt;
-      const vertexScoreAllTime = Math.max(0, Math.round(rawAllTime));
 
-      anchors.push({
-        fighter_id: fighterId,
-        as_of_bout_id: anchor.bout_id,
-        as_of_date: anchor.event_date,
-        vertex_score: clampedVertex,
-        raw_current: rawCurrent,
-        vertex_score_all_time: Number.isFinite(vertexScoreAllTime)
-          ? vertexScoreAllTime
-          : 0,
+      // Bout anchor — score "as of the bout's event date" with the
+      // bout itself included in the cumulative state.
+      const boutResult = computeAnchorScores({
+        asOfDate: anchorDate,
+        asOfDateStr: anchor.event_date,
+        allUpTo,
+        cum,
+        prevBoutDate,
+        fighterSlug: anchor.fighter_slug,
+        fighterDob: anchor.fighter_dob,
+        peakSoFar,
+        titleFightCount,
       });
+      if (boutResult) {
+        peakSoFar = Math.max(peakSoFar, boutResult.vertex_score);
+        anchors.push({
+          fighter_id: fighterId,
+          as_of_bout_id: anchor.bout_id,
+          as_of_date: anchor.event_date,
+          kind: "bout",
+          vertex_score: boutResult.vertex_score,
+          raw_current: boutResult.raw_current,
+          vertex_score_all_time: boutResult.vertex_score_all_time,
+        });
+      }
+
+      // Monthly synthetic snapshots between this bout and the next bout
+      // (or today, for the very last bout). One row per first-of-month
+      // so the chart can show activity/recent_form decay during long
+      // layoffs without redrawing a flat segment.
+      const intervalEnd =
+        i + 1 < allBoutsAsc.length
+          ? parseDate(allBoutsAsc[i + 1].event_date)
+          : TODAY;
+      let monthDate = firstOfNextMonth(anchorDate);
+      while (monthDate < intervalEnd) {
+        const monthResult = computeAnchorScores({
+          asOfDate: monthDate,
+          asOfDateStr: formatYmd(monthDate),
+          allUpTo,
+          cum,
+          prevBoutDate: anchorDate,
+          fighterSlug: anchor.fighter_slug,
+          fighterDob: anchor.fighter_dob,
+          peakSoFar,
+          titleFightCount,
+        });
+        if (monthResult) {
+          peakSoFar = Math.max(peakSoFar, monthResult.vertex_score);
+          anchors.push({
+            fighter_id: fighterId,
+            as_of_bout_id: null,
+            as_of_date: formatYmd(monthDate),
+            kind: "monthly",
+            vertex_score: monthResult.vertex_score,
+            raw_current: monthResult.raw_current,
+            vertex_score_all_time: monthResult.vertex_score_all_time,
+          });
+        }
+        monthDate = nextMonth(monthDate);
+      }
     }
 
     if (fighterIdx % 500 === 0) {
@@ -1135,27 +1262,66 @@ async function main() {
   console.log("Truncating fighter_score_history...");
   await sql`TRUNCATE TABLE fighter_score_history`;
 
-  // Batch insert
+  // Batch insert. Smaller chunks (300) keep each query small; an
+  // inter-batch micro-sleep keeps the Supabase session pooler from
+  // dropping the connection mid-backfill (we saw repeated ECONNRESET /
+  // CONNECT_TIMEOUT errors on long unbroken streams). On error we
+  // recreate the connection from scratch — postgres-js's internal pool
+  // doesn't always recover after the pooler hangs up.
   console.log("Inserting...");
-  const CHUNK = 1000;
+  let conn = sql;
+  const CHUNK = 300;
   for (let i = 0; i < anchors.length; i += CHUNK) {
     const slice = anchors.slice(i, i + CHUNK);
-    await sql`
-      INSERT INTO fighter_score_history ${sql(
-        slice,
-        "fighter_id",
-        "as_of_bout_id",
-        "as_of_date",
-        "vertex_score",
-        "raw_current",
-        "vertex_score_all_time",
-      )}
-    `;
-    if ((i / CHUNK) % 5 === 0) {
+    let attempt = 0;
+    while (true) {
+      try {
+        await conn`
+          INSERT INTO fighter_score_history ${conn(
+            slice,
+            "fighter_id",
+            "as_of_bout_id",
+            "as_of_date",
+            "kind",
+            "vertex_score",
+            "raw_current",
+            "vertex_score_all_time",
+          )}
+        `;
+        break;
+      } catch (err) {
+        attempt += 1;
+        if (attempt > 6) throw err;
+        const delayMs = 1000 * attempt;
+        console.warn(
+          `  retry ${attempt} at row ${i} after ${(err as Error).message} — reopening connection in ${delayMs}ms`,
+        );
+        await new Promise((r) => setTimeout(r, delayMs));
+        try {
+          await conn.end({ timeout: 1 });
+        } catch {
+          // ignore
+        }
+        conn = postgres(url, { prepare: false, max: 1 });
+      }
+    }
+    if ((i / CHUNK) % 20 === 0) {
       console.log(`  inserted ${Math.min(i + CHUNK, anchors.length)} / ${anchors.length}`);
+    }
+    // 200ms pause every ~6000 rows lets the pooler reclaim slots
+    // instead of cumulatively saturating.
+    if (i > 0 && i % 6000 === 0) {
+      await new Promise((r) => setTimeout(r, 200));
     }
   }
   console.log("Inserted.");
+  if (conn !== sql) {
+    try {
+      await conn.end({ timeout: 5 });
+    } catch {
+      // ignore
+    }
+  }
 
   // Sanity: top-20 peaks of active fighters
   const top = await sql<

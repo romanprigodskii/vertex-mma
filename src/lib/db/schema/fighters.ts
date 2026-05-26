@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  bigserial,
   boolean,
   char,
   date,
@@ -450,19 +451,27 @@ export const fighterDivisionalScore = pgTable(
 export const fighterScoreHistory = pgTable(
   "fighter_score_history",
   {
+    // Surrogate primary key — needed because two natural keys coexist
+    // (kind='bout' is unique per (fighter, bout); kind='monthly' is
+    // unique per (fighter, date)) and at least one fighter has two
+    // bouts on the same date.
+    id: bigserial("id", { mode: "number" }).primaryKey(),
     fighterId: uuid("fighter_id")
       .notNull()
       .references(() => fighter.id, { onDelete: "cascade" }),
-    asOfBoutId: uuid("as_of_bout_id").notNull(),
+    /** NULL for kind='monthly' synthetic snapshots. */
+    asOfBoutId: uuid("as_of_bout_id"),
     asOfDate: date("as_of_date").notNull(),
+    /** 'bout' = computed at the date of a completed UFC bout.
+     *  'monthly' = synthetic snapshot at the first of a month so the
+     *  chart shows score drift during a layoff. */
+    kind: text("kind").notNull().default("bout"),
     vertexScore: smallint("vertex_score").notNull(),
     rawCurrent: real("raw_current").notNull(),
-    // Nullable: legacy rows + sub-3-bout careers don't carry an all-time
-    // value. Populated by scripts/compute_score_history.ts.
+    /** Wave 53/54/55 all-time formula replayed as-of-anchor. */
     vertexScoreAllTime: smallint("vertex_score_all_time"),
   },
   (table) => [
-    primaryKey({ columns: [table.fighterId, table.asOfBoutId] }),
     index("fighter_score_history_fighter_date_idx").on(
       table.fighterId,
       sql`${table.asOfDate} DESC`,

@@ -43,7 +43,7 @@ function formatDate(iso: string): string {
   });
 }
 
-function resultColor(r: "W" | "L" | "D" | "NC"): string {
+function resultColor(r: "W" | "L" | "D" | "NC" | null): string {
   if (r === "W") return "var(--color-streak-win)";
   if (r === "L") return "var(--color-streak-loss)";
   return "var(--color-foreground-muted)";
@@ -183,14 +183,29 @@ export function ScoreHistoryChart({ history, mode }: ScoreHistoryChartProps) {
           strokeLinecap="round"
         />
 
-        {/* per-bout dots, color-coded by result */}
+        {/* Per-anchor dots. Bout anchors render larger and stroke-color
+            matches the result (W/L/D). Monthly synthetic anchors render
+            as a small muted disc so the timeline reads as "fight-by-
+            fight with monthly tick marks." */}
         {points.map((p, i) => {
           const isHover = i === hoverIdx;
           const v = valueOf(p, mode);
           if (v == null) return null;
+          if (p.kind === "monthly") {
+            return (
+              <circle
+                key={p.key}
+                cx={xOf(i)}
+                cy={yOf(v)}
+                r={isHover ? 3 : 1.6}
+                fill={lineColor}
+                opacity={isHover ? 0.85 : 0.45}
+              />
+            );
+          }
           return (
             <circle
-              key={p.boutId}
+              key={p.key}
               cx={xOf(i)}
               cy={yOf(v)}
               r={isHover ? 5 : 3}
@@ -253,16 +268,23 @@ export function ScoreHistoryChart({ history, mode }: ScoreHistoryChartProps) {
               {hoverPoint.eventDate}
             </span>
           </div>
-          <div className="mt-1 text-foreground-muted">
-            <span style={{ color: resultColor(hoverPoint.result) }}>
-              {hoverPoint.result}
-            </span>{" "}
-            vs <span className="text-foreground">{hoverPoint.opponentName}</span>
-            <span className="text-foreground-subtle">
-              {" · "}
-              {methodLabel(hoverPoint.method)}
-            </span>
-          </div>
+          {hoverPoint.kind === "bout" && hoverPoint.result ? (
+            <div className="mt-1 text-foreground-muted">
+              <span style={{ color: resultColor(hoverPoint.result) }}>
+                {hoverPoint.result}
+              </span>{" "}
+              vs{" "}
+              <span className="text-foreground">{hoverPoint.opponentName}</span>
+              <span className="text-foreground-subtle">
+                {" · "}
+                {methodLabel(hoverPoint.method)}
+              </span>
+            </div>
+          ) : (
+            <div className="mt-1 font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
+              Monthly snapshot · no bout
+            </div>
+          )}
         </div>
       ) : null}
     </div>
