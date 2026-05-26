@@ -214,7 +214,23 @@ export function FighterCatalogClient({
   // ---------- Filter mutation helpers ----------
   const onFiltersChange = React.useCallback(
     (next: Partial<CatalogFilterState>) => {
-      setFilters((prev) => ({ ...prev, ...next }));
+      setFilters((prev) => {
+        const merged = { ...prev, ...next };
+        // When the user switches to an all-time-flavoured sort and the
+        // status filter is still the default "active", broaden it to
+        // "all". Without this, legends like Jon Jones (roster_status=
+        // released) silently disappear from a sort meant to surface
+        // exactly them. Mirrors the same default applied in
+        // parseCatalogFilters so direct-URL hits behave identically.
+        if (
+          "sort" in next &&
+          (next.sort === "vertex_all_time" || next.sort === "all_time") &&
+          prev.status === "active"
+        ) {
+          merged.status = "all";
+        }
+        return merged;
+      });
       if ("q" in next && typeof next.q === "string") {
         setSearchInput(next.q);
       }

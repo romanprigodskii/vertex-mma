@@ -2,23 +2,22 @@
 
 import { cn } from "@/lib/utils";
 
-// Wave 6A.5b: roster.watch import emits only two roster_status values now
-// (active for current UFC roster, retired for everyone else — released,
-// HoF, and untracked-ancient all collapse). The granular enum stays in
-// the DB schema for future use; the UI exposes just the binary view +
-// "All" to escape the active default.
-const STATUSES: Array<{
-  id: "all" | "active" | "retired";
-  label: string;
-}> = [
+// roster.watch keeps three roster_status values (active 614, retired 132,
+// released 1951). "Inactive" is the UI bucket that covers retired +
+// released so legends like Jon Jones (released, not formally retired)
+// surface immediately on a single click instead of hiding under the
+// "All" archive view.
+type StatusValue = "all" | "active" | "inactive" | "retired";
+
+const STATUSES: Array<{ id: StatusValue; label: string }> = [
   { id: "active", label: "Active" },
-  { id: "retired", label: "Retired" },
+  { id: "inactive", label: "Inactive" },
   { id: "all", label: "All" },
 ];
 
 interface StatusRadioProps {
-  value: "all" | "active" | "retired";
-  onChange: (value: "all" | "active" | "retired") => void;
+  value: StatusValue;
+  onChange: (value: StatusValue) => void;
 }
 
 export function StatusRadio({ value, onChange }: StatusRadioProps) {

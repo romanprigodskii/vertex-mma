@@ -46,10 +46,12 @@ const VALID_GENDERS: ReadonlySet<CatalogGenderFilter> = new Set([
 
 const VALID_WEIGHTS = new Set(WEIGHT_CLASSES.map((w) => w.id as string));
 const VALID_STANCES = new Set(["orthodox", "southpaw", "switch", "unknown"]);
-// Wave 6A.5b: import_roster_watch.ts now emits only 'active' or 'retired'.
-// URLs with status=released | inactive | unknown silently fall through to
-// the 'active' default.
-const VALID_STATUSES = new Set(["all", "active", "retired"]);
+// roster.watch emits active / retired / released. The UI collapses
+// retired+released under a single "Inactive" button (status=inactive)
+// so legends like Jon Jones (released, not formally retired) aren't
+// hidden when sorting by all-time. URLs with the literal status=retired
+// still work as an exact-match opt-in to formally-retired fighters.
+const VALID_STATUSES = new Set(["all", "active", "inactive", "retired"]);
 
 function parseList(raw: string | null | undefined): string[] {
   if (!raw) return [];
@@ -83,15 +85,6 @@ export function parseCatalogFilters(
     .map((c) => c.toUpperCase())
     .filter((c) => c.length === 2);
 
-  // Wave 6C: default status is "active" (live UFC roster from roster.watch)
-  // so /fighters opens on the ~611 currently-rostered fighters instead of
-  // the full ~2697 historical archive. URLs without ?status= still resolve
-  // to active; pass `?status=all` for the legacy "everyone" view.
-  const rawStatus = get("status");
-  const status = rawStatus && VALID_STATUSES.has(rawStatus)
-    ? (rawStatus as FighterCatalogFilters["status"])
-    : "active";
-
   const rawSort = get("sort");
   // Default sort is Vertex Score (current) as of Wave 3.5 step 4A. Old URLs
   // with `sort=winrate` etc. continue to work via VALID_SORTS lookup.
@@ -99,6 +92,23 @@ export function parseCatalogFilters(
     rawSort && VALID_SORTS.has(rawSort as CatalogSort)
       ? (rawSort as CatalogSort)
       : "vertex_current";
+
+  // Wave 6C: default status is "active" (live UFC roster from
+  // roster.watch) so /fighters opens on the ~614 currently-rostered
+  // fighters. EXCEPT when the user is sorting by an all-time signal —
+  // there the active roster is the wrong default (Jon Jones, Khabib,
+  // Anderson Silva are all 'released' or 'retired'), so we broaden to
+  // 'all' until they explicitly pick a status. Passing ?status= in the
+  // URL overrides this on either branch.
+  const rawStatus = get("status");
+  let status: FighterCatalogFilters["status"];
+  if (rawStatus && VALID_STATUSES.has(rawStatus)) {
+    status = rawStatus as FighterCatalogFilters["status"];
+  } else if (sort === "vertex_all_time" || sort === "all_time") {
+    status = "all";
+  } else {
+    status = "active";
+  }
 
   const rawTier = get("tier");
   let tier: CatalogTierFilter =

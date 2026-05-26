@@ -129,7 +129,7 @@ export type FighterCatalogFilters = {
    *  rostered fighters instead of the full ~2697 historical archive.
    *  As of Wave 6A.5b the import emits a binary active/retired view
    *  (released/inactive/unknown still in the enum but no longer written). */
-  status?: "all" | "active" | "retired";
+  status?: "all" | "active" | "retired" | "inactive";
   hasPhoto?: boolean;
   hallOfFame?: boolean;
   /** Vertex Score tier filter (score-based). Defaults to "all". */
@@ -289,7 +289,16 @@ function buildWhere(filters: FighterCatalogFilters): SQL {
     // Wave 6C: status filter targets the roster_status column (populated
     // by scripts/import_roster_watch.ts), not the legacy fighter.status
     // enum which is defaulted to 'active' for nearly every fighter.
-    conditions.push(sql`f.roster_status::text = ${filters.status}`);
+    //
+    // 'inactive' is the UI bucket that covers everyone NOT on the current
+    // roster — both formally retired fighters (132) and 'released'
+    // fighters (1951, the long tail). Jon Jones lives in 'released', so
+    // before this collapse the UI's Retired button hid him from view.
+    if (filters.status === "inactive") {
+      conditions.push(sql`f.roster_status::text IN ('retired', 'released')`);
+    } else {
+      conditions.push(sql`f.roster_status::text = ${filters.status}`);
+    }
   }
 
   if (filters.hasPhoto) {
@@ -393,15 +402,19 @@ function buildOrderBy(filters: FighterCatalogFilters): SQL {
     case "name_desc":
       return sql`f.name_en DESC`;
     case "wins":
-      // wins_total comes from the fighter_with_stats view (selected as
-      // f.wins_total above) — the old draft of this sort referenced a
-      // non-existent `fsa` alias and broke the catalog query.
-      return sql`COALESCE(f.wins_total, 0) DESC, bout_count DESC`;
+      // UFC-only wins so regional-circuit pioneers like Travis Fulton or
+      // Dan Severn (career career_wins=300+/100+ from pre-UFC bouts)
+      // don't crowd out actual UFC legends. ufc_wins comes from the
+      // fighter_with_stats view's fighter_results CTE — only completed
+      // UFC bouts.
+      return sql`COALESCE(f.ufc_wins, 0) DESC, ufc_total DESC`;
     case "winrate":
+      // Same intent — UFC-only win rate, with a soft floor of 5 UFC
+      // bouts so flukey 1-0 fighters don't top the list at 100%.
       return sql`(
-        COALESCE(f.wins_total, 0)::float
-        / NULLIF(COALESCE(f.wins_total, 0) + COALESCE(f.losses_total, 0), 0)
-      ) DESC NULLS LAST, COALESCE(f.wins_total, 0) DESC`;
+        COALESCE(f.ufc_wins, 0)::float
+        / NULLIF(COALESCE(f.ufc_wins, 0) + COALESCE(f.ufc_losses, 0), 0)
+      ) DESC NULLS LAST, COALESCE(f.ufc_wins, 0) DESC`;
     case "recent":
       return sql`last_fight_date DESC NULLS LAST, bout_count DESC`;
     case "champions_first": {
