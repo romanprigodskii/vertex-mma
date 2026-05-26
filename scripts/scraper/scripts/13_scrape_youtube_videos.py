@@ -36,6 +36,12 @@ UFC_CHANNEL_URL = "https://www.youtube.com/@UFC/videos"
 # Set to None to fetch all.
 DEFAULT_PLAYLIST_END: int | None = None
 
+# Drop anything longer than this — UFC's "Full Fight Marathon" uploads are
+# multi-hour compilation broadcasts (e.g. 148-minute "Chimaev vs Strickland"
+# marathon), not the actual single-fight upload. A real top-tier 5-round
+# main-event fight, including walkouts, tops out around 33 min.
+MAX_FIGHT_DURATION_S = 35 * 60
+
 VS_RE = re.compile(r"\s+vs\.?\s+", re.IGNORECASE)
 # Trailing "2" / "3" / "II" on a fighter name = rematch indicator we want to
 # strip before matching (DB stores them as separate bouts, not a name suffix).
@@ -403,6 +409,7 @@ def main() -> None:
         matched_count = 0
         inserted_count = 0
         skipped_existing = 0
+        skipped_too_long = 0
         unmatched_examples: list[str] = []
 
         with conn.cursor() as cur:
@@ -422,6 +429,12 @@ def main() -> None:
                 if parsed is None:
                     continue
                 parsed_count += 1
+
+                # Drop UFC's "Full Fight Marathon" compilations (multi-hour
+                # broadcasts that share the FULL FIGHT label).
+                if duration is not None and duration > MAX_FIGHT_DURATION_S:
+                    skipped_too_long += 1
+                    continue
 
                 cand = match_bout(parsed, bout_index, published_at)
                 if cand is None:
@@ -463,7 +476,8 @@ def main() -> None:
     log.info(
         "YouTube ingest done: "
         f"parsed_titles={parsed_count} matched={matched_count} "
-        f"inserted={inserted_count} already_present={skipped_existing}"
+        f"inserted={inserted_count} already_present={skipped_existing} "
+        f"too_long={skipped_too_long}"
     )
     if unmatched_examples:
         log.info("  examples of parsed-but-unmatched titles (no bout in DB):")
