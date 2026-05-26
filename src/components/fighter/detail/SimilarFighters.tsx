@@ -51,7 +51,7 @@ export function SimilarFighters({ fighters }: SimilarFightersProps) {
                 imageSizes="64px"
               />
               <div className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate font-display text-lg uppercase leading-tight tracking-tight text-foreground">
+                <span className="truncate font-sans font-bold text-lg uppercase leading-tight tracking-tight text-foreground">
                   {f.name_en}
                 </span>
                 {f.nickname ? (
@@ -73,7 +73,7 @@ export function SimilarFighters({ fighters }: SimilarFightersProps) {
                 </span>
               </div>
               <div className="flex shrink-0 flex-col items-end gap-0.5">
-                <span className="font-display tabular text-xl tracking-tight text-primary">
+                <span className="font-sans font-bold tabular text-xl tracking-tight text-primary">
                   {sim}%
                 </span>
                 <span className="font-sans text-[10px] uppercase tracking-widest text-foreground-subtle">

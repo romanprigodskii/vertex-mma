@@ -212,7 +212,7 @@ export function FighterCard({
               borderColor:
                 championStyle.crownColor ?? championStyle.borderColor,
             }}
-            className="absolute -bottom-1 -right-1 inline-flex items-center justify-center rounded-full border bg-background-base px-1.5 py-0.5 font-display text-[10px] tabular leading-none"
+            className="absolute -bottom-1 -right-1 inline-flex items-center justify-center rounded-full border bg-background-base px-1.5 py-0.5 font-sans font-bold text-[10px] tabular leading-none"
           >
             2×
           </span>
@@ -227,7 +227,7 @@ export function FighterCard({
               #{rank}
             </p>
           ) : null}
-          <h3 className="truncate font-display text-2xl uppercase leading-tight tracking-tight text-foreground sm:text-[28px]">
+          <h3 className="truncate font-sans font-bold text-2xl uppercase leading-tight tracking-tight text-foreground sm:text-[28px]">
             {fighter.name_en}
           </h3>
           {hasNickname ? (
@@ -284,7 +284,7 @@ export function FighterCard({
 
       {/* Record column */}
       <div className="flex flex-col items-end gap-1 pl-1">
-        <span className="font-display text-3xl leading-none tabular tracking-tight text-foreground sm:text-[32px]">
+        <span className="font-sans font-bold text-3xl leading-none tabular tracking-tight text-foreground sm:text-[32px]">
           {record}
         </span>
         <span className="h-px w-6 bg-foreground/[0.1]" aria-hidden />
@@ -304,7 +304,7 @@ export function FighterCard({
       {showTierBadge && displayScore != null ? (
         <span
           aria-hidden
-          className="pointer-events-none absolute bottom-3 right-4 select-none font-display tabular leading-none"
+          className="pointer-events-none absolute bottom-3 right-4 select-none font-sans font-bold tabular leading-none"
           style={{
             fontSize: 32,
             color: tierStyle.scoreColor,

@@ -91,11 +91,11 @@ function CatalogHero({ totalAll }: { totalAll: number }) {
         <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground-subtle">
           The roster
         </p>
-        <h1 className="mt-3 font-display uppercase tracking-[-0.01em] text-foreground text-hero">
+        <h1 className="mt-3 font-sans font-bold uppercase tracking-[-0.01em] text-foreground text-hero">
           FIGHTERS
         </h1>
         <div className="mt-6 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <span className="font-display text-[28px] leading-none text-primary">
+          <span className="font-sans font-bold text-[28px] leading-none text-primary">
             {formatNumber(totalAll)}
           </span>
           <span className="font-sans text-base text-foreground-muted">

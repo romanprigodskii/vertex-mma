@@ -139,7 +139,7 @@ export function ShareButton({
             rel="noopener noreferrer"
             className="flex w-full items-center gap-3 rounded-sm px-3 py-2 font-sans text-sm text-foreground hover:bg-foreground/[0.05]"
           >
-            <span className="font-display text-base text-foreground-muted">
+            <span className="font-sans font-bold text-base text-foreground-muted">
               X
             </span>
             <span>Share to X / Twitter</span>
@@ -150,7 +150,7 @@ export function ShareButton({
             rel="noopener noreferrer"
             className="flex w-full items-center gap-3 rounded-sm px-3 py-2 font-sans text-sm text-foreground hover:bg-foreground/[0.05]"
           >
-            <span className="font-display text-base text-foreground-muted">
+            <span className="font-sans font-bold text-base text-foreground-muted">
               TG
             </span>
             <span>Share to Telegram</span>

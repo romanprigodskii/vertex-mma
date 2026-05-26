@@ -72,7 +72,7 @@ export function NavbarNotifications({
           className="absolute right-0 top-full z-50 mt-1 w-80 max-w-[90vw] rounded-md border border-foreground/10 bg-background-elevated shadow-lg"
         >
           <div className="flex items-baseline justify-between border-b border-foreground/10 px-3 py-2">
-            <p className="font-display text-xs uppercase tracking-widest text-foreground-muted">
+            <p className="font-sans font-bold text-xs uppercase tracking-widest text-foreground-muted">
               Notifications
             </p>
             <Link

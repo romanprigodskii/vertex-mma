@@ -75,7 +75,7 @@ export function OtherDivisions({ rows, currentDivision }: OtherDivisionsProps) {
             >
               <div className="flex min-w-0 flex-col">
                 <span className="flex items-center gap-2">
-                  <span className="font-display text-sm uppercase tracking-tight text-foreground">
+                  <span className="font-sans font-bold text-sm uppercase tracking-tight text-foreground">
                     {short}
                   </span>
                   {isCurrentDivision ? (
@@ -94,7 +94,7 @@ export function OtherDivisions({ rows, currentDivision }: OtherDivisionsProps) {
               </div>
               <span
                 className={cn(
-                  "font-display tabular text-2xl leading-none",
+                  "font-sans font-bold tabular text-2xl leading-none",
                   inactive ? "text-foreground-muted" : "text-foreground",
                 )}
               >

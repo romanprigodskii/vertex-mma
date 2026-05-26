@@ -19,7 +19,7 @@ export default function BoutNotFound() {
             404 · No such bout
           </p>
           <h1
-            className="font-display uppercase tracking-tight text-foreground leading-[0.9]"
+            className="font-sans font-bold uppercase tracking-tight text-foreground leading-[0.9]"
             style={{ fontSize: "clamp(48px, 7vw, 96px)" }}
           >
             Bout not found

@@ -81,7 +81,7 @@ export function BoutHero({ bout, weightLabel }: BoutHeroProps) {
         <Link
           href={`/events/${bout.event.slug}`}
           prefetch={false}
-          className="mt-4 inline-block font-display uppercase tracking-tight text-foreground leading-[0.95] hover:text-primary transition-colors"
+          className="mt-4 inline-block font-sans font-bold uppercase tracking-tight text-foreground leading-[0.95] hover:text-primary transition-colors"
           style={{ fontSize: "clamp(28px, 4vw, 56px)" }}
         >
           {bout.event.short_name || bout.event.name}
@@ -106,7 +106,7 @@ export function BoutHero({ bout, weightLabel }: BoutHeroProps) {
             align="left"
           />
           <div className="text-center">
-            <p className="font-display text-3xl uppercase tracking-widest text-foreground-subtle">
+            <p className="font-sans font-bold text-3xl uppercase tracking-widest text-foreground-subtle">
               vs
             </p>
             {isCompleted ? (
@@ -181,7 +181,7 @@ function FighterSide({
       <div className={cn("flex flex-col gap-0.5 min-w-0")}>
         <span
           className={cn(
-            "font-display text-2xl uppercase leading-tight tracking-tight sm:text-3xl",
+            "font-sans font-bold text-2xl uppercase leading-tight tracking-tight sm:text-3xl",
             won
               ? "text-streak-win"
               : isNc || isDraw

@@ -312,7 +312,7 @@ function CardFront({
             aria-hidden
           >
             <span
-              className="font-display uppercase tracking-wider text-foreground/90"
+              className="font-sans font-bold uppercase tracking-wider text-foreground/90"
               style={{ fontSize: 64 }}
             >
               {initialsOf(fighter.name_en)}
@@ -323,7 +323,7 @@ function CardFront({
 
       {/* Identity block */}
       <div className="relative z-10 mt-3 flex flex-1 flex-col items-center px-4 text-center">
-        <h2 className="font-display text-[28px] uppercase leading-none tracking-tight text-foreground sm:text-3xl">
+        <h2 className="font-sans font-bold text-[28px] uppercase leading-none tracking-tight text-foreground sm:text-3xl">
           {fighter.name_en}
         </h2>
         {fighter.nickname ? (
@@ -332,7 +332,7 @@ function CardFront({
           </p>
         ) : null}
         <div className="mt-3 flex items-baseline gap-2">
-          <span className="font-display tabular text-[40px] leading-none tracking-tight text-foreground">
+          <span className="font-sans font-bold tabular text-[40px] leading-none tracking-tight text-foreground">
             {record}
           </span>
         </div>
@@ -355,7 +355,7 @@ function CardFront({
         <span className="font-mono text-[9px] uppercase tracking-[0.3em] text-foreground-subtle">
           MMA · 2026
         </span>
-        <span className="font-display text-[13px] tracking-[0.32em]">
+        <span className="font-sans font-bold text-[13px] tracking-[0.32em]">
           <span className="text-primary">V</span>
           <span className="text-foreground">ERTEX</span>
         </span>
@@ -470,7 +470,7 @@ function CardBack({
                   key={h.bout_id}
                   title={`${h.event_date.slice(0, 10)} · ${h.result} vs ${h.opponent_name}`}
                   className={cn(
-                    "inline-flex h-5 w-5 items-center justify-center rounded-full font-display text-[10px]",
+                    "inline-flex h-5 w-5 items-center justify-center rounded-full font-sans font-bold text-[10px]",
                     h.result === "W"
                       ? "bg-streak-win/80 text-background-base"
                       : h.result === "L"
@@ -486,7 +486,7 @@ function CardBack({
         ) : null}
 
         <div className="mt-auto pt-3">
-          <p className="text-center font-display text-[14px] tracking-[0.32em]">
+          <p className="text-center font-sans font-bold text-[14px] tracking-[0.32em]">
             <span className="text-primary">V</span>
             <span className="text-foreground">ERTEX · </span>
             <span className="text-foreground-muted">MMA</span>

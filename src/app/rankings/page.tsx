@@ -30,7 +30,7 @@ export default async function RankingsListPage() {
               <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground-subtle">
                 Community
               </p>
-              <h1 className="mt-2 font-display uppercase tracking-tight text-foreground text-h1">
+              <h1 className="mt-2 font-sans font-bold uppercase tracking-tight text-foreground text-h1">
                 Rankings
               </h1>
               <p className="mt-2 max-w-xl font-sans text-sm text-foreground-muted">
@@ -41,14 +41,14 @@ export default async function RankingsListPage() {
             {currentUser ? (
               <Link
                 href="/rankings/create"
-                className="rounded-sm bg-primary px-4 py-2 font-display text-sm uppercase tracking-widest text-background-base hover:opacity-90"
+                className="rounded-sm bg-primary px-4 py-2 font-sans font-bold text-sm uppercase tracking-widest text-background-base hover:opacity-90"
               >
                 Create ranking
               </Link>
             ) : (
               <Link
                 href="/signin?next=/rankings/create"
-                className="rounded-sm border border-foreground/15 px-4 py-2 font-display text-sm uppercase tracking-widest text-foreground-muted hover:bg-foreground/[0.05] hover:text-foreground"
+                className="rounded-sm border border-foreground/15 px-4 py-2 font-sans font-bold text-sm uppercase tracking-widest text-foreground-muted hover:bg-foreground/[0.05] hover:text-foreground"
               >
                 Sign in to create
               </Link>
@@ -57,7 +57,7 @@ export default async function RankingsListPage() {
 
           {rankings.length === 0 ? (
             <div className="rounded-md border border-dashed border-foreground/15 bg-background-elevated/20 px-6 py-16 text-center">
-              <p className="font-display text-2xl uppercase tracking-tight text-foreground">
+              <p className="font-sans font-bold text-2xl uppercase tracking-tight text-foreground">
                 No community rankings yet
               </p>
               <p className="mx-auto mt-3 max-w-md font-sans text-sm text-foreground-muted">
@@ -66,7 +66,7 @@ export default async function RankingsListPage() {
               </p>
               <Link
                 href={currentUser ? "/rankings/create" : "/signin?next=/rankings/create"}
-                className="mt-6 inline-block rounded-sm bg-primary px-4 py-2 font-display text-sm uppercase tracking-widest text-background-base hover:opacity-90"
+                className="mt-6 inline-block rounded-sm bg-primary px-4 py-2 font-sans font-bold text-sm uppercase tracking-widest text-background-base hover:opacity-90"
               >
                 Create the first ranking →
               </Link>

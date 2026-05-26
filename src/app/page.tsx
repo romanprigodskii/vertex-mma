@@ -77,7 +77,7 @@ export default async function HomePage() {
             <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-primary">
               Vertex MMA · Beta
             </p>
-            <h1 className="mt-4 font-display uppercase tracking-tight text-foreground text-hero">
+            <h1 className="mt-4 font-sans font-bold uppercase tracking-tight text-foreground text-hero">
               Every UFC fighter,
               <br />
               ranked and wagered.
@@ -91,21 +91,21 @@ export default async function HomePage() {
             <div className="mt-8 flex flex-wrap gap-3">
               <Link
                 href="/fighters"
-                className="rounded-sm bg-primary px-5 py-2.5 font-display text-sm uppercase tracking-widest text-background-base hover:opacity-90"
+                className="rounded-sm bg-primary px-5 py-2.5 font-sans font-bold text-sm uppercase tracking-widest text-background-base hover:opacity-90"
               >
                 Browse fighters
               </Link>
               {user ? (
                 <Link
                   href="/markets"
-                  className="rounded-sm border border-foreground/15 px-5 py-2.5 font-display text-sm uppercase tracking-widest text-foreground hover:bg-foreground/[0.05]"
+                  className="rounded-sm border border-foreground/15 px-5 py-2.5 font-sans font-bold text-sm uppercase tracking-widest text-foreground hover:bg-foreground/[0.05]"
                 >
                   Open markets
                 </Link>
               ) : (
                 <Link
                   href="/signup"
-                  className="rounded-sm border border-foreground/15 px-5 py-2.5 font-display text-sm uppercase tracking-widest text-foreground hover:bg-foreground/[0.05]"
+                  className="rounded-sm border border-foreground/15 px-5 py-2.5 font-sans font-bold text-sm uppercase tracking-widest text-foreground hover:bg-foreground/[0.05]"
                 >
                   Create account
                 </Link>
@@ -117,7 +117,7 @@ export default async function HomePage() {
         <section className="border-b border-foreground/[0.06]">
           <Container size="xl" className="py-12 md:py-16">
             <div className="mb-6 flex items-baseline justify-between">
-              <h2 className="font-display uppercase tracking-tight text-foreground text-h2">
+              <h2 className="font-sans font-bold uppercase tracking-tight text-foreground text-h2">
                 Top fighters
               </h2>
               <Link
@@ -140,7 +140,7 @@ export default async function HomePage() {
                       prefetch={false}
                       className="flex items-center gap-4 rounded-md border border-foreground/10 bg-background-elevated/30 px-4 py-3 transition-colors hover:border-foreground/20 hover:bg-foreground/[0.04]"
                     >
-                      <span className="min-w-[2.5rem] text-center font-display text-2xl tabular text-foreground-subtle">
+                      <span className="min-w-[2.5rem] text-center font-sans font-bold text-2xl tabular text-foreground-subtle">
                         #{i + 1}
                       </span>
                       {f.photo_thumbnail_url || f.photo_url ? (
@@ -153,12 +153,12 @@ export default async function HomePage() {
                           className="h-12 w-12 shrink-0 rounded-sm border border-foreground/15 object-cover"
                         />
                       ) : (
-                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-sm bg-primary/15 font-display text-sm uppercase text-primary">
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-sm bg-primary/15 font-sans font-bold text-sm uppercase text-primary">
                           {f.name_en.slice(0, 2)}
                         </div>
                       )}
                       <div className="min-w-0 flex-1">
-                        <p className="truncate font-display text-base uppercase tracking-tight text-foreground">
+                        <p className="truncate font-sans font-bold text-base uppercase tracking-tight text-foreground">
                           {f.name_en}
                         </p>
                         <p className="font-mono text-[11px] uppercase tracking-widest text-foreground-subtle">
@@ -166,7 +166,7 @@ export default async function HomePage() {
                         </p>
                       </div>
                       <div className="shrink-0 text-right">
-                        <p className="font-display text-2xl tabular text-foreground">
+                        <p className="font-sans font-bold text-2xl tabular text-foreground">
                           {f.score ?? "—"}
                         </p>
                         <p className="font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
@@ -184,7 +184,7 @@ export default async function HomePage() {
         <section className="border-b border-foreground/[0.06]">
           <Container size="xl" className="py-12 md:py-16">
             <div className="mb-6 flex items-baseline justify-between">
-              <h2 className="font-display uppercase tracking-tight text-foreground text-h2">
+              <h2 className="font-sans font-bold uppercase tracking-tight text-foreground text-h2">
                 Open markets
               </h2>
               <Link
@@ -217,7 +217,7 @@ export default async function HomePage() {
         <section className="border-b border-foreground/[0.06]">
           <Container size="xl" className="py-12 md:py-16">
             <div className="mb-6 flex items-baseline justify-between">
-              <h2 className="font-display uppercase tracking-tight text-foreground text-h2">
+              <h2 className="font-sans font-bold uppercase tracking-tight text-foreground text-h2">
                 Community rankings
               </h2>
               <Link
@@ -253,7 +253,7 @@ export default async function HomePage() {
         {!user ? (
           <section>
             <Container size="md" className="py-16 text-center md:py-20">
-              <h2 className="font-display uppercase tracking-tight text-foreground text-h2">
+              <h2 className="font-sans font-bold uppercase tracking-tight text-foreground text-h2">
                 Get 10,000 free coins on signup.
               </h2>
               <p className="mt-3 font-sans text-base text-foreground-muted">
@@ -261,7 +261,7 @@ export default async function HomePage() {
               </p>
               <Link
                 href="/signup"
-                className="mt-6 inline-block rounded-sm bg-primary px-6 py-3 font-display text-sm uppercase tracking-widest text-background-base hover:opacity-90"
+                className="mt-6 inline-block rounded-sm bg-primary px-6 py-3 font-sans font-bold text-sm uppercase tracking-widest text-background-base hover:opacity-90"
               >
                 Create account
               </Link>

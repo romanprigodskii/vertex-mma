@@ -95,7 +95,7 @@ function HeroPhoto({
   return (
     <div className={wrapper} style={{ backgroundColor: hashColor(name) }}>
       <span
-        className="absolute inset-0 flex items-center justify-center font-display uppercase tracking-wider text-foreground/90"
+        className="absolute inset-0 flex items-center justify-center font-sans font-bold uppercase tracking-wider text-foreground/90"
         style={{ fontSize: "clamp(80px, 14vw, 156px)" }}
         aria-hidden
       >
@@ -166,7 +166,7 @@ export function FighterHero({ fighter, championEntry }: FighterHeroProps) {
         {/* Identity column */}
         <div className="flex min-w-0 flex-1 flex-col">
           <h1
-            className="font-display uppercase tracking-tight text-foreground leading-[0.9]"
+            className="font-sans font-bold uppercase tracking-tight text-foreground leading-[0.9]"
             style={{ fontSize: "clamp(48px, 7vw, 120px)" }}
           >
             {fighter.name_en}
@@ -196,7 +196,7 @@ export function FighterHero({ fighter, championEntry }: FighterHeroProps) {
 
           <div className="mt-6 md:mt-8">
             <p
-              className="font-display tabular tracking-tight text-foreground leading-none"
+              className="font-sans font-bold tabular tracking-tight text-foreground leading-none"
               style={{ fontSize: "clamp(56px, 9vw, 96px)" }}
             >
               {record}

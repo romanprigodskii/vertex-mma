@@ -135,7 +135,7 @@ function Tooltip({ state }: { state: TooltipState }) {
       <p className="font-sans text-[11px] uppercase tracking-widest text-foreground-subtle">
         vs
       </p>
-      <p className="truncate font-display text-base uppercase tracking-tight text-foreground">
+      <p className="truncate font-sans font-bold text-base uppercase tracking-tight text-foreground">
         {state.bout.opponent_name}
       </p>
       <p

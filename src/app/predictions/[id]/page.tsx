@@ -67,7 +67,7 @@ export default async function PredictionDetailPage({ params }: PageProps) {
               year: "numeric",
             })}
           </p>
-          <h1 className="mt-3 font-display uppercase tracking-tight text-foreground text-h1">
+          <h1 className="mt-3 font-sans font-bold uppercase tracking-tight text-foreground text-h1">
             {evt.event_name}
           </h1>
           <p className="mt-2 font-sans text-sm text-foreground-muted">

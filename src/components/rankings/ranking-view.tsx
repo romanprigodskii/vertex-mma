@@ -19,11 +19,11 @@ export function RankingView({ ranking }: Props) {
     <>
       <section className="border-b border-foreground/[0.06]">
         <Container size="lg" className="py-10 md:py-14">
-          <p className="font-display text-xs uppercase tracking-[0.3em] text-primary">
+          <p className="font-sans font-bold text-xs uppercase tracking-[0.3em] text-primary">
             VERTEX&nbsp;MMA · Community ranking
           </p>
           <h1
-            className="mt-3 font-display uppercase tracking-tight text-foreground leading-[0.95]"
+            className="mt-3 font-sans font-bold uppercase tracking-tight text-foreground leading-[0.95]"
             style={{ fontSize: "clamp(36px, 5vw, 64px)" }}
           >
             {ranking.title}
@@ -42,7 +42,7 @@ export function RankingView({ ranking }: Props) {
                 className="h-6 w-6 rounded-full border border-foreground/15 object-cover"
               />
             ) : (
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/15 font-display text-[10px] uppercase text-primary">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/15 font-sans font-bold text-[10px] uppercase text-primary">
                 {ranking.author_username.slice(0, 2)}
               </span>
             )}
@@ -74,7 +74,7 @@ export function RankingView({ ranking }: Props) {
                   prefetch={false}
                   className="flex items-start gap-4 rounded-md border border-foreground/10 bg-background-elevated/30 px-4 py-3 transition-colors hover:bg-foreground/[0.04]"
                 >
-                  <span className="min-w-[2.5rem] text-center font-display text-3xl tabular text-foreground-subtle">
+                  <span className="min-w-[2.5rem] text-center font-sans font-bold text-3xl tabular text-foreground-subtle">
                     #{e.position}
                   </span>
                   {e.fighter_photo_thumbnail_url ? (
@@ -91,7 +91,7 @@ export function RankingView({ ranking }: Props) {
                     />
                   )}
                   <div className="min-w-0 flex-1">
-                    <p className="font-display text-lg uppercase tracking-tight text-foreground">
+                    <p className="font-sans font-bold text-lg uppercase tracking-tight text-foreground">
                       {e.fighter_name}
                     </p>
                     <p className="mt-0.5 font-mono text-[11px] uppercase tracking-widest text-foreground-subtle">

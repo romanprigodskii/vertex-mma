@@ -207,7 +207,7 @@ export function RankingForm({
                 className="rounded-md border border-foreground/10 bg-background-elevated/30 p-3"
               >
                 <div className="flex items-start gap-3">
-                  <span className="min-w-[2rem] pt-1 text-center font-display text-xl tabular text-foreground-subtle">
+                  <span className="min-w-[2rem] pt-1 text-center font-sans font-bold text-xl tabular text-foreground-subtle">
                     #{e.position}
                   </span>
                   {e.fighter_photo_thumbnail_url ? (
@@ -286,7 +286,7 @@ export function RankingForm({
         <button
           type="submit"
           disabled={submitDisabled}
-          className="rounded-sm bg-primary px-4 py-2.5 font-display text-sm uppercase tracking-widest text-background-base hover:opacity-90 disabled:opacity-50"
+          className="rounded-sm bg-primary px-4 py-2.5 font-sans font-bold text-sm uppercase tracking-widest text-background-base hover:opacity-90 disabled:opacity-50"
         >
           {pending ? "Saving…" : mode === "create" ? "Publish" : "Save changes"}
         </button>

@@ -64,7 +64,7 @@ export function PeakVertex({ info }: PeakVertexProps) {
 
       <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
         <div className="flex items-baseline gap-2">
-          <span className="font-display tabular text-5xl leading-none text-foreground">
+          <span className="font-sans font-bold tabular text-5xl leading-none text-foreground">
             {peak}
           </span>
           {delta != null && delta !== 0 ? (

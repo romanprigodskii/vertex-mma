@@ -39,7 +39,7 @@ export default async function CardsListPage() {
               <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground-subtle">
                 Community
               </p>
-              <h1 className="mt-2 font-display uppercase tracking-tight text-foreground text-h1">
+              <h1 className="mt-2 font-sans font-bold uppercase tracking-tight text-foreground text-h1">
                 Fight Cards
               </h1>
               <p className="mt-2 max-w-xl font-sans text-sm text-foreground-muted">
@@ -50,14 +50,14 @@ export default async function CardsListPage() {
             {currentUser ? (
               <Link
                 href="/cards/create"
-                className="rounded-sm bg-primary px-4 py-2 font-display text-sm uppercase tracking-widest text-background-base hover:opacity-90"
+                className="rounded-sm bg-primary px-4 py-2 font-sans font-bold text-sm uppercase tracking-widest text-background-base hover:opacity-90"
               >
                 Build a card
               </Link>
             ) : (
               <Link
                 href="/signin?next=/cards/create"
-                className="rounded-sm border border-foreground/15 px-4 py-2 font-display text-sm uppercase tracking-widest text-foreground-muted hover:bg-foreground/[0.05] hover:text-foreground"
+                className="rounded-sm border border-foreground/15 px-4 py-2 font-sans font-bold text-sm uppercase tracking-widest text-foreground-muted hover:bg-foreground/[0.05] hover:text-foreground"
               >
                 Sign in to build
               </Link>
@@ -83,7 +83,7 @@ export default async function CardsListPage() {
             ) : null}
             {communityCards.length === 0 ? (
               <div className="rounded-md border border-dashed border-foreground/15 bg-background-elevated/20 px-6 py-16 text-center">
-                <p className="font-display text-2xl uppercase tracking-tight text-foreground">
+                <p className="font-sans font-bold text-2xl uppercase tracking-tight text-foreground">
                   No fight cards yet
                 </p>
                 <p className="mx-auto mt-3 max-w-md font-sans text-sm text-foreground-muted">
@@ -94,7 +94,7 @@ export default async function CardsListPage() {
                   href={
                     currentUser ? "/cards/create" : "/signin?next=/cards/create"
                   }
-                  className="mt-6 inline-block rounded-sm bg-primary px-4 py-2 font-display text-sm uppercase tracking-widest text-background-base hover:opacity-90"
+                  className="mt-6 inline-block rounded-sm bg-primary px-4 py-2 font-sans font-bold text-sm uppercase tracking-widest text-background-base hover:opacity-90"
                 >
                   Build the first card →
                 </Link>

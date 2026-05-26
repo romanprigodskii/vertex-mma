@@ -134,7 +134,7 @@ export default async function CardViewPage({ params }: PageProps) {
                   className="h-6 w-6 rounded-full border border-foreground/15 object-cover"
                 />
               ) : (
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/15 font-display text-[10px] uppercase text-primary">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/15 font-sans font-bold text-[10px] uppercase text-primary">
                   {card.author_username.slice(0, 2)}
                 </span>
               )}

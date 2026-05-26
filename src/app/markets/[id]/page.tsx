@@ -102,7 +102,7 @@ export default async function MarketDetailPage({ params }: PageProps) {
             })}
           </p>
           <h1
-            className="mt-3 font-display uppercase tracking-tight text-foreground"
+            className="mt-3 font-sans font-bold uppercase tracking-tight text-foreground"
             style={{ fontSize: "clamp(32px, 4vw, 56px)" }}
           >
             {market.type === "method" ? (
@@ -150,7 +150,7 @@ export default async function MarketDetailPage({ params }: PageProps) {
                   <p className="truncate font-sans text-[11px] uppercase tracking-widest text-foreground-muted">
                     {o.label}
                   </p>
-                  <p className="mt-2 font-display text-2xl tabular text-foreground">
+                  <p className="mt-2 font-sans font-bold text-2xl tabular text-foreground">
                     {(o.current_price * 100).toFixed(1)}
                     <span className="text-xs text-foreground-muted">%</span>
                   </p>
@@ -173,7 +173,7 @@ export default async function MarketDetailPage({ params }: PageProps) {
                   <p className="font-sans text-[11px] uppercase tracking-widest text-foreground-muted">
                     {o.label}
                   </p>
-                  <p className="mt-2 font-display text-3xl tabular text-foreground">
+                  <p className="mt-2 font-sans font-bold text-3xl tabular text-foreground">
                     {(o.current_price * 100).toFixed(1)}
                     <span className="text-base text-foreground-muted">%</span>
                   </p>
@@ -198,7 +198,7 @@ export default async function MarketDetailPage({ params }: PageProps) {
             ) : (
               <Link
                 href={`/signin?next=/markets/${market.id}`}
-                className="inline-block rounded-sm bg-primary px-4 py-2.5 font-display text-sm uppercase tracking-widest text-background-base hover:opacity-90"
+                className="inline-block rounded-sm bg-primary px-4 py-2.5 font-sans font-bold text-sm uppercase tracking-widest text-background-base hover:opacity-90"
               >
                 Sign in to bet
               </Link>
@@ -219,7 +219,7 @@ export default async function MarketDetailPage({ params }: PageProps) {
               <dt className="font-sans text-[10px] uppercase tracking-widest text-foreground-subtle">
                 Volume
               </dt>
-              <dd className="mt-1 font-display text-xl tabular text-foreground">
+              <dd className="mt-1 font-sans font-bold text-xl tabular text-foreground">
                 {market.total_volume.toLocaleString()}
               </dd>
             </div>
@@ -227,7 +227,7 @@ export default async function MarketDetailPage({ params }: PageProps) {
               <dt className="font-sans text-[10px] uppercase tracking-widest text-foreground-subtle">
                 Traders
               </dt>
-              <dd className="mt-1 font-display text-xl tabular text-foreground">
+              <dd className="mt-1 font-sans font-bold text-xl tabular text-foreground">
                 {market.unique_traders}
               </dd>
             </div>
@@ -269,7 +269,7 @@ function FighterOutcomesPanel({
 }) {
   return (
     <div className="rounded-md border border-foreground/10 bg-background-elevated/30 p-4">
-      <p className="font-display text-lg uppercase tracking-tight text-foreground">
+      <p className="font-sans font-bold text-lg uppercase tracking-tight text-foreground">
         {fighterName}
       </p>
       <div className="mt-3 flex flex-col gap-3">
@@ -282,7 +282,7 @@ function FighterOutcomesPanel({
               {METHOD_SUB_LABELS[i] ?? o.label}
             </p>
             <div className="mt-1 flex items-baseline justify-between gap-2">
-              <p className="font-display text-2xl tabular text-foreground">
+              <p className="font-sans font-bold text-2xl tabular text-foreground">
                 {(o.current_price * 100).toFixed(1)}
                 <span className="text-xs text-foreground-muted">%</span>
                 <span className="ml-2 font-mono text-xs tabular text-primary">

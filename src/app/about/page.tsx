@@ -13,7 +13,7 @@ export default function AboutPage() {
           <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground-subtle">
             Vertex MMA
           </p>
-          <h1 className="mt-3 font-display uppercase tracking-tight text-foreground text-h1">
+          <h1 className="mt-3 font-sans font-bold uppercase tracking-tight text-foreground text-h1">
             About
           </h1>
           <p className="mt-6 font-sans text-sm text-foreground-muted">

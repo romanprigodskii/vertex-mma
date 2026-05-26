@@ -17,7 +17,7 @@ export function EmptyState({
         <SearchX className="h-5 w-5" />
       </div>
       <div className="space-y-1">
-        <p className="font-display text-2xl uppercase tracking-wide text-foreground">
+        <p className="font-sans font-bold text-2xl uppercase tracking-wide text-foreground">
           Nothing here
         </p>
         <p className="max-w-sm text-sm text-foreground-muted">{hint}</p>

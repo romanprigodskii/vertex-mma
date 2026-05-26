@@ -76,7 +76,7 @@ export function AchievementsGrid({
           >
             <p
               className={cn(
-                "font-display text-sm uppercase tracking-tight",
+                "font-sans font-bold text-sm uppercase tracking-tight",
                 isUnlocked ? "text-foreground" : "text-foreground-muted",
               )}
             >

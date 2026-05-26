@@ -44,7 +44,7 @@ export function SignInForm() {
 
   return (
     <>
-      <h1 className="font-display text-3xl uppercase tracking-tight text-foreground sm:text-4xl">
+      <h1 className="font-sans font-bold text-3xl uppercase tracking-tight text-foreground sm:text-4xl">
         Sign in
       </h1>
       <p className="mt-2 font-sans text-sm text-foreground-muted">
@@ -93,7 +93,7 @@ export function SignInForm() {
         <button
           type="submit"
           disabled={pending}
-          className="mt-2 rounded-sm bg-primary px-4 py-2.5 font-display text-sm uppercase tracking-widest text-background-base hover:opacity-90 disabled:opacity-50"
+          className="mt-2 rounded-sm bg-primary px-4 py-2.5 font-sans font-bold text-sm uppercase tracking-widest text-background-base hover:opacity-90 disabled:opacity-50"
         >
           {pending ? "Signing in..." : "Sign in"}
         </button>

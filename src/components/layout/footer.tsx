@@ -66,7 +66,7 @@ export function Footer() {
         </div>
 
         <div className="mt-10 flex flex-wrap items-baseline justify-between gap-3 border-t border-foreground/[0.06] pt-6">
-          <p className="font-display text-lg uppercase tracking-widest">
+          <p className="font-sans font-bold text-lg uppercase tracking-widest">
             <span className="text-primary">V</span>
             <span className="text-foreground">ERTEX MMA</span>
           </p>

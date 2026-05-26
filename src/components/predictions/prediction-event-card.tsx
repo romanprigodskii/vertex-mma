@@ -27,7 +27,7 @@ export function PredictionEventCard({
       <p className="font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
         {dateLabel}
       </p>
-      <h3 className="mt-2 font-display text-lg uppercase tracking-tight text-foreground line-clamp-2">
+      <h3 className="mt-2 font-sans font-bold text-lg uppercase tracking-tight text-foreground line-clamp-2">
         {event.event_name}
       </h3>
       <div className="mt-3 flex flex-wrap items-baseline justify-between gap-2 font-mono text-[11px] tabular text-foreground-subtle">

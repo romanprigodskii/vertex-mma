@@ -29,7 +29,7 @@ export function BmfBadge({ slug, variant, className }: BmfBadgeProps) {
     return (
       <span
         className={cn(
-          "inline-flex items-center rounded-sm bg-amber-400 px-1.5 py-px font-display text-[9px] font-medium uppercase tracking-wider leading-none text-black",
+          "inline-flex items-center rounded-sm bg-amber-400 px-1.5 py-px font-sans font-bold text-[9px] font-medium uppercase tracking-wider leading-none text-black",
           className,
         )}
         title={currentReign.notes}
@@ -44,7 +44,7 @@ export function BmfBadge({ slug, variant, className }: BmfBadgeProps) {
     return (
       <span
         className={cn(
-          "inline-flex items-center rounded-full bg-amber-400 px-2.5 py-1 font-display text-[10px] uppercase tracking-wider leading-none text-black shadow-md",
+          "inline-flex items-center rounded-full bg-amber-400 px-2.5 py-1 font-sans font-bold text-[10px] uppercase tracking-wider leading-none text-black shadow-md",
           className,
         )}
         title={currentReign.notes}

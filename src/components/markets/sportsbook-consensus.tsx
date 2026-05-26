@@ -131,7 +131,7 @@ function WinnerCell({
       <p className="truncate font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
         {lastName(name)}
       </p>
-      <p className="font-display text-xl tabular text-foreground">
+      <p className="font-sans font-bold text-xl tabular text-foreground">
         {impliedNoVig}
       </p>
       <p className="font-mono text-[10px] tabular text-foreground-subtle">
@@ -170,7 +170,7 @@ function FighterMethodOdds({
             <span className="font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
               {r.label}
             </span>
-            <span className="font-display text-sm tabular text-foreground">
+            <span className="font-sans font-bold text-sm tabular text-foreground">
               {impliedPct(r.v)}
             </span>
           </div>

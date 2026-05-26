@@ -50,7 +50,7 @@ function BoutLine({
       <span className="font-mono text-[11px] uppercase tracking-widest text-foreground-subtle">
         {label}
       </span>
-      <span className={cn("font-display tabular text-base tracking-wider", resultClass(bout.result))}>
+      <span className={cn("font-sans font-bold tabular text-base tracking-wider", resultClass(bout.result))}>
         {bout.result}
       </span>
       <span className="flex min-w-0 flex-wrap items-baseline gap-x-1.5">
@@ -112,7 +112,7 @@ export function CommonOpponents({
             <Link
               href={`/fighters/${e.opponent_slug}`}
               prefetch={false}
-              className="font-display text-2xl uppercase tracking-tight text-foreground hover:text-primary transition-colors sm:text-3xl"
+              className="font-sans font-bold text-2xl uppercase tracking-tight text-foreground hover:text-primary transition-colors sm:text-3xl"
             >
               {e.opponent_name}
             </Link>

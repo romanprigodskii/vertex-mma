@@ -33,13 +33,13 @@ export default async function MyPredictionsPage() {
         </div>
 
         <Container size="lg" className="py-10 md:py-14">
-          <h1 className="font-display uppercase tracking-tight text-foreground text-h1">
+          <h1 className="font-sans font-bold uppercase tracking-tight text-foreground text-h1">
             My predictions
           </h1>
 
           {rows.length === 0 ? (
             <div className="mt-10 rounded-md border border-dashed border-foreground/15 bg-background-elevated/20 px-6 py-16 text-center">
-              <p className="font-display text-2xl uppercase tracking-tight text-foreground">
+              <p className="font-sans font-bold text-2xl uppercase tracking-tight text-foreground">
                 No picks yet
               </p>
               <p className="mx-auto mt-3 max-w-md font-sans text-sm text-foreground-muted">
@@ -48,7 +48,7 @@ export default async function MyPredictionsPage() {
               </p>
               <Link
                 href="/predictions"
-                className="mt-6 inline-block rounded-sm bg-primary px-4 py-2 font-display text-sm uppercase tracking-widest text-background-base hover:opacity-90"
+                className="mt-6 inline-block rounded-sm bg-primary px-4 py-2 font-sans font-bold text-sm uppercase tracking-widest text-background-base hover:opacity-90"
               >
                 Browse open events →
               </Link>
@@ -82,7 +82,7 @@ export default async function MyPredictionsPage() {
                       </div>
                       <div className="shrink-0 text-right">
                         {r.status === "resolved" ? (
-                          <p className="font-display text-lg tabular text-foreground">
+                          <p className="font-sans font-bold text-lg tabular text-foreground">
                             {r.correct_count}/{r.picks_count}
                           </p>
                         ) : (

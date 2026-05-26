@@ -32,7 +32,7 @@ export function DeleteAccountSection() {
   if (!showConfirm) {
     return (
       <div className="rounded-md border border-streak-loss/30 bg-streak-loss/[0.04] p-4">
-        <h3 className="font-display text-sm uppercase tracking-widest text-streak-loss">
+        <h3 className="font-sans font-bold text-sm uppercase tracking-widest text-streak-loss">
           Delete account
         </h3>
         <p className="mt-2 font-sans text-sm text-foreground-muted">
@@ -52,7 +52,7 @@ export function DeleteAccountSection() {
 
   return (
     <div className="rounded-md border border-streak-loss/40 bg-streak-loss/[0.04] p-4">
-      <h3 className="font-display text-sm uppercase tracking-widest text-streak-loss">
+      <h3 className="font-sans font-bold text-sm uppercase tracking-widest text-streak-loss">
         Confirm deletion
       </h3>
       <p className="mt-2 font-sans text-sm text-foreground-muted">

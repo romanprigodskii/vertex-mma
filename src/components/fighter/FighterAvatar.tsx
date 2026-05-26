@@ -111,7 +111,7 @@ export function FighterAvatar({
     >
       <span
         className={cn(
-          "absolute inset-0 flex items-center justify-center font-display uppercase tracking-wider text-foreground/90",
+          "absolute inset-0 flex items-center justify-center font-sans font-bold uppercase tracking-wider text-foreground/90",
           INITIAL_TEXT_PX[size],
         )}
       >

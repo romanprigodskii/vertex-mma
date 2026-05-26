@@ -93,7 +93,7 @@ export default async function ComparePage({ searchParams }: PageProps) {
               <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground-subtle">
                 Side-by-side
               </p>
-              <h1 className="mt-3 font-display uppercase tracking-tight text-foreground text-hero">
+              <h1 className="mt-3 font-sans font-bold uppercase tracking-tight text-foreground text-hero">
                 Compare fighters
               </h1>
               <p className="mt-4 max-w-xl font-sans text-sm text-foreground-muted">
@@ -169,7 +169,7 @@ export default async function ComparePage({ searchParams }: PageProps) {
             <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground-subtle">
               Side-by-side
             </p>
-            <h1 className="mt-2 font-display uppercase tracking-tight text-foreground text-h1">
+            <h1 className="mt-2 font-sans font-bold uppercase tracking-tight text-foreground text-h1">
               Compare fighters
             </h1>
           </Container>

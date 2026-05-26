@@ -34,7 +34,7 @@ export default async function LeaderboardPage({ searchParams }: PageProps) {
             <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground-subtle">
               Community
             </p>
-            <h1 className="mt-2 font-display uppercase tracking-tight text-foreground text-h1">
+            <h1 className="mt-2 font-sans font-bold uppercase tracking-tight text-foreground text-h1">
               Leaderboard
             </h1>
             <p className="mt-2 max-w-xl font-sans text-sm text-foreground-muted">

@@ -39,7 +39,7 @@ export function NavbarUserMenu({ user }: { user: CurrentUser }) {
         aria-expanded={open}
         aria-label="Account menu"
       >
-        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/15 font-display text-[11px] uppercase text-primary">
+        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/15 font-sans font-bold text-[11px] uppercase text-primary">
           {initials}
         </span>
         <span className="hidden max-w-[8rem] truncate font-sans text-sm text-foreground sm:inline">

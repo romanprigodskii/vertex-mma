@@ -79,7 +79,7 @@ export function AvatarUpload({ currentUrl, authUserId, username }: Props) {
           className="h-20 w-20 rounded-full border border-foreground/15 object-cover"
         />
       ) : (
-        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary/15 font-display text-xl uppercase text-primary">
+        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary/15 font-sans font-bold text-xl uppercase text-primary">
           {username.slice(0, 2)}
         </div>
       )}

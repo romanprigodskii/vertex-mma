@@ -177,7 +177,7 @@ export function RadarChart({
             fill="oklch(0.98 0 0)"
             textAnchor={l.anchor}
             dominantBaseline={l.baseline}
-            className="font-display"
+            className="font-sans font-bold"
             style={{ fontSize: 16, letterSpacing: "0.04em" }}
           >
             {l.value}

@@ -37,7 +37,7 @@ export function MarketCard({ market }: { market: MarketListItem }) {
           {TYPE_LABEL[market.type] ?? market.type}
         </span>
       </div>
-      <h3 className="mt-2 font-display text-lg uppercase tracking-tight text-foreground">
+      <h3 className="mt-2 font-sans font-bold text-lg uppercase tracking-tight text-foreground">
         {market.fighter_a_name}{" "}
         <span className="text-foreground-subtle">vs</span>{" "}
         {market.fighter_b_name}
@@ -89,7 +89,7 @@ function WinnerCell({ name, price }: { name: string; price: number }) {
       <p className="truncate font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
         {name}
       </p>
-      <p className="font-display text-base tabular text-foreground">
+      <p className="font-sans font-bold text-base tabular text-foreground">
         {(price * 100).toFixed(0)}%
       </p>
       <p className="font-mono text-[10px] tabular text-foreground-subtle">
@@ -121,7 +121,7 @@ function MethodColumn({
               {METHOD_SHORT[i]}
             </span>
             <span className="text-right">
-              <span className="font-display text-xs tabular text-foreground">
+              <span className="font-sans font-bold text-xs tabular text-foreground">
                 {(o.current_price * 100).toFixed(0)}%
               </span>
               <span className="ml-1.5 font-mono text-[9px] tabular text-foreground-subtle">
@@ -147,7 +147,7 @@ function BinaryCompact({ outcomes }: { outcomes: MarketCardOutcome[] }) {
           <p className="truncate font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
             {truncate(o.label, 18)}
           </p>
-          <p className="font-display text-base tabular text-foreground">
+          <p className="font-sans font-bold text-base tabular text-foreground">
             {(o.current_price * 100).toFixed(0)}%
           </p>
           <p className="font-mono text-[10px] tabular text-foreground-subtle">
@@ -169,7 +169,7 @@ function RoundCompact({ outcomes }: { outcomes: MarketCardOutcome[] }) {
       <p className="font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
         Favorite · {top.label}
       </p>
-      <p className="font-display text-base tabular text-foreground">
+      <p className="font-sans font-bold text-base tabular text-foreground">
         {(top.current_price * 100).toFixed(0)}%
         <span className="ml-1.5 font-mono text-[10px] tabular text-foreground-subtle">
           {priceToDecimalOdds(top.current_price)}x

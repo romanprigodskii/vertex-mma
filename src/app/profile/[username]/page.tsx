@@ -100,14 +100,14 @@ export default async function PublicProfilePage({ params }: PageProps) {
                   className="h-24 w-24 rounded-full border border-foreground/15 object-cover sm:h-32 sm:w-32"
                 />
               ) : (
-                <div className="flex h-24 w-24 items-center justify-center rounded-full bg-primary/15 font-display text-2xl uppercase text-primary sm:h-32 sm:w-32 sm:text-3xl">
+                <div className="flex h-24 w-24 items-center justify-center rounded-full bg-primary/15 font-sans font-bold text-2xl uppercase text-primary sm:h-32 sm:w-32 sm:text-3xl">
                   {profile.username.slice(0, 2)}
                 </div>
               )}
             </div>
 
             <div className="flex-1 text-center sm:text-left">
-              <h1 className="font-display text-3xl uppercase tracking-tight text-foreground sm:text-4xl">
+              <h1 className="font-sans font-bold text-3xl uppercase tracking-tight text-foreground sm:text-4xl">
                 {profile.displayName || profile.username}
               </h1>
               <p className="mt-1 font-mono text-sm text-foreground-muted">
@@ -241,7 +241,7 @@ function Stat({ label, value }: { label: string; value: number }) {
       <dt className="font-sans text-[10px] uppercase tracking-widest text-foreground-subtle">
         {label}
       </dt>
-      <dd className="mt-1 font-display text-2xl tabular text-foreground">
+      <dd className="mt-1 font-sans font-bold text-2xl tabular text-foreground">
         {value.toLocaleString()}
       </dd>
     </div>

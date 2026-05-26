@@ -37,7 +37,7 @@ export function MobileNav({ user }: { user: CurrentUser | null }) {
           className="fixed inset-y-0 right-0 z-50 flex w-80 max-w-[85vw] flex-col border-l border-foreground/10 bg-background-elevated md:hidden"
         >
           <div className="flex items-center justify-between border-b border-foreground/10 p-4">
-            <Dialog.Title className="font-display text-base uppercase tracking-widest text-foreground">
+            <Dialog.Title className="font-sans font-bold text-base uppercase tracking-widest text-foreground">
               Menu
             </Dialog.Title>
             <Dialog.Close asChild>
@@ -144,13 +144,13 @@ export function MobileNav({ user }: { user: CurrentUser | null }) {
               <div className="flex flex-col gap-2">
                 <Link
                   href="/signin"
-                  className="rounded-sm bg-primary px-3 py-2 text-center font-display text-sm uppercase tracking-widest text-background-base hover:opacity-90"
+                  className="rounded-sm bg-primary px-3 py-2 text-center font-sans font-bold text-sm uppercase tracking-widest text-background-base hover:opacity-90"
                 >
                   Sign in
                 </Link>
                 <Link
                   href="/signup"
-                  className="rounded-sm border border-foreground/15 px-3 py-2 text-center font-display text-sm uppercase tracking-widest text-foreground hover:bg-foreground/[0.05]"
+                  className="rounded-sm border border-foreground/15 px-3 py-2 text-center font-sans font-bold text-sm uppercase tracking-widest text-foreground hover:bg-foreground/[0.05]"
                 >
                   Create account
                 </Link>

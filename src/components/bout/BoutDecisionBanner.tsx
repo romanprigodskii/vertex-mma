@@ -37,7 +37,7 @@ export function BoutDecisionBanner({ bout }: BoutDecisionBannerProps) {
       className="border-t border-foreground/[0.06] bg-background-elevated/20"
     >
       <Container size="xl" className="py-5 text-center">
-        <p className="font-display text-base uppercase tracking-widest text-primary">
+        <p className="font-sans font-bold text-base uppercase tracking-widest text-primary">
           {label}
         </p>
         {subline ? (

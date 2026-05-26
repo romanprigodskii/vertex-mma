@@ -14,7 +14,7 @@ export default function FightersLoading() {
               The roster
             </p>
             <h1
-              className="mt-3 font-display tracking-[-0.01em] text-foreground leading-[0.85]"
+              className="mt-3 font-sans font-bold tracking-[-0.01em] text-foreground leading-[0.85]"
               style={{ fontSize: "clamp(64px, 8vw, 144px)" }}
             >
               FIGHTERS

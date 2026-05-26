@@ -91,7 +91,7 @@ function PickerInput({ label, slot, onSelect, onClear }: PickerInputProps) {
           {label}
         </label>
         <div className="flex h-12 items-center justify-between gap-3 rounded-md border border-primary/40 bg-primary/[0.06] px-3">
-          <span className="truncate font-display text-base uppercase tracking-tight text-foreground">
+          <span className="truncate font-sans font-bold text-base uppercase tracking-tight text-foreground">
             {slot.name}
           </span>
           <button

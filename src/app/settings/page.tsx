@@ -40,7 +40,7 @@ export default async function SettingsPage() {
 
         <Container size="md" className="space-y-12 py-12 md:py-16">
           <header>
-            <h1 className="font-display text-3xl uppercase tracking-tight text-foreground sm:text-4xl">
+            <h1 className="font-sans font-bold text-3xl uppercase tracking-tight text-foreground sm:text-4xl">
               Settings
             </h1>
             <p className="mt-2 font-sans text-sm text-foreground-muted">

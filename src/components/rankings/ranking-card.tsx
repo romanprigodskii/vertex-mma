@@ -20,7 +20,7 @@ export function RankingCard({ ranking }: Props) {
       prefetch={false}
       className="block rounded-md border border-foreground/10 bg-background-elevated/30 p-4 transition-colors hover:border-foreground/20 hover:bg-foreground/[0.04]"
     >
-      <h3 className="font-display text-lg uppercase tracking-tight text-foreground line-clamp-2">
+      <h3 className="font-sans font-bold text-lg uppercase tracking-tight text-foreground line-clamp-2">
         {ranking.title}
       </h3>
       {ranking.description ? (
