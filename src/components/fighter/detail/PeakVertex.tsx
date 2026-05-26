@@ -53,6 +53,10 @@ export function PeakVertex({ info }: PeakVertexProps) {
     endingBout,
     currentScore,
   } = info;
+  // Only show the "vs current" delta when there's an actual current
+  // rating — retired fighters carry only an all-time score, and saying
+  // their peak is "−11 vs current" is misleading (it's comparing peak
+  // against all-time, two different scales).
   const delta = currentScore != null ? currentScore - peak : null;
   const isAtPeak = endingBout == null;
   const heldAcrossBouts = peakBoutCount > 1;
@@ -169,7 +173,9 @@ export function PeakVertex({ info }: PeakVertexProps) {
             </div>
           ) : isAtPeak ? (
             <div className="text-[11px] uppercase tracking-widest text-streak-win">
-              Still at career peak
+              {currentScore != null
+                ? "Still at career peak"
+                : "Retired at career peak"}
             </div>
           ) : null}
         </div>

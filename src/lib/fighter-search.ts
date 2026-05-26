@@ -393,12 +393,15 @@ function buildOrderBy(filters: FighterCatalogFilters): SQL {
     case "name_desc":
       return sql`f.name_en DESC`;
     case "wins":
-      return sql`COALESCE(fsa.wins_total, 0) DESC, bout_count DESC`;
+      // wins_total comes from the fighter_with_stats view (selected as
+      // f.wins_total above) — the old draft of this sort referenced a
+      // non-existent `fsa` alias and broke the catalog query.
+      return sql`COALESCE(f.wins_total, 0) DESC, bout_count DESC`;
     case "winrate":
       return sql`(
-        COALESCE(fsa.wins_total, 0)::float
-        / NULLIF(COALESCE(fsa.wins_total, 0) + COALESCE(fsa.losses_total, 0), 0)
-      ) DESC NULLS LAST, COALESCE(fsa.wins_total, 0) DESC`;
+        COALESCE(f.wins_total, 0)::float
+        / NULLIF(COALESCE(f.wins_total, 0) + COALESCE(f.losses_total, 0), 0)
+      ) DESC NULLS LAST, COALESCE(f.wins_total, 0) DESC`;
     case "recent":
       return sql`last_fight_date DESC NULLS LAST, bout_count DESC`;
     case "champions_first": {

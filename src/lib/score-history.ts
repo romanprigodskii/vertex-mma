@@ -42,8 +42,12 @@ export interface PeakVertexInfo {
    * historical peak right now).
    */
   endingBout: (PeakBout & { scoreAfter: number }) | null;
-  /** Current vertex_score (or all_time fallback) for the same fighter. */
+  /** Current vertex_score for the same fighter — null when no current
+   *  rating exists (retired fighter, sub-5-bout career, etc.). */
   currentScore: number | null;
+  /** All-time vertex_score. Both null only for the deepest <3-bout
+   *  case where the fighter has no rating at all. */
+  allTimeScore: number | null;
 }
 
 type BoutDetailRow = {
@@ -222,9 +226,6 @@ export async function getPeakVertex(
     ? hydrate(combined.end_bout_id)
     : null;
 
-  const currentScore =
-    combined.current_score ?? combined.all_time_score ?? null;
-
   return {
     peak: combined.peak_score,
     peakDate: combined.first_peak_date.slice(0, 10),
@@ -235,7 +236,11 @@ export async function getPeakVertex(
       endingHydrated && combined.end_score != null
         ? { ...endingHydrated, scoreAfter: combined.end_score }
         : null,
-    currentScore,
+    // Real current score — null for retired/<5-bout fighters who only
+    // carry an all-time score. The PeakVertex panel uses this to decide
+    // whether the "vs current" delta makes sense to render.
+    currentScore: combined.current_score,
+    allTimeScore: combined.all_time_score,
   };
 }
 
