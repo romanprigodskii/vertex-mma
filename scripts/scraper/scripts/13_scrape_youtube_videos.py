@@ -1,13 +1,9 @@
 """
-Pull videos from UFC's YouTube channel, parse fight-title patterns
-(`A vs B | FULL FIGHT | UFC X`, `Free Fight: A vs B`, etc.), and link them
-to bouts in our DB.
-
-Heuristic kind:
-  duration < 10 min → highlights
-  duration ≥ 10 min → free_fight
-(UFC publishes both under the "FULL FIGHT" label — duration is the only
-reliable splitter.)
+Pull videos from UFC's YouTube channel, restrict to titles that literally
+contain "FULL FIGHT" or "ПОЛНЫЙ БОЙ" (case-insensitive — UFC's canonical
+label for actual fight uploads), parse out the `<A> vs <B>` pair, and link
+them to bouts in our DB. Sibling labels — "Finish Fight", "Highlights",
+"Fight Motion", "Fight Recap" — are deliberately excluded.
 
 Match strategy: normalize fighter names (lower, strip accents/punctuation),
 then look for a bout where BOTH fighters appear. If a year/event hint is
@@ -38,9 +34,6 @@ UFC_CHANNEL_URL = "https://www.youtube.com/@UFC/videos"
 # historically — fetching everything once is fine but takes a few minutes.
 # Set to None to fetch all.
 DEFAULT_PLAYLIST_END: int | None = None
-
-# Anything < 10 min that still parses as a fight is classed as highlights.
-HIGHLIGHTS_DURATION_CUTOFF_S = 600
 
 VS_RE = re.compile(r"\s+vs\.?\s+", re.IGNORECASE)
 # Trailing "2" / "3" / "II" on a fighter name = rematch indicator we want to
@@ -119,10 +112,18 @@ NON_FIGHT_TOKENS = (
 def parse_title(title: str) -> ParsedTitle | None:
     """Extract (fighter_a, fighter_b, event_hint) if the title matches a
     `<A> vs <B>` UFC fight pattern. Returns None for non-fight content
-    (interviews, promos, KO compilations, training pieces, etc.)."""
-    if " vs " not in title.lower() and " vs." not in title.lower():
-        return None
+    (interviews, promos, KO compilations, training pieces, etc.).
+
+    Hard requirement: title MUST contain the literal phrase "full fight" or
+    "полный бой" (case-insensitive). UFC uses many sibling labels for
+    near-fight content — "Finish Fight", "Highlights", "Fight Recap",
+    "Fight Motion" — none of which are actual fight uploads, so we exclude
+    them by demanding the canonical label."""
     lower_title = title.lower()
+    if " vs " not in lower_title and " vs." not in lower_title:
+        return None
+    if "full fight" not in lower_title and "полный бой" not in lower_title:
+        return None
     for token in NON_FIGHT_TOKENS:
         if token in lower_title:
             return None
@@ -329,17 +330,12 @@ def match_bout(
 
 
 def detect_kind(title: str, duration: float | None) -> str:
-    """Return 'free_fight' or 'highlights'.
-
-    Heuristic: explicit "Free Fight" keyword → free_fight. Otherwise duration
-    splits — UFC labels both 4-min recap reels and 18-min full fights as
-    "FULL FIGHT", duration is the only thing we can trust."""
-    lower = title.lower()
-    if "free fight" in lower:
-        return "free_fight"
-    if duration is not None and duration >= HIGHLIGHTS_DURATION_CUTOFF_S:
-        return "free_fight"
-    return "highlights"
+    """Every video that gets through parse_title now carries the literal
+    "full fight" / "полный бой" label, so they all map to free_fight. The
+    highlights enum value is kept on the schema for forward-compat but is
+    no longer produced by the scraper."""
+    del title, duration  # unused — left in the signature to keep call sites stable.
+    return "free_fight"
 
 
 def fetch_channel_videos(

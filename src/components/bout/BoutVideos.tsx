@@ -25,10 +25,6 @@ function formatDuration(seconds: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-function kindLabel(kind: BoutVideo["kind"]): string {
-  return kind === "free_fight" ? "Full fight" : "Highlights";
-}
-
 /** Canonical thumbnail URL — mqdefault is a clean 16:9 crop with no letter-
  *  boxing and stays cached forever; the auth-token-bearing URLs yt-dlp
  *  scrapes ("...?sqp=...&rs=...") can rotate or expire. */
@@ -39,15 +35,12 @@ function thumbnailUrl(videoId: string): string {
 export function BoutVideos({ videos }: BoutVideosProps) {
   if (videos.length === 0) return null;
 
-  // Free fights first (more content), then highlights — within each group,
-  // longer-running videos float to the top.
+  // Longer-running uploads float to the top — they're closer to the real
+  // unedited fight than the short condensed clips.
   const sorted = React.useMemo(() => {
-    return [...videos].sort((a, b) => {
-      if (a.kind !== b.kind) {
-        return a.kind === "free_fight" ? -1 : 1;
-      }
-      return (b.duration_seconds ?? 0) - (a.duration_seconds ?? 0);
-    });
+    return [...videos].sort(
+      (a, b) => (b.duration_seconds ?? 0) - (a.duration_seconds ?? 0),
+    );
   }, [videos]);
 
   return (
@@ -126,7 +119,7 @@ function VideoCard({
               </span>
             </span>
             <span className="absolute left-3 top-3 inline-flex items-center rounded-[4px] bg-black/70 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-white">
-              {kindLabel(video.kind)}
+              Full fight
             </span>
             {duration ? (
               <span className="absolute bottom-3 right-3 inline-flex items-center rounded-[4px] bg-black/80 px-1.5 py-0.5 font-mono text-[11px] tracking-wide text-white">
