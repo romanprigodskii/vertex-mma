@@ -116,6 +116,8 @@ export default async function BoutDetailPage({ params }: PageProps) {
 
         <BoutDecisionBanner bout={bout} />
 
+        <BoutVideos videos={bout.videos} />
+
         {bout.rounds.length > 0 ? (
           <BoutStrikeAnalysis
             fighterA={bout.fighter_a}
@@ -162,8 +164,6 @@ export default async function BoutDetailPage({ params }: PageProps) {
             </Container>
           </section>
         ) : null}
-
-        <BoutVideos videos={bout.videos} />
       </main>
       <Footer />
     </>
