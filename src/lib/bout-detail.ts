@@ -47,6 +47,15 @@ export type BoutScorecardJudge = {
   total_b: number;
 };
 
+export type BoutDetailVideo = {
+  id: string;
+  youtube_video_id: string;
+  kind: "free_fight" | "highlights";
+  title: string;
+  duration_seconds: number | null;
+  thumbnail_url: string | null;
+};
+
 export type BoutDetail = {
   id: string;
   event: {
@@ -74,6 +83,7 @@ export type BoutDetail = {
   time_finished_seconds: number | null;
   rounds: BoutRoundStatsRow[];
   scorecards: BoutScorecardJudge[];
+  videos: BoutDetailVideo[];
 };
 
 type BoutHeaderRow = {
@@ -215,6 +225,23 @@ export async function getBoutById(id: string): Promise<BoutDetail | null> {
     }>)],
   );
 
+  const videoResult = await db.execute<BoutDetailVideo>(sql`
+    SELECT
+      bv.id::text AS id,
+      bv.youtube_video_id,
+      bv.kind::text AS kind,
+      bv.title,
+      bv.duration_seconds,
+      bv.thumbnail_url
+    FROM bout_video bv
+    WHERE bv.bout_id = ${id}::uuid
+    ORDER BY
+      CASE bv.kind WHEN 'free_fight' THEN 0 ELSE 1 END,
+      bv.duration_seconds DESC NULLS LAST,
+      bv.created_at DESC
+  `);
+  const videos = [...(videoResult as unknown as BoutDetailVideo[])];
+
   return {
     id: r.id,
     event: {
@@ -258,6 +285,7 @@ export async function getBoutById(id: string): Promise<BoutDetail | null> {
     time_finished_seconds: r.time_finished_seconds,
     rounds,
     scorecards,
+    videos,
   };
 }
 

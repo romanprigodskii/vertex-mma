@@ -9,6 +9,7 @@ import { BoutRoundBreakdown } from "@/components/bout/BoutRoundBreakdown";
 import { BoutScorecards } from "@/components/bout/BoutScorecards";
 import { BoutStrikeAnalysis } from "@/components/bout/BoutStrikeAnalysis";
 import { BoutTotals } from "@/components/bout/BoutTotals";
+import { BoutVideos } from "@/components/bout/BoutVideos";
 import { Container } from "@/components/layout/container";
 import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
@@ -161,6 +162,8 @@ export default async function BoutDetailPage({ params }: PageProps) {
             </Container>
           </section>
         ) : null}
+
+        <BoutVideos videos={bout.videos} />
       </main>
       <Footer />
     </>

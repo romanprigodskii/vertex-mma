@@ -127,3 +127,8 @@ export const newsStatusEnum = pgEnum("news_status", [
   "auto_approved",
   "rejected",
 ]);
+
+export const boutVideoKindEnum = pgEnum("bout_video_kind", [
+  "free_fight",
+  "highlights",
+]);

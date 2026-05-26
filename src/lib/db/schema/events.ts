@@ -14,6 +14,7 @@ import {
 import {
   boutMethodEnum,
   boutStatusEnum,
+  boutVideoKindEnum,
   eventStatusEnum,
   promotionEnum,
   weightClassEnum,
@@ -219,6 +220,34 @@ export const boutExternalOdds = pgTable(
   ],
 );
 
+// UFC publishes ~daily on YouTube — every event ships both per-fight
+// FULL FIGHT clips (highlights, 4-8 min) and a handful of full free-fight
+// uploads (15-25 min). We mirror that mapping here so a bout can have
+// multiple linked videos. video_id is the YouTube ID (e.g. "OyaDaWlPt5A").
+export const boutVideo = pgTable(
+  "bout_video",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    boutId: uuid("bout_id")
+      .notNull()
+      .references(() => bout.id, { onDelete: "cascade" }),
+    youtubeVideoId: text("youtube_video_id").notNull(),
+    kind: boutVideoKindEnum("kind").notNull(),
+    title: text("title").notNull(),
+    durationSeconds: integer("duration_seconds"),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    thumbnailUrl: text("thumbnail_url"),
+    sourceChannel: text("source_channel").default("UFC").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("bout_video_bout_idx").on(table.boutId),
+    unique("bout_video_yt_unique").on(table.boutId, table.youtubeVideoId),
+  ],
+);
+
 export type Event = typeof event.$inferSelect;
 export type NewEvent = typeof event.$inferInsert;
 export type Bout = typeof bout.$inferSelect;
@@ -227,3 +256,5 @@ export type BoutScorecard = typeof boutScorecard.$inferSelect;
 export type NewBoutScorecard = typeof boutScorecard.$inferInsert;
 export type BoutExternalOdds = typeof boutExternalOdds.$inferSelect;
 export type NewBoutExternalOdds = typeof boutExternalOdds.$inferInsert;
+export type BoutVideo = typeof boutVideo.$inferSelect;
+export type NewBoutVideo = typeof boutVideo.$inferInsert;
