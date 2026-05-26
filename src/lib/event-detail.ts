@@ -209,3 +209,51 @@ export async function getEventBouts(eventId: string): Promise<EventBout[]> {
   `);
   return [...(result as unknown as EventBout[])];
 }
+
+export type UpcomingEventSidebar = {
+  id: string;
+  slug: string;
+  name: string;
+  short_name: string | null;
+  date: string;
+  promotion: string;
+  bout_count: number;
+  main_event_fighter_a: string | null;
+  main_event_fighter_b: string | null;
+  main_event_weight_class: string | null;
+};
+
+/** Single-query helper for the news sidebar: the next upcoming event plus
+ *  the names of its main-event corners. Returns null when nothing upcoming. */
+export async function getNextUpcomingEventForSidebar(): Promise<UpcomingEventSidebar | null> {
+  const rows = (await db.execute<UpcomingEventSidebar>(sql`
+    SELECT
+      e.id::text AS id,
+      e.slug,
+      e.name,
+      e.short_name,
+      e.date::text AS date,
+      e.promotion::text AS promotion,
+      (SELECT COUNT(*)::int FROM bout WHERE event_id = e.id) AS bout_count,
+      me.fighter_a_name AS main_event_fighter_a,
+      me.fighter_b_name AS main_event_fighter_b,
+      me.weight_class AS main_event_weight_class
+    FROM event e
+    LEFT JOIN LATERAL (
+      SELECT
+        fa.name_en AS fighter_a_name,
+        fb.name_en AS fighter_b_name,
+        b.weight_class::text AS weight_class
+      FROM bout b
+      JOIN fighter fa ON fa.id = b.fighter_a_id
+      JOIN fighter fb ON fb.id = b.fighter_b_id
+      WHERE b.event_id = e.id AND b.is_main_event = TRUE
+      LIMIT 1
+    ) me ON TRUE
+    WHERE e.status IN ('upcoming', 'in_progress')
+      AND e.date >= NOW() - INTERVAL '1 day'
+    ORDER BY e.date ASC
+    LIMIT 1
+  `)) as unknown as UpcomingEventSidebar[];
+  return rows[0] ?? null;
+}

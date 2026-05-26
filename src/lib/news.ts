@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
+import type { NewsExternalRef } from "@/lib/db/schema/news";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -204,6 +205,86 @@ export async function getNewsClassificationCounts(): Promise<
   return rows;
 }
 
+/** Latest approved news for the sidebar, excluding the article currently
+ *  being read. Returns just enough for a compact headline list. */
+export async function listLatestNewsExcluding(
+  excludeId: string | null,
+  limit = 5,
+): Promise<NewsFeedItem[]> {
+  const exclude = excludeId && UUID_RE.test(excludeId) ? excludeId : null;
+  const where = exclude
+    ? sql`AND ni.id != ${exclude}::uuid`
+    : sql``;
+  const rows = (await db.execute<FeedRow>(sql`
+    ${FEED_SELECT}
+    WHERE ni.status IN ('approved', 'auto_approved')
+    ${where}
+    ORDER BY ni.published_at DESC
+    LIMIT ${Math.min(20, Math.max(1, limit))}
+  `)) as unknown as FeedRow[];
+  return rows.map((r) => toFeedItem(r, []));
+}
+
+/** Related-news ranking for the article page. Ranks by overlap with the
+ *  current article's fighter set (×3 per shared fighter) plus a small bump
+ *  for matching classification (×1). Excludes the current article. Falls
+ *  back to "latest from same classification" when nothing overlaps. */
+export async function listRelatedNews(opts: {
+  excludeId: string;
+  fighterIds: string[];
+  classification: string;
+  limit?: number;
+}): Promise<NewsFeedItem[]> {
+  if (!UUID_RE.test(opts.excludeId)) return [];
+  const limit = Math.min(8, Math.max(1, opts.limit ?? 4));
+  const fighterIds = opts.fighterIds.filter((id) => UUID_RE.test(id));
+  const fighterValues =
+    fighterIds.length > 0
+      ? sql.join(
+          fighterIds.map((id) => sql`${id}::uuid`),
+          sql`, `,
+        )
+      : null;
+
+  const rankExpr = fighterValues
+    ? sql`(
+        SELECT COUNT(*)::int FROM unnest(ni.related_fighter_ids) AS fid
+        WHERE fid IN (${fighterValues})
+      ) * 3 + CASE WHEN ni.classification = ${opts.classification}::news_classification THEN 1 ELSE 0 END`
+    : sql`CASE WHEN ni.classification = ${opts.classification}::news_classification THEN 1 ELSE 0 END`;
+
+  const rows = (await db.execute<FeedRow & { rank: number }>(sql`
+    SELECT
+      ni.id::text AS id,
+      ni.url,
+      ni.title,
+      ni.body_rephrased,
+      ni.published_at::text AS published_at,
+      ni.classification::text AS classification,
+      ni.related_fighter_ids,
+      ns.name AS source_name,
+      ${rankExpr} AS rank
+    FROM news_item ni
+    JOIN news_source ns ON ns.id = ni.source_id
+    WHERE ni.status IN ('approved', 'auto_approved')
+      AND ni.id != ${opts.excludeId}::uuid
+    ORDER BY rank DESC, ni.published_at DESC
+    LIMIT ${limit}
+  `)) as unknown as Array<FeedRow & { rank: number }>;
+
+  const fighters = await resolveNewsFighters(
+    rows.flatMap((r) => r.related_fighter_ids ?? []),
+  );
+  return rows.map((r) =>
+    toFeedItem(
+      r,
+      (r.related_fighter_ids ?? [])
+        .map((id) => fighters.get(id))
+        .filter((f): f is NewsFighter => f !== undefined),
+    ),
+  );
+}
+
 /** Approved news mentioning a given fighter. Chips are omitted — the reader
  *  is already on that fighter's page. */
 export async function listNewsForFighter(
@@ -232,6 +313,7 @@ export type NewsItemDetail = {
   source_name: string;
   source_url: string | null;
   fighters: NewsFighter[];
+  external_refs: NewsExternalRef[];
 };
 
 type DetailRow = {
@@ -245,6 +327,7 @@ type DetailRow = {
   related_fighter_ids: string[] | null;
   source_name: string;
   source_url: string | null;
+  external_refs: NewsExternalRef[] | null;
 };
 
 /** A single approved news item with everything the article page needs. */
@@ -252,24 +335,52 @@ export async function getNewsItemById(
   id: string,
 ): Promise<NewsItemDetail | null> {
   if (!UUID_RE.test(id)) return null;
-  const rows = (await db.execute<DetailRow>(sql`
-    SELECT
-      ni.id::text AS id,
-      ni.url,
-      ni.title,
-      ni.body,
-      ni.body_rephrased,
-      ni.published_at::text AS published_at,
-      ni.classification::text AS classification,
-      ni.related_fighter_ids,
-      ns.name AS source_name,
-      ns.url AS source_url
-    FROM news_item ni
-    JOIN news_source ns ON ns.id = ni.source_id
-    WHERE ni.id = ${id}::uuid
-      AND ni.status IN ('approved', 'auto_approved')
-    LIMIT 1
-  `)) as unknown as DetailRow[];
+
+  // Try the new SELECT with external_refs; fall back when the column hasn't
+  // been pushed yet (drizzle-kit push needs an interactive TTY for new
+  // columns, so this lets the page render before the migration is applied).
+  let rows: DetailRow[];
+  try {
+    rows = (await db.execute<DetailRow>(sql`
+      SELECT
+        ni.id::text AS id,
+        ni.url,
+        ni.title,
+        ni.body,
+        ni.body_rephrased,
+        ni.published_at::text AS published_at,
+        ni.classification::text AS classification,
+        ni.related_fighter_ids,
+        ns.name AS source_name,
+        ns.url AS source_url,
+        ni.external_refs
+      FROM news_item ni
+      JOIN news_source ns ON ns.id = ni.source_id
+      WHERE ni.id = ${id}::uuid
+        AND ni.status IN ('approved', 'auto_approved')
+      LIMIT 1
+    `)) as unknown as DetailRow[];
+  } catch {
+    const fallback = (await db.execute<Omit<DetailRow, "external_refs">>(sql`
+      SELECT
+        ni.id::text AS id,
+        ni.url,
+        ni.title,
+        ni.body,
+        ni.body_rephrased,
+        ni.published_at::text AS published_at,
+        ni.classification::text AS classification,
+        ni.related_fighter_ids,
+        ns.name AS source_name,
+        ns.url AS source_url
+      FROM news_item ni
+      JOIN news_source ns ON ns.id = ni.source_id
+      WHERE ni.id = ${id}::uuid
+        AND ni.status IN ('approved', 'auto_approved')
+      LIMIT 1
+    `)) as unknown as Array<Omit<DetailRow, "external_refs">>;
+    rows = fallback.map((r) => ({ ...r, external_refs: [] }));
+  }
 
   if (rows.length === 0) return null;
   const r = rows[0];
@@ -290,5 +401,6 @@ export async function getNewsItemById(
     source_name: r.source_name,
     source_url: r.source_url,
     fighters,
+    external_refs: Array.isArray(r.external_refs) ? r.external_refs : [],
   };
 }
