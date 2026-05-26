@@ -23,6 +23,7 @@ async function main() {
     DELETE FROM bout_video
     WHERE NOT (
       lower(title) LIKE '%full fight%'
+      OR lower(title) LIKE '%free fight%'
       OR lower(title) LIKE '%полный бой%'
     )
     RETURNING id

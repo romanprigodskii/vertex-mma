@@ -1,8 +1,9 @@
 """
 Pull videos from UFC's YouTube channel, restrict to titles that literally
-contain "FULL FIGHT" or "ПОЛНЫЙ БОЙ" (case-insensitive — UFC's canonical
-label for actual fight uploads), parse out the `<A> vs <B>` pair, and link
-them to bouts in our DB. Sibling labels — "Finish Fight", "Highlights",
+contain "FULL FIGHT", "FREE FIGHT", or "ПОЛНЫЙ БОЙ" (case-insensitive —
+UFC's canonical labels for actual fight uploads; "Free Fight" is the older
+branding for the same content type), parse out the `<A> vs <B>` pair, and
+link them to bouts in our DB. Sibling labels — "Finish Fight", "Highlights",
 "Fight Motion", "Fight Recap" — are deliberately excluded.
 
 Match strategy: normalize fighter names (lower, strip accents/punctuation),
@@ -114,15 +115,19 @@ def parse_title(title: str) -> ParsedTitle | None:
     `<A> vs <B>` UFC fight pattern. Returns None for non-fight content
     (interviews, promos, KO compilations, training pieces, etc.).
 
-    Hard requirement: title MUST contain the literal phrase "full fight" or
+    Hard requirement: title MUST contain "full fight", "free fight", or
     "полный бой" (case-insensitive). UFC uses many sibling labels for
     near-fight content — "Finish Fight", "Highlights", "Fight Recap",
     "Fight Motion" — none of which are actual fight uploads, so we exclude
-    them by demanding the canonical label."""
+    them by demanding one of the canonical full-fight labels."""
     lower_title = title.lower()
     if " vs " not in lower_title and " vs." not in lower_title:
         return None
-    if "full fight" not in lower_title and "полный бой" not in lower_title:
+    if (
+        "full fight" not in lower_title
+        and "free fight" not in lower_title
+        and "полный бой" not in lower_title
+    ):
         return None
     for token in NON_FIGHT_TOKENS:
         if token in lower_title:
@@ -349,9 +354,10 @@ def fetch_channel_videos(
         "skip_download": True,
         "extract_flat": "in_playlist",
         "ignoreerrors": True,
-        "socket_timeout": 30,
-        "retries": 5,
-        "extractor_retries": 5,
+        "socket_timeout": 60,
+        "retries": 10,
+        "extractor_retries": 10,
+        "fragment_retries": 10,
     }
     if playlist_end is not None:
         opts["playlistend"] = playlist_end
