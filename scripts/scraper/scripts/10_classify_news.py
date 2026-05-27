@@ -5,8 +5,10 @@ import _path  # noqa: F401
 from src.db import get_connection
 from src.loaders.news import (
     apply_classification,
+    auto_create_bout,
     fetch_unprocessed,
     find_bout,
+    resolve_event_id,
     resolve_fighter_ids,
 )
 from src.news_classifier import ItemInput, classify_batch
@@ -14,6 +16,14 @@ from src.utils.logger import log
 
 BATCH_SIZE = 10
 APPROVE_THRESHOLD = 0.70
+
+# Auto-creating a bout from a news announcement is irreversible-ish (we'd
+# pollute the bout table with bad rows). Gate it aggressively:
+#   - Haiku must be at least 85% sure of the classification.
+#   - The source has to be trusted (MMA Junkie / Fighting / Mania / etc.),
+#     so a random tabloid blog can't seed a phantom bout.
+#   - We need both fighters AND an event resolved AND a weight class.
+AUTO_CREATE_BOUT_MIN_CONFIDENCE = 0.85
 
 
 def decide_status(
@@ -50,6 +60,7 @@ def run() -> dict[str, int]:
         "pending": 0,
         "rejected": 0,
         "failed_batches": 0,
+        "bouts_auto_created": 0,
     }
 
     with get_connection() as conn:
@@ -59,6 +70,7 @@ def run() -> dict[str, int]:
             return totals
 
         fighter_cache: dict[str, str | None] = {}
+        event_cache: dict[str, str | None] = {}
         batch_count = (len(items) + BATCH_SIZE - 1) // BATCH_SIZE
 
         for bi in range(batch_count):
@@ -91,6 +103,42 @@ def run() -> dict[str, int]:
                     if len(fighter_ids) == 2
                     else None
                 )
+
+                # If Haiku tagged this as a freshly-announced bout AND we
+                # have everything needed (two known fighters, an event we
+                # already track, a stated weight class, a trusted source,
+                # high confidence) AND no existing bout links the pair —
+                # spin up a scheduled bout row right here so the matchup
+                # surfaces on the event page without a manual touch.
+                if (
+                    res.classification == "bout_announced"
+                    and bout_id is None
+                    and len(fighter_ids) == 2
+                    and res.confidence >= AUTO_CREATE_BOUT_MIN_CONFIDENCE
+                    and item.source_is_trusted
+                    and res.event_hint
+                    and res.weight_class
+                ):
+                    event_id = resolve_event_id(
+                        conn, res.event_hint, cache=event_cache
+                    )
+                    if event_id:
+                        new_bout_id, created = auto_create_bout(
+                            conn,
+                            fighter_a_id=fighter_ids[0],
+                            fighter_b_id=fighter_ids[1],
+                            event_id=event_id,
+                            weight_class=res.weight_class,
+                        )
+                        bout_id = new_bout_id
+                        if created:
+                            totals["bouts_auto_created"] += 1
+                            log.info(
+                                f"  auto-bout: {res.fighters[0]} vs "
+                                f"{res.fighters[1]} @ {res.event_hint} "
+                                f"({res.weight_class}) — {new_bout_id}"
+                            )
+
                 status = decide_status(
                     res.classification,
                     res.confidence,
@@ -117,7 +165,8 @@ def run() -> dict[str, int]:
     log.info(
         f"news classify done: classified={totals['classified']} "
         f"auto_approved={totals['auto_approved']} pending={totals['pending']} "
-        f"rejected={totals['rejected']} failed_batches={totals['failed_batches']}"
+        f"rejected={totals['rejected']} failed_batches={totals['failed_batches']} "
+        f"bouts_auto_created={totals['bouts_auto_created']}"
     )
     return totals
 

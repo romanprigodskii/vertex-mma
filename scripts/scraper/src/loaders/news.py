@@ -244,6 +244,101 @@ def find_bout(
         return row[0] if row else None
 
 
+def resolve_event_id(
+    conn: psycopg.Connection,
+    event_hint: str | None,
+    *,
+    cache: dict[str, str | None] | None = None,
+) -> str | None:
+    """Match an event hint string (e.g. "UFC 330", "UFC Fight Night: Whittaker
+    vs Costa") to an event_id in the DB. Uses pg_trgm similarity on both
+    event.name and event.short_name. Slugs are deterministic so we also try
+    them directly. Returns None when nothing matches well enough.
+
+    Threshold (0.45) is tuned to be aggressive — the news pipeline already
+    runs upstream confidence gates before reaching here, so a missed match
+    is worse than a slightly fuzzy hit. Won't return events that already
+    happened more than a week ago."""
+    if not event_hint:
+        return None
+    key = event_hint.strip().lower()
+    if cache is not None and key in cache:
+        return cache[key]
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT id::text
+            FROM event
+            WHERE (
+                similarity(name, %s) > 0.45
+                OR similarity(coalesce(short_name, name), %s) > 0.45
+                OR lower(name) = lower(%s)
+                OR lower(coalesce(short_name, '')) = lower(%s)
+              )
+              AND (status IN ('upcoming', 'in_progress')
+                   OR date >= now() - interval '7 days')
+            ORDER BY
+              GREATEST(
+                similarity(name, %s),
+                similarity(coalesce(short_name, name), %s)
+              ) DESC,
+              date ASC
+            LIMIT 1
+            """,
+            (event_hint, event_hint, event_hint, event_hint, event_hint, event_hint),
+        )
+        row = cur.fetchone()
+        eid = row[0] if row else None
+    if cache is not None:
+        cache[key] = eid
+    return eid
+
+
+def auto_create_bout(
+    conn: psycopg.Connection,
+    *,
+    fighter_a_id: str,
+    fighter_b_id: str,
+    event_id: str,
+    weight_class: str,
+) -> tuple[str, bool]:
+    """Insert a scheduled bout between two fighters at an event, or return
+    the existing one if a row already links the same pair to the same event.
+    Returns (bout_id, created). Idempotent on (event_id, fighter pair)."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT id::text FROM bout
+            WHERE event_id = %s::uuid
+              AND (
+                (fighter_a_id = %s::uuid AND fighter_b_id = %s::uuid)
+                OR (fighter_a_id = %s::uuid AND fighter_b_id = %s::uuid)
+              )
+            LIMIT 1
+            """,
+            (
+                event_id,
+                fighter_a_id, fighter_b_id,
+                fighter_b_id, fighter_a_id,
+            ),
+        )
+        row = cur.fetchone()
+        if row:
+            return row[0], False
+
+        cur.execute(
+            """
+            INSERT INTO bout (event_id, fighter_a_id, fighter_b_id,
+                              weight_class, status, scheduled_rounds)
+            VALUES (%s::uuid, %s::uuid, %s::uuid,
+                    %s::weight_class, 'scheduled', 3)
+            RETURNING id::text
+            """,
+            (event_id, fighter_a_id, fighter_b_id, weight_class),
+        )
+        return cur.fetchone()[0], True
+
+
 def apply_classification(
     conn: psycopg.Connection,
     item_id: str,

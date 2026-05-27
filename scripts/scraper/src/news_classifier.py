@@ -66,10 +66,34 @@ fighters mentioned only in passing. For an analyst-prediction piece, do NOT \
 list the analyst — list the fighters the prediction is about. Empty list when \
 there are none. At most four.
 
+Event hint: ONLY for `bout_announced` items, give the event name the booking \
+is FOR, exactly as written (e.g. "UFC 330", "UFC Fight Night: Whittaker vs \
+Costa", "UFC on ESPN 60"). Use null if you can't find a specific event name \
+in the text, or for any other category.
+
+Weight class: ONLY for `bout_announced` items, return one of: strawweight, \
+flyweight, bantamweight, featherweight, lightweight, welterweight, \
+middleweight, light_heavyweight, heavyweight, catchweight. Use the underscore \
+form `light_heavyweight`. Use null when not stated.
+
 Confidence: 0.0-1.0 — how sure you are of the category. Use lower values for \
 ambiguous or thinly-sourced items.
 
 Return exactly one result object per input item, echoing each item's index."""
+
+WEIGHT_CLASSES = (
+    "strawweight",
+    "flyweight",
+    "bantamweight",
+    "featherweight",
+    "lightweight",
+    "welterweight",
+    "middleweight",
+    "light_heavyweight",
+    "heavyweight",
+    "catchweight",
+)
+_VALID_WEIGHT = frozenset(WEIGHT_CLASSES)
 
 OUTPUT_SCHEMA = {
     "type": "object",
@@ -89,12 +113,19 @@ OUTPUT_SCHEMA = {
                         "type": "array",
                         "items": {"type": "string"},
                     },
+                    "event_hint": {"type": ["string", "null"]},
+                    # Weight class is enum-validated in code (_VALID_WEIGHT)
+                    # rather than via JSON Schema — Anthropic's structured
+                    # output rejects `enum` mixed with a nullable type.
+                    "weight_class": {"type": ["string", "null"]},
                 },
                 "required": [
                     "index",
                     "classification",
                     "confidence",
                     "fighters",
+                    "event_hint",
+                    "weight_class",
                 ],
                 "additionalProperties": False,
             },
@@ -117,6 +148,8 @@ class ItemClassification:
     classification: str
     confidence: float
     fighters: list[str]
+    event_hint: str | None
+    weight_class: str | None
 
 
 _client: Anthropic | None = None
@@ -189,9 +222,23 @@ def classify_batch(items: list[ItemInput]) -> dict[int, ItemClassification]:
             for f in row.get("fighters", [])
             if isinstance(f, str) and f.strip()
         ][:4]
+        event_hint_raw = row.get("event_hint")
+        event_hint = (
+            event_hint_raw.strip()
+            if isinstance(event_hint_raw, str) and event_hint_raw.strip()
+            else None
+        )
+        weight_raw = row.get("weight_class")
+        weight_class = (
+            weight_raw
+            if isinstance(weight_raw, str) and weight_raw in _VALID_WEIGHT
+            else None
+        )
         out[idx] = ItemClassification(
             classification=classification,
             confidence=confidence,
             fighters=fighters,
+            event_hint=event_hint,
+            weight_class=weight_class,
         )
     return out
