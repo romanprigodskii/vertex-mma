@@ -1,13 +1,17 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
+import {
+  getLocale,
+  getTranslations,
+  setRequestLocale,
+} from "next-intl/server";
 import { ChevronLeft } from "lucide-react";
 
 import { BoutAnchorHighlight } from "@/components/event/BoutAnchorHighlight";
 import { Container } from "@/components/layout/container";
 import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
-import { WEIGHT_CLASSES } from "@/lib/constants";
+import { Link } from "@/i18n/navigation";
 import {
   type EventBout,
   type EventDetail,
@@ -20,12 +24,8 @@ import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
-const WEIGHT_LABEL: Record<string, string> = Object.fromEntries(
-  WEIGHT_CLASSES.map((w) => [w.id, w.label]),
-);
-WEIGHT_LABEL["catchweight"] = "Catchweight";
-WEIGHT_LABEL["openweight"] = "Openweight";
-
+// Compact method label set — these are scoring abbreviations the UFC
+// stats site uses verbatim, so they stay constant across locales.
 const METHOD_SHORT: Record<string, string> = {
   ko: "KO",
   tko: "TKO",
@@ -45,10 +45,10 @@ function formatRoundTime(sec: number | null): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-function formatEventDate(iso: string): string {
+function formatEventDate(iso: string, locale: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso.slice(0, 10);
-  return d.toLocaleDateString("en-US", {
+  return d.toLocaleDateString(locale === "ru" ? "ru-RU" : "en-US", {
     year: "numeric",
     month: "long",
     day: "numeric",
@@ -64,28 +64,52 @@ function locationString(event: EventDetail): string | null {
 }
 
 interface PageProps {
-  params: Promise<{ slug: string }>;
+  params: Promise<{ slug: string; locale: string }>;
 }
 
 export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
-  const { slug } = await params;
+  const { slug, locale } = await params;
+  const tEvent = await getTranslations({ locale, namespace: "event" });
   const event = await getEventBySlug(slug);
-  if (!event) return { title: "Event not found" };
+  if (!event) return { title: tEvent("notFoundTitle") };
+  const name = event.name;
   return {
     title: event.short_name || event.name,
-    description: `${event.name} fight card and results.`,
+    description: tEvent("metaDescription", { name }),
     openGraph: {
-      title: `${event.short_name || event.name} · Vertex MMA`,
-      description: `Fight card and results for ${event.name}.`,
+      title: tEvent("ogTitle", { name: event.short_name || event.name }),
+      description: tEvent("ogDescription", { name }),
       images: event.poster_url ? [event.poster_url] : [],
     },
   };
 }
 
-function BoutCard({ bout }: { bout: EventBout }) {
-  const weightLabel = WEIGHT_LABEL[bout.weight_class] ?? bout.weight_class;
+interface BoutCardTranslations {
+  weight: (id: string) => string;
+  rounds: (n: number) => string;
+  mainEvent: string;
+  coMain: string;
+  title: string;
+  titleAria: string;
+  winner: string;
+  noContest: string;
+  draw: string;
+  resultPending: string;
+  viewDetails: string;
+  decision: string;
+  finish: string;
+}
+
+function BoutCard({
+  bout,
+  tr,
+}: {
+  bout: EventBout;
+  tr: BoutCardTranslations;
+}) {
+  const weightLabel = tr.weight(bout.weight_class);
   const time = formatRoundTime(bout.time_finished_seconds);
   // Method may be NULL for many completed bouts (scraper gap, Wave 3.5 will
   // backfill). Fall back to "Finish" / "Decision" inferred from how the bout
@@ -97,9 +121,9 @@ function BoutCard({ bout }: { bout: EventBout }) {
   const inferredFromTime: string | null =
     bout.status === "completed"
       ? wentFullDistance
-        ? "Decision"
+        ? tr.decision
         : bout.round_finished
-          ? "Finish"
+          ? tr.finish
           : null
       : null;
   const methodLabel = bout.method
@@ -112,9 +136,9 @@ function BoutCard({ bout }: { bout: EventBout }) {
       : null;
 
   const placement = bout.is_main_event
-    ? "Main event"
+    ? tr.mainEvent
     : bout.is_co_main_event
-      ? "Co-main"
+      ? tr.coMain
       : null;
 
   const winnerId = bout.winner_id;
@@ -137,15 +161,15 @@ function BoutCard({ bout }: { bout: EventBout }) {
           {placement ? <span className="mx-1.5 text-foreground-subtle/40">·</span> : null}
           <span>{weightLabel}</span>
           <span className="mx-1.5 text-foreground-subtle/40">·</span>
-          <span>{bout.scheduled_rounds} rounds</span>
+          <span>{tr.rounds(bout.scheduled_rounds)}</span>
           {isCuratedTitleFight(bout.id) ? (
             <>
               <span className="mx-1.5 text-foreground-subtle/40">·</span>
               <span
                 className="rounded-sm border border-primary/35 bg-primary/10 px-1.5 py-0.5 text-primary"
-                aria-label="Title fight"
+                aria-label={tr.titleAria}
               >
-                Title
+                {tr.title}
               </span>
             </>
           ) : null}
@@ -164,6 +188,7 @@ function BoutCard({ bout }: { bout: EventBout }) {
           isDraw={!!isDraw}
           isNc={isNc}
           align="left"
+          winnerLabel={tr.winner}
         />
         <div className="text-center sm:text-center">
           <p className="font-display text-lg uppercase tracking-widest text-foreground-subtle">
@@ -172,10 +197,10 @@ function BoutCard({ bout }: { bout: EventBout }) {
           {bout.status === "completed" ? (
             <p className="mt-0.5 font-sans text-[11px] uppercase tracking-widest text-foreground-muted">
               {isNc
-                ? "No Contest"
+                ? tr.noContest
                 : isDraw
-                  ? `Draw${methodLabel ? ` · ${methodLabel}` : ""}`
-                  : methodLabel ?? "Result —"}
+                  ? `${tr.draw}${methodLabel ? ` · ${methodLabel}` : ""}`
+                  : methodLabel ?? tr.resultPending}
             </p>
           ) : (
             <p className="mt-0.5 font-sans text-[11px] uppercase tracking-widest text-foreground-subtle">
@@ -187,7 +212,7 @@ function BoutCard({ bout }: { bout: EventBout }) {
             prefetch={false}
             className="mt-1 inline-flex font-sans text-[10px] uppercase tracking-widest text-primary/80 hover:text-primary"
           >
-            View details
+            {tr.viewDetails}
           </Link>
         </div>
         <FighterSide
@@ -196,6 +221,7 @@ function BoutCard({ bout }: { bout: EventBout }) {
           isDraw={!!isDraw}
           isNc={isNc}
           align="right"
+          winnerLabel={tr.winner}
         />
       </div>
     </article>
@@ -208,12 +234,14 @@ function FighterSide({
   isDraw,
   isNc,
   align,
+  winnerLabel,
 }: {
   fighter: EventBout["fighter_a"];
   won: boolean;
   isDraw: boolean;
   isNc: boolean;
   align: "left" | "right";
+  winnerLabel: string;
 }) {
   const flag = getCountryFlag(fighter.country_code);
   return (
@@ -249,13 +277,13 @@ function FighterSide({
             </span>
             <span>{fighter.country_code ?? "—"}</span>
             {won ? (
-              <span className="text-streak-win">· Winner</span>
+              <span className="text-streak-win">· {winnerLabel}</span>
             ) : null}
           </>
         ) : (
           <>
             {won ? (
-              <span className="text-streak-win">Winner ·</span>
+              <span className="text-streak-win">{winnerLabel} ·</span>
             ) : null}
             <span>{fighter.country_code ?? "—"}</span>
             <span aria-hidden className="text-[13px] leading-none">
@@ -269,13 +297,33 @@ function FighterSide({
 }
 
 export default async function EventDetailPage({ params }: PageProps) {
-  const { slug } = await params;
+  const { slug, locale } = await params;
+  setRequestLocale(locale);
+  const t = await getTranslations("event");
+  const tWeight = await getTranslations("weight");
   const event = await getEventBySlug(slug);
   if (!event) notFound();
 
   const bouts = await getEventBouts(event.id);
-  const dateStr = formatEventDate(event.date);
+  const activeLocale = await getLocale();
+  const dateStr = formatEventDate(event.date, activeLocale);
   const location = locationString(event);
+
+  const boutCardTranslations: BoutCardTranslations = {
+    weight: (id: string) => (tWeight.has(id) ? tWeight(id) : id),
+    rounds: (count: number) => t("rounds", { count }),
+    mainEvent: t("mainEvent"),
+    coMain: t("coMain"),
+    title: t("title"),
+    titleAria: t("titleAria"),
+    winner: t("winner"),
+    noContest: t("noContest"),
+    draw: t("draw"),
+    resultPending: t("resultPending"),
+    viewDetails: t("viewDetails"),
+    decision: t("decision"),
+    finish: t("finish"),
+  };
 
   return (
     <>
@@ -284,11 +332,11 @@ export default async function EventDetailPage({ params }: PageProps) {
         <div className="border-b border-foreground/[0.06]">
           <Container size="xl" className="py-3">
             <Link
-              href="/fighters"
+              href="/events"
               className="inline-flex items-center gap-1.5 font-sans text-sm text-foreground-muted transition-colors hover:text-primary"
             >
               <ChevronLeft className="h-4 w-4" aria-hidden />
-              Back
+              {t("back")}
             </Link>
           </Container>
         </div>
@@ -296,7 +344,7 @@ export default async function EventDetailPage({ params }: PageProps) {
         <section className="border-b border-foreground/10">
           <Container size="xl" className="py-10 md:py-12">
             <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground-subtle">
-              Event · {event.promotion.toUpperCase()}
+              {t("kicker")} · {event.promotion.toUpperCase()}
             </p>
             <h1 className="mt-3 font-display uppercase tracking-tight text-foreground text-hero">
               {event.short_name || event.name}
@@ -311,8 +359,7 @@ export default async function EventDetailPage({ params }: PageProps) {
               ) : null}
             </p>
             <p className="mt-3 font-sans text-xs text-foreground-subtle">
-              Full event analytics arrive in a later wave — for now this is a
-              fight card view with results.
+              {t("previewLead")}
             </p>
           </Container>
         </section>
@@ -320,12 +367,12 @@ export default async function EventDetailPage({ params }: PageProps) {
         <section className="py-10 md:py-14">
           <Container size="xl">
             <h2 className="mb-5 font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
-              Fight card
+              {t("fightCard")}
             </h2>
             {bouts.length === 0 ? (
               <div className="rounded-md border border-dashed border-foreground/10 bg-background-elevated/30 px-6 py-12 text-center">
                 <p className="font-sans text-sm text-foreground-muted">
-                  No bouts recorded for this event yet.
+                  {t("noBouts")}
                 </p>
               </div>
             ) : (
@@ -334,7 +381,7 @@ export default async function EventDetailPage({ params }: PageProps) {
                 <ul className="flex flex-col gap-3">
                   {bouts.map((b) => (
                     <li key={b.id}>
-                      <BoutCard bout={b} />
+                      <BoutCard bout={b} tr={boutCardTranslations} />
                     </li>
                   ))}
                 </ul>

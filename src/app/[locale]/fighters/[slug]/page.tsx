@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import { ArrowLeftRight, ChevronLeft, ChevronRight } from "lucide-react";
+
+import { Link } from "@/i18n/navigation";
 
 import { CircleScore, OctagonScore } from "@/components/fighter/ScoreShapes";
 import { CareerOverview } from "@/components/fighter/detail/CareerOverview";
@@ -39,34 +41,38 @@ import { getSimilarFighters } from "@/lib/similar-fighters";
 export const dynamic = "force-dynamic";
 
 interface PageProps {
-  params: Promise<{ slug: string }>;
+  params: Promise<{ slug: string; locale: string }>;
 }
 
 export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
-  const { slug } = await params;
+  const { slug, locale } = await params;
+  const tFighter = await getTranslations({ locale, namespace: "fighter" });
+  const tWeight = await getTranslations({ locale, namespace: "weight" });
   const fighter = await getFighterBySlug(slug);
   if (!fighter) {
     return {
-      title: "Fighter not found",
-      description: "This fighter does not exist in the Vertex MMA database.",
+      title: tFighter("notFoundTitle"),
+      description: tFighter("notFoundDesc"),
     };
   }
   const recordSuffix = `${fighter.wins_total}-${fighter.losses_total}${
     fighter.draws_total > 0 ? `-${fighter.draws_total}` : ""
   }`;
-  const division = fighter.weight_class_primary
-    ? fighter.weight_class_primary
-        .replace(/_/g, " ")
-        .replace(/\b\w/g, (c) => c.toUpperCase())
-    : "Fighter";
+  const division =
+    fighter.weight_class_primary && tWeight.has(fighter.weight_class_primary)
+      ? tWeight(fighter.weight_class_primary)
+      : tFighter("metaTitleFallback");
   return {
     title: `${fighter.name_en} · ${division}`,
-    description: `${fighter.name_en} fighter profile — ${recordSuffix} record, fight history, and career analytics.`,
+    description: tFighter("metaDescription", {
+      name: fighter.name_en,
+      record: recordSuffix,
+    }),
     openGraph: {
-      title: `${fighter.name_en} · Vertex MMA`,
-      description: `Career stats, fight history, and analytics for ${fighter.name_en}.`,
+      title: tFighter("ogTitle", { name: fighter.name_en }),
+      description: tFighter("ogDescription", { name: fighter.name_en }),
       images: fighter.photo_url ? [fighter.photo_url] : [],
       type: "profile",
     },
@@ -95,7 +101,9 @@ function Section({
 }
 
 export default async function FighterDetailPage({ params }: PageProps) {
-  const { slug } = await params;
+  const { slug, locale } = await params;
+  setRequestLocale(locale);
+  const t = await getTranslations("fighter");
   const fighter = await getFighterBySlug(slug);
   if (!fighter) notFound();
 
@@ -160,7 +168,7 @@ export default async function FighterDetailPage({ params }: PageProps) {
               className="inline-flex items-center gap-1.5 font-sans text-sm text-foreground-muted transition-colors hover:text-primary"
             >
               <ChevronLeft className="h-4 w-4" aria-hidden />
-              Back to roster
+              {t("backToRoster")}
             </Link>
           </Container>
         </div>
@@ -173,7 +181,7 @@ export default async function FighterDetailPage({ params }: PageProps) {
               <Link
                 href={`/fighters/${slug}/score-history?mode=current`}
                 prefetch={false}
-                aria-label="Open per-bout current Vertex score history"
+                aria-label={t("openCurrentHistory")}
                 className="group block rounded-full outline-none ring-offset-2 ring-offset-background-base transition-transform hover:scale-[1.02] focus-visible:ring-2 focus-visible:ring-primary"
               >
                 <OctagonScore
@@ -188,13 +196,13 @@ export default async function FighterDetailPage({ params }: PageProps) {
                     vertexScoreAllTime: fighter.vertex_score_all_time,
                     ufcBouts: fighter.ufc_total,
                   }}
-                  label="Current Vertex Score"
+                  label={t("currentVertex")}
                 />
               </Link>
               <Link
                 href={`/fighters/${slug}/score-history?mode=all_time`}
                 prefetch={false}
-                aria-label="Open per-bout all-time Vertex history"
+                aria-label={t("openAllTimeHistory")}
                 className="group block rounded-full outline-none ring-offset-2 ring-offset-background-base transition-transform hover:scale-[1.02] focus-visible:ring-2 focus-visible:ring-primary"
               >
                 <CircleScore
@@ -206,7 +214,7 @@ export default async function FighterDetailPage({ params }: PageProps) {
                     vertexScoreAllTime: fighter.vertex_score_all_time,
                     ufcBouts: fighter.ufc_total,
                   }}
-                  label="All-Time Vertex Score"
+                  label={t("allTimeVertex")}
                 />
               </Link>
             </div>
@@ -217,7 +225,7 @@ export default async function FighterDetailPage({ params }: PageProps) {
               <Link
                 href={`/fighters/${slug}/score-history?mode=all_time`}
                 prefetch={false}
-                aria-label="Open per-bout all-time Vertex history"
+                aria-label={t("openAllTimeHistory")}
                 className="group block rounded-full outline-none ring-offset-2 ring-offset-background-base transition-transform hover:scale-[1.02] focus-visible:ring-2 focus-visible:ring-primary"
               >
                 <CircleScore
@@ -229,7 +237,7 @@ export default async function FighterDetailPage({ params }: PageProps) {
                     vertexScoreAllTime: fighter.vertex_score_all_time,
                     ufcBouts: fighter.ufc_total,
                   }}
-                  label="Vertex Score · All-Time"
+                  label={t("allTimeVertexShort")}
                 />
               </Link>
             </div>
@@ -258,46 +266,45 @@ export default async function FighterDetailPage({ params }: PageProps) {
           >
             <span className="flex items-center gap-2 font-sans text-[11px] uppercase tracking-[0.22em] text-foreground-muted">
               <ArrowLeftRight className="h-3.5 w-3.5" aria-hidden />
-              Compare with another fighter
+              {t("compareWith")}
             </span>
             <span className="flex items-center gap-1.5 font-sans text-xs text-foreground transition-transform group-hover:translate-x-0.5">
-              <span>Open compare</span>
+              <span>{t("openCompare")}</span>
               <ChevronRight className="h-3.5 w-3.5" aria-hidden />
             </span>
           </Link>
         </Container>
 
         <Section
-          label="Career timeline"
-          explainer="Each dot is a fight — green wins, red losses, larger dots are title fights. Hover for details, click to open the bout."
+          label={t("careerTimeline")}
+          explainer={t("careerTimelineExplainer")}
           className="mt-16 sm:mt-20"
         >
           <CareerTimeline bouts={timelineBouts} />
         </Section>
 
         <Section
-          label="Key stats"
-          explainer="Six attributes derived from striking, grappling, and finishing rates."
+          label={t("keyStats")}
+          explainer={t("keyStatsExplainer")}
           className="mt-16 sm:mt-20"
         >
           <div className="grid grid-cols-1 gap-10 lg:grid-cols-2 lg:gap-16">
             <div className="flex flex-col items-center lg:items-start">
               <RadarChart attributes={attributes} />
               <p className="mt-4 max-w-sm text-center font-sans text-[11px] text-foreground-subtle lg:text-left">
-                Fighters with sparse method data (older bouts) will read lower
-                on Power and Cardio.
+                {t("keyStatsCaveat")}
               </p>
             </div>
             <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
               <div>
                 <h3 className="mb-3 font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-subtle">
-                  Physical
+                  {t("physical")}
                 </h3>
                 <PhysicalInfo fighter={fighter} />
               </div>
               <div>
                 <h3 className="mb-3 font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-subtle">
-                  Career overview
+                  {t("careerOverview")}
                 </h3>
                 <CareerOverview fighter={fighter} />
               </div>
@@ -312,24 +319,24 @@ export default async function FighterDetailPage({ params }: PageProps) {
         </Section>
 
         <Section
-          label="Striking heatmap"
-          explainer="Significant strikes by target zone, aggregated across all UFC rounds."
+          label={t("strikingHeatmap")}
+          explainer={t("strikingHeatmapExplainer")}
           className="mt-16 sm:mt-20"
         >
           <StrikingHeatmap boutRounds={boutRounds} />
         </Section>
 
         <Section
-          label="Round-by-round averages"
-          explainer="Average values per round across the selected fights — toggle metrics below."
+          label={t("roundAverages")}
+          explainer={t("roundAveragesExplainer")}
           className="mt-16 sm:mt-20"
         >
           <RoundByRoundChart boutRounds={boutRounds} />
         </Section>
 
         <Section
-          label="Fight history"
-          explainer="Career UFC bouts in reverse chronological order."
+          label={t("fightHistory")}
+          explainer={t("fightHistoryExplainer")}
           className="mt-16 sm:mt-20"
         >
           <FightHistoryList history={history} />
@@ -337,8 +344,8 @@ export default async function FighterDetailPage({ params }: PageProps) {
 
         {fighterNews.length > 0 ? (
           <Section
-            label="In the news"
-            explainer="Recent MMA headlines that mention this fighter."
+            label={t("inTheNews")}
+            explainer={t("inTheNewsExplainer")}
             className="mt-16 sm:mt-20"
           >
             <ul className="mx-auto flex max-w-3xl flex-col gap-3">
@@ -352,8 +359,8 @@ export default async function FighterDetailPage({ params }: PageProps) {
         ) : null}
 
         <Section
-          label="Similar fighters"
-          explainer="Closest stylistic matches by inverse-Euclidean similarity over striking and grappling rates."
+          label={t("similarFighters")}
+          explainer={t("similarFightersExplainer")}
           className="mt-16 pb-20 sm:mt-20"
         >
           <SimilarFighters fighters={similar} />
