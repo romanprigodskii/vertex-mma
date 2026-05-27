@@ -146,8 +146,10 @@ export function FighterCard({
   const tierGradient = `linear-gradient(180deg, ${gradientFrom} 0%, ${tierStyle.gradientTo} ${gradientStop})`;
   const cardBase =
     "color-mix(in oklch, var(--color-background-elevated) 30%, transparent)";
-  const goldTint =
-    "linear-gradient(0deg, var(--fighter-card-gold-tint) 0%, transparent 25%)";
+  // Explicit alpha-0 same-hue end stops — `transparent` is rgba(0,0,0,0)
+  // and CSS interpolates gradients through that midpoint as grey, which
+  // visibly muddies the gold rim on dark.
+  const goldTint = `linear-gradient(0deg, var(--fighter-card-gold-tint-from) 0%, var(--fighter-card-gold-tint-to) 25%)`;
 
   return (
     <Link
