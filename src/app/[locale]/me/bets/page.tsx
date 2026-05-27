@@ -1,18 +1,36 @@
-import Link from "next/link";
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import { ChevronLeft } from "lucide-react";
 
 import { Container } from "@/components/layout/container";
 import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
+import { Link } from "@/i18n/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { listMyBets } from "@/lib/markets";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "My bets" };
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "me" });
+  return { title: t("myBetsTitle") };
+}
 
-export default async function MyBetsPage() {
+export default async function MyBetsPage({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
+  setRequestLocale(locale);
+  const t = await getTranslations("me");
+  const tMarkets = await getTranslations("markets");
   const user = await getCurrentUser();
   if (!user) redirect("/signin?next=/me/bets");
   const bets = await listMyBets(user.userProfileId);
@@ -27,36 +45,35 @@ export default async function MyBetsPage() {
               href="/markets"
               className="inline-flex items-center gap-1.5 font-sans text-sm text-foreground-muted hover:text-primary"
             >
-              <ChevronLeft className="h-4 w-4" aria-hidden /> Markets
+              <ChevronLeft className="h-4 w-4" aria-hidden /> {tMarkets("heading")}
             </Link>
           </Container>
         </div>
 
         <Container size="lg" className="py-10 md:py-14">
           <h1 className="font-display text-3xl uppercase tracking-tight text-foreground sm:text-4xl">
-            My bets
+            {t("myBetsTitle")}
           </h1>
           <p className="mt-2 font-sans text-sm text-foreground-muted">
-            Balance:{" "}
+            {t("balance")}{" "}
             <span className="text-foreground">
-              {user.balanceCoins.toLocaleString()} coins
+              {user.balanceCoins.toLocaleString()} {t("coinsSuffix")}
             </span>
           </p>
 
           {bets.length === 0 ? (
             <div className="mt-10 rounded-md border border-dashed border-foreground/15 bg-background-elevated/20 px-6 py-16 text-center">
               <p className="font-display text-2xl uppercase tracking-tight text-foreground">
-                No bets yet
+                {t("noBets")}
               </p>
               <p className="mx-auto mt-3 max-w-md font-sans text-sm text-foreground-muted">
-                Pick a market to start. Every trade nudges the implied odds —
-                early shares pay more if you&rsquo;re right.
+                {t("noBetsLead")}
               </p>
               <Link
                 href="/markets"
                 className="mt-6 inline-block rounded-sm bg-primary px-4 py-2 font-display text-sm uppercase tracking-widest text-background-base hover:opacity-90"
               >
-                Browse markets →
+                {t("browseMarkets")} →
               </Link>
             </div>
           ) : (
@@ -76,14 +93,18 @@ export default async function MyBetsPage() {
                         {b.fighter_a_name} vs {b.fighter_b_name}
                       </Link>
                       <p className="mt-1 font-mono text-[11px] tabular text-foreground-subtle">
-                        on &ldquo;{b.outcome_label}&rdquo; @{" "}
-                        {(b.price_at_purchase * 100).toFixed(1)}%
+                        {t("onOutcomeAt", {
+                          outcome: b.outcome_label,
+                          pct: (b.price_at_purchase * 100).toFixed(1),
+                        })}
                       </p>
                     </div>
                     <div className="shrink-0 text-right">
                       <p className="font-mono text-sm tabular text-foreground-muted">
-                        -{b.coins_spent.toLocaleString()}c →{" "}
-                        {b.shares_bought.toFixed(1)} shares
+                        {t("spentForShares", {
+                          coins: b.coins_spent.toLocaleString(),
+                          shares: b.shares_bought.toFixed(1),
+                        })}
                       </p>
                       {b.resolved_at ? (
                         // Refund check comes BEFORE is_winning: a cancelled
@@ -91,21 +112,24 @@ export default async function MyBetsPage() {
                         // ternary would have shown "Lost" incorrectly.
                         b.market_status === "cancelled" ? (
                           <p className="font-mono text-xs tabular text-foreground-muted">
-                            Refunded · {(b.payout ?? 0).toLocaleString()}c
-                            returned
+                            {t("refundedSuffix", {
+                              coins: (b.payout ?? 0).toLocaleString(),
+                            })}
                           </p>
                         ) : b.is_winning ? (
                           <p className="font-mono text-xs tabular text-streak-win">
-                            Won · +{(b.payout ?? 0).toLocaleString()}c
+                            {t("wonSuffix", {
+                              coins: (b.payout ?? 0).toLocaleString(),
+                            })}
                           </p>
                         ) : (
                           <p className="font-mono text-xs tabular text-streak-loss">
-                            Lost
+                            {t("lost")}
                           </p>
                         )
                       ) : (
                         <p className="font-mono text-xs tabular text-foreground-subtle">
-                          Pending
+                          {t("pending")}
                         </p>
                       )}
                     </div>

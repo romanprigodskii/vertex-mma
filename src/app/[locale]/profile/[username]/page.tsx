@@ -1,5 +1,9 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
+import {
+  getLocale,
+  getTranslations,
+  setRequestLocale,
+} from "next-intl/server";
 import { ChevronLeft } from "lucide-react";
 
 import { AchievementsGrid } from "@/components/achievements/achievements-grid";
@@ -10,6 +14,7 @@ import { DailyBonusButton } from "@/components/me/daily-bonus-button";
 import { TierProgress } from "@/components/profile/tier-progress";
 import { RankingCard } from "@/components/rankings/ranking-card";
 import { ShareButton } from "@/components/share/share-button";
+import { Link } from "@/i18n/navigation";
 import {
   listAchievements,
   listUserAchievements,
@@ -21,20 +26,22 @@ import { isTier } from "@/lib/tier";
 export const dynamic = "force-dynamic";
 
 interface PageProps {
-  params: Promise<{ username: string }>;
+  params: Promise<{ username: string; locale: string }>;
 }
 
 export async function generateMetadata({ params }: PageProps) {
-  const { username } = await params;
+  const { username, locale } = await params;
+  const t = await getTranslations({ locale, namespace: "profile" });
   const profile = await getUserProfileByUsername(username);
-  if (!profile) return { title: "User not found" };
-  const desc = `${profile.displayName || profile.username}'s Vertex MMA profile · ${profile.tier} tier.`;
+  if (!profile) return { title: t("notFound") };
+  const name = profile.displayName || profile.username;
+  const desc = t("metaDescription", { name, tier: profile.tier });
   const ogImage = `/api/og/profile/${profile.username}`;
   return {
-    title: `@${profile.username}`,
+    title: t("metaTitle", { username: profile.username }),
     description: desc,
     openGraph: {
-      title: `@${profile.username} · Vertex MMA`,
+      title: t("ogTitle", { username: profile.username }),
       description: desc,
       siteName: "Vertex MMA",
       type: "profile",
@@ -43,19 +50,19 @@ export async function generateMetadata({ params }: PageProps) {
           url: ogImage,
           width: 1200,
           height: 630,
-          alt: `${profile.username}'s Vertex MMA profile`,
+          alt: t("ogAlt", { username: profile.username }),
         },
       ],
     },
-    twitter: {
-      card: "summary_large_image",
-      images: [ogImage],
-    },
+    twitter: { card: "summary_large_image", images: [ogImage] },
   };
 }
 
 export default async function PublicProfilePage({ params }: PageProps) {
-  const { username } = await params;
+  const { username, locale } = await params;
+  setRequestLocale(locale);
+  const t = await getTranslations("profile");
+  const activeLocale = await getLocale();
   const [profile, currentUser] = await Promise.all([
     getUserProfileByUsername(username),
     getCurrentUser(),
@@ -69,10 +76,10 @@ export default async function PublicProfilePage({ params }: PageProps) {
     isOwner ? listAchievements() : Promise.resolve(undefined),
   ]);
   const joined = new Date(profile.joinedAt);
-  const joinedLabel = joined.toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-  });
+  const joinedLabel = joined.toLocaleDateString(
+    activeLocale === "ru" ? "ru-RU" : "en-US",
+    { year: "numeric", month: "long" },
+  );
 
   return (
     <>
@@ -84,7 +91,7 @@ export default async function PublicProfilePage({ params }: PageProps) {
               href="/"
               className="inline-flex items-center gap-1.5 font-sans text-sm text-foreground-muted hover:text-primary"
             >
-              <ChevronLeft className="h-4 w-4" aria-hidden /> Home
+              <ChevronLeft className="h-4 w-4" aria-hidden /> {t("home")}
             </Link>
           </Container>
         </div>
@@ -114,7 +121,7 @@ export default async function PublicProfilePage({ params }: PageProps) {
                 @{profile.username}
               </p>
               <p className="mt-3 font-sans text-[11px] uppercase tracking-widest text-foreground-subtle">
-                {profile.tier.toUpperCase()} · joined {joinedLabel}
+                {profile.tier.toUpperCase()} · {t("joined", { date: joinedLabel })}
                 {profile.countryCode ? ` · ${profile.countryCode}` : ""}
               </p>
               {isOwner && isTier(profile.tier) ? (
@@ -135,31 +142,31 @@ export default async function PublicProfilePage({ params }: PageProps) {
                     href="/settings"
                     className="inline-flex rounded-sm border border-foreground/15 px-4 py-2 font-sans text-sm text-foreground-muted hover:bg-foreground/[0.05] hover:text-foreground"
                   >
-                    Edit profile
+                    {t("editProfile")}
                   </Link>
                 ) : null}
                 <ShareButton
                   url={`/profile/${profile.username}`}
                   ogImageUrl={`/api/og/profile/${profile.username}`}
-                  title={`@${profile.username} · Vertex MMA profile`}
+                  title={t("ogTitle", { username: profile.username })}
                   filename={`vertexmma-profile-${profile.username}`}
-                  label="Share profile"
+                  label={t("shareProfile")}
                 />
               </div>
             </div>
           </div>
 
           <dl className="mt-10 grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <Stat label="Predictions" value={profile.predictionCount} />
-            <Stat label="Bets" value={profile.betCount} />
-            <Stat label="Current streak" value={profile.currentStreak} />
-            <Stat label="Best streak" value={profile.bestStreak} />
+            <Stat label={t("predictions")} value={profile.predictionCount} />
+            <Stat label={t("bets")} value={profile.betCount} />
+            <Stat label={t("currentStreak")} value={profile.currentStreak} />
+            <Stat label={t("bestStreak")} value={profile.bestStreak} />
           </dl>
 
           {isOwner ? (
             <section className="mt-10">
               <h2 className="mb-4 font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
-                Daily bonus
+                {t("dailyBonus")}
               </h2>
               <DailyBonusButton
                 lastDailyBonusAt={profile.lastDailyBonusAt}
@@ -170,7 +177,7 @@ export default async function PublicProfilePage({ params }: PageProps) {
 
           <section className="mt-10">
             <h2 className="mb-4 font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
-              Achievements · {userAchievements.length}
+              {t("achievements")} · {userAchievements.length}
               {isOwner && allAchievements ? `/${allAchievements.length}` : ""}
             </h2>
             <AchievementsGrid
@@ -181,7 +188,7 @@ export default async function PublicProfilePage({ params }: PageProps) {
 
           <section className="mt-12">
             <h2 className="mb-5 font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
-              Rankings by @{profile.username}
+              {t("rankingsBy", { username: profile.username })}
             </h2>
             {rankings.length > 0 ? (
               <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -195,11 +202,11 @@ export default async function PublicProfilePage({ params }: PageProps) {
               <ProfileEmptySection
                 message={
                   isOwner
-                    ? "You haven't published any rankings yet."
-                    : `@${profile.username} hasn't published any rankings yet.`
+                    ? t("youNoRankings")
+                    : t("theyNoRankings", { username: profile.username })
                 }
                 ctaHref={isOwner ? "/rankings/create" : null}
-                ctaLabel="Create your first ranking →"
+                ctaLabel={`${t("createFirstRanking")} →`}
               />
             )}
           </section>

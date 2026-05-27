@@ -1,3 +1,5 @@
+import { useTranslations } from "next-intl";
+
 import type { BoutScorecardJudge } from "@/lib/bout-detail";
 import { cn } from "@/lib/utils";
 
@@ -21,15 +23,16 @@ export function BoutScorecards({
   fighterAId,
   winnerId,
 }: BoutScorecardsProps) {
+  const t = useTranslations("bout");
   if (scorecards.length === 0) return null;
 
   const labelA = lastNameOnly(fighterAName);
   const labelB = lastNameOnly(fighterBName);
 
   return (
-    <section aria-label="Judges' scorecards">
+    <section aria-label={t("judgesScorecardsAria")}>
       <h2 className="mb-4 font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
-        Judges&apos; scorecards
+        {t("judgesScorecards")}
       </h2>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {scorecards.map((judge) => {

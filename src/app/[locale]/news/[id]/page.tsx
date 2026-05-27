@@ -1,6 +1,10 @@
 import * as React from "react";
-import Link from "next/link";
 import { notFound } from "next/navigation";
+import {
+  getLocale,
+  getTranslations,
+  setRequestLocale,
+} from "next-intl/server";
 import { ChevronLeft, ExternalLink } from "lucide-react";
 
 import { Container } from "@/components/layout/container";
@@ -15,6 +19,7 @@ import {
   SocialReactions,
   type SocialEmbedData,
 } from "@/components/news/social-embed";
+import { Link } from "@/i18n/navigation";
 import {
   detectMentionedEvents,
   getNextUpcomingEventForSidebar,
@@ -48,21 +53,24 @@ function toEmbedData(ref: NewsExternalRef): SocialEmbedData {
 export const dynamic = "force-dynamic";
 
 interface PageProps {
-  params: Promise<{ id: string }>;
+  params: Promise<{ id: string; locale: string }>;
 }
 
 export async function generateMetadata({ params }: PageProps) {
-  const { id } = await params;
+  const { id, locale } = await params;
+  const t = await getTranslations({ locale, namespace: "news" });
   const item = await getNewsItemById(id);
-  if (!item) return { title: "News article not found" };
+  if (!item) return { title: t("articleNotFound") };
   return {
     title: item.title,
-    description: `${item.source_name} · MMA news on Vertex MMA`,
+    description: t("metaDescriptionArticle", { source: item.source_name }),
   };
 }
 
 export default async function NewsArticlePage({ params }: PageProps) {
-  const { id } = await params;
+  const { id, locale } = await params;
+  setRequestLocale(locale);
+  const t = await getTranslations("news");
   const item = await getNewsItemById(id);
   if (!item) notFound();
 
@@ -94,11 +102,11 @@ export default async function NewsArticlePage({ params }: PageProps) {
   // first 1-2 names usually make it into related_fighter_ids).
   const allFighters: NewsFighter[] = [...item.fighters, ...detectedFighters];
 
-  const date = new Date(item.published_at).toLocaleDateString("en-US", {
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  });
+  const activeLocale = await getLocale();
+  const date = new Date(item.published_at).toLocaleDateString(
+    activeLocale === "ru" ? "ru-RU" : "en-US",
+    { month: "long", day: "numeric", year: "numeric" },
+  );
 
   const paragraphs = body
     .split(/\n{2,}/)
@@ -133,7 +141,7 @@ export default async function NewsArticlePage({ params }: PageProps) {
             prefetch={false}
             className="inline-flex items-center gap-1.5 font-sans text-sm text-foreground-muted hover:text-primary"
           >
-            <ChevronLeft className="h-4 w-4" aria-hidden /> All news
+            <ChevronLeft className="h-4 w-4" aria-hidden /> {t("allNews")}
           </Link>
 
           <div className="mt-6 grid grid-cols-1 gap-x-12 gap-y-10 lg:grid-cols-[minmax(0,1fr)_320px]">
@@ -149,7 +157,9 @@ export default async function NewsArticlePage({ params }: PageProps) {
                   {paragraphs.length > 0 ? (
                     <>
                       <span aria-hidden>·</span>
-                      <span className="shrink-0">{readMinutes} min read</span>
+                      <span className="shrink-0">
+                        {t("minRead", { n: readMinutes })}
+                      </span>
                     </>
                   ) : null}
                 </div>
@@ -186,14 +196,14 @@ export default async function NewsArticlePage({ params }: PageProps) {
                 </div>
               ) : (
                 <p className="mt-6 font-sans text-sm italic text-foreground-muted">
-                  No rephrased body yet — head to the source below.
+                  {t("noBody")}
                 </p>
               )}
 
               {allFighters.length > 0 ? (
                 <div className="mt-7">
                   <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.2em] text-foreground-subtle">
-                    Fighters mentioned
+                    {t("fightersMentioned")}
                   </p>
                   <div className="flex flex-wrap gap-1.5">
                     {allFighters.map((f) => (
@@ -223,12 +233,12 @@ export default async function NewsArticlePage({ params }: PageProps) {
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 font-sans text-sm text-primary hover:underline"
                 >
-                  Read the original at {item.source_name}
+                  {t("readOriginal", { source: item.source_name })}
                   <ExternalLink className="h-3.5 w-3.5" aria-hidden />
                 </a>
               </div>
 
-              <RelatedNews items={related} heading="More news" />
+              <RelatedNews items={related} heading={t("moreNews")} />
 
               <NewsComments newsItemId={item.id} />
             </article>

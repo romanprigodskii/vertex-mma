@@ -1,12 +1,14 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
+import { useTranslations } from "next-intl";
 
 import { resetPasswordAction } from "@/app/auth/reset-password/actions";
 import { PasswordInput } from "@/components/auth/PasswordInput";
+import { Link } from "@/i18n/navigation";
 
 export function ResetPasswordForm() {
+  const t = useTranslations("auth");
   const [pending, setPending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [success, setSuccess] = React.useState(false);
@@ -19,11 +21,11 @@ export function ResetPasswordForm() {
     const newPassword = String(formData.get("newPassword") ?? "");
     const confirm = String(formData.get("confirm") ?? "");
     if (newPassword.length < 8) {
-      setError("Password must be at least 8 characters.");
+      setError(t("passwordTooShort"));
       return;
     }
     if (newPassword !== confirm) {
-      setError("Passwords do not match.");
+      setError(t("passwordsDoNotMatch"));
       return;
     }
 
@@ -38,14 +40,14 @@ export function ResetPasswordForm() {
     return (
       <div className="py-8 text-center">
         <h1 className="font-display text-3xl uppercase tracking-tight text-foreground">
-          Password updated
+          {t("passwordUpdated")}
         </h1>
         <p className="mt-4 font-sans text-sm text-foreground-muted">
-          You can now sign in with your new password.
+          {t("passwordUpdatedLead")}
         </p>
         <p className="mt-6 font-sans text-sm text-foreground-muted">
           <Link href="/signin" className="text-primary hover:underline">
-            Sign in
+            {t("signIn")}
           </Link>
         </p>
       </div>
@@ -55,16 +57,16 @@ export function ResetPasswordForm() {
   return (
     <>
       <h1 className="font-display text-3xl uppercase tracking-tight text-foreground sm:text-4xl">
-        Choose a new password
+        {t("chooseNewPassword")}
       </h1>
       <p className="mt-2 font-sans text-sm text-foreground-muted">
-        Pick something at least 8 characters long.
+        {t("chooseNewLead")}
       </p>
 
       <form onSubmit={onSubmit} className="mt-8 flex flex-col gap-4">
         <label className="flex flex-col gap-1.5">
           <span className="font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
-            New password
+            {t("newPassword")}
           </span>
           <PasswordInput
             name="newPassword"
@@ -75,7 +77,7 @@ export function ResetPasswordForm() {
         </label>
         <label className="flex flex-col gap-1.5">
           <span className="font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
-            Confirm new password
+            {t("confirmNewPassword")}
           </span>
           <PasswordInput
             name="confirm"
@@ -96,7 +98,7 @@ export function ResetPasswordForm() {
           disabled={pending}
           className="mt-2 rounded-sm bg-primary px-4 py-2.5 font-display text-sm uppercase tracking-widest text-background-base hover:opacity-90 disabled:opacity-50"
         >
-          {pending ? "Updating…" : "Update password"}
+          {pending ? t("updating") : t("updatePassword")}
         </button>
       </form>
     </>

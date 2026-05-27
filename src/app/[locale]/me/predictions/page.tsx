@@ -1,18 +1,41 @@
-import Link from "next/link";
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import {
+  getLocale,
+  getTranslations,
+  setRequestLocale,
+} from "next-intl/server";
 import { ChevronLeft } from "lucide-react";
 
 import { Container } from "@/components/layout/container";
 import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
+import { Link } from "@/i18n/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { listMyPredictions } from "@/lib/predictions";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "My predictions" };
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "me" });
+  return { title: t("myPredictionsTitle") };
+}
 
-export default async function MyPredictionsPage() {
+export default async function MyPredictionsPage({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
+  setRequestLocale(locale);
+  const t = await getTranslations("me");
+  const tNav = await getTranslations("nav");
+  const activeLocale = await getLocale();
   const user = await getCurrentUser();
   if (!user) redirect("/signin?next=/me/predictions");
   const rows = await listMyPredictions(user.userProfileId);
@@ -27,30 +50,29 @@ export default async function MyPredictionsPage() {
               href="/predictions"
               className="inline-flex items-center gap-1.5 font-sans text-sm text-foreground-muted hover:text-primary"
             >
-              <ChevronLeft className="h-4 w-4" aria-hidden /> Predictions
+              <ChevronLeft className="h-4 w-4" aria-hidden /> {tNav("rankings")}
             </Link>
           </Container>
         </div>
 
         <Container size="lg" className="py-10 md:py-14">
           <h1 className="font-display uppercase tracking-tight text-foreground text-h1">
-            My predictions
+            {t("myPredictionsTitle")}
           </h1>
 
           {rows.length === 0 ? (
             <div className="mt-10 rounded-md border border-dashed border-foreground/15 bg-background-elevated/20 px-6 py-16 text-center">
               <p className="font-display text-2xl uppercase tracking-tight text-foreground">
-                No picks yet
+                {t("noPicks")}
               </p>
               <p className="mx-auto mt-3 max-w-md font-sans text-sm text-foreground-muted">
-                Predict the next card to climb the leaderboard. 10 points per
-                correct call — free, no coins needed.
+                {t("noPicksLead")}
               </p>
               <Link
                 href="/predictions"
                 className="mt-6 inline-block rounded-sm bg-primary px-4 py-2 font-display text-sm uppercase tracking-widest text-background-base hover:opacity-90"
               >
-                Browse open events →
+                {t("browseOpenEvents")} →
               </Link>
             </div>
           ) : (
@@ -69,15 +91,10 @@ export default async function MyPredictionsPage() {
                         </p>
                         <p className="mt-0.5 font-mono text-[11px] tabular text-foreground-subtle">
                           {new Date(r.event_date).toLocaleDateString(
-                            "en-US",
-                            {
-                              month: "short",
-                              day: "numeric",
-                              year: "numeric",
-                            },
+                            activeLocale === "ru" ? "ru-RU" : "en-US",
+                            { month: "short", day: "numeric", year: "numeric" },
                           )}{" "}
-                          · {r.picks_count} pick
-                          {r.picks_count === 1 ? "" : "s"}
+                          · {t("picksCount", { count: r.picks_count })}
                         </p>
                       </div>
                       <div className="shrink-0 text-right">
@@ -87,11 +104,11 @@ export default async function MyPredictionsPage() {
                           </p>
                         ) : (
                           <p className="font-mono text-xs text-foreground-subtle">
-                            Pending
+                            {t("pending")}
                           </p>
                         )}
                         <p className="font-mono text-[10px] tabular text-foreground-subtle">
-                          {r.total_points} pts
+                          {t("pointsSuffix", { n: r.total_points })}
                         </p>
                       </div>
                     </div>

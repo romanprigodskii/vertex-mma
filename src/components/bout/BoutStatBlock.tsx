@@ -1,3 +1,5 @@
+import { useTranslations } from "next-intl";
+
 import type { BoutRoundStatsRow } from "@/lib/bout-detail";
 import { StatRow, formatStrike, formatTakedowns, formatTime } from "./StatRow";
 
@@ -21,6 +23,7 @@ function gtMark(av: number, bv: number): { a: boolean; b: boolean } {
 }
 
 export function BoutStatBlock({ a, b }: BoutStatBlockProps) {
+  const t = useTranslations("bout");
   const sigA = pick(a, "sig_str_landed");
   const sigB = pick(b, "sig_str_landed");
   const sigAttA = pick(a, "sig_str_attempted");
@@ -90,77 +93,77 @@ export function BoutStatBlock({ a, b }: BoutStatBlockProps) {
   return (
     <div className="rounded-md border border-foreground/10 bg-background-elevated/30 px-4 py-3">
       <StatRow
-        label="Sig. strikes"
+        label={t("stat_sigStrikes")}
         valueA={formatStrike(sigA, sigAttA)}
         valueB={formatStrike(sigB, sigAttB)}
         highlightA={sigMark.a}
         highlightB={sigMark.b}
       />
       <StatRow
-        label="Head"
+        label={t("head")}
         valueA={formatStrike(headA, headAttA)}
         valueB={formatStrike(headB, headAttB)}
         highlightA={headMark.a}
         highlightB={headMark.b}
       />
       <StatRow
-        label="Body"
+        label={t("body")}
         valueA={formatStrike(bodyA, bodyAttA)}
         valueB={formatStrike(bodyB, bodyAttB)}
         highlightA={bodyMark.a}
         highlightB={bodyMark.b}
       />
       <StatRow
-        label="Legs"
+        label={t("legs")}
         valueA={formatStrike(legsA, legsAttA)}
         valueB={formatStrike(legsB, legsAttB)}
         highlightA={legsMark.a}
         highlightB={legsMark.b}
       />
       <StatRow
-        label="Distance"
+        label={t("distance")}
         valueA={distA}
         valueB={distB}
         highlightA={distMark.a}
         highlightB={distMark.b}
       />
       <StatRow
-        label="Clinch"
+        label={t("clinch")}
         valueA={clinA}
         valueB={clinB}
         highlightA={clinMark.a}
         highlightB={clinMark.b}
       />
       <StatRow
-        label="Ground"
+        label={t("ground")}
         valueA={grndA}
         valueB={grndB}
         highlightA={grndMark.a}
         highlightB={grndMark.b}
       />
       <StatRow
-        label="Total strikes"
+        label={t("stat_totalStrikes")}
         valueA={formatStrike(totA, totAttA)}
         valueB={formatStrike(totB, totAttB)}
         highlightA={totMark.a}
         highlightB={totMark.b}
       />
       <StatRow
-        label="Takedowns"
+        label={t("stat_takedowns")}
         valueA={formatTakedowns(tdA, tdAttA)}
         valueB={formatTakedowns(tdB, tdAttB)}
         highlightA={tdMark.a}
         highlightB={tdMark.b}
       />
       <StatRow
-        label="Sub. attempts"
+        label={t("stat_subAttempts")}
         valueA={saA}
         valueB={saB}
         highlightA={saMark.a}
         highlightB={saMark.b}
       />
       <StatRow
-        label="Control time"
+        label={t("stat_controlTime")}
         valueA={formatTime(ctA)}
         valueB={formatTime(ctB)}
         highlightA={ctMark.a}
@@ -168,7 +171,7 @@ export function BoutStatBlock({ a, b }: BoutStatBlockProps) {
       />
       {showReversals ? (
         <StatRow
-          label="Reversals"
+          label={t("stat_reversals")}
           valueA={revA}
           valueB={revB}
           highlightA={revMark.a}
@@ -177,7 +180,7 @@ export function BoutStatBlock({ a, b }: BoutStatBlockProps) {
       ) : null}
       {showKnockdowns ? (
         <StatRow
-          label="Knockdowns"
+          label={t("stat_knockdowns")}
           valueA={kdA}
           valueB={kdB}
           highlightA={kdMark.a}

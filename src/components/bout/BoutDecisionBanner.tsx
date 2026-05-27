@@ -1,8 +1,9 @@
+import { getTranslations } from "next-intl/server";
+
 import { Container } from "@/components/layout/container";
 import type { BoutDetail } from "@/lib/bout-detail";
 import {
   computeJudgeAgreement,
-  formatDecisionLabel,
   isDecisionMethod,
 } from "@/lib/bout-detail";
 
@@ -10,9 +11,19 @@ interface BoutDecisionBannerProps {
   bout: BoutDetail;
 }
 
-export function BoutDecisionBanner({ bout }: BoutDecisionBannerProps) {
+// Pulls the localized decision label from `bout.*` — keys match the
+// enum value, e.g. `decision_unanimous` → "Unanimous Decision" / "Единогласное решение".
+const METHOD_LABEL_KEY: Record<string, string> = {
+  decision_unanimous: "unanimousDecision",
+  decision_split: "splitDecision",
+  decision_majority: "majorityDecision",
+};
+
+export async function BoutDecisionBanner({ bout }: BoutDecisionBannerProps) {
   if (!isDecisionMethod(bout.method)) return null;
-  const label = formatDecisionLabel(bout.method);
+  const t = await getTranslations("bout");
+  const key = bout.method ? METHOD_LABEL_KEY[bout.method] : null;
+  const label = key ? t(key) : null;
   if (label == null) return null;
 
   let subline: string | null = null;
@@ -27,13 +38,13 @@ export function BoutDecisionBanner({ bout }: BoutDecisionBannerProps) {
       subline = `${a.judgesForB}-${a.judgesForA}${drawPart} ${bout.fighter_b.name_en}`;
     } else {
       // Draw / no recorded winner — show raw counts.
-      subline = `${a.judgesForA}-${a.judgesForB}${a.judgesDraw > 0 ? `-${a.judgesDraw} draw` : ""}`;
+      subline = `${a.judgesForA}-${a.judgesForB}${a.judgesDraw > 0 ? `-${a.judgesDraw} ${t("draw").toLowerCase()}` : ""}`;
     }
   }
 
   return (
     <section
-      aria-label="Decision summary"
+      aria-label={t("decisionSummary")}
       className="border-t border-foreground/[0.06] bg-background-elevated/20"
     >
       <Container size="xl" className="py-5 text-center">

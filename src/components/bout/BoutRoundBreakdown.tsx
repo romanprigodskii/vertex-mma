@@ -1,3 +1,5 @@
+import { useTranslations } from "next-intl";
+
 import type { BoutDetail, RoundPair } from "@/lib/bout-detail";
 import { groupRoundsByNumber } from "@/lib/bout-detail";
 
@@ -8,6 +10,7 @@ interface BoutRoundBreakdownProps {
 }
 
 export function BoutRoundBreakdown({ bout }: BoutRoundBreakdownProps) {
+  const t = useTranslations("bout");
   const groups = groupRoundsByNumber(
     bout.rounds,
     bout.fighter_a.id,
@@ -18,7 +21,7 @@ export function BoutRoundBreakdown({ bout }: BoutRoundBreakdownProps) {
     return (
       <div className="rounded-md border border-dashed border-foreground/10 bg-background-elevated/30 px-6 py-12 text-center">
         <p className="font-sans text-sm text-foreground-muted">
-          No round-by-round data available for this bout.
+          {t("noRoundData")}
         </p>
       </div>
     );
@@ -55,19 +58,22 @@ function RoundSection({
   isFinishingRound: boolean;
   roundFinishedTimeSeconds: number | null;
 }) {
+  const t = useTranslations("bout");
   const finishLabel =
     isFinishingRound && roundFinishedTimeSeconds != null
-      ? `Finish · ${Math.floor(roundFinishedTimeSeconds / 60)}:${(
-          roundFinishedTimeSeconds % 60
-        )
-          .toString()
-          .padStart(2, "0")}`
+      ? t("finishAt", {
+          time: `${Math.floor(roundFinishedTimeSeconds / 60)}:${(
+            roundFinishedTimeSeconds % 60
+          )
+            .toString()
+            .padStart(2, "0")}`,
+        })
       : null;
   return (
     <section>
       <header className="mb-2 flex items-baseline justify-between gap-3 px-1">
         <h3 className="font-sans text-xs uppercase tracking-widest text-foreground">
-          Round {group.round}
+          {t("roundN", { n: group.round })}
         </h3>
         {finishLabel ? (
           <span className="font-mono tabular text-[11px] text-streak-win">

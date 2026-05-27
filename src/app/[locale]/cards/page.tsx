@@ -1,23 +1,37 @@
-import Link from "next/link";
+import type { Metadata } from "next";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 
 import { FightCardGridCard } from "@/components/cards/fight-card-grid-card";
 import { Container } from "@/components/layout/container";
 import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
+import { Link } from "@/i18n/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { listCardsByUser, listPublicCards } from "@/lib/fight-cards";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = {
-  title: "Fight Cards",
-  description: "Community-built dream fight cards on Vertex MMA.",
-};
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "cards" });
+  return { title: t("metaTitle"), description: t("metaDescription") };
+}
 
 const SECTION_LABEL =
   "mb-3 font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted";
 
-export default async function CardsListPage() {
+export default async function CardsListPage({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
+  setRequestLocale(locale);
+  const t = await getTranslations("cards");
   const currentUser = await getCurrentUser();
   const [publicCards, myCards] = await Promise.all([
     listPublicCards(36),
@@ -37,14 +51,13 @@ export default async function CardsListPage() {
           <header className="mb-8 flex flex-wrap items-baseline justify-between gap-3">
             <div>
               <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground-subtle">
-                Community
+                {t("kicker")}
               </p>
               <h1 className="mt-2 font-display uppercase tracking-tight text-foreground text-h1">
-                Fight Cards
+                {t("heading")}
               </h1>
               <p className="mt-2 max-w-xl font-sans text-sm text-foreground-muted">
-                Dream cards built by Vertex MMA users. Book any matchup, theme
-                it, share it.
+                {t("lead")}
               </p>
             </div>
             {currentUser ? (
@@ -52,21 +65,21 @@ export default async function CardsListPage() {
                 href="/cards/create"
                 className="rounded-sm bg-primary px-4 py-2 font-display text-sm uppercase tracking-widest text-background-base hover:opacity-90"
               >
-                Build a card
+                {t("buildCard")}
               </Link>
             ) : (
               <Link
                 href="/signin?next=/cards/create"
                 className="rounded-sm border border-foreground/15 px-4 py-2 font-display text-sm uppercase tracking-widest text-foreground-muted hover:bg-foreground/[0.05] hover:text-foreground"
               >
-                Sign in to build
+                {t("signInToBuild")}
               </Link>
             )}
           </header>
 
           {myCards.length > 0 ? (
             <section className="mb-10">
-              <h2 className={SECTION_LABEL}>Your cards</h2>
+              <h2 className={SECTION_LABEL}>{t("yourCards")}</h2>
               <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {myCards.map((c) => (
                   <li key={c.id}>
@@ -79,16 +92,15 @@ export default async function CardsListPage() {
 
           <section>
             {myCards.length > 0 ? (
-              <h2 className={SECTION_LABEL}>Community cards</h2>
+              <h2 className={SECTION_LABEL}>{t("communityCards")}</h2>
             ) : null}
             {communityCards.length === 0 ? (
               <div className="rounded-md border border-dashed border-foreground/15 bg-background-elevated/20 px-6 py-16 text-center">
                 <p className="font-display text-2xl uppercase tracking-tight text-foreground">
-                  No fight cards yet
+                  {t("emptyTitle")}
                 </p>
                 <p className="mx-auto mt-3 max-w-md font-sans text-sm text-foreground-muted">
-                  Be the first to book one. Pick the fighters, set the main
-                  event, theme it, and share.
+                  {t("emptyLead")}
                 </p>
                 <Link
                   href={
@@ -96,7 +108,7 @@ export default async function CardsListPage() {
                   }
                   className="mt-6 inline-block rounded-sm bg-primary px-4 py-2 font-display text-sm uppercase tracking-widest text-background-base hover:opacity-90"
                 >
-                  Build the first card →
+                  {t("buildFirst")} →
                 </Link>
               </div>
             ) : (

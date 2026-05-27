@@ -1,15 +1,16 @@
-import Link from "next/link";
+import { getLocale } from "next-intl/server";
 import { ChevronRight } from "lucide-react";
 
 import { NewsClassificationBadge } from "@/components/news/news-classification-badge";
+import { Link } from "@/i18n/navigation";
 import type { NewsFeedItem } from "@/lib/news";
 
-export function NewsRow({ item }: { item: NewsFeedItem }) {
-  const date = new Date(item.published_at).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+export async function NewsRow({ item }: { item: NewsFeedItem }) {
+  const locale = await getLocale();
+  const date = new Date(item.published_at).toLocaleDateString(
+    locale === "ru" ? "ru-RU" : "en-US",
+    { month: "short", day: "numeric", year: "numeric" },
+  );
 
   return (
     <div className="rounded-md border border-foreground/10 bg-background-elevated/30 p-4 transition-colors hover:border-foreground/20 hover:bg-foreground/[0.04]">

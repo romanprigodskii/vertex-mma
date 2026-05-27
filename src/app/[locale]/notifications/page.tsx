@@ -1,4 +1,6 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 
 import { Container } from "@/components/layout/container";
 import { Footer } from "@/components/layout/footer";
@@ -10,9 +12,24 @@ import { listNotifications } from "@/lib/notifications";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "Notifications" };
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "notifications" });
+  return { title: t("metaTitle") };
+}
 
-export default async function NotificationsPage() {
+export default async function NotificationsPage({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
+  setRequestLocale(locale);
+  const t = await getTranslations("notifications");
   const user = await getCurrentUser();
   if (!user) redirect("/signin?next=/notifications");
 
@@ -27,10 +44,10 @@ export default async function NotificationsPage() {
           <header className="mb-8 flex items-baseline justify-between gap-3">
             <div>
               <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground-subtle">
-                Inbox
+                {t("kicker")}
               </p>
               <h1 className="mt-2 font-display uppercase tracking-tight text-foreground text-h1">
-                Notifications
+                {t("heading")}
               </h1>
             </div>
             {hasUnread ? <MarkAllReadButton /> : null}
@@ -38,8 +55,7 @@ export default async function NotificationsPage() {
 
           {items.length === 0 ? (
             <p className="py-12 text-center font-sans text-sm text-foreground-muted">
-              No notifications yet. Place a bet, make a pick, or unlock an
-              achievement — anything that happens will show up here.
+              {t("empty")}
             </p>
           ) : (
             <ul className="flex flex-col rounded-md border border-foreground/10 bg-background-elevated/30">
