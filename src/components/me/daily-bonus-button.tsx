@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 
-import { claimDailyBonusAction } from "@/app/me/actions";
+import { claimDailyBonusAction } from "@/app/[locale]/me/actions";
 import { dailyBonusAmount } from "@/lib/tier";
 
 const COOLDOWN_HOURS = 20;

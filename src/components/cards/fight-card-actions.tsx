@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { Check, Heart, Link2 } from "lucide-react";
 
-import { toggleLikeAction } from "@/app/cards/actions";
+import { toggleLikeAction } from "@/app/[locale]/cards/actions";
 import { cn } from "@/lib/utils";
 
 interface Props {

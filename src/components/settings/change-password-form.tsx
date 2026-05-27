@@ -2,7 +2,7 @@
 
 import * as React from "react";
 
-import { changePasswordAction } from "@/app/settings/actions";
+import { changePasswordAction } from "@/app/[locale]/settings/actions";
 import { PasswordInput } from "@/components/auth/PasswordInput";
 
 export function ChangePasswordForm() {

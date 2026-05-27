@@ -9,7 +9,7 @@ import {
   type PickerFighter,
   searchFightersForPicker,
   updateRankingAction,
-} from "@/app/rankings/actions";
+} from "@/app/[locale]/rankings/actions";
 
 const INPUT_CLASS =
   "rounded-sm border border-foreground/15 bg-background-elevated/30 px-3 py-2 font-sans text-sm text-foreground focus:border-primary focus:outline-none";

@@ -1,4 +1,4 @@
-import { SignInForm } from "@/app/signin/sign-in-form";
+import { SignInForm } from "@/app/[locale]/signin/sign-in-form";
 import { Container } from "@/components/layout/container";
 import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";

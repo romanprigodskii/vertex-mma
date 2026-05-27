@@ -1,0 +1,52 @@
+{
+  "nav": {
+    "fighters": "Fighters",
+    "events": "Events",
+    "news": "News",
+    "markets": "Markets",
+    "rankings": "Rankings",
+    "cards": "Cards",
+    "leaderboard": "Leaderboard",
+    "signIn": "Sign in",
+    "signUp": "Create account",
+    "search": "Find",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu",
+    "menu": "Menu",
+    "switchToLight": "Switch to light",
+    "switchToDark": "Switch to dark",
+    "switchToEnglish": "Switch to English",
+    "switchToRussian": "Перейти на русский"
+  },
+  "userMenu": {
+    "profile": "Profile",
+    "myBets": "My bets",
+    "myPredictions": "My predictions",
+    "notifications": "Notifications",
+    "settings": "Settings",
+    "signOut": "Sign out"
+  },
+  "footer": {
+    "fighters": "Fighters",
+    "allFighters": "All fighters",
+    "events": "Events",
+    "compare": "Compare",
+    "markets": "Markets",
+    "openMarkets": "Open markets",
+    "myBets": "My bets",
+    "community": "Community",
+    "predictions": "Predictions",
+    "rankings": "Rankings",
+    "leaderboard": "Leaderboard",
+    "about": "About",
+    "privacy": "Privacy",
+    "terms": "Terms",
+    "tagline": "UFC scores, community rankings, virtual coin betting. Virtual currency has no monetary value. © {year}."
+  },
+  "common": {
+    "loading": "Loading…",
+    "error": "Something went wrong",
+    "retry": "Retry",
+    "back": "Back"
+  }
+}

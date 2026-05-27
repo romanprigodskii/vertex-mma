@@ -1,7 +1,9 @@
+import { getTranslations } from "next-intl/server";
 import Link from "next/link";
 import { Coins } from "lucide-react";
 
 import { Container } from "@/components/layout/container";
+import { LanguageToggle } from "@/components/layout/language-toggle";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { NavSections } from "@/components/layout/nav-sections";
 import { NavbarNotifications } from "@/components/layout/navbar-notifications";
@@ -30,11 +32,12 @@ function Logo() {
   );
 }
 
-export function NavbarInner({
+export async function NavbarInner({
   user,
   unreadCount,
   recentNotifications,
 }: Props) {
+  const t = await getTranslations("nav");
   return (
     <header className="sticky top-0 z-40 border-b border-foreground/[0.06] bg-background-base/85 backdrop-blur-md">
       <Container size="xl">
@@ -43,6 +46,7 @@ export function NavbarInner({
           <NavSections />
           <div className="flex items-center gap-2">
             <FighterSearchTrigger className="hidden lg:inline-flex" />
+            <LanguageToggle className="hidden md:inline-flex" />
             <ThemeToggle className="hidden md:inline-flex" />
             {user ? (
               <>
@@ -63,7 +67,7 @@ export function NavbarInner({
                 href="/signin"
                 className="hidden font-sans text-sm uppercase tracking-widest text-foreground-muted transition-colors hover:text-foreground md:inline"
               >
-                Sign in
+                {t("signIn")}
               </Link>
             )}
             <MobileNav user={user} />

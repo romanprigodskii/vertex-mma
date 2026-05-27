@@ -1,0 +1,52 @@
+{
+  "nav": {
+    "fighters": "Бойцы",
+    "events": "Турниры",
+    "news": "Новости",
+    "markets": "Маркеты",
+    "rankings": "Рейтинги",
+    "cards": "Карды",
+    "leaderboard": "Лидерборд",
+    "signIn": "Войти",
+    "signUp": "Регистрация",
+    "search": "Поиск",
+    "openMenu": "Открыть меню",
+    "closeMenu": "Закрыть меню",
+    "menu": "Меню",
+    "switchToLight": "Светлая тема",
+    "switchToDark": "Тёмная тема",
+    "switchToEnglish": "Switch to English",
+    "switchToRussian": "Перейти на русский"
+  },
+  "userMenu": {
+    "profile": "Профиль",
+    "myBets": "Мои ставки",
+    "myPredictions": "Мои прогнозы",
+    "notifications": "Уведомления",
+    "settings": "Настройки",
+    "signOut": "Выйти"
+  },
+  "footer": {
+    "fighters": "Бойцы",
+    "allFighters": "Все бойцы",
+    "events": "Турниры",
+    "compare": "Сравнить",
+    "markets": "Маркеты",
+    "openMarkets": "Открытые маркеты",
+    "myBets": "Мои ставки",
+    "community": "Сообщество",
+    "predictions": "Прогнозы",
+    "rankings": "Рейтинги",
+    "leaderboard": "Лидерборд",
+    "about": "О проекте",
+    "privacy": "Конфиденциальность",
+    "terms": "Условия",
+    "tagline": "UFC статистика, рейтинги от сообщества, ставки на виртуальные монеты. Виртуальная валюта не имеет денежной ценности. © {year}."
+  },
+  "common": {
+    "loading": "Загрузка…",
+    "error": "Что-то пошло не так",
+    "retry": "Повторить",
+    "back": "Назад"
+  }
+}

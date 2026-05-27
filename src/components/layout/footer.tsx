@@ -1,53 +1,71 @@
-import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 
 import { Container } from "@/components/layout/container";
+import { Link } from "@/i18n/navigation";
+
+type FooterTKey =
+  | "fighters"
+  | "allFighters"
+  | "events"
+  | "compare"
+  | "markets"
+  | "openMarkets"
+  | "myBets"
+  | "community"
+  | "predictions"
+  | "rankings"
+  | "leaderboard"
+  | "about"
+  | "privacy"
+  | "terms";
 
 const COLUMNS: Array<{
-  title: string;
-  links: Array<{ href: string; label: string }>;
+  titleKey: FooterTKey;
+  links: Array<{ href: string; labelKey: FooterTKey }>;
 }> = [
   {
-    title: "Fighters",
+    titleKey: "fighters",
     links: [
-      { href: "/fighters", label: "All fighters" },
-      { href: "/events", label: "Events" },
-      { href: "/fighters/compare", label: "Compare" },
+      { href: "/fighters", labelKey: "allFighters" },
+      { href: "/events", labelKey: "events" },
+      { href: "/fighters/compare", labelKey: "compare" },
     ],
   },
   {
-    title: "Markets",
+    titleKey: "markets",
     links: [
-      { href: "/markets", label: "Open markets" },
-      { href: "/me/bets", label: "My bets" },
+      { href: "/markets", labelKey: "openMarkets" },
+      { href: "/me/bets", labelKey: "myBets" },
     ],
   },
   {
-    title: "Community",
+    titleKey: "community",
     links: [
-      { href: "/predictions", label: "Predictions" },
-      { href: "/rankings", label: "Rankings" },
-      { href: "/leaderboard", label: "Leaderboard" },
+      { href: "/predictions", labelKey: "predictions" },
+      { href: "/rankings", labelKey: "rankings" },
+      { href: "/leaderboard", labelKey: "leaderboard" },
     ],
   },
   {
-    title: "About",
+    titleKey: "about",
     links: [
-      { href: "/about", label: "About" },
-      { href: "/privacy", label: "Privacy" },
-      { href: "/terms", label: "Terms" },
+      { href: "/about", labelKey: "about" },
+      { href: "/privacy", labelKey: "privacy" },
+      { href: "/terms", labelKey: "terms" },
     ],
   },
 ];
 
-export function Footer() {
+export async function Footer() {
+  const t = await getTranslations("footer");
   return (
     <footer className="mt-16 border-t border-foreground/[0.06] bg-background-elevated/30">
       <Container size="xl" className="py-10 md:py-14">
         <div className="grid grid-cols-2 gap-8 md:grid-cols-4">
           {COLUMNS.map((col) => (
-            <div key={col.title}>
+            <div key={col.titleKey}>
               <h4 className="font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
-                {col.title}
+                {t(col.titleKey)}
               </h4>
               <ul className="mt-3 flex flex-col gap-1.5">
                 {col.links.map((l) => (
@@ -56,7 +74,7 @@ export function Footer() {
                       href={l.href}
                       className="font-sans text-sm text-foreground-muted transition-colors hover:text-foreground"
                     >
-                      {l.label}
+                      {t(l.labelKey)}
                     </Link>
                   </li>
                 ))}
@@ -71,8 +89,7 @@ export function Footer() {
             <span className="text-foreground">ERTEX MMA</span>
           </p>
           <p className="max-w-xl text-right font-sans text-xs text-foreground-subtle">
-            UFC scores, community rankings, virtual coin betting. Virtual
-            currency has no monetary value. © {new Date().getFullYear()}.
+            {t("tagline", { year: new Date().getFullYear() })}
           </p>
         </div>
       </Container>

@@ -3,7 +3,7 @@
 import * as React from "react";
 import { ArrowBigUp, ArrowBigDown, MoreHorizontal } from "lucide-react";
 
-import { deleteCommentAction } from "@/app/news/[id]/actions";
+import { deleteCommentAction } from "@/app/[locale]/news/[id]/actions";
 import {
   CommenterAvatar,
   CommentComposer,

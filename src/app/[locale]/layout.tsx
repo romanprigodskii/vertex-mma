@@ -1,10 +1,15 @@
 import type { Metadata } from "next";
 import { Bebas_Neue, Inter, JetBrains_Mono } from "next/font/google";
-import "./globals.css";
+import { notFound } from "next/navigation";
+import { hasLocale, NextIntlClientProvider } from "next-intl";
+import { setRequestLocale } from "next-intl/server";
+
+import "../globals.css";
 
 import { ScrollToTopOnNav } from "@/components/layout/scroll-to-top-on-nav";
 import { ThemeProvider } from "@/components/layout/theme-provider";
 import { FighterSearchPalette } from "@/components/search/fighter-search-palette";
+import { routing } from "@/i18n/routing";
 
 const bebasNeue = Bebas_Neue({
   variable: "--font-display-bebas",
@@ -15,13 +20,13 @@ const bebasNeue = Bebas_Neue({
 
 const inter = Inter({
   variable: "--font-sans-inter",
-  subsets: ["latin"],
+  subsets: ["latin", "cyrillic"],
   display: "swap",
 });
 
 const jetbrainsMono = JetBrains_Mono({
   variable: "--font-mono-jetbrains",
-  subsets: ["latin"],
+  subsets: ["latin", "cyrillic"],
   display: "swap",
 });
 
@@ -45,23 +50,39 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export function generateStaticParams() {
+  return routing.locales.map((locale) => ({ locale }));
+}
+
+export default async function RootLayout({
   children,
+  params,
 }: Readonly<{
   children: React.ReactNode;
+  params: Promise<{ locale: string }>;
 }>) {
+  const { locale } = await params;
+  if (!hasLocale(routing.locales, locale)) {
+    notFound();
+  }
+  // Hint next-intl/server about the active locale so RSC-level
+  // useTranslations / getTranslations resolve correctly.
+  setRequestLocale(locale);
+
   return (
     <html
-      lang="en"
+      lang={locale}
       className={`${bebasNeue.variable} ${inter.variable} ${jetbrainsMono.variable} h-full`}
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col bg-background-base text-foreground font-sans antialiased">
-        <ThemeProvider>
-          <ScrollToTopOnNav />
-          <FighterSearchPalette />
-          {children}
-        </ThemeProvider>
+        <NextIntlClientProvider>
+          <ThemeProvider>
+            <ScrollToTopOnNav />
+            <FighterSearchPalette />
+            {children}
+          </ThemeProvider>
+        </NextIntlClientProvider>
       </body>
     </html>
   );

@@ -1,12 +1,13 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Coins, LogOut, Menu, Moon, Sun, X } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
 import { useTheme } from "next-themes";
 
+import { Link, usePathname, useRouter } from "@/i18n/navigation";
+import { routing } from "@/i18n/routing";
 import type { CurrentUser } from "@/lib/auth";
 import { NAV_SECTIONS } from "@/lib/navigation";
 import { cn } from "@/lib/utils";
@@ -14,6 +15,10 @@ import { cn } from "@/lib/utils";
 export function MobileNav({ user }: { user: CurrentUser | null }) {
   const [open, setOpen] = React.useState(false);
   const pathname = usePathname();
+  const router = useRouter();
+  const locale = useLocale();
+  const t = useTranslations("nav");
+  const tUser = useTranslations("userMenu");
   const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = React.useState(false);
   React.useEffect(() => setMounted(true), []);
@@ -24,13 +29,14 @@ export function MobileNav({ user }: { user: CurrentUser | null }) {
   }, [pathname]);
 
   const isLight = resolvedTheme === "light";
+  const otherLocale = locale === "ru" ? "en" : "ru";
 
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
       <Dialog.Trigger asChild>
         <button
           type="button"
-          aria-label="Open menu"
+          aria-label={t("openMenu")}
           className="md:hidden rounded-sm p-1.5 text-foreground-muted transition-colors hover:bg-foreground/[0.05] hover:text-foreground"
         >
           <Menu className="h-5 w-5" />
@@ -44,11 +50,11 @@ export function MobileNav({ user }: { user: CurrentUser | null }) {
         >
           <div className="flex items-center justify-between border-b border-foreground/10 p-4">
             <Dialog.Title className="font-display text-base uppercase tracking-widest text-foreground">
-              Menu
+              {t("menu")}
             </Dialog.Title>
             <Dialog.Close asChild>
               <button
-                aria-label="Close menu"
+                aria-label={t("closeMenu")}
                 className="rounded-sm p-1.5 text-foreground-muted hover:bg-foreground/[0.05]"
               >
                 <X className="h-5 w-5" />
@@ -72,7 +78,7 @@ export function MobileNav({ user }: { user: CurrentUser | null }) {
                           : "text-foreground-muted hover:bg-foreground/[0.04] hover:text-foreground",
                       )}
                     >
-                      {s.label}
+                      {t(s.labelKey)}
                     </Link>
                   </li>
                 );
@@ -80,6 +86,23 @@ export function MobileNav({ user }: { user: CurrentUser | null }) {
             </ul>
 
             <hr className="my-4 border-foreground/10" />
+
+            <button
+              type="button"
+              onClick={() =>
+                router.replace(pathname, {
+                  locale: otherLocale as (typeof routing.locales)[number],
+                })
+              }
+              className="mb-3 flex w-full items-center gap-2.5 rounded-sm border border-foreground/15 px-3 py-2.5 text-left font-sans text-sm text-foreground transition-colors hover:bg-foreground/[0.04]"
+            >
+              <span className="inline-flex h-4 w-4 items-center justify-center rounded-sm border border-foreground/30 font-mono text-[9px] tracking-tighter">
+                {otherLocale.toUpperCase()}
+              </span>
+              <span className="uppercase tracking-widest">
+                {otherLocale === "ru" ? t("switchToRussian") : t("switchToEnglish")}
+              </span>
+            </button>
 
             <button
               type="button"
@@ -98,9 +121,9 @@ export function MobileNav({ user }: { user: CurrentUser | null }) {
               <span className="uppercase tracking-widest">
                 {mounted
                   ? isLight
-                    ? "Switch to dark"
-                    : "Switch to light"
-                  : "Theme"}
+                    ? t("switchToDark")
+                    : t("switchToLight")
+                  : t("switchToLight")}
               </span>
             </button>
 
@@ -121,7 +144,7 @@ export function MobileNav({ user }: { user: CurrentUser | null }) {
                       href={`/profile/${user.username}`}
                       className="block rounded-sm px-3 py-2 font-sans text-sm text-foreground hover:bg-foreground/[0.04]"
                     >
-                      Profile
+                      {tUser("profile")}
                     </Link>
                   </li>
                   <li>
@@ -129,7 +152,7 @@ export function MobileNav({ user }: { user: CurrentUser | null }) {
                       href="/me/bets"
                       className="block rounded-sm px-3 py-2 font-sans text-sm text-foreground hover:bg-foreground/[0.04]"
                     >
-                      My bets
+                      {tUser("myBets")}
                     </Link>
                   </li>
                   <li>
@@ -137,7 +160,7 @@ export function MobileNav({ user }: { user: CurrentUser | null }) {
                       href="/me/predictions"
                       className="block rounded-sm px-3 py-2 font-sans text-sm text-foreground hover:bg-foreground/[0.04]"
                     >
-                      My predictions
+                      {tUser("myPredictions")}
                     </Link>
                   </li>
                   <li>
@@ -145,7 +168,7 @@ export function MobileNav({ user }: { user: CurrentUser | null }) {
                       href="/notifications"
                       className="block rounded-sm px-3 py-2 font-sans text-sm text-foreground hover:bg-foreground/[0.04]"
                     >
-                      Notifications
+                      {tUser("notifications")}
                     </Link>
                   </li>
                   <li>
@@ -153,7 +176,7 @@ export function MobileNav({ user }: { user: CurrentUser | null }) {
                       href="/settings"
                       className="block rounded-sm px-3 py-2 font-sans text-sm text-foreground hover:bg-foreground/[0.04]"
                     >
-                      Settings
+                      {tUser("settings")}
                     </Link>
                   </li>
                   <li className="mt-2">
@@ -163,7 +186,7 @@ export function MobileNav({ user }: { user: CurrentUser | null }) {
                         className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left font-sans text-sm text-streak-loss hover:bg-streak-loss/10"
                       >
                         <LogOut className="h-4 w-4" />
-                        Sign out
+                        {tUser("signOut")}
                       </button>
                     </form>
                   </li>
@@ -175,13 +198,13 @@ export function MobileNav({ user }: { user: CurrentUser | null }) {
                   href="/signin"
                   className="rounded-sm bg-primary px-3 py-2 text-center font-display text-sm uppercase tracking-widest text-background-base hover:opacity-90"
                 >
-                  Sign in
+                  {t("signIn")}
                 </Link>
                 <Link
                   href="/signup"
                   className="rounded-sm border border-foreground/15 px-3 py-2 text-center font-display text-sm uppercase tracking-widest text-foreground hover:bg-foreground/[0.05]"
                 >
-                  Create account
+                  {t("signUp")}
                 </Link>
               </div>
             )}

@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 
-import { changeUsernameAction } from "@/app/settings/actions";
+import { changeUsernameAction } from "@/app/[locale]/settings/actions";
 
 const INPUT_CLASS =
   "rounded-sm border border-foreground/15 bg-background-elevated/30 px-3 py-2 font-sans text-sm text-foreground focus:border-primary focus:outline-none disabled:opacity-50";

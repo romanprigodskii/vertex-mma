@@ -1,8 +1,8 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { useTranslations } from "next-intl";
 
+import { Link, usePathname } from "@/i18n/navigation";
 import { NAV_SECTIONS } from "@/lib/navigation";
 import { cn } from "@/lib/utils";
 
@@ -16,6 +16,7 @@ function isActiveSection(pathname: string, href: string): boolean {
 
 export function NavSections() {
   const pathname = usePathname();
+  const t = useTranslations("nav");
   return (
     <nav className="hidden md:flex items-center gap-1">
       {NAV_SECTIONS.map((s) => {
@@ -31,7 +32,7 @@ export function NavSections() {
                 : "text-foreground-muted hover:text-foreground",
             )}
           >
-            {s.label}
+            {t(s.labelKey)}
             {active ? (
               <span
                 className="absolute inset-x-3 -bottom-[15px] h-0.5 bg-primary"

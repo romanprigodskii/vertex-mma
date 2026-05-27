@@ -1,17 +1,25 @@
 // Shared nav section list. Centralised so the desktop nav, mobile drawer,
-// and footer column all stay in sync.
+// and footer column all stay in sync. `labelKey` is the path inside the
+// `nav.*` namespace of our messages files — translated at render time.
 
 export type NavSection = {
   href: string;
-  label: string;
+  labelKey:
+    | "fighters"
+    | "events"
+    | "news"
+    | "markets"
+    | "rankings"
+    | "cards"
+    | "leaderboard";
 };
 
 export const NAV_SECTIONS: NavSection[] = [
-  { href: "/fighters", label: "Fighters" },
-  { href: "/events", label: "Events" },
-  { href: "/news", label: "News" },
-  { href: "/markets", label: "Markets" },
-  { href: "/rankings", label: "Rankings" },
-  { href: "/cards", label: "Cards" },
-  { href: "/leaderboard", label: "Leaderboard" },
+  { href: "/fighters", labelKey: "fighters" },
+  { href: "/events", labelKey: "events" },
+  { href: "/news", labelKey: "news" },
+  { href: "/markets", labelKey: "markets" },
+  { href: "/rankings", labelKey: "rankings" },
+  { href: "/cards", labelKey: "cards" },
+  { href: "/leaderboard", labelKey: "leaderboard" },
 ];

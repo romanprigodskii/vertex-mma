@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 
-import { signUpAction } from "@/app/signup/actions";
+import { signUpAction } from "@/app/[locale]/signup/actions";
 import { PasswordInput } from "@/components/auth/PasswordInput";
 
 export function SignUpForm() {

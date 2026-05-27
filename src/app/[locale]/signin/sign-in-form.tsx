@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
-import { signInAction } from "@/app/signin/actions";
+import { signInAction } from "@/app/[locale]/signin/actions";
 import { PasswordInput } from "@/components/auth/PasswordInput";
 
 const INPUT_CLASS =

@@ -1,4 +1,4 @@
-import { SignUpForm } from "@/app/signup/sign-up-form";
+import { SignUpForm } from "@/app/[locale]/signup/sign-up-form";
 import { Container } from "@/components/layout/container";
 import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";

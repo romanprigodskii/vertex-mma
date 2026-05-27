@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 
-import { markAllReadAction } from "@/app/notifications/actions";
+import { markAllReadAction } from "@/app/[locale]/notifications/actions";
 
 export function MarkAllReadButton() {
   const router = useRouter();

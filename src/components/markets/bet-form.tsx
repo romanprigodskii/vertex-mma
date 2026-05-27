@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 
-import { placeBetAction, previewBetCost } from "@/app/markets/actions";
+import { placeBetAction, previewBetCost } from "@/app/[locale]/markets/actions";
 import { priceToDecimalOdds } from "@/lib/lmsr";
 import type { MarketDetail } from "@/lib/markets";
 

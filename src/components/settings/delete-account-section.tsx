@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 
-import { deleteAccountAction } from "@/app/settings/actions";
+import { deleteAccountAction } from "@/app/[locale]/settings/actions";
 
 export function DeleteAccountSection() {
   const router = useRouter();

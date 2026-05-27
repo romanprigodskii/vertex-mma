@@ -3,7 +3,7 @@
 import * as React from "react";
 import Image from "next/image";
 
-import { postCommentAction } from "@/app/news/[id]/actions";
+import { postCommentAction } from "@/app/[locale]/news/[id]/actions";
 import type { CommentAuthorSnapshot } from "@/lib/news-comments";
 import { cn } from "@/lib/utils";
 

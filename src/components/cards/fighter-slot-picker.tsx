@@ -5,7 +5,7 @@ import * as React from "react";
 import {
   type PickerFighter,
   searchFightersForPicker,
-} from "@/app/cards/actions";
+} from "@/app/[locale]/cards/actions";
 import { formatWeightClass } from "@/lib/card-theme";
 
 export type BoutFighter = {

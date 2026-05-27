@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 
-import { markNotificationReadAction } from "@/app/notifications/actions";
+import { markNotificationReadAction } from "@/app/[locale]/notifications/actions";
 import type { NotificationRow as NotificationRowData } from "@/lib/notifications";
 import { cn } from "@/lib/utils";
 

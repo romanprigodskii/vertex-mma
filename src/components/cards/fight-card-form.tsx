@@ -8,7 +8,7 @@ import {
   deleteFightCardAction,
   type PickerFighter,
   updateFightCardAction,
-} from "@/app/cards/actions";
+} from "@/app/[locale]/cards/actions";
 import {
   FightCardPoster,
   type PosterDisplayBout,

@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 
-import { submitPicksAction } from "@/app/predictions/actions";
+import { submitPicksAction } from "@/app/[locale]/predictions/actions";
 import type { PredictionBoutRow } from "@/lib/predictions";
 import { cn } from "@/lib/utils";
 

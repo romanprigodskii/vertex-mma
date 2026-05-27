@@ -2,7 +2,7 @@
 
 import * as React from "react";
 
-import { changeEmailAction } from "@/app/settings/actions";
+import { changeEmailAction } from "@/app/[locale]/settings/actions";
 
 const INPUT_CLASS =
   "rounded-sm border border-foreground/15 bg-background-elevated/30 px-3 py-2 font-sans text-sm text-foreground focus:border-primary focus:outline-none";

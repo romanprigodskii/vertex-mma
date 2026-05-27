@@ -2,7 +2,7 @@
 
 import * as React from "react";
 
-import { updateAvatarUrlAction } from "@/app/settings/actions";
+import { updateAvatarUrlAction } from "@/app/[locale]/settings/actions";
 import { createClient } from "@/lib/supabase/client";
 
 interface Props {
