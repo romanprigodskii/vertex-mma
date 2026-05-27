@@ -70,6 +70,7 @@
   --tier-apex-badge-text: oklch(0.92 0.10 295);
   --tier-apex-badge-border: oklch(0.55 0.20 295);
   --tier-apex-gradient-from: oklch(0.45 0.22 295 / 0.18);
+  --tier-apex-gradient-from-champion: oklch(0.45 0.22 295 / 0.396);
   --tier-apex-gradient-to: oklch(0.45 0.22 295 / 0);
   --tier-apex-score: oklch(0.85 0.18 295);
 
@@ -77,6 +78,7 @@
   --tier-elite-badge-text: oklch(0.88 0.10 235);
   --tier-elite-badge-border: oklch(0.55 0.18 235);
   --tier-elite-gradient-from: oklch(0.45 0.18 235 / 0.16);
+  --tier-elite-gradient-from-champion: oklch(0.45 0.18 235 / 0.352);
   --tier-elite-gradient-to: oklch(0.45 0.18 235 / 0);
   --tier-elite-score: oklch(0.82 0.16 235);
 
@@ -84,6 +86,7 @@
   --tier-established-badge-text: oklch(0.78 0.06 200);
   --tier-established-badge-border: oklch(0.45 0.07 200);
   --tier-established-gradient-from: oklch(0.50 0.08 200 / 0.12);
+  --tier-established-gradient-from-champion: oklch(0.50 0.08 200 / 0.264);
   --tier-established-gradient-to: oklch(0.50 0.08 200 / 0);
   --tier-established-score: oklch(0.75 0.07 200);
 
@@ -91,6 +94,7 @@
   --tier-roster-badge-text: oklch(0.65 0.02 240);
   --tier-roster-badge-border: oklch(0.35 0.02 240);
   --tier-roster-gradient-from: oklch(0.45 0.02 240 / 0.08);
+  --tier-roster-gradient-from-champion: oklch(0.45 0.02 240 / 0.176);
   --tier-roster-gradient-to: oklch(0.45 0.02 240 / 0);
   --tier-roster-score: oklch(0.62 0.03 240);
 
@@ -244,6 +248,7 @@
   --tier-apex-badge-text: oklch(0.4 0.18 295);
   --tier-apex-badge-border: oklch(0.65 0.18 295);
   --tier-apex-gradient-from: oklch(0.5 0.22 295 / 0.07);
+  --tier-apex-gradient-from-champion: oklch(0.5 0.22 295 / 0.154);
   --tier-apex-gradient-to: oklch(0.5 0.22 295 / 0);
   --tier-apex-score: oklch(0.42 0.2 295);
 
@@ -251,6 +256,7 @@
   --tier-elite-badge-text: oklch(0.4 0.16 235);
   --tier-elite-badge-border: oklch(0.6 0.16 235);
   --tier-elite-gradient-from: oklch(0.5 0.18 235 / 0.06);
+  --tier-elite-gradient-from-champion: oklch(0.5 0.18 235 / 0.132);
   --tier-elite-gradient-to: oklch(0.5 0.18 235 / 0);
   --tier-elite-score: oklch(0.42 0.16 235);
 
@@ -258,6 +264,7 @@
   --tier-established-badge-text: oklch(0.4 0.06 200);
   --tier-established-badge-border: oklch(0.6 0.07 200);
   --tier-established-gradient-from: oklch(0.55 0.08 200 / 0.05);
+  --tier-established-gradient-from-champion: oklch(0.55 0.08 200 / 0.11);
   --tier-established-gradient-to: oklch(0.55 0.08 200 / 0);
   --tier-established-score: oklch(0.42 0.07 200);
 
@@ -265,6 +272,7 @@
   --tier-roster-badge-text: oklch(0.4 0.02 240);
   --tier-roster-badge-border: oklch(0.75 0.02 240);
   --tier-roster-gradient-from: oklch(0.5 0.02 240 / 0.04);
+  --tier-roster-gradient-from-champion: oklch(0.5 0.02 240 / 0.088);
   --tier-roster-gradient-to: oklch(0.5 0.02 240 / 0);
   --tier-roster-score: oklch(0.42 0.03 240);
 

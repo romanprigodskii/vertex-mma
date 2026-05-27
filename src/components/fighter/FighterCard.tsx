@@ -7,7 +7,7 @@ import { WEIGHT_CLASSES } from "@/lib/constants";
 import { getCountryFlag } from "@/lib/fighter-helpers";
 import type { FighterCatalogRow } from "@/lib/fighter-search";
 import { cn } from "@/lib/utils";
-import { boostAlpha, classifyAndStyle } from "@/lib/vertex-tier";
+import { classifyAndStyle } from "@/lib/vertex-tier";
 
 const WEIGHT_LABELS: Record<string, string> = Object.fromEntries(
   WEIGHT_CLASSES.map((w) => [w.id, w.label]),
@@ -139,8 +139,10 @@ export function FighterCard({
   // stop) plus a subtle warm gold tint at the bottom 25% of the card —
   // replacing the previous yellow border + glow. Conveys "champion" via
   // fill intensity (FIFA/EA UFC convention) rather than a competing border.
+  // The 2.2× boost is now pre-baked into a sibling CSS variable per tier
+  // because the runtime alpha-bumper can't introspect `var(...)` tokens.
   const gradientFrom = isChampion
-    ? boostAlpha(tierStyle.gradientFrom, 2.2)
+    ? tierStyle.gradientFromChampion
     : tierStyle.gradientFrom;
   const gradientStop = isChampion ? "90%" : "70%";
   const tierGradient = `linear-gradient(180deg, ${gradientFrom} 0%, ${tierStyle.gradientTo} ${gradientStop})`;

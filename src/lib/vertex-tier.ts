@@ -100,6 +100,12 @@ export interface TierStyle {
   /** Top-of-card tint (OKLCH with alpha). Used as the `from` stop of a
    *  linear-gradient(180deg, ...) layered over the card background. */
   gradientFrom: string;
+  /** Same hue as `gradientFrom` but with alpha pre-boosted ~2.2× for
+   *  champion cards — the tier wash needs to feel like a status step
+   *  above peers, not the same. Pre-computed at the CSS-variable layer
+   *  because `gradientFrom` is now a `var(...)` token and the runtime
+   *  regex-bumper can't introspect those. */
+  gradientFromChampion: string;
   /** Bottom stop — usually the same hue at 0 alpha so the gradient fades
    *  to transparent ~70% down the card. */
   gradientTo: string;
@@ -128,6 +134,7 @@ export const TIER_STYLES: Record<VertexTier, TierStyle> = {
     badgeTextColor: "var(--tier-apex-badge-text)",
     badgeBorder: "var(--tier-apex-badge-border)",
     gradientFrom: "var(--tier-apex-gradient-from)",
+    gradientFromChampion: "var(--tier-apex-gradient-from-champion)",
     gradientTo: "var(--tier-apex-gradient-to)",
     scoreColor: "var(--tier-apex-score)",
   },
@@ -139,6 +146,7 @@ export const TIER_STYLES: Record<VertexTier, TierStyle> = {
     badgeTextColor: "var(--tier-elite-badge-text)",
     badgeBorder: "var(--tier-elite-badge-border)",
     gradientFrom: "var(--tier-elite-gradient-from)",
+    gradientFromChampion: "var(--tier-elite-gradient-from-champion)",
     gradientTo: "var(--tier-elite-gradient-to)",
     scoreColor: "var(--tier-elite-score)",
   },
@@ -150,6 +158,7 @@ export const TIER_STYLES: Record<VertexTier, TierStyle> = {
     badgeTextColor: "var(--tier-established-badge-text)",
     badgeBorder: "var(--tier-established-badge-border)",
     gradientFrom: "var(--tier-established-gradient-from)",
+    gradientFromChampion: "var(--tier-established-gradient-from-champion)",
     gradientTo: "var(--tier-established-gradient-to)",
     scoreColor: "var(--tier-established-score)",
   },
@@ -161,6 +170,7 @@ export const TIER_STYLES: Record<VertexTier, TierStyle> = {
     badgeTextColor: "var(--tier-roster-badge-text)",
     badgeBorder: "var(--tier-roster-badge-border)",
     gradientFrom: "var(--tier-roster-gradient-from)",
+    gradientFromChampion: "var(--tier-roster-gradient-from-champion)",
     gradientTo: "var(--tier-roster-gradient-to)",
     scoreColor: "var(--tier-roster-score)",
   },
@@ -172,6 +182,7 @@ export const TIER_STYLES: Record<VertexTier, TierStyle> = {
     badgeTextColor: "transparent",
     badgeBorder: "transparent",
     gradientFrom: "transparent",
+    gradientFromChampion: "transparent",
     gradientTo: "transparent",
     scoreColor: "transparent",
   },
@@ -271,25 +282,3 @@ export function classifyAndStyle(args: ClassifyArgs): {
   };
 }
 
-/**
- * Multiply the alpha channel of an OKLCH(L C h / a) color string. Clamps to
- * [0, 1]. Returns the input unchanged when no alpha is present (no-op for
- * `transparent`, named colors, or hex). Used by FighterCard to deepen the
- * tier gradient for champions without recoloring the hue (Wave 6F).
- *
- * Input forms supported:
- *   oklch(0.45 0.22 295 / 0.18)
- *   oklch(0.45 0.22 295 / .18)
- *   oklch(0.45 0.22 295 / 18%)
- */
-export function boostAlpha(color: string, factor: number): string {
-  const m = color.match(
-    /^oklch\(\s*([^\s)]+)\s+([^\s)]+)\s+([^\s)]+)\s*\/\s*([0-9.]+)(%?)\s*\)$/i,
-  );
-  if (!m) return color;
-  const [, l, c, h, alphaStr, pct] = m;
-  const base = pct === "%" ? Number(alphaStr) / 100 : Number(alphaStr);
-  if (!Number.isFinite(base)) return color;
-  const next = Math.min(1, Math.max(0, base * factor));
-  return `oklch(${l} ${c} ${h} / ${next.toFixed(3)})`;
-}
