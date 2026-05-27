@@ -1,3 +1,5 @@
+import { getTranslations } from "next-intl/server";
+
 import type { FighterBoutRound } from "@/lib/fighter-detail";
 import { formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -56,14 +58,23 @@ function zoneFill(
   return "oklch(0.55 0.18 27)"; // muted-red full
 }
 
+interface SilhouetteLabels {
+  head: string;
+  body: string;
+  legs: string;
+  ariaLabel: string;
+}
+
 function Silhouette({
   title,
   totals,
   side,
+  labels,
 }: {
   title: string;
   totals: ZoneTotals;
   side: "landed" | "absorbed";
+  labels: SilhouetteLabels;
 }) {
   const headPct = totals.total ? totals.head / totals.total : 0;
   const bodyPct = totals.total ? totals.body / totals.total : 0;
@@ -78,7 +89,7 @@ function Silhouette({
         viewBox="0 0 200 400"
         className="h-auto w-full max-w-[200px]"
         role="img"
-        aria-label={`${title} per-zone heatmap`}
+        aria-label={labels.ariaLabel}
       >
         {/* Head — circle. */}
         <circle
@@ -137,7 +148,7 @@ function Silhouette({
           fill="oklch(0.98 0 0)"
           style={{ fontSize: 9, letterSpacing: "0.16em" }}
         >
-          HEAD
+          {labels.head.toUpperCase()}
         </text>
         <text
           x={100}
@@ -147,7 +158,7 @@ function Silhouette({
           fill="oklch(0.98 0 0)"
           style={{ fontSize: 9, letterSpacing: "0.16em" }}
         >
-          BODY
+          {labels.body.toUpperCase()}
         </text>
         <text
           x={100}
@@ -157,15 +168,15 @@ function Silhouette({
           fill="oklch(0.98 0 0)"
           style={{ fontSize: 9, letterSpacing: "0.16em" }}
         >
-          LEGS
+          {labels.legs.toUpperCase()}
         </text>
       </svg>
 
       <ul className="w-full max-w-[220px] text-xs">
         {[
-          { name: "Head", count: totals.head, pct: headPct },
-          { name: "Body", count: totals.body, pct: bodyPct },
-          { name: "Legs", count: totals.legs, pct: legsPct },
+          { name: labels.head, count: totals.head, pct: headPct },
+          { name: labels.body, count: totals.body, pct: bodyPct },
+          { name: labels.legs, count: totals.legs, pct: legsPct },
         ].map((row) => (
           <li
             key={row.name}
@@ -191,12 +202,15 @@ function Silhouette({
  * Two silhouettes side-by-side: where the fighter lands strikes (gold ramp)
  * and where opponents land strikes on them (red ramp). Pure SVG, no client JS.
  */
-export function StrikingHeatmap({ boutRounds }: StrikingHeatmapProps) {
+export async function StrikingHeatmap({ boutRounds }: StrikingHeatmapProps) {
+  const tFighter = await getTranslations("fighter");
+  const tBout = await getTranslations("bout");
+
   if (boutRounds.length === 0) {
     return (
       <div className="rounded-md border border-dashed border-foreground/10 bg-background-elevated/30 px-6 py-12 text-center">
         <p className="font-sans text-sm text-foreground-muted">
-          Detailed strike-location data not available for this fighter.
+          {tFighter("noStrikeData")}
         </p>
       </div>
     );
@@ -209,17 +223,40 @@ export function StrikingHeatmap({ boutRounds }: StrikingHeatmapProps) {
     return (
       <div className="rounded-md border border-dashed border-foreground/10 bg-background-elevated/30 px-6 py-12 text-center">
         <p className="font-sans text-sm text-foreground-muted">
-          No head/body/legs breakdown recorded in this fighter&rsquo;s bout
-          round stats.
+          {tFighter("noZoneBreakdown")}
         </p>
       </div>
     );
   }
 
+  const landedTitle = tFighter("strikesLanded");
+  const absorbedTitle = tFighter("strikesAbsorbed");
+  const zoneLabels = {
+    head: tBout("head"),
+    body: tBout("body"),
+    legs: tBout("legs"),
+  };
+
   return (
     <div className={cn("grid grid-cols-2 gap-6 sm:gap-10")}>
-      <Silhouette title="Strikes landed" totals={landed} side="landed" />
-      <Silhouette title="Strikes absorbed" totals={absorbed} side="absorbed" />
+      <Silhouette
+        title={landedTitle}
+        totals={landed}
+        side="landed"
+        labels={{
+          ...zoneLabels,
+          ariaLabel: tFighter("heatmapAriaLabel", { title: landedTitle }),
+        }}
+      />
+      <Silhouette
+        title={absorbedTitle}
+        totals={absorbed}
+        side="absorbed"
+        labels={{
+          ...zoneLabels,
+          ariaLabel: tFighter("heatmapAriaLabel", { title: absorbedTitle }),
+        }}
+      />
     </div>
   );
 }

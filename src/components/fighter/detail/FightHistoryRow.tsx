@@ -1,5 +1,8 @@
-import Link from "next/link";
+"use client";
 
+import { useTranslations } from "next-intl";
+
+import { Link } from "@/i18n/navigation";
 import type { FightHistoryEntry } from "@/lib/fighter-detail";
 import { abbreviateMethod } from "@/lib/method";
 import { isCuratedTitleFight } from "@/lib/title-fights";
@@ -28,6 +31,7 @@ interface FightHistoryRowProps {
 }
 
 export function FightHistoryRow({ entry }: FightHistoryRowProps) {
+  const t = useTranslations("fighter");
   const date = entry.event_date.slice(0, 10);
   const methodLabel = abbreviateMethod(entry.method_resolved ?? entry.method);
   const methodInferred =
@@ -56,7 +60,10 @@ export function FightHistoryRow({ entry }: FightHistoryRowProps) {
       <Link
         href={`/bouts/${entry.bout_id}`}
         prefetch={false}
-        aria-label={`Bout vs ${entry.opponent_name} at ${entry.event_name}`}
+        aria-label={t("boutVsAt", {
+          opponent: entry.opponent_name,
+          event: entry.event_name,
+        })}
         className="absolute inset-0 z-0"
       />
 
@@ -91,9 +98,9 @@ export function FightHistoryRow({ entry }: FightHistoryRowProps) {
         {isTitle ? (
           <span
             className="shrink-0 rounded-sm border border-primary/35 bg-primary/10 px-1.5 py-0.5 font-sans text-[9px] uppercase tracking-widest text-primary"
-            aria-label="Title fight"
+            aria-label={t("titleAria")}
           >
-            Title
+            {t("titleChip")}
           </span>
         ) : null}
       </div>
@@ -102,7 +109,7 @@ export function FightHistoryRow({ entry }: FightHistoryRowProps) {
       <Link
         href={`/bouts/${entry.bout_id}`}
         prefetch={false}
-        title="View bout detail"
+        title={t("viewBoutDetail")}
         className={cn(
           "relative z-10 col-span-2 flex shrink-0 items-baseline justify-end gap-1.5 font-sans text-sm tabular sm:col-span-1",
           "transition-colors hover:opacity-80",
@@ -118,7 +125,7 @@ export function FightHistoryRow({ entry }: FightHistoryRowProps) {
             "font-sans text-foreground",
             methodInferred && "italic text-foreground-muted",
           )}
-          title={methodInferred ? "Method inferred from round stats" : undefined}
+          title={methodInferred ? t("methodInferred") : undefined}
         >
           {methodLabel}
         </span>

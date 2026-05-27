@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useTranslations } from "next-intl";
 
 import type { FighterBoutRound } from "@/lib/fighter-detail";
 import { proRateToFullRound } from "@/lib/round-stats";
@@ -26,7 +27,8 @@ type GroupKey = "strikes" | "takedowns" | "knockdowns" | "subs" | "control";
 
 interface MetricDef {
   key: MetricKey;
-  label: string;
+  /** Translation key under `fighter.metric_*`. */
+  labelKey: string;
   bar: string;
   column: keyof FighterBoutRound;
   group: GroupKey;
@@ -45,7 +47,7 @@ const formatTime = (n: number) => {
 const METRICS: readonly MetricDef[] = [
   {
     key: "sig_str_landed",
-    label: "Sig Str landed",
+    labelKey: "metric_sig_str_landed",
     bar: "bg-primary/65",
     column: "sig_str_landed",
     group: "strikes",
@@ -53,7 +55,7 @@ const METRICS: readonly MetricDef[] = [
   },
   {
     key: "sig_str_absorbed",
-    label: "Sig Str absorbed",
+    labelKey: "metric_sig_str_absorbed",
     bar: "bg-streak-loss/65",
     column: "sig_str_absorbed",
     group: "strikes",
@@ -61,7 +63,7 @@ const METRICS: readonly MetricDef[] = [
   },
   {
     key: "td_landed",
-    label: "Takedowns landed",
+    labelKey: "metric_td_landed",
     bar: "bg-streak-win/65",
     column: "td_landed",
     group: "takedowns",
@@ -69,7 +71,7 @@ const METRICS: readonly MetricDef[] = [
   },
   {
     key: "td_absorbed",
-    label: "Takedowns absorbed",
+    labelKey: "metric_td_absorbed",
     bar: "bg-streak-loss/55",
     column: "td_absorbed",
     group: "takedowns",
@@ -77,7 +79,7 @@ const METRICS: readonly MetricDef[] = [
   },
   {
     key: "total_str_landed",
-    label: "Total str landed",
+    labelKey: "metric_total_str_landed",
     bar: "bg-primary/40",
     column: "total_str_landed",
     group: "strikes",
@@ -85,7 +87,7 @@ const METRICS: readonly MetricDef[] = [
   },
   {
     key: "total_str_absorbed",
-    label: "Total str absorbed",
+    labelKey: "metric_total_str_absorbed",
     bar: "bg-streak-loss/40",
     column: "total_str_absorbed",
     group: "strikes",
@@ -93,7 +95,7 @@ const METRICS: readonly MetricDef[] = [
   },
   {
     key: "sub_attempts",
-    label: "Sub attempts",
+    labelKey: "metric_sub_attempts",
     bar: "bg-submission/65",
     column: "sub_attempts",
     group: "subs",
@@ -101,7 +103,7 @@ const METRICS: readonly MetricDef[] = [
   },
   {
     key: "kd_landed",
-    label: "Knockdowns landed",
+    labelKey: "metric_kd_landed",
     bar: "bg-knockdown/70",
     column: "kd_landed",
     group: "knockdowns",
@@ -109,7 +111,7 @@ const METRICS: readonly MetricDef[] = [
   },
   {
     key: "kd_absorbed",
-    label: "Knockdowns absorbed",
+    labelKey: "metric_kd_absorbed",
     bar: "bg-knockdown/35",
     column: "kd_absorbed",
     group: "knockdowns",
@@ -117,7 +119,7 @@ const METRICS: readonly MetricDef[] = [
   },
   {
     key: "control",
-    label: "Control time",
+    labelKey: "metric_control",
     bar: "bg-foreground-muted/35",
     column: "control_seconds",
     group: "control",
@@ -135,17 +137,16 @@ const DEFAULT_VISIBLE: ReadonlyArray<MetricKey> = [
 
 type FilterMode = "all" | "wins" | "losses" | "last5" | "title";
 
-const FILTERS: ReadonlyArray<{ id: FilterMode; label: string; hint?: string }> = [
-  { id: "all", label: "All fights" },
-  { id: "wins", label: "Wins only" },
-  { id: "losses", label: "Losses only" },
-  { id: "last5", label: "Last 5" },
-  {
-    id: "title",
-    label: "Title fights",
-    hint:
-      "Experimental — scraper flagged is_title_fight at event level, not per bout, so undercard rounds of title-headlined cards can leak in.",
-  },
+const FILTERS: ReadonlyArray<{
+  id: FilterMode;
+  labelKey: string;
+  hintKey?: string;
+}> = [
+  { id: "all", labelKey: "filter_all" },
+  { id: "wins", labelKey: "filter_wins" },
+  { id: "losses", labelKey: "filter_losses" },
+  { id: "last5", labelKey: "filter_last5" },
+  { id: "title", labelKey: "filter_title", hintKey: "filter_title_hint" },
 ];
 
 const ROUND_NUMBERS = [1, 2, 3, 4, 5] as const;
@@ -235,6 +236,7 @@ function computeGroupMaxes(
 }
 
 export function RoundByRoundChart({ boutRounds }: RoundByRoundChartProps) {
+  const t = useTranslations("fighter");
   const [visible, setVisible] = React.useState<Set<MetricKey>>(
     () => new Set(DEFAULT_VISIBLE),
   );
@@ -262,11 +264,10 @@ export function RoundByRoundChart({ boutRounds }: RoundByRoundChartProps) {
     return (
       <div className="rounded-md border border-dashed border-foreground/10 bg-background-elevated/30 px-6 py-12 text-center">
         <p className="font-sans text-sm text-foreground-muted">
-          No round-by-round data available for this fighter.
+          {t("noRoundData")}
         </p>
         <p className="mt-1 font-sans text-xs text-foreground-subtle">
-          UFCStats only publishes per-round numbers for newer bouts, so older
-          careers can be partially or fully missing.
+          {t("noRoundDataHint")}
         </p>
       </div>
     );
@@ -280,7 +281,7 @@ export function RoundByRoundChart({ boutRounds }: RoundByRoundChartProps) {
       {/* Filter chips */}
       <div className="flex flex-wrap items-center gap-1.5">
         <span className="mr-1 font-sans text-[11px] uppercase tracking-widest text-foreground-subtle">
-          Filter
+          {t("filterLabel")}
         </span>
         {FILTERS.map((f) => {
           const isActive = filter === f.id;
@@ -290,7 +291,7 @@ export function RoundByRoundChart({ boutRounds }: RoundByRoundChartProps) {
               type="button"
               onClick={() => setFilter(f.id)}
               aria-pressed={isActive}
-              title={f.hint}
+              title={f.hintKey ? t(f.hintKey) : undefined}
               className={cn(
                 "inline-flex h-7 items-center rounded-sm border px-2.5 transition-colors",
                 "font-sans text-[11px] font-medium uppercase tracking-widest",
@@ -299,7 +300,7 @@ export function RoundByRoundChart({ boutRounds }: RoundByRoundChartProps) {
                   : "border-foreground/10 bg-foreground/[0.02] text-foreground-muted hover:border-foreground/25 hover:text-foreground",
               )}
             >
-              {f.label}
+              {t(f.labelKey)}
             </button>
           );
         })}
@@ -308,7 +309,7 @@ export function RoundByRoundChart({ boutRounds }: RoundByRoundChartProps) {
       {/* Metric toggles */}
       <div className="flex flex-wrap gap-1.5">
         <span className="mr-1 font-sans text-[11px] uppercase tracking-widest text-foreground-subtle">
-          Metrics
+          {t("metricsLabel")}
         </span>
         {METRICS.map((m) => {
           const isOn = visible.has(m.key);
@@ -333,7 +334,7 @@ export function RoundByRoundChart({ boutRounds }: RoundByRoundChartProps) {
                   isOn ? m.bar : "bg-foreground/15",
                 )}
               />
-              {m.label}
+              {t(m.labelKey)}
             </button>
           );
         })}
@@ -343,7 +344,7 @@ export function RoundByRoundChart({ boutRounds }: RoundByRoundChartProps) {
       {aggregated.length === 0 ? (
         <div className="rounded-md border border-dashed border-foreground/10 bg-background-elevated/30 px-6 py-10 text-center">
           <p className="font-sans text-sm text-foreground-muted">
-            No round data matches the current filter.
+            {t("noRoundsForFilter")}
           </p>
         </div>
       ) : (
@@ -352,7 +353,7 @@ export function RoundByRoundChart({ boutRounds }: RoundByRoundChartProps) {
             <thead>
               <tr>
                 <th className="w-[180px] py-2 text-left font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-subtle">
-                  Metric
+                  {t("metric")}
                 </th>
                 {ROUND_NUMBERS.map((r) => {
                   const data = byRound.get(r);
@@ -379,7 +380,7 @@ export function RoundByRoundChart({ boutRounds }: RoundByRoundChartProps) {
                     colSpan={6}
                     className="py-8 text-center font-sans text-xs text-foreground-subtle"
                   >
-                    Toggle at least one metric above to view round breakdowns.
+                    {t("toggleAtLeastOne")}
                   </td>
                 </tr>
               ) : null}
@@ -391,7 +392,7 @@ export function RoundByRoundChart({ boutRounds }: RoundByRoundChartProps) {
                     className="border-t border-foreground/[0.06]"
                   >
                     <td className="py-3 font-sans text-xs text-foreground-muted">
-                      {metric.label}
+                      {t(metric.labelKey)}
                     </td>
                     {ROUND_NUMBERS.map((r) => {
                       const row = byRound.get(r);

@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useTranslations } from "next-intl";
 
 import type { TimelineBout } from "@/lib/fighter-detail";
 import { isCuratedTitleFight } from "@/lib/title-fights";
@@ -69,13 +70,6 @@ function strokeFor(result: TimelineBout["result"]): string {
   return "oklch(0.50 0.01 240 / 0.3)";
 }
 
-const RESULT_LABEL: Record<TimelineBout["result"], string> = {
-  W: "Win",
-  L: "Loss",
-  D: "Draw",
-  NC: "No contest",
-};
-
 function xForDateMs(ms: number): number {
   const d = new Date(ms);
   const year =
@@ -91,6 +85,7 @@ type TooltipState = {
 };
 
 function Tooltip({ state }: { state: TooltipState }) {
+  const tr = useTranslations("fighter");
   const viewport =
     typeof window !== "undefined" ? window.innerWidth : TOOLTIP_W + 64;
   const left = Math.max(
@@ -148,7 +143,7 @@ function Tooltip({ state }: { state: TooltipState }) {
               : "text-foreground-muted",
         )}
       >
-        {RESULT_LABEL[state.bout.result]}
+        {tr(`result_${state.bout.result}`)}
         {m ? (
           <>
             <span className="mx-1 text-foreground-subtle/40">·</span>
@@ -167,18 +162,18 @@ function Tooltip({ state }: { state: TooltipState }) {
         <>
           <div className="my-2 h-px bg-foreground/10" aria-hidden />
           <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 font-sans text-[11px]">
-            <dt className="text-foreground-subtle">Sig Str</dt>
+            <dt className="text-foreground-subtle">{tr("tipSigStr")}</dt>
             <dd className="font-mono tabular text-foreground">
               {state.bout.sig_str_landed}-{state.bout.sig_str_absorbed}
             </dd>
-            <dt className="text-foreground-subtle">Takedowns</dt>
+            <dt className="text-foreground-subtle">{tr("tipTakedowns")}</dt>
             <dd className="font-mono tabular text-foreground">
               {state.bout.td_landed}/{state.bout.td_attempted}
               {tdAcc != null ? (
                 <span className="ml-1 text-foreground-muted">· {tdAcc}%</span>
               ) : null}
             </dd>
-            <dt className="text-foreground-subtle">Control</dt>
+            <dt className="text-foreground-subtle">{tr("tipControl")}</dt>
             <dd className="font-mono tabular text-foreground">
               {formatControl(state.bout.control_seconds)}
             </dd>
@@ -186,7 +181,7 @@ function Tooltip({ state }: { state: TooltipState }) {
         </>
       ) : (
         <p className="mt-2 font-sans text-[10px] text-foreground-subtle">
-          Per-round stats not recorded for this bout.
+          {tr("tipNoStats")}
         </p>
       )}
     </div>
@@ -194,6 +189,7 @@ function Tooltip({ state }: { state: TooltipState }) {
 }
 
 export function CareerTimeline({ bouts }: CareerTimelineProps) {
+  const t = useTranslations("fighter");
   const [tooltip, setTooltip] = React.useState<TooltipState | null>(null);
   const hideTimer = React.useRef<number | null>(null);
   const scrollRef = React.useRef<HTMLDivElement>(null);
@@ -334,7 +330,7 @@ export function CareerTimeline({ bouts }: CareerTimelineProps) {
           height={TIMELINE_HEIGHT}
           style={{ display: "block" }}
           role="img"
-          aria-label="Career timeline of completed bouts across UFC history"
+          aria-label={t("timelineAriaLabel")}
         >
           <line
             x1={PADDING_X}
@@ -395,7 +391,11 @@ export function CareerTimeline({ bouts }: CareerTimelineProps) {
               <a
                 key={b.bout_id}
                 href={`/bouts/${b.bout_id}`}
-                aria-label={`${b.event_date.slice(0, 10)} ${RESULT_LABEL[b.result]} vs ${b.opponent_name}`}
+                aria-label={t("timelineBoutAria", {
+                  date: b.event_date.slice(0, 10),
+                  result: t(`result_${b.result}`),
+                  opponent: b.opponent_name,
+                })}
                 style={{ outline: "none" }}
               >
                 <circle
@@ -450,43 +450,31 @@ export function CareerTimeline({ bouts }: CareerTimelineProps) {
           "flex flex-wrap items-baseline gap-x-2.5 gap-y-1",
         )}
       >
-        <span>
-          <span className="font-mono tabular text-foreground">{wins}</span>{" "}
-          wins
-        </span>
+        <span>{t("tlWins", { n: wins })}</span>
         <span aria-hidden className="text-foreground-subtle/40">·</span>
-        <span>
-          <span className="font-mono tabular text-foreground">{losses}</span>{" "}
-          losses
-        </span>
+        <span>{t("tlLosses", { n: losses })}</span>
         {draws > 0 ? (
           <>
             <span aria-hidden className="text-foreground-subtle/40">·</span>
-            <span>
-              <span className="font-mono tabular text-foreground">{draws}</span>{" "}
-              draws
-            </span>
+            <span>{t("tlDraws", { n: draws })}</span>
           </>
         ) : null}
         {ncs > 0 ? (
           <>
             <span aria-hidden className="text-foreground-subtle/40">·</span>
-            <span>
-              <span className="font-mono tabular text-foreground">{ncs}</span>{" "}
-              NC
-            </span>
+            <span>{t("tlNoContests", { n: ncs })}</span>
           </>
         ) : null}
         <span aria-hidden className="text-foreground-subtle/40">·</span>
         <span>
-          last 5:{" "}
+          {t("lastFive")}:{" "}
           <span className="font-mono tabular text-foreground">
             {lastFiveLabel}
           </span>
         </span>
         <span aria-hidden className="text-foreground-subtle/40">·</span>
         <span className="text-foreground-subtle">
-          drag to scroll · {FIRST_YEAR}–{currentYear}
+          {t("dragToScroll")} · {FIRST_YEAR}–{currentYear}
         </span>
       </p>
 

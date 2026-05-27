@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useTranslations } from "next-intl";
 import { ChevronDown, ChevronRight } from "lucide-react";
 
 import type {
@@ -8,20 +9,6 @@ import type {
   ScoreComponentRow,
 } from "@/lib/fighter-detail";
 import { cn } from "@/lib/utils";
-
-const WEIGHT_DIVISION_LABEL: Record<string, string> = {
-  strawweight: "Strawweight",
-  flyweight: "Flyweight",
-  bantamweight: "Bantamweight",
-  featherweight: "Featherweight",
-  lightweight: "Lightweight",
-  welterweight: "Welterweight",
-  middleweight: "Middleweight",
-  light_heavyweight: "Light Heavyweight",
-  heavyweight: "Heavyweight",
-  catchweight: "Catchweight",
-  openweight: "Openweight",
-};
 
 interface ScoreBreakdownProps {
   data: ScoreBreakdownData;
@@ -38,6 +25,8 @@ interface ScoreBreakdownProps {
  * skips it because the all-time formula has no curve.
  */
 export function ScoreBreakdown({ data, divisionalStatus }: ScoreBreakdownProps) {
+  const t = useTranslations("fighter");
+  const tWeight = useTranslations("weight");
   const [open, setOpen] = React.useState(false);
   // Wave 29: retired fighters have no Current score — default the tab to
   // All-Time so the breakdown lands on a populated view. User can still
@@ -46,15 +35,26 @@ export function ScoreBreakdown({ data, divisionalStatus }: ScoreBreakdownProps) 
     data.current.finalScore == null ? "all-time" : "current",
   );
 
-  const sourceLabel =
-    data.source === "divisional" && data.divisionLabel
-      ? `Divisional · ${WEIGHT_DIVISION_LABEL[data.divisionLabel] ?? data.divisionLabel}${
-          divisionalStatus ? ` (${divisionalStatus})` : ""
-        }`
-      : "Global";
+  const sourceLabel = (() => {
+    if (data.source !== "divisional" || !data.divisionLabel) {
+      return t("sourceGlobal");
+    }
+    const divisionTranslated = tWeight.has(data.divisionLabel)
+      ? tWeight(data.divisionLabel)
+      : data.divisionLabel;
+    const statusKey = divisionalStatus
+      ? `divisionalStatus_${divisionalStatus}`
+      : null;
+    const statusSuffix =
+      statusKey && t.has(statusKey) ? t(statusKey) : "";
+    return t("sourceDivisional", {
+      division: divisionTranslated,
+      statusSuffix,
+    });
+  })();
 
   return (
-    <section aria-label="Score breakdown" className="mt-6">
+    <section aria-label={t("scoreBreakdown")} className="mt-6">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -66,31 +66,31 @@ export function ScoreBreakdown({ data, divisionalStatus }: ScoreBreakdownProps) 
         ) : (
           <ChevronRight className="h-3.5 w-3.5" aria-hidden />
         )}
-        Score breakdown
+        {t("scoreBreakdown")}
       </button>
 
       {open ? (
         <div className="mt-4 rounded-md border border-foreground/10 bg-background-elevated/30 p-4">
           <div
             role="tablist"
-            aria-label="Score breakdown view"
+            aria-label={t("scoreBreakdownView")}
             className="flex gap-1 border-b border-foreground/10"
           >
-            {(["current", "all-time"] as const).map((t) => (
+            {(["current", "all-time"] as const).map((tabKey) => (
               <button
-                key={t}
+                key={tabKey}
                 type="button"
                 role="tab"
-                aria-selected={tab === t}
-                onClick={() => setTab(t)}
+                aria-selected={tab === tabKey}
+                onClick={() => setTab(tabKey)}
                 className={cn(
                   "px-3 py-1.5 font-sans text-[11px] uppercase tracking-widest transition-colors",
-                  tab === t
+                  tab === tabKey
                     ? "border-b-2 border-foreground text-foreground"
                     : "border-b-2 border-transparent text-foreground-muted hover:text-foreground",
                 )}
               >
-                {t === "current" ? "Current" : "All-Time"}
+                {tabKey === "current" ? t("tabCurrent") : t("tabAllTime")}
               </button>
             ))}
           </div>
@@ -109,7 +109,7 @@ export function ScoreBreakdown({ data, divisionalStatus }: ScoreBreakdownProps) 
               rawTotal={null}
               curveMultiplier={null}
               finalScore={data.allTime.finalScore}
-              sourceLabel="Global"
+              sourceLabel={t("sourceGlobal")}
             />
           )}
         </div>
@@ -131,25 +131,27 @@ function BreakdownTable({
   finalScore: number | null;
   sourceLabel: string;
 }) {
+  const t = useTranslations("fighter");
   return (
     <div className="mt-4">
       <p className="mb-3 font-sans text-[10px] uppercase tracking-widest text-foreground-subtle">
-        Source <span className="ml-1 text-foreground-muted">{sourceLabel}</span>
+        {t("sourceLabel")}{" "}
+        <span className="ml-1 text-foreground-muted">{sourceLabel}</span>
       </p>
       <table className="w-full font-mono text-xs tabular">
         <thead>
           <tr className="border-b border-foreground/10 text-foreground-subtle">
             <th className="py-1 text-left font-sans text-[10px] font-medium uppercase tracking-widest">
-              Component
+              {t("colComponent")}
             </th>
             <th className="py-1 text-right font-sans text-[10px] font-medium uppercase tracking-widest">
-              Raw
+              {t("colRaw")}
             </th>
             <th className="py-1 text-right font-sans text-[10px] font-medium uppercase tracking-widest">
-              ×Weight
+              {t("colWeight")}
             </th>
             <th className="py-1 text-right font-sans text-[10px] font-medium uppercase tracking-widest">
-              Contribution
+              {t("colContribution")}
             </th>
           </tr>
         </thead>
@@ -189,7 +191,7 @@ function BreakdownTable({
                 colSpan={3}
                 className="pt-3 text-right font-sans text-[10px] uppercase tracking-widest text-foreground-muted"
               >
-                Raw subtotal
+                {t("rawSubtotal")}
               </td>
               <td className="pt-3 text-right font-mono text-sm tabular text-foreground">
                 {rawTotal.toFixed(1)}
@@ -202,7 +204,7 @@ function BreakdownTable({
                 colSpan={3}
                 className="pt-1 text-right font-sans text-[10px] uppercase tracking-widest text-foreground-muted"
               >
-                Curve multiplier
+                {t("curveMultiplier")}
               </td>
               <td className="pt-1 text-right font-mono text-sm tabular text-foreground">
                 ×{curveMultiplier.toFixed(2)}
@@ -214,7 +216,7 @@ function BreakdownTable({
               colSpan={3}
               className="pt-3 text-right font-sans text-[10px] font-medium uppercase tracking-widest text-foreground"
             >
-              Final {curveMultiplier != null ? "(after curve, clamp 0-100)" : "(clamp 0-100)"}
+              {curveMultiplier != null ? t("finalAfterCurve") : t("finalClamp")}
             </td>
             <td className="pt-3 text-right font-display text-xl tabular text-foreground">
               {finalScore != null ? finalScore : "—"}
