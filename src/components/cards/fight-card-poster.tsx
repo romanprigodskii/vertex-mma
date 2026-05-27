@@ -1,6 +1,7 @@
 import * as React from "react";
-import Link from "next/link";
+import { useTranslations } from "next-intl";
 
+import { Link } from "@/i18n/navigation";
 import {
   formatWeightClass,
   resolveThemeBackground,
@@ -8,6 +9,16 @@ import {
   resolveThemeFont,
 } from "@/lib/card-theme";
 import { cn } from "@/lib/utils";
+
+function useWeightLabel() {
+  const tWeight = useTranslations("weight");
+  return (wc: string): string => {
+    const key = wc.replace(/-/g, "_");
+    return tWeight.has(key)
+      ? tWeight(key as "lightweight")
+      : formatWeightClass(wc);
+  };
+}
 
 export type PosterDisplayFighter = {
   slug: string | null;
@@ -44,6 +55,7 @@ export function FightCardPoster({
   backgroundId,
   bouts,
 }: FightCardPosterProps) {
+  const t = useTranslations("cards");
   const color = resolveThemeColor(themeColor);
   const font = resolveThemeFont(titleFont);
   const bg = resolveThemeBackground(backgroundId);
@@ -63,7 +75,7 @@ export function FightCardPoster({
     >
       <div className="relative px-5 py-8 sm:px-10 sm:py-12">
         <p className="font-mono text-[11px] uppercase tracking-[0.3em] text-[var(--card-accent)]">
-          Vertex MMA · Fight Card
+          {t("posterKicker")}
         </p>
         <h2
           className={cn(
@@ -72,7 +84,7 @@ export function FightCardPoster({
           )}
           style={{ fontSize: "clamp(28px, 4.6vw, 52px)" }}
         >
-          {title || "Untitled card"}
+          {title || t("untitledCard")}
         </h2>
         {subtitle ? (
           <p className="mt-2 font-sans text-sm text-foreground-muted">
@@ -87,7 +99,7 @@ export function FightCardPoster({
           </div>
         ) : (
           <p className="mt-8 font-sans text-sm text-foreground-subtle">
-            No bouts on this card yet.
+            {t("noBouts")}
           </p>
         )}
 
@@ -106,6 +118,8 @@ export function FightCardPoster({
 }
 
 function PosterHeadliner({ bout }: { bout: PosterDisplayBout }) {
+  const t = useTranslations("cards");
+  const weightLabel = useWeightLabel();
   return (
     <div
       className="rounded-lg border px-4 py-5 sm:px-6"
@@ -117,16 +131,16 @@ function PosterHeadliner({ bout }: { bout: PosterDisplayBout }) {
     >
       <div className="flex items-center justify-center gap-2">
         <span className="rounded-sm bg-[var(--card-accent)] px-2 py-0.5 font-mono text-[10px] font-medium uppercase tracking-widest text-background-base">
-          Main Event
+          {t("mainEvent")}
         </span>
         <span className="font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
-          {formatWeightClass(bout.weightClass)}
+          {weightLabel(bout.weightClass)}
         </span>
       </div>
       <div className="mt-4 grid grid-cols-[1fr_auto_1fr] items-center gap-2 sm:gap-5">
         <PosterFighterColumn fighter={bout.fighterA} align="right" />
         <span className="font-display text-2xl text-[var(--card-accent)] sm:text-4xl">
-          VS
+          {t("vsLabel")}
         </span>
         <PosterFighterColumn fighter={bout.fighterB} align="left" />
       </div>
@@ -141,6 +155,7 @@ function PosterFighterColumn({
   fighter: PosterDisplayFighter | null;
   align: "left" | "right";
 }) {
+  const t = useTranslations("cards");
   const alignClass =
     align === "right" ? "items-end text-right" : "items-start text-left";
 
@@ -149,7 +164,7 @@ function PosterFighterColumn({
       <div className={cn("flex min-w-0 flex-col gap-2", alignClass)}>
         <div className="h-20 w-20 rounded-md border border-dashed border-foreground/20 bg-foreground/[0.03] sm:h-24 sm:w-24" />
         <span className="font-display text-base uppercase tracking-tight text-foreground-subtle">
-          TBD
+          {t("tbd")}
         </span>
       </div>
     );
@@ -201,6 +216,8 @@ function PosterFighterColumn({
 }
 
 function PosterUndercardRow({ bout }: { bout: PosterDisplayBout }) {
+  const t = useTranslations("cards");
+  const weightLabel = useWeightLabel();
   return (
     <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 rounded-md border border-foreground/10 bg-background-base/40 px-3 py-2.5 sm:gap-3">
       <span className="min-w-0 truncate text-right font-display text-sm uppercase tracking-tight text-foreground sm:text-base">
@@ -208,10 +225,10 @@ function PosterUndercardRow({ bout }: { bout: PosterDisplayBout }) {
       </span>
       <span className="flex shrink-0 flex-col items-center leading-none">
         <span className="font-mono text-[10px] uppercase tracking-widest text-[var(--card-accent)]">
-          vs
+          {t("vsConnector")}
         </span>
         <span className="mt-1 font-mono text-[9px] uppercase tracking-wider text-foreground-subtle">
-          {formatWeightClass(bout.weightClass)}
+          {weightLabel(bout.weightClass)}
         </span>
       </span>
       <span className="min-w-0 truncate font-display text-sm uppercase tracking-tight text-foreground sm:text-base">
@@ -226,7 +243,8 @@ function FighterInline({
 }: {
   fighter: PosterDisplayFighter | null;
 }) {
-  if (!fighter) return <span className="text-foreground-subtle">TBD</span>;
+  const t = useTranslations("cards");
+  if (!fighter) return <span className="text-foreground-subtle">{t("tbd")}</span>;
   if (fighter.slug) {
     return (
       <Link

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import { ChevronLeft } from "lucide-react";
 
 import { ScoreHistoryChart } from "@/components/fighter/detail/ScoreHistoryChart";
@@ -8,6 +8,7 @@ import { Container } from "@/components/layout/container";
 import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
 import { FighterSearchTrigger } from "@/components/search/fighter-search-palette";
+import { Link } from "@/i18n/navigation";
 import { getFighterBySlug } from "@/lib/fighter-detail";
 import {
   getScoreHistory,
@@ -19,7 +20,7 @@ export const dynamic = "force-dynamic";
 type Mode = "current" | "all_time";
 
 interface PageProps {
-  params: Promise<{ slug: string }>;
+  params: Promise<{ slug: string; locale: string }>;
   searchParams: Promise<{ mode?: string }>;
 }
 
@@ -31,34 +32,36 @@ export async function generateMetadata({
   params,
   searchParams,
 }: PageProps): Promise<Metadata> {
-  const { slug } = await params;
+  const { slug, locale } = await params;
+  const t = await getTranslations({ locale, namespace: "scoreHistory" });
+  const tPred = await getTranslations({ locale, namespace: "predictions" });
   const fighter = await getFighterBySlug(slug);
-  if (!fighter) return { title: "Score history not found" };
+  if (!fighter) return { title: tPred("scoreHistoryNotFound") };
   const { mode: rawMode } = await searchParams;
   const mode = resolveMode(rawMode);
-  const label = mode === "current" ? "Current" : "All-Time";
+  const label = mode === "current" ? t("labelCurrent") : t("labelAllTime");
+  const labelLower =
+    mode === "current" ? t("labelCurrentLower") : t("labelAllTimeLower");
   return {
-    title: `${fighter.name_en} · ${label} Vertex history`,
-    description: `Per-bout ${label.toLowerCase()} Vertex Score trajectory for ${fighter.name_en}.`,
+    title: t("metaTitle", { fighter: fighter.name_en, label }),
+    description: t("metaDescription", {
+      fighter: fighter.name_en,
+      label: labelLower,
+    }),
   };
 }
 
-const METHOD_SHORT: Record<string, string> = {
-  ko: "KO",
-  tko: "TKO",
-  submission: "Sub",
-  decision_unanimous: "U-Dec",
-  decision_split: "S-Dec",
-  decision_majority: "M-Dec",
-  draw: "Draw",
-  no_contest: "NC",
-  dq: "DQ",
+const METHOD_KEY: Record<string, string> = {
+  ko: "methodKo",
+  tko: "methodTko",
+  submission: "methodSub",
+  decision_unanimous: "methodUDec",
+  decision_split: "methodSDec",
+  decision_majority: "methodMDec",
+  draw: "methodDraw",
+  no_contest: "methodNc",
+  dq: "methodDq",
 };
-
-function methodLabel(method: string | null): string {
-  if (!method) return "—";
-  return METHOD_SHORT[method] ?? method;
-}
 
 function resultClass(r: "W" | "L" | "D" | "NC" | null): string {
   if (r === "W") return "text-streak-win";
@@ -70,15 +73,15 @@ export default async function FighterScoreHistoryPage({
   params,
   searchParams,
 }: PageProps) {
-  const { slug } = await params;
+  const { slug, locale } = await params;
+  setRequestLocale(locale);
+  const t = await getTranslations("scoreHistory");
   const fighter = await getFighterBySlug(slug);
   if (!fighter) notFound();
   const { mode: rawMode } = await searchParams;
   const mode = resolveMode(rawMode);
 
   const history = await getScoreHistory(fighter.id);
-  // The bouts list below only ever lists real bouts — monthly synthetic
-  // snapshots show up on the chart but aren't useful as table rows.
   const boutHistory = history.filter((p) => p.kind === "bout");
   const modeHistory =
     mode === "all_time"
@@ -99,7 +102,7 @@ export default async function FighterScoreHistoryPage({
               className="inline-flex items-center gap-1.5 font-sans text-sm text-foreground-muted transition-colors hover:text-primary"
             >
               <ChevronLeft className="h-4 w-4" aria-hidden />
-              Back to {fighter.name_en}
+              {t("backTo", { fighter: fighter.name_en })}
             </Link>
             <FighterSearchTrigger />
           </Container>
@@ -107,17 +110,13 @@ export default async function FighterScoreHistoryPage({
 
         <Container size="xl" className="py-10 md:py-14">
           <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground-subtle">
-            {fighter.name_en} · Vertex history
+            {t("kicker", { fighter: fighter.name_en })}
           </p>
           <h1 className="mt-2 font-display uppercase tracking-tight text-foreground text-h1">
-            {mode === "current"
-              ? "Current score, fight by fight"
-              : "All-time score, fight by fight"}
+            {mode === "current" ? t("headingCurrent") : t("headingAllTime")}
           </h1>
           <p className="mt-2 max-w-xl font-sans text-sm text-foreground-muted">
-            {mode === "current"
-              ? "Replay of the current-Vertex formula at each completed UFC bout. Hover the chart for the bout that locked in each value."
-              : "Replay of the all-time legacy formula at each bout — quality wins, championship pedigree, era dominance, performance, finishing, career peak, minus weighted losses."}
+            {mode === "current" ? t("leadCurrent") : t("leadAllTime")}
           </p>
 
           <div className="mt-6 inline-flex rounded-md border border-foreground/15 bg-background-elevated/30 p-0.5">
@@ -125,11 +124,13 @@ export default async function FighterScoreHistoryPage({
               slug={fighter.slug}
               mode="current"
               active={mode === "current"}
+              label={t("labelCurrent")}
             />
             <ModeTab
               slug={fighter.slug}
               mode="all_time"
               active={mode === "all_time"}
+              label={t("labelAllTime")}
             />
           </div>
 
@@ -141,8 +142,7 @@ export default async function FighterScoreHistoryPage({
             <HistoryTable history={modeHistory} mode={mode} />
           ) : (
             <p className="mt-8 font-sans text-sm text-foreground-muted">
-              No replay data — this fighter has fewer than three completed
-              UFC bouts, so the formula has nothing to anchor on yet.
+              {t("noReplay")}
             </p>
           )}
         </Container>
@@ -156,12 +156,13 @@ function ModeTab({
   slug,
   mode,
   active,
+  label,
 }: {
   slug: string;
   mode: Mode;
   active: boolean;
+  label: string;
 }) {
-  const label = mode === "current" ? "Current" : "All-Time";
   return (
     <Link
       href={`/fighters/${slug}/score-history?mode=${mode}`}
@@ -179,19 +180,25 @@ function ModeTab({
   );
 }
 
-function HistoryTable({
+async function HistoryTable({
   history,
   mode,
 }: {
   history: ScoreHistoryPoint[];
   mode: Mode;
 }) {
-  // Most-recent first reads better in a list view; chart stays oldest→newest.
+  const t = await getTranslations("scoreHistory");
+  function methodLabel(method: string | null): string {
+    if (!method) return "—";
+    const key = METHOD_KEY[method];
+    if (!key) return method;
+    return t(key as "methodKo");
+  }
   const rows = [...history].reverse();
   return (
     <div className="mt-10">
       <h2 className="mb-4 font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-subtle">
-        Bouts
+        {t("boutsHeading")}
       </h2>
       <ul className="divide-y divide-foreground/[0.06] rounded-md border border-foreground/10 bg-background-elevated/20">
         {rows.map((p, i) => {
@@ -225,7 +232,7 @@ function HistoryTable({
               ) : null}
               <span className="font-sans text-sm text-foreground-muted">
                 <span className={resultClass(p.result)}>{p.result}</span>{" "}
-                vs{" "}
+                {t("vsLabel")}{" "}
                 {p.opponentSlug ? (
                   <Link
                     href={`/fighters/${p.opponentSlug}`}

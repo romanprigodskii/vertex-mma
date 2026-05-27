@@ -1,9 +1,12 @@
+import { getTranslations } from "next-intl/server";
+
 import { CatalogSkeleton } from "@/components/fighter/CatalogSkeleton";
 import { Container } from "@/components/layout/container";
 import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
 
-export default function FightersLoading() {
+export default async function FightersLoading() {
+  const t = await getTranslations("loading");
   return (
     <>
       <Navbar />
@@ -11,16 +14,16 @@ export default function FightersLoading() {
         <section className="relative border-b border-foreground/10">
           <Container size="xl" className="pb-16 pt-20 md:pt-24">
             <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground-subtle">
-              The roster
+              {t("rosterKicker")}
             </p>
             <h1
               className="mt-3 font-display tracking-[-0.01em] text-foreground leading-[0.85]"
               style={{ fontSize: "clamp(64px, 8vw, 144px)" }}
             >
-              FIGHTERS
+              {t("rosterHeading")}
             </h1>
             <p className="mt-6 font-sans text-base text-foreground-muted">
-              Loading roster…
+              {t("loadingRoster")}
             </p>
           </Container>
         </section>
