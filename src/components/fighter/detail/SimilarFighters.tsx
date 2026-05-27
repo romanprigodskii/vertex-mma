@@ -1,6 +1,7 @@
-import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 
 import { FighterAvatar } from "@/components/fighter/FighterAvatar";
+import { Link } from "@/i18n/navigation";
 import { getCountryFlag } from "@/lib/fighter-helpers";
 import type { SimilarFighter } from "@/lib/similar-fighters";
 import { cn } from "@/lib/utils";
@@ -9,16 +10,16 @@ interface SimilarFightersProps {
   fighters: SimilarFighter[];
 }
 
-export function SimilarFighters({ fighters }: SimilarFightersProps) {
+export async function SimilarFighters({ fighters }: SimilarFightersProps) {
+  const t = await getTranslations("fighter");
   if (fighters.length === 0) {
     return (
       <div className="rounded-md border border-dashed border-foreground/10 bg-background-elevated/30 px-6 py-10 text-center">
         <p className="font-sans text-sm text-foreground-muted">
-          No stat-similar fighters found in this weight class yet.
+          {t("noStatSimilar")}
         </p>
         <p className="mt-1 font-sans text-xs text-foreground-subtle">
-          We require at least 3 UFC bouts and recorded per-round stats on
-          both sides to compute similarity.
+          {t("noStatSimilarHint")}
         </p>
       </div>
     );
@@ -42,7 +43,7 @@ export function SimilarFighters({ fighters }: SimilarFightersProps) {
                 "focus-visible:outline-none focus-visible:border-primary/50",
                 "focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background-base",
               )}
-              aria-label={`${f.name_en}, ${sim}% similar`}
+              aria-label={`${f.name_en}, ${t("similarPercent", { pct: sim })}`}
             >
               <FighterAvatar
                 name={f.name_en}
@@ -69,7 +70,8 @@ export function SimilarFighters({ fighters }: SimilarFightersProps) {
                   <span aria-hidden className="text-foreground-subtle/40">
                     ·
                   </span>
-                  <span className="tabular">{f.ufc_total}</span> UFC bouts
+                  <span className="tabular">{f.ufc_total}</span>{" "}
+                  {t("ufcBoutsInline")}
                 </span>
               </div>
               <div className="flex shrink-0 flex-col items-end gap-0.5">
@@ -77,7 +79,7 @@ export function SimilarFighters({ fighters }: SimilarFightersProps) {
                   {sim}%
                 </span>
                 <span className="font-sans text-[10px] uppercase tracking-widest text-foreground-subtle">
-                  similar
+                  {t("similarLabel")}
                 </span>
               </div>
             </Link>

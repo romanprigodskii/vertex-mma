@@ -1,26 +1,18 @@
+import { getLocale, getTranslations } from "next-intl/server";
+
 import type { FighterDetail } from "@/lib/fighter-detail";
 import { getCountryFlag } from "@/lib/fighter-helpers";
 
-const STANCE_LABEL: Record<string, string> = {
-  orthodox: "Orthodox",
-  southpaw: "Southpaw",
-  switch: "Switch",
-  sideways: "Sideways",
-  unknown: "Unknown",
-};
-
-// Lazy-init the formatter once.
-let regionFormatter: Intl.DisplayNames | null = null;
-function countryName(code: string | null): string | null {
+// Locale-aware country name lookup. Re-creating Intl.DisplayNames every
+// request is cheap (cached internally by the runtime) and lets us switch
+// between "United States" / "США" without a hand-curated map.
+function countryName(code: string | null, locale: string): string | null {
   if (!code) return null;
-  if (!regionFormatter) {
-    try {
-      regionFormatter = new Intl.DisplayNames(["en"], { type: "region" });
-    } catch {
-      return code;
-    }
+  try {
+    return new Intl.DisplayNames([locale], { type: "region" }).of(code) ?? code;
+  } catch {
+    return code;
   }
-  return regionFormatter.of(code) ?? code;
 }
 
 function formatDob(dob: string | null): { display: string; age: number | null } {
@@ -50,36 +42,42 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
-export function PhysicalInfo({ fighter }: PhysicalInfoProps) {
+export async function PhysicalInfo({ fighter }: PhysicalInfoProps) {
+  const t = await getTranslations("fighter");
+  const locale = await getLocale();
   const { display: dobDisplay, age } = formatDob(fighter.dob);
-  const cn_label = countryName(fighter.country_code);
+  const cn_label = countryName(fighter.country_code, locale);
   const flag = getCountryFlag(fighter.country_code);
   const stanceLabel = fighter.stance
-    ? STANCE_LABEL[fighter.stance] ?? fighter.stance
+    ? t.has(`stance_value.${fighter.stance}`)
+      ? t(`stance_value.${fighter.stance}`)
+      : fighter.stance
     : null;
 
   return (
     <dl className="flex flex-col">
       <Row
-        label="Height"
+        label={t("height")}
         value={fighter.height_cm ? `${fighter.height_cm} cm` : "—"}
       />
       <Row
-        label="Reach"
+        label={t("reach")}
         value={fighter.reach_cm ? `${fighter.reach_cm} cm` : "—"}
       />
       <Row
-        label="Leg reach"
+        label={t("legReach")}
         value={fighter.leg_reach_cm ? `${fighter.leg_reach_cm} cm` : "—"}
       />
-      <Row label="Stance" value={stanceLabel ?? "—"} />
+      <Row label={t("stance")} value={stanceLabel ?? "—"} />
       <Row
-        label="Date of birth"
+        label={t("dateOfBirth")}
         value={
           age != null ? (
             <>
               <span className="font-mono tabular">{dobDisplay}</span>
-              <span className="ml-1.5 text-foreground-muted">· age {age}</span>
+              <span className="ml-1.5 text-foreground-muted">
+                · {t("age", { n: age })}
+              </span>
             </>
           ) : (
             dobDisplay
@@ -87,7 +85,7 @@ export function PhysicalInfo({ fighter }: PhysicalInfoProps) {
         }
       />
       <Row
-        label="Country"
+        label={t("country")}
         value={
           fighter.country_code ? (
             <span className="flex items-center gap-1.5">
@@ -102,7 +100,7 @@ export function PhysicalInfo({ fighter }: PhysicalInfoProps) {
         }
       />
       {fighter.fighting_out_of ? (
-        <Row label="Out of" value={fighter.fighting_out_of} />
+        <Row label={t("outOf")} value={fighter.fighting_out_of} />
       ) : null}
     </dl>
   );

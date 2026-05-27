@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { getTranslations } from "next-intl/server";
 
 import { BmfBadge } from "@/components/fighter/detail/BmfBadge";
 import { TrophyBadge } from "@/components/fighter/detail/TrophyBadge";
@@ -7,27 +8,6 @@ import type { FighterDetail } from "@/lib/fighter-detail";
 import { getCountryFlag } from "@/lib/fighter-helpers";
 import { formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
-
-const STATUS_LABEL: Record<string, string> = {
-  active: "Active",
-  retired: "Retired",
-  inactive: "Inactive",
-  suspended: "Suspended",
-};
-
-const WEIGHT_LABEL: Record<string, string> = {
-  strawweight: "Strawweight",
-  flyweight: "Flyweight",
-  bantamweight: "Bantamweight",
-  featherweight: "Featherweight",
-  lightweight: "Lightweight",
-  welterweight: "Welterweight",
-  middleweight: "Middleweight",
-  light_heavyweight: "Light Heavyweight",
-  heavyweight: "Heavyweight",
-  catchweight: "Catchweight",
-  openweight: "Openweight",
-};
 
 function computeAge(dob: string | null): number | null {
   if (!dob) return null;
@@ -110,13 +90,20 @@ interface FighterHeroProps {
   championEntry: ChampionEntry | null;
 }
 
-export function FighterHero({ fighter, championEntry }: FighterHeroProps) {
+export async function FighterHero({ fighter, championEntry }: FighterHeroProps) {
+  const tFighter = await getTranslations("fighter");
+  const tWeight = await getTranslations("weight");
   const age = computeAge(fighter.dob);
   const flag = getCountryFlag(fighter.country_code);
   const weightLabel = fighter.weight_class_primary
-    ? WEIGHT_LABEL[fighter.weight_class_primary] ?? fighter.weight_class_primary
+    ? tWeight.has(fighter.weight_class_primary)
+      ? tWeight(fighter.weight_class_primary)
+      : fighter.weight_class_primary
     : null;
-  const statusLabel = fighter.status ? STATUS_LABEL[fighter.status] : null;
+  const statusLabel =
+    fighter.status && tFighter.has(`status.${fighter.status}`)
+      ? tFighter(`status.${fighter.status}`)
+      : null;
   const isChampion = championEntry !== null;
 
   const wins = fighter.wins_total;
@@ -125,13 +112,16 @@ export function FighterHero({ fighter, championEntry }: FighterHeroProps) {
   const ncs = fighter.no_contests;
   const record = draws > 0 ? `${wins} — ${losses} — ${draws}` : `${wins} — ${losses}`;
   const denom = wins + losses;
-  const winRate = denom > 0 ? `${Math.round((wins / denom) * 100)}% win rate` : "Record pending";
+  const winRate =
+    denom > 0
+      ? tFighter("winRate", { pct: Math.round((wins / denom) * 100) })
+      : tFighter("recordPending");
 
   const tierBits: string[] = [];
   if (fighter.country_code) tierBits.push(fighter.country_code);
   if (weightLabel) tierBits.push(weightLabel);
   if (statusLabel) tierBits.push(statusLabel);
-  if (age != null) tierBits.push(`age ${age}`);
+  if (age != null) tierBits.push(tFighter("age", { n: age }));
 
   return (
     <section className="border-b border-foreground/10">
@@ -206,7 +196,7 @@ export function FighterHero({ fighter, championEntry }: FighterHeroProps) {
               {ncs > 0 ? (
                 <>
                   <span className="mx-1.5 text-foreground-subtle/50">·</span>
-                  <span>{formatNumber(ncs)} NC</span>
+                  <span>{tFighter("noContestSuffix", { n: formatNumber(ncs) })}</span>
                 </>
               ) : null}
             </p>
@@ -222,7 +212,7 @@ export function FighterHero({ fighter, championEntry }: FighterHeroProps) {
                   {fighter.current_streak_type}
                   {fighter.current_streak_count}
                 </span>{" "}
-                streak
+                {tFighter("streakSuffix")}
               </p>
             ) : null}
           </div>

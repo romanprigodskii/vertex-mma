@@ -1,3 +1,5 @@
+import { getTranslations } from "next-intl/server";
+
 import type { FighterDetail } from "@/lib/fighter-detail";
 import { formatNumber } from "@/lib/format";
 
@@ -45,7 +47,8 @@ function StatRow({
   );
 }
 
-export function CareerOverview({ fighter }: CareerOverviewProps) {
+export async function CareerOverview({ fighter }: CareerOverviewProps) {
+  const t = await getTranslations("fighter");
   const ufcWins = fighter.ufc_wins;
   // Finishes we know the method for vs. ones the scraper left as NULL.
   const knownFinishMethods = fighter.ufc_wins_ko + fighter.ufc_wins_sub;
@@ -72,35 +75,35 @@ export function CareerOverview({ fighter }: CareerOverviewProps) {
   return (
     <dl className="flex flex-col">
       <StatRow
-        label="UFC wins"
+        label={t("ufcWins")}
         value={formatNumber(ufcWins)}
         detail={koBreakdown}
       />
       <StatRow
-        label="UFC losses"
+        label={t("ufcLosses")}
         value={formatNumber(fighter.ufc_losses)}
       />
       {fighter.ufc_draws > 0 ? (
-        <StatRow label="UFC draws" value={formatNumber(fighter.ufc_draws)} />
+        <StatRow label={t("ufcDraws")} value={formatNumber(fighter.ufc_draws)} />
       ) : null}
       {fighter.ufc_no_contests > 0 ? (
         <StatRow
-          label="UFC no contests"
+          label={t("ufcNoContests")}
           value={formatNumber(fighter.ufc_no_contests)}
         />
       ) : null}
       <StatRow
-        label="UFC bouts"
+        label={t("ufcBouts")}
         value={formatNumber(fighter.ufc_total)}
         detail={
           fighter.bout_count > fighter.ufc_total
-            ? `${formatNumber(fighter.bout_count)} career`
+            ? `${formatNumber(fighter.bout_count)}`
             : null
         }
       />
       {lastFight ? (
         <StatRow
-          label="Last fight"
+          label={t("lastFightLabel")}
           value={lastFight.date}
           detail={
             <>

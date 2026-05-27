@@ -104,6 +104,14 @@ export default async function FighterDetailPage({ params }: PageProps) {
   const { slug, locale } = await params;
   setRequestLocale(locale);
   const t = await getTranslations("fighter");
+  const radarLabels = {
+    striking: t("attribute.striking"),
+    grappling: t("attribute.grappling"),
+    defense: t("attribute.defense"),
+    cardio: t("attribute.cardio"),
+    power: t("attribute.power"),
+    activity: t("attribute.activity"),
+  };
   const fighter = await getFighterBySlug(slug);
   if (!fighter) notFound();
 
@@ -290,7 +298,7 @@ export default async function FighterDetailPage({ params }: PageProps) {
         >
           <div className="grid grid-cols-1 gap-10 lg:grid-cols-2 lg:gap-16">
             <div className="flex flex-col items-center lg:items-start">
-              <RadarChart attributes={attributes} />
+              <RadarChart attributes={attributes} labels={radarLabels} />
               <p className="mt-4 max-w-sm text-center font-sans text-[11px] text-foreground-subtle lg:text-left">
                 {t("keyStatsCaveat")}
               </p>

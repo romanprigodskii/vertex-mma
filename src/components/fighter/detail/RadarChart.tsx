@@ -10,6 +10,13 @@ interface RadarChartProps {
   attributes: FighterAttributes;
   size?: number;
   className?: string;
+  /** Optional locale-translated labels per attribute key. Falls back to the
+   *  hardcoded English defaults so the chart stays usable in tests or any
+   *  caller that hasn't wired up i18n yet. */
+  labels?: Partial<Record<AttributeKey, string>>;
+  /** Accessible label for the whole chart (server-translated by the
+   *  caller). */
+  ariaLabel?: string;
 }
 
 const RING_PERCENTS = [20, 40, 60, 80, 100] as const;
@@ -51,6 +58,8 @@ export function RadarChart({
   attributes,
   size = 380,
   className,
+  labels: labelsOverride,
+  ariaLabel = "Fighter attribute radar",
 }: RadarChartProps) {
   const cx = size / 2;
   const cy = size / 2;
@@ -87,7 +96,7 @@ export function RadarChart({
     const [lx, ly] = pointAt(cx, cy, a, outerRadius + labelOffset);
     return {
       key: k as AttributeKey,
-      label: ATTRIBUTE_LABELS[k],
+      label: labelsOverride?.[k] ?? ATTRIBUTE_LABELS[k],
       value: attributes[k],
       x: lx,
       y: ly,
@@ -108,7 +117,7 @@ export function RadarChart({
       preserveAspectRatio="xMidYMid meet"
       className={cn("h-auto w-full max-w-[420px]", className)}
       role="img"
-      aria-label="Fighter attribute radar"
+      aria-label={ariaLabel}
     >
       {/* Concentric hex grid */}
       {gridPolys.map((poly, idx) => (
