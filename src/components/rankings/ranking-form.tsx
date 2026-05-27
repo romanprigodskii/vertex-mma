@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 
 import {
   createRankingAction,
@@ -10,6 +10,7 @@ import {
   searchFightersForPicker,
   updateRankingAction,
 } from "@/app/[locale]/rankings/actions";
+import { useRouter } from "@/i18n/navigation";
 
 const INPUT_CLASS =
   "rounded-sm border border-foreground/15 bg-background-elevated/30 px-3 py-2 font-sans text-sm text-foreground focus:border-primary focus:outline-none";
@@ -40,6 +41,8 @@ export function RankingForm({
   initialDescription = "",
   initialEntries = [],
 }: Props) {
+  const t = useTranslations("rankings");
+  const tWeight = useTranslations("weight");
   const router = useRouter();
   const [title, setTitle] = React.useState(initialTitle);
   const [description, setDescription] = React.useState(initialDescription);
@@ -123,7 +126,7 @@ export function RankingForm({
     const targetId =
       mode === "create" && "rankingId" in res ? res.rankingId : rankingId;
     if (!targetId) {
-      setError("Could not determine the ranking URL after save.");
+      setError(t("noResolvedUrl"));
       return;
     }
     router.push(`/rankings/${targetId}`);
@@ -134,7 +137,7 @@ export function RankingForm({
     if (!rankingId) return;
     if (
       typeof window !== "undefined" &&
-      !window.confirm("Delete this ranking? This cannot be undone.")
+      !window.confirm(t("deleteConfirm"))
     ) {
       return;
     }
@@ -157,7 +160,7 @@ export function RankingForm({
     <form onSubmit={onSubmit} className="flex flex-col gap-6">
       <label className="flex flex-col gap-1.5">
         <span className="font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
-          Title
+          {t("titleLabel")}
         </span>
         <input
           type="text"
@@ -167,13 +170,13 @@ export function RankingForm({
           minLength={3}
           maxLength={100}
           className={INPUT_CLASS}
-          placeholder='e.g. "Top 10 P4P 2026"'
+          placeholder={t("titlePlaceholder")}
         />
       </label>
 
       <label className="flex flex-col gap-1.5">
         <span className="font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
-          Description (optional)
+          {t("descriptionLabel")}
         </span>
         <textarea
           value={description}
@@ -181,13 +184,13 @@ export function RankingForm({
           maxLength={500}
           rows={3}
           className={`${INPUT_CLASS} resize-y`}
-          placeholder="Short context — why this list?"
+          placeholder={t("descriptionPlaceholder")}
         />
       </label>
 
       <div className="flex flex-col gap-3">
         <h2 className="font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
-          Fighters · {entries.length}/{MAX_ENTRIES}
+          {t("fightersCount", { n: entries.length, max: MAX_ENTRIES })}
         </h2>
         <FighterPickerInline
           onPick={addEntry}
@@ -197,7 +200,7 @@ export function RankingForm({
 
         {entries.length === 0 ? (
           <p className="py-6 text-center font-sans text-sm text-foreground-subtle">
-            No fighters added yet. Search above to add.
+            {t("addFightersHint")}
           </p>
         ) : (
           <ol className="flex flex-col gap-2">
@@ -228,7 +231,13 @@ export function RankingForm({
                       {e.fighter_name}
                     </p>
                     <p className="font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
-                      {e.fighter_weight_class ?? "—"}
+                      {(() => {
+                        if (!e.fighter_weight_class) return "—";
+                        const key = e.fighter_weight_class.replace(/-/g, "_");
+                        return tWeight.has(key)
+                          ? tWeight(key as "lightweight")
+                          : e.fighter_weight_class;
+                      })()}
                     </p>
                     <input
                       type="text"
@@ -236,7 +245,7 @@ export function RankingForm({
                       onChange={(evt) =>
                         updateNote(e.fighter_id, evt.target.value)
                       }
-                      placeholder="Optional note"
+                      placeholder={t("notePlaceholder")}
                       maxLength={200}
                       className="mt-2 w-full rounded-sm border border-foreground/10 bg-background-elevated/20 px-2 py-1 font-sans text-xs text-foreground focus:border-primary focus:outline-none"
                     />
@@ -247,7 +256,7 @@ export function RankingForm({
                       onClick={() => moveEntry(idx, -1)}
                       disabled={idx === 0}
                       className="rounded-sm border border-foreground/15 px-2 py-0.5 font-mono text-xs text-foreground-muted hover:bg-foreground/[0.05] disabled:opacity-30"
-                      aria-label="Move up"
+                      aria-label={t("moveUp")}
                     >
                       ↑
                     </button>
@@ -256,7 +265,7 @@ export function RankingForm({
                       onClick={() => moveEntry(idx, 1)}
                       disabled={idx === entries.length - 1}
                       className="rounded-sm border border-foreground/15 px-2 py-0.5 font-mono text-xs text-foreground-muted hover:bg-foreground/[0.05] disabled:opacity-30"
-                      aria-label="Move down"
+                      aria-label={t("moveDown")}
                     >
                       ↓
                     </button>
@@ -264,7 +273,7 @@ export function RankingForm({
                       type="button"
                       onClick={() => removeEntry(e.fighter_id)}
                       className="rounded-sm border border-streak-loss/30 px-2 py-0.5 font-mono text-xs text-streak-loss hover:bg-streak-loss/10"
-                      aria-label="Remove"
+                      aria-label={t("remove")}
                     >
                       ×
                     </button>
@@ -288,7 +297,11 @@ export function RankingForm({
           disabled={submitDisabled}
           className="rounded-sm bg-primary px-4 py-2.5 font-display text-sm uppercase tracking-widest text-background-base hover:opacity-90 disabled:opacity-50"
         >
-          {pending ? "Saving…" : mode === "create" ? "Publish" : "Save changes"}
+          {pending
+            ? t("saving")
+            : mode === "create"
+              ? t("publish")
+              : t("saveChanges")}
         </button>
         {mode === "edit" ? (
           <button
@@ -297,7 +310,7 @@ export function RankingForm({
             disabled={pending}
             className="rounded-sm border border-streak-loss/30 px-4 py-2 font-sans text-sm text-streak-loss hover:bg-streak-loss/10 disabled:opacity-50"
           >
-            Delete ranking
+            {t("deleteRanking")}
           </button>
         ) : null}
       </div>
@@ -314,6 +327,9 @@ function FighterPickerInline({
   excludedIds: string[];
   disabled: boolean;
 }) {
+  const t = useTranslations("rankings");
+  const tSearch = useTranslations("search");
+  const tWeight = useTranslations("weight");
   const [query, setQuery] = React.useState("");
   const [results, setResults] = React.useState<PickerFighter[]>([]);
   const [pending, setPending] = React.useState(false);
@@ -350,15 +366,15 @@ function FighterPickerInline({
         onChange={(e) => setQuery(e.target.value)}
         placeholder={
           disabled
-            ? `Reached the ${MAX_ENTRIES}-fighter limit`
-            : "Search fighter by name…"
+            ? t("limitPlaceholder", { max: MAX_ENTRIES })
+            : t("searchByName")
         }
         disabled={disabled}
         className="w-full rounded-sm border border-foreground/15 bg-background-elevated/20 px-3 py-2 font-sans text-sm text-foreground focus:border-primary focus:outline-none disabled:opacity-50"
       />
       {pending ? (
         <p className="mt-2 font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
-          Searching…
+          {tSearch("searching")}
         </p>
       ) : null}
       {visible.length > 0 ? (
@@ -392,7 +408,13 @@ function FighterPickerInline({
                     {r.name}
                   </p>
                   <p className="font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
-                    {r.weight_class ?? "—"}
+                    {(() => {
+                      if (!r.weight_class) return "—";
+                      const key = r.weight_class.replace(/-/g, "_");
+                      return tWeight.has(key)
+                        ? tWeight(key as "lightweight")
+                        : r.weight_class;
+                    })()}
                   </p>
                 </span>
               </button>
