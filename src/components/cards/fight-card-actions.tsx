@@ -1,10 +1,11 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { Check, Heart, Link2 } from "lucide-react";
 
 import { toggleLikeAction } from "@/app/[locale]/cards/actions";
+import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -25,6 +26,7 @@ export function FightCardActions({
   initialLikeCount,
   isSignedIn,
 }: Props) {
+  const t = useTranslations("cards");
   const [liked, setLiked] = React.useState(initialLiked);
   const [count, setCount] = React.useState(initialLikeCount);
   const [pending, setPending] = React.useState(false);
@@ -93,7 +95,7 @@ export function FightCardActions({
             BTN,
             "border-foreground/15 text-foreground-muted hover:bg-foreground/[0.05] hover:text-foreground",
           )}
-          title="Sign in to like cards"
+          title={t("signInToLike")}
         >
           <Heart className="h-4 w-4" aria-hidden />
           <span className="tabular">{count}</span>
@@ -113,7 +115,7 @@ export function FightCardActions({
         ) : (
           <Link2 className="h-4 w-4" aria-hidden />
         )}
-        <span>{copied ? "Link copied" : "Copy link"}</span>
+        <span>{copied ? t("linkCopied") : t("copyLink")}</span>
       </button>
     </div>
   );

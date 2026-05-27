@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useTranslations } from "next-intl";
 
 import {
   type PickerFighter,
@@ -30,6 +31,7 @@ export function FighterSlotPicker({
   onClear,
   excludedIds,
 }: Props) {
+  const t = useTranslations("cards");
   if (fighter) {
     return (
       <div className="flex items-center gap-2 rounded-md border border-foreground/15 bg-background-elevated/40 p-2">
@@ -53,7 +55,7 @@ export function FighterSlotPicker({
           type="button"
           onClick={onClear}
           className="shrink-0 rounded-sm border border-foreground/15 px-2 py-0.5 font-mono text-xs text-foreground-muted hover:bg-foreground/[0.05]"
-          aria-label={`Remove ${label}`}
+          aria-label={t("removeSlotAria", { label })}
         >
           ✕
         </button>
@@ -74,6 +76,9 @@ function SlotSearch({
   onPick: (f: PickerFighter) => void;
   excludedIds: string[];
 }) {
+  const t = useTranslations("cards");
+  const tSearch = useTranslations("search");
+  const tWeight = useTranslations("weight");
   const [query, setQuery] = React.useState("");
   const [results, setResults] = React.useState<PickerFighter[]>([]);
   const [pending, setPending] = React.useState(false);
@@ -110,12 +115,12 @@ function SlotSearch({
         type="text"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder={`${label} — search…`}
+        placeholder={t("slotPlaceholder", { label })}
         className="w-full rounded-sm border border-foreground/15 bg-background-base px-2.5 py-1.5 font-sans text-sm text-foreground placeholder:text-foreground-subtle focus:border-primary focus:outline-none"
       />
       {pending && query.trim() ? (
         <p className="mt-1.5 font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
-          Searching…
+          {tSearch("searching")}
         </p>
       ) : null}
       {visible.length > 0 ? (
@@ -150,7 +155,12 @@ function SlotSearch({
                   </span>
                   {r.weight_class ? (
                     <span className="block font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
-                      {formatWeightClass(r.weight_class)}
+                      {(() => {
+                        const key = r.weight_class.replace(/-/g, "_");
+                        return tWeight.has(key)
+                          ? tWeight(key as "lightweight")
+                          : formatWeightClass(r.weight_class);
+                      })()}
                     </span>
                   ) : null}
                 </span>

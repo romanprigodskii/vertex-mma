@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 
 import { submitPicksAction } from "@/app/[locale]/predictions/actions";
 import type { PredictionBoutRow } from "@/lib/predictions";
@@ -18,6 +19,8 @@ export function PredictionForm({
   bouts,
   readOnly,
 }: Props) {
+  const t = useTranslations("predictions");
+  const tWeight = useTranslations("weight");
   const router = useRouter();
   const [picks, setPicks] = React.useState<Map<string, string>>(() => {
     const m = new Map<string, string>();
@@ -56,9 +59,7 @@ export function PredictionForm({
       setError(res.error);
       return;
     }
-    setFeedback(
-      `Saved ${res.saved} pick${res.saved === 1 ? "" : "s"}.`,
-    );
+    setFeedback(t("savedPicks", { count: res.saved ?? 0 }));
     router.refresh();
   }
 
@@ -69,9 +70,9 @@ export function PredictionForm({
           const picked = picks.get(b.bout_id);
           const tag =
             b.is_main_event
-              ? "Main event"
+              ? t("mainEventTag")
               : b.is_co_main_event
-                ? "Co-main"
+                ? t("coMainTag")
                 : "";
           return (
             <li
@@ -82,11 +83,16 @@ export function PredictionForm({
                 <p className="mb-2 font-mono text-[10px] uppercase tracking-widest text-primary">
                   {tag}
                   {tag && b.is_title_fight ? " · " : ""}
-                  {b.is_title_fight ? "Title" : ""}
+                  {b.is_title_fight ? t("titleTag") : ""}
                 </p>
               ) : null}
               <p className="mb-3 font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
-                {b.weight_class.replace(/_/g, " ")}
+                {(() => {
+                  const key = b.weight_class.replace(/-/g, "_");
+                  return tWeight.has(key)
+                    ? tWeight(key as "lightweight")
+                    : b.weight_class.replace(/_/g, " ");
+                })()}
               </p>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <FighterPickButton
@@ -136,10 +142,10 @@ export function PredictionForm({
                   )}
                 >
                   {b.is_correct
-                    ? "+10 pts — correct call"
+                    ? t("correctCall")
                     : picked
-                      ? "Missed"
-                      : "No pick"}
+                      ? t("missedCall")
+                      : t("noPick")}
                 </p>
               ) : null}
             </li>
@@ -156,8 +162,8 @@ export function PredictionForm({
             className="rounded-sm bg-primary px-5 py-2.5 font-display text-sm uppercase tracking-widest text-background-base hover:opacity-90 disabled:opacity-50"
           >
             {pending
-              ? "Saving…"
-              : `Save ${picks.size} pick${picks.size === 1 ? "" : "s"}`}
+              ? t("submitting")
+              : t("savePicks", { count: picks.size })}
           </button>
           {error ? (
             <p className="font-sans text-sm text-streak-loss">{error}</p>
@@ -166,8 +172,7 @@ export function PredictionForm({
             <p className="font-sans text-sm text-streak-win">{feedback}</p>
           ) : null}
           <p className="font-sans text-[11px] text-foreground-subtle">
-            Tap a card again to clear it. Re-save anytime before the
-            deadline.
+            {t("tapToClear")}
           </p>
         </div>
       ) : null}

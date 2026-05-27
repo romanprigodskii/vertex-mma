@@ -1,3 +1,5 @@
+import { useLocale, useTranslations } from "next-intl";
+
 import type {
   AchievementRow,
   UserAchievementRow,
@@ -25,6 +27,9 @@ export function AchievementsGrid({
   allAchievements,
   compact,
 }: Props) {
+  const t = useTranslations("profile");
+  const locale = useLocale();
+  const dateLocale = locale === "ru" ? "ru-RU" : "en-US";
   if (compact) {
     if (unlocked.length === 0) return null;
     return (
@@ -32,7 +37,10 @@ export function AchievementsGrid({
         {unlocked.slice(0, 8).map((a) => (
           <span
             key={a.id}
-            title={`${a.name} — ${a.description}`}
+            title={t("achievementTooltip", {
+              name: a.name,
+              description: a.description,
+            })}
             className={cn(
               "inline-flex h-6 w-6 items-center justify-center rounded-sm border bg-background-elevated/30 font-mono text-[10px] uppercase",
               RARITY_BORDER[a.rarity] ?? "border-foreground/15",
@@ -54,7 +62,7 @@ export function AchievementsGrid({
   if (all.length === 0) {
     return (
       <p className="rounded-md border border-foreground/10 bg-background-elevated/20 px-4 py-6 text-center font-sans text-sm text-foreground-subtle">
-        No achievements yet.
+        {t("noAchievementsYet")}
       </p>
     );
   }
@@ -89,7 +97,7 @@ export function AchievementsGrid({
               {a.rarity}
               {a.reward_coins > 0 ? ` · +${a.reward_coins}c` : ""}
               {isUnlocked && unlockedRow
-                ? ` · ${new Date(unlockedRow.unlocked_at).toLocaleDateString()}`
+                ? ` · ${new Date(unlockedRow.unlocked_at).toLocaleDateString(dateLocale)}`
                 : ""}
             </p>
           </li>

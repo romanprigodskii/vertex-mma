@@ -1,5 +1,6 @@
-import Link from "next/link";
+import { useLocale, useTranslations } from "next-intl";
 
+import { Link } from "@/i18n/navigation";
 import type { PredictionEventListItem } from "@/lib/predictions";
 
 export function PredictionEventCard({
@@ -7,12 +8,15 @@ export function PredictionEventCard({
 }: {
   event: PredictionEventListItem;
 }) {
+  const t = useTranslations("predictions");
+  const locale = useLocale();
+  const dateLocale = locale === "ru" ? "ru-RU" : "en-US";
   const closesMs = new Date(event.closes_at).getTime();
   const hoursLeft = Math.max(
     0,
     Math.floor((closesMs - Date.now()) / 3_600_000),
   );
-  const dateLabel = new Date(event.event_date).toLocaleDateString("en-US", {
+  const dateLabel = new Date(event.event_date).toLocaleDateString(dateLocale, {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -31,9 +35,10 @@ export function PredictionEventCard({
         {event.event_name}
       </h3>
       <div className="mt-3 flex flex-wrap items-baseline justify-between gap-2 font-mono text-[11px] tabular text-foreground-subtle">
-        <span>{event.bout_count} bouts</span>
+        <span>{t("boutCount", { count: event.bout_count })}</span>
         <span>
-          {event.total_participants} predicting · closes in {hoursLeft}h
+          {t("predictingCount", { count: event.total_participants })} ·{" "}
+          {t("closesInHours", { h: hoursLeft })}
         </span>
       </div>
     </Link>

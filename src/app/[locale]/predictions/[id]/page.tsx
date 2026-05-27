@@ -1,35 +1,41 @@
-import Link from "next/link";
+import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import { ChevronLeft } from "lucide-react";
 
 import { Container } from "@/components/layout/container";
 import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
 import { PredictionForm } from "@/components/predictions/prediction-form";
+import { Link } from "@/i18n/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { getPredictionEventForUser } from "@/lib/predictions";
 
 export const dynamic = "force-dynamic";
 
 interface PageProps {
-  params: Promise<{ id: string }>;
+  params: Promise<{ id: string; locale: string }>;
 }
 
-export async function generateMetadata({ params }: PageProps) {
-  const { id } = await params;
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { id, locale } = await params;
+  const t = await getTranslations({ locale, namespace: "predictions" });
   const user = await getCurrentUser();
   const evt = await getPredictionEventForUser(id, user?.userProfileId ?? null);
-  if (!evt) return { title: "Predictions not found" };
+  if (!evt) return { title: t("notFoundTitle") };
   return {
-    title: `${evt.event_name} · Predictions`,
-    description: `Pick winners for ${evt.event_name}. 10 points per correct call.`,
+    title: t("detailMetaTitle", { event: evt.event_name }),
+    description: t("detailMetaDescription", { event: evt.event_name }),
   };
 }
 
 export default async function PredictionDetailPage({ params }: PageProps) {
-  const { id } = await params;
+  const { id, locale } = await params;
+  setRequestLocale(locale);
+  const t = await getTranslations("predictions");
+  const localePrefix = locale === "en" ? "" : `/${locale}`;
   const user = await getCurrentUser();
-  if (!user) redirect(`/signin?next=/predictions/${id}`);
+  if (!user) redirect(`${localePrefix}/signin?next=/predictions/${id}`);
 
   const evt = await getPredictionEventForUser(id, user.userProfileId);
   if (!evt) notFound();
@@ -37,7 +43,8 @@ export default async function PredictionDetailPage({ params }: PageProps) {
   const closed =
     evt.status !== "upcoming" ||
     new Date(evt.closes_at).getTime() <= Date.now();
-  const closesLabel = new Date(evt.closes_at).toLocaleString("en-US", {
+  const dateLocale = locale === "ru" ? "ru-RU" : "en-US";
+  const closesLabel = new Date(evt.closes_at).toLocaleString(dateLocale, {
     month: "short",
     day: "numeric",
     hour: "numeric",
@@ -54,14 +61,14 @@ export default async function PredictionDetailPage({ params }: PageProps) {
               href="/predictions"
               className="inline-flex items-center gap-1.5 font-sans text-sm text-foreground-muted hover:text-primary"
             >
-              <ChevronLeft className="h-4 w-4" aria-hidden /> All predictions
+              <ChevronLeft className="h-4 w-4" aria-hidden /> {t("allPredictions")}
             </Link>
           </Container>
         </div>
 
         <Container size="lg" className="py-10 md:py-14">
           <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground-subtle">
-            {new Date(evt.event_date).toLocaleDateString("en-US", {
+            {new Date(evt.event_date).toLocaleDateString(dateLocale, {
               month: "long",
               day: "numeric",
               year: "numeric",
@@ -71,9 +78,8 @@ export default async function PredictionDetailPage({ params }: PageProps) {
             {evt.event_name}
           </h1>
           <p className="mt-2 font-sans text-sm text-foreground-muted">
-            {closed ? "Predictions closed." : `Closes ${closesLabel}.`} ·{" "}
-            {evt.total_participants} participant
-            {evt.total_participants === 1 ? "" : "s"}
+            {closed ? t("closed") : t("closesAt", { when: closesLabel })} ·{" "}
+            {t("participants", { count: evt.total_participants })}
           </p>
 
           <div className="mt-8">

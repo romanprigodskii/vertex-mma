@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 
 import {
   createFightCardAction,
@@ -17,6 +17,7 @@ import {
   type BoutFighter,
   FighterSlotPicker,
 } from "@/components/cards/fighter-slot-picker";
+import { useRouter } from "@/i18n/navigation";
 import {
   CARD_THEME_BACKGROUNDS,
   CARD_THEME_COLORS,
@@ -86,6 +87,8 @@ export function FightCardForm({
   initialIsPublic = true,
   initialBouts,
 }: Props) {
+  const t = useTranslations("cards");
+  const tWeight = useTranslations("weight");
   const router = useRouter();
   const [title, setTitle] = React.useState(initialTitle);
   const [subtitle, setSubtitle] = React.useState(initialSubtitle);
@@ -139,13 +142,11 @@ export function FightCardForm({
     setError(null);
 
     if (title.trim().length < 3) {
-      setError("Title must be at least 3 characters.");
+      setError(t("titleTooShort"));
       return;
     }
     if (bouts.some((b) => !b.fighterA || !b.fighterB)) {
-      setError(
-        "Every bout needs two fighters — finish or remove the empty one.",
-      );
+      setError(t("boutsNeedFighters"));
       return;
     }
 
@@ -181,7 +182,7 @@ export function FightCardForm({
       return;
     }
     if (!res?.slug) {
-      setError("Could not determine the card URL after save.");
+      setError(t("couldNotResolveUrl"));
       return;
     }
     router.push(`/cards/${res.slug}`);
@@ -192,7 +193,7 @@ export function FightCardForm({
     if (!cardId) return;
     if (
       typeof window !== "undefined" &&
-      !window.confirm("Delete this fight card? This cannot be undone.")
+      !window.confirm(t("deleteCardConfirm"))
     ) {
       return;
     }
@@ -236,7 +237,7 @@ export function FightCardForm({
     >
       <div className="flex flex-col gap-6">
         <label className="flex flex-col gap-1.5">
-          <span className={LABEL}>Title</span>
+          <span className={LABEL}>{t("titleLabel")}</span>
           <input
             type="text"
             value={title}
@@ -245,27 +246,27 @@ export function FightCardForm({
             minLength={3}
             maxLength={100}
             className={INPUT_CLASS}
-            placeholder='e.g. "Dream Card: Era Clash"'
+            placeholder={t("titlePlaceholder")}
           />
         </label>
 
         <label className="flex flex-col gap-1.5">
-          <span className={LABEL}>Subtitle (optional)</span>
+          <span className={LABEL}>{t("subtitleLabel")}</span>
           <input
             type="text"
             value={subtitle}
             onChange={(e) => setSubtitle(e.target.value)}
             maxLength={120}
             className={INPUT_CLASS}
-            placeholder="A venue, a date, a tagline…"
+            placeholder={t("subtitlePlaceholder")}
           />
         </label>
 
         <div className="flex flex-col gap-4 rounded-md border border-foreground/10 bg-background-elevated/20 p-4">
-          <h2 className={LABEL}>Style</h2>
+          <h2 className={LABEL}>{t("styleHeading")}</h2>
 
           <div className="flex flex-col gap-1.5">
-            <span className={LABEL}>Accent color</span>
+            <span className={LABEL}>{t("accentColor")}</span>
             <div className="flex flex-wrap gap-2">
               {CARD_THEME_COLORS.map((c) => (
                 <button
@@ -287,7 +288,7 @@ export function FightCardForm({
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <span className={LABEL}>Title font</span>
+            <span className={LABEL}>{t("titleFont")}</span>
             <div className="flex flex-wrap gap-2">
               {CARD_THEME_FONTS.map((f) => (
                 <button
@@ -309,7 +310,7 @@ export function FightCardForm({
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <span className={LABEL}>Background</span>
+            <span className={LABEL}>{t("background")}</span>
             <div className="flex flex-wrap gap-2">
               {CARD_THEME_BACKGROUNDS.map((b) => (
                 <button
@@ -337,7 +338,7 @@ export function FightCardForm({
               className="h-4 w-4 accent-primary"
             />
             <span className="font-sans text-sm text-foreground">
-              Public — list this card in the community feed
+              {t("publicCard")}
             </span>
           </label>
         </div>
@@ -345,7 +346,7 @@ export function FightCardForm({
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between gap-3">
             <h2 className={LABEL}>
-              Bouts · {bouts.length}/{MAX_BOUTS}
+              {t("boutsCounter", { n: bouts.length, max: MAX_BOUTS })}
             </h2>
           </div>
 
@@ -357,9 +358,9 @@ export function FightCardForm({
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-mono text-[11px] uppercase tracking-widest text-foreground-subtle">
-                    Bout {idx + 1}
+                    {t("boutNumber", { n: idx + 1 })}
                     {b.isMain ? (
-                      <span className="text-primary"> · Main event</span>
+                      <span className="text-primary">{t("mainEventSuffix")}</span>
                     ) : null}
                   </span>
                   <div className="flex items-center gap-1">
@@ -368,7 +369,7 @@ export function FightCardForm({
                       onClick={() => moveBout(idx, -1)}
                       disabled={idx === 0}
                       className="rounded-sm border border-foreground/15 px-2 py-0.5 font-mono text-xs text-foreground-muted hover:bg-foreground/[0.05] disabled:opacity-30"
-                      aria-label="Move bout up"
+                      aria-label={t("moveBoutUp")}
                     >
                       ↑
                     </button>
@@ -377,7 +378,7 @@ export function FightCardForm({
                       onClick={() => moveBout(idx, 1)}
                       disabled={idx === bouts.length - 1}
                       className="rounded-sm border border-foreground/15 px-2 py-0.5 font-mono text-xs text-foreground-muted hover:bg-foreground/[0.05] disabled:opacity-30"
-                      aria-label="Move bout down"
+                      aria-label={t("moveBoutDown")}
                     >
                       ↓
                     </button>
@@ -386,7 +387,7 @@ export function FightCardForm({
                       onClick={() => removeBout(b.key)}
                       disabled={bouts.length <= 1}
                       className="rounded-sm border border-streak-loss/30 px-2 py-0.5 font-mono text-xs text-streak-loss hover:bg-streak-loss/10 disabled:opacity-30"
-                      aria-label="Remove bout"
+                      aria-label={t("removeBoutAria")}
                     >
                       ✕
                     </button>
@@ -395,7 +396,7 @@ export function FightCardForm({
 
                 <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto_1fr] sm:items-start">
                   <FighterSlotPicker
-                    label="Fighter A"
+                    label={t("fighterA")}
                     fighter={b.fighterA}
                     onPick={(f) =>
                       patchBout(b.key, { fighterA: toBoutFighter(f) })
@@ -404,10 +405,10 @@ export function FightCardForm({
                     excludedIds={usedFighterIds}
                   />
                   <span className="hidden self-center font-display text-sm text-foreground-subtle sm:block">
-                    VS
+                    {t("vsLabel")}
                   </span>
                   <FighterSlotPicker
-                    label="Fighter B"
+                    label={t("fighterB")}
                     fighter={b.fighterB}
                     onPick={(f) =>
                       patchBout(b.key, { fighterB: toBoutFighter(f) })
@@ -420,7 +421,7 @@ export function FightCardForm({
                 <div className="mt-3 flex flex-wrap items-center gap-4">
                   <label className="flex items-center gap-2">
                     <span className="font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
-                      Weight
+                      {t("weight")}
                     </span>
                     <select
                       value={b.weightClass}
@@ -429,11 +430,17 @@ export function FightCardForm({
                       }
                       className="rounded-sm border border-foreground/15 bg-background-elevated/30 px-2 py-1.5 font-sans text-sm text-foreground focus:border-primary focus:outline-none"
                     >
-                      {WEIGHT_CLASSES.map((wc) => (
-                        <option key={wc} value={wc}>
-                          {formatWeightClass(wc)}
-                        </option>
-                      ))}
+                      {WEIGHT_CLASSES.map((wc) => {
+                        const key = wc.replace(/-/g, "_");
+                        const label = tWeight.has(key)
+                          ? tWeight(key as "lightweight")
+                          : formatWeightClass(wc);
+                        return (
+                          <option key={wc} value={wc}>
+                            {label}
+                          </option>
+                        );
+                      })}
                     </select>
                   </label>
                   <label className="flex items-center gap-2">
@@ -444,7 +451,7 @@ export function FightCardForm({
                       className="h-4 w-4 accent-primary"
                     />
                     <span className="font-sans text-sm text-foreground-muted">
-                      Main event
+                      {t("mainEvent")}
                     </span>
                   </label>
                 </div>
@@ -459,8 +466,8 @@ export function FightCardForm({
             className="rounded-md border border-dashed border-foreground/20 px-4 py-2.5 font-sans text-sm text-foreground-muted hover:border-foreground/30 hover:text-foreground disabled:opacity-40"
           >
             {bouts.length >= MAX_BOUTS
-              ? `Reached the ${MAX_BOUTS}-bout limit`
-              : "+ Add bout"}
+              ? t("boutLimit", { max: MAX_BOUTS })
+              : t("addBoutBtn")}
           </button>
         </div>
 
@@ -477,10 +484,10 @@ export function FightCardForm({
             className="rounded-sm bg-primary px-4 py-2.5 font-display text-sm uppercase tracking-widest text-background-base hover:opacity-90 disabled:opacity-50"
           >
             {pending
-              ? "Saving…"
+              ? t("saving")
               : mode === "create"
-                ? "Publish card"
-                : "Save changes"}
+                ? t("publishCard")
+                : t("saveChanges")}
           </button>
           {mode === "edit" ? (
             <button
@@ -489,14 +496,14 @@ export function FightCardForm({
               disabled={pending}
               className="rounded-sm border border-streak-loss/30 px-4 py-2 font-sans text-sm text-streak-loss hover:bg-streak-loss/10 disabled:opacity-50"
             >
-              Delete card
+              {t("deleteCard")}
             </button>
           ) : null}
         </div>
       </div>
 
       <div className="lg:sticky lg:top-6 lg:self-start">
-        <p className={cn(LABEL, "mb-2")}>Live preview</p>
+        <p className={cn(LABEL, "mb-2")}>{t("livePreview")}</p>
         <FightCardPoster
           title={title}
           subtitle={subtitle.trim() || null}

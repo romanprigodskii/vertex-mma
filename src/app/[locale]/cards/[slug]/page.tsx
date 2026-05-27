@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import { ChevronLeft, Edit3 } from "lucide-react";
 
 import { FightCardActions } from "@/components/cards/fight-card-actions";
@@ -10,6 +10,7 @@ import {
 import { Container } from "@/components/layout/container";
 import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
+import { Link } from "@/i18n/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import {
   getFightCardBySlug,
@@ -20,18 +21,22 @@ import {
 export const dynamic = "force-dynamic";
 
 interface PageProps {
-  params: Promise<{ slug: string }>;
+  params: Promise<{ slug: string; locale: string }>;
 }
 
 export async function generateMetadata({ params }: PageProps) {
-  const { slug } = await params;
+  const { slug, locale } = await params;
+  const t = await getTranslations({ locale, namespace: "cards" });
   const card = await getFightCardBySlug(slug);
-  if (!card) return { title: "Fight card not found" };
+  if (!card) return { title: t("cardNotFound") };
   const desc = card.subtitle?.trim()
     ? card.subtitle
-    : `A ${card.bouts.length}-bout fight card by @${card.author_username}.`;
+    : t("cardDescription", {
+        count: card.bouts.length,
+        username: card.author_username,
+      });
   return {
-    title: `${card.title} · by @${card.author_username}`,
+    title: `${card.title} · ${t("byUser")} @${card.author_username}`,
     description: desc,
     openGraph: {
       title: `${card.title} · @${card.author_username}`,
@@ -43,7 +48,9 @@ export async function generateMetadata({ params }: PageProps) {
 }
 
 export default async function CardViewPage({ params }: PageProps) {
-  const { slug } = await params;
+  const { slug, locale } = await params;
+  setRequestLocale(locale);
+  const t = await getTranslations("cards");
   const [card, currentUser] = await Promise.all([
     getFightCardBySlug(slug),
     getCurrentUser(),
@@ -82,11 +89,14 @@ export default async function CardViewPage({ params }: PageProps) {
       : null,
   }));
 
-  const dateLabel = new Date(card.created_at).toLocaleDateString("en-US", {
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  });
+  const dateLabel = new Date(card.created_at).toLocaleDateString(
+    locale === "ru" ? "ru-RU" : "en-US",
+    {
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+    },
+  );
 
   return (
     <>
@@ -101,14 +111,14 @@ export default async function CardViewPage({ params }: PageProps) {
               href="/cards"
               className="inline-flex items-center gap-1.5 font-sans text-sm text-foreground-muted hover:text-primary"
             >
-              <ChevronLeft className="h-4 w-4" aria-hidden /> All cards
+              <ChevronLeft className="h-4 w-4" aria-hidden /> {t("allCards")}
             </Link>
             {isOwner ? (
               <Link
                 href={`/cards/${card.slug}/edit`}
                 className="inline-flex items-center gap-1.5 font-sans text-sm text-foreground-muted hover:text-primary"
               >
-                <Edit3 className="h-4 w-4" aria-hidden /> Edit
+                <Edit3 className="h-4 w-4" aria-hidden /> {t("edit")}
               </Link>
             ) : null}
           </Container>
@@ -139,7 +149,7 @@ export default async function CardViewPage({ params }: PageProps) {
                 </span>
               )}
               <span>
-                by{" "}
+                {t("byUser")}{" "}
                 <Link
                   href={`/profile/${card.author_username}`}
                   className="text-foreground hover:text-primary"
@@ -148,12 +158,11 @@ export default async function CardViewPage({ params }: PageProps) {
                 </Link>{" "}
                 · <span className="text-foreground-subtle">{dateLabel}</span> ·{" "}
                 <span className="text-foreground-subtle">
-                  {card.bouts.length} bout
-                  {card.bouts.length === 1 ? "" : "s"}
+                  {t("boutCount", { count: card.bouts.length })}
                 </span>{" "}
                 ·{" "}
                 <span className="text-foreground-subtle">
-                  {card.view_count} view{card.view_count === 1 ? "" : "s"}
+                  {t("viewCount", { count: card.view_count })}
                 </span>
               </span>
             </p>

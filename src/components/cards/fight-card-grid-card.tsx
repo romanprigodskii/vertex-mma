@@ -1,12 +1,14 @@
 import * as React from "react";
-import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { Heart, Lock } from "lucide-react";
 
+import { Link } from "@/i18n/navigation";
 import { resolveThemeColor, resolveThemeFont } from "@/lib/card-theme";
 import type { FightCardListItem } from "@/lib/fight-cards";
 import { cn } from "@/lib/utils";
 
 export function FightCardGridCard({ card }: { card: FightCardListItem }) {
+  const t = useTranslations("cards");
   const accent = resolveThemeColor(card.theme_color).accent;
   const font = resolveThemeFont(card.title_font);
 
@@ -31,9 +33,9 @@ export function FightCardGridCard({ card }: { card: FightCardListItem }) {
           {!card.is_public ? (
             <span
               className="mt-0.5 inline-flex shrink-0 items-center gap-1 font-mono text-[10px] uppercase tracking-widest text-foreground-subtle"
-              title="Private"
+              title={t("private")}
             >
-              <Lock className="h-3 w-3" /> Private
+              <Lock className="h-3 w-3" /> {t("private")}
             </span>
           ) : null}
         </div>
@@ -41,12 +43,12 @@ export function FightCardGridCard({ card }: { card: FightCardListItem }) {
         {card.headliner ? (
           <p className="mt-2 font-mono text-[11px] uppercase tracking-widest">
             <span className="text-foreground">{card.headliner.fighter_a}</span>
-            <span className="text-[var(--card-accent)]"> vs </span>
+            <span className="text-[var(--card-accent)]"> {t("vsConnector")} </span>
             <span className="text-foreground">{card.headliner.fighter_b}</span>
           </p>
         ) : (
           <p className="mt-2 font-mono text-[11px] uppercase tracking-widest text-foreground-subtle">
-            Empty card
+            {t("emptyCard")}
           </p>
         )}
         {card.subtitle ? (
@@ -56,11 +58,9 @@ export function FightCardGridCard({ card }: { card: FightCardListItem }) {
         ) : null}
 
         <div className="mt-3 flex items-center justify-between gap-2 font-mono text-[11px] tabular text-foreground-subtle">
-          <span className="truncate">by @{card.author_username}</span>
+          <span className="truncate">{t("byUser")} @{card.author_username}</span>
           <span className="flex shrink-0 items-center gap-2">
-            <span>
-              {card.bout_count} bout{card.bout_count === 1 ? "" : "s"}
-            </span>
+            <span>{t("boutCount", { count: card.bout_count })}</span>
             <span aria-hidden>·</span>
             <span className="inline-flex items-center gap-1">
               <Heart className="h-3 w-3" />

@@ -1,10 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Search } from "lucide-react";
 
+import { useRouter } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 
 const OPEN_EVENT = "fighter-search:open";
@@ -32,26 +33,33 @@ function isMac(): boolean {
   return /Mac|iPod|iPhone|iPad/.test(navigator.platform);
 }
 
-const WEIGHT_LABEL: Record<string, string> = {
-  strawweight: "Strawweight",
-  flyweight: "Flyweight",
-  bantamweight: "Bantamweight",
-  featherweight: "Featherweight",
-  lightweight: "Lightweight",
-  welterweight: "Welterweight",
-  middleweight: "Middleweight",
-  light_heavyweight: "Light Heavyweight",
-  heavyweight: "Heavyweight",
-  catchweight: "Catchweight",
-  openweight: "Openweight",
-};
+const WEIGHT_KEYS = new Set([
+  "strawweight",
+  "flyweight",
+  "bantamweight",
+  "featherweight",
+  "lightweight",
+  "welterweight",
+  "middleweight",
+  "light_heavyweight",
+  "heavyweight",
+  "catchweight",
+  "openweight",
+]);
 
-function weightLabel(wc: string | null): string {
-  if (!wc) return "";
-  return WEIGHT_LABEL[wc] ?? wc;
+function useWeightLabel() {
+  const tWeight = useTranslations("weight");
+  return (wc: string | null): string => {
+    if (!wc) return "";
+    return WEIGHT_KEYS.has(wc)
+      ? tWeight(wc as "strawweight")
+      : wc;
+  };
 }
 
 export function FighterSearchPalette() {
+  const t = useTranslations("search");
+  const weightLabel = useWeightLabel();
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
@@ -182,7 +190,7 @@ export function FighterSearchPalette() {
           }}
         >
           <DialogPrimitive.Title className="sr-only">
-            Find a fighter
+            {t("title")}
           </DialogPrimitive.Title>
 
           <div className="flex items-center gap-2 border-b border-foreground/10 px-4 py-3">
@@ -195,11 +203,11 @@ export function FighterSearchPalette() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={onKeyDown}
-              placeholder="Find a fighter…"
+              placeholder={t("placeholder")}
               className="w-full bg-transparent font-sans text-base text-foreground outline-none placeholder:text-foreground-subtle"
               autoComplete="off"
               spellCheck={false}
-              aria-label="Find a fighter"
+              aria-label={t("triggerAria")}
             />
           </div>
 
@@ -208,11 +216,11 @@ export function FighterSearchPalette() {
               <EmptyHint />
             ) : loading && results.length === 0 ? (
               <p className="px-4 py-8 text-center font-sans text-sm text-foreground-subtle">
-                Searching…
+                {t("searching")}
               </p>
             ) : results.length === 0 ? (
               <p className="px-4 py-8 text-center font-sans text-sm text-foreground-subtle">
-                No fighter matches “{query.trim()}”.
+                {t("noMatches", { query: query.trim() })}
               </p>
             ) : (
               <ul ref={listRef} className="py-1">
@@ -275,19 +283,21 @@ export function FighterSearchPalette() {
 }
 
 function EmptyHint() {
+  const t = useTranslations("search");
   return (
     <div className="px-4 py-8 text-center">
       <p className="font-sans text-sm text-foreground-muted">
-        Type a fighter name to search the roster.
+        {t("emptyHint")}
       </p>
       <p className="mt-1 font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
-        ↑ ↓ to navigate · enter to open · esc to close
+        {t("shortcuts")}
       </p>
     </div>
   );
 }
 
 function Footer() {
+  const t = useTranslations("search");
   const [mac, setMac] = React.useState(false);
   React.useEffect(() => setMac(isMac()), []);
   return (
@@ -299,9 +309,9 @@ function Footer() {
         <kbd className="rounded-sm border border-foreground/15 bg-background-overlay px-1.5 py-0.5 text-foreground-muted">
           K
         </kbd>
-        <span>opens this anywhere</span>
+        <span>{t("opensAnywhere")}</span>
       </span>
-      <span>Vertex search</span>
+      <span>{t("footerBrand")}</span>
     </div>
   );
 }
@@ -316,13 +326,14 @@ export function FighterSearchTrigger({
   className,
   iconOnly = false,
 }: TriggerProps) {
+  const t = useTranslations("search");
   const [mac, setMac] = React.useState(false);
   React.useEffect(() => setMac(isMac()), []);
   return (
     <button
       type="button"
       onClick={() => openFighterSearch()}
-      aria-label="Find a fighter"
+      aria-label={t("triggerAria")}
       className={cn(
         "group inline-flex items-center gap-2 rounded-md border border-foreground/15 bg-background-elevated/40 px-3 py-1.5 font-sans text-sm text-foreground-muted transition-colors",
         "hover:border-foreground/30 hover:bg-foreground/[0.05] hover:text-foreground",
@@ -331,10 +342,10 @@ export function FighterSearchTrigger({
     >
       <Search className="h-3.5 w-3.5" aria-hidden />
       {iconOnly ? (
-        <span className="sr-only">Find</span>
+        <span className="sr-only">{t("trigger")}</span>
       ) : (
         <>
-          <span>Find</span>
+          <span>{t("trigger")}</span>
           <kbd className="hidden rounded-sm border border-foreground/15 bg-background-overlay px-1 py-px font-mono text-[10px] text-foreground-subtle md:inline-block">
             {mac ? "⌘" : "Ctrl"}K
           </kbd>
