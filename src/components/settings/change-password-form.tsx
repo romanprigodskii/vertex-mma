@@ -1,11 +1,13 @@
 "use client";
 
 import * as React from "react";
+import { useTranslations } from "next-intl";
 
 import { changePasswordAction } from "@/app/[locale]/settings/actions";
 import { PasswordInput } from "@/components/auth/PasswordInput";
 
 export function ChangePasswordForm() {
+  const t = useTranslations("settings");
   const [pending, setPending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [saved, setSaved] = React.useState(false);
@@ -19,11 +21,11 @@ export function ChangePasswordForm() {
     const newPassword = String(formData.get("newPassword") ?? "");
     const confirm = String(formData.get("confirm") ?? "");
     if (newPassword.length < 8) {
-      setError("Password must be at least 8 characters.");
+      setError(t("passwordTooShort"));
       return;
     }
     if (newPassword !== confirm) {
-      setError("Passwords do not match.");
+      setError(t("passwordsDoNotMatch"));
       return;
     }
 
@@ -42,7 +44,7 @@ export function ChangePasswordForm() {
     <form onSubmit={onSubmit} className="flex flex-col gap-4">
       <label className="flex flex-col gap-1.5">
         <span className="font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
-          New password
+          {t("newPassword")}
         </span>
         <PasswordInput
           name="newPassword"
@@ -51,12 +53,12 @@ export function ChangePasswordForm() {
           autoComplete="new-password"
         />
         <span className="font-sans text-[11px] text-foreground-subtle">
-          At least 8 characters.
+          {t("passwordAtLeast8")}
         </span>
       </label>
       <label className="flex flex-col gap-1.5">
         <span className="font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
-          Confirm new password
+          {t("confirmNewPassword")}
         </span>
         <PasswordInput
           name="confirm"
@@ -72,7 +74,7 @@ export function ChangePasswordForm() {
       ) : null}
       {saved ? (
         <p className="font-sans text-sm text-streak-win">
-          Password updated.
+          {t("passwordUpdated")}
         </p>
       ) : null}
       <button
@@ -80,7 +82,7 @@ export function ChangePasswordForm() {
         disabled={pending}
         className="self-start rounded-sm bg-primary px-4 py-2 font-display text-sm uppercase tracking-widest text-background-base hover:opacity-90 disabled:opacity-50"
       >
-        {pending ? "Updating…" : "Update password"}
+        {pending ? t("updating") : t("updatePassword")}
       </button>
     </form>
   );

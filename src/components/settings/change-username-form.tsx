@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 
 import { changeUsernameAction } from "@/app/[locale]/settings/actions";
 
@@ -28,6 +29,7 @@ export function ChangeUsernameForm({
   usernameLastChangedAt,
 }: Props) {
   const router = useRouter();
+  const t = useTranslations("settings");
   const [pending, setPending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [success, setSuccess] = React.useState<string | null>(null);
@@ -46,9 +48,7 @@ export function ChangeUsernameForm({
       setError(res.error);
       return;
     }
-    setSuccess(
-      `Username updated to @${res.newUsername}. Redirecting…`,
-    );
+    setSuccess(t("usernameUpdated", { username: res.newUsername ?? "" }));
     // Tiny pause so the success message is visible, then bounce to the
     // canonical profile URL.
     setTimeout(() => {
@@ -61,7 +61,7 @@ export function ChangeUsernameForm({
     <form onSubmit={onSubmit} className="flex flex-col gap-4">
       <label className="flex flex-col gap-1.5">
         <span className="font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
-          Current username
+          {t("currentUsername")}
         </span>
         <input
           type="text"
@@ -73,7 +73,7 @@ export function ChangeUsernameForm({
 
       <label className="flex flex-col gap-1.5">
         <span className="font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
-          New username
+          {t("newUsername")}
         </span>
         <input
           type="text"
@@ -84,15 +84,12 @@ export function ChangeUsernameForm({
           pattern="[a-zA-Z0-9_]+"
           autoComplete="username"
           disabled={locked || pending}
-          title="3–30 chars: letters, digits, underscore"
+          title={t("usernameRule")}
           className={INPUT_CLASS}
         />
         <span className="font-sans text-[11px] text-foreground-subtle">
-          3–30 chars: letters, digits, underscore. Limited to once every
-          30 days.
-          {locked
-            ? ` Available in ${daysLeft} day${daysLeft === 1 ? "" : "s"}.`
-            : ""}
+          {t("usernameRule")}
+          {locked ? t("availableInDays", { count: daysLeft }) : ""}
         </span>
       </label>
 
@@ -110,7 +107,7 @@ export function ChangeUsernameForm({
         disabled={pending || locked}
         className="self-start rounded-sm bg-primary px-4 py-2 font-display text-sm uppercase tracking-widest text-background-base hover:opacity-90 disabled:opacity-50"
       >
-        {pending ? "Saving…" : "Change username"}
+        {pending ? t("saving") : t("changeUsername")}
       </button>
     </form>
   );

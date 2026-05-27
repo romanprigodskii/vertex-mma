@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useTranslations } from "next-intl";
 
 import { updateProfileAction } from "@/app/[locale]/settings/actions";
 
@@ -18,6 +19,7 @@ export function ProfileEditForm({
   initialBio,
   initialCountryCode,
 }: Props) {
+  const t = useTranslations("settings");
   const [pending, setPending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [saved, setSaved] = React.useState(false);
@@ -35,10 +37,7 @@ export function ProfileEditForm({
 
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-4">
-      <Field
-        label="Display name"
-        hint="Shown above your username on /me. Up to 60 characters."
-      >
+      <Field label={t("displayName")} hint={t("displayNameHint")}>
         <input
           name="displayName"
           defaultValue={initialDisplayName}
@@ -46,7 +45,7 @@ export function ProfileEditForm({
           className={INPUT_CLASS}
         />
       </Field>
-      <Field label="Bio" hint="Short bio, up to 280 characters.">
+      <Field label={t("bio")} hint={t("bioHint")}>
         <textarea
           name="bio"
           defaultValue={initialBio}
@@ -55,10 +54,7 @@ export function ProfileEditForm({
           className={`${INPUT_CLASS} resize-y`}
         />
       </Field>
-      <Field
-        label="Country code"
-        hint="Two-letter ISO code (e.g. BR, US, RU). Leave blank to clear."
-      >
+      <Field label={t("countryCode")} hint={t("countryCodeHint")}>
         <input
           name="countryCode"
           defaultValue={initialCountryCode}
@@ -72,14 +68,14 @@ export function ProfileEditForm({
         </p>
       ) : null}
       {saved ? (
-        <p className="font-sans text-sm text-streak-win">Saved.</p>
+        <p className="font-sans text-sm text-streak-win">{t("saved")}</p>
       ) : null}
       <button
         type="submit"
         disabled={pending}
         className="self-start rounded-sm bg-primary px-4 py-2 font-display text-sm uppercase tracking-widest text-background-base hover:opacity-90 disabled:opacity-50"
       >
-        {pending ? "Saving…" : "Save"}
+        {pending ? t("saving") : t("save")}
       </button>
     </form>
   );

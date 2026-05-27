@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useTranslations } from "next-intl";
 
 import { updateAvatarUrlAction } from "@/app/[locale]/settings/actions";
 import { createClient } from "@/lib/supabase/client";
@@ -15,6 +16,7 @@ const ALLOWED = ["image/png", "image/jpeg", "image/webp"];
 const MAX_BYTES = 2 * 1024 * 1024;
 
 export function AvatarUpload({ currentUrl, authUserId, username }: Props) {
+  const t = useTranslations("settings");
   const supabase = React.useMemo(() => createClient(), []);
   const [preview, setPreview] = React.useState<string | null>(currentUrl);
   const [pending, setPending] = React.useState(false);
@@ -28,11 +30,11 @@ export function AvatarUpload({ currentUrl, authUserId, username }: Props) {
     if (!file) return;
 
     if (file.size > MAX_BYTES) {
-      setError("Avatar must be under 2 MB.");
+      setError(t("avatarTooLarge"));
       return;
     }
     if (!ALLOWED.includes(file.type)) {
-      setError("Avatar must be PNG, JPEG, or WebP.");
+      setError(t("avatarWrongType"));
       return;
     }
 
@@ -63,7 +65,7 @@ export function AvatarUpload({ currentUrl, authUserId, username }: Props) {
 
       setPreview(versionedUrl);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed.");
+      setError(err instanceof Error ? err.message : t("uploadFailed"));
     } finally {
       setPending(false);
     }
@@ -75,7 +77,7 @@ export function AvatarUpload({ currentUrl, authUserId, username }: Props) {
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={preview}
-          alt={`${username} avatar preview`}
+          alt={t("avatarPreviewAlt", { username })}
           className="h-20 w-20 rounded-full border border-foreground/15 object-cover"
         />
       ) : (
@@ -85,7 +87,7 @@ export function AvatarUpload({ currentUrl, authUserId, username }: Props) {
       )}
       <div className="flex flex-col gap-1.5">
         <label className="inline-flex w-fit cursor-pointer items-center rounded-sm border border-foreground/15 px-3 py-1.5 font-sans text-sm text-foreground-muted hover:bg-foreground/[0.05] hover:text-foreground">
-          {pending ? "Uploading…" : "Choose image"}
+          {pending ? t("uploading") : t("chooseImage")}
           <input
             ref={inputRef}
             type="file"
@@ -96,7 +98,7 @@ export function AvatarUpload({ currentUrl, authUserId, username }: Props) {
           />
         </label>
         <span className="font-sans text-[11px] text-foreground-subtle">
-          PNG / JPEG / WebP, up to 2 MB.
+          {t("avatarFormatHint")}
         </span>
         {error ? (
           <span className="font-sans text-xs text-streak-loss">{error}</span>

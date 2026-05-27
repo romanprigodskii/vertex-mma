@@ -2,11 +2,13 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 
 import { deleteAccountAction } from "@/app/[locale]/settings/actions";
 
 export function DeleteAccountSection() {
   const router = useRouter();
+  const t = useTranslations("settings");
   const [showConfirm, setShowConfirm] = React.useState(false);
   const [confirmText, setConfirmText] = React.useState("");
   const [pending, setPending] = React.useState(false);
@@ -14,7 +16,7 @@ export function DeleteAccountSection() {
 
   async function onConfirm() {
     if (confirmText !== "DELETE") {
-      setError("You must type DELETE exactly to confirm.");
+      setError(t("typeDeleteExactly"));
       return;
     }
     setError(null);
@@ -33,18 +35,17 @@ export function DeleteAccountSection() {
     return (
       <div className="rounded-md border border-streak-loss/30 bg-streak-loss/[0.04] p-4">
         <h3 className="font-display text-sm uppercase tracking-widest text-streak-loss">
-          Delete account
+          {t("deleteHeading")}
         </h3>
         <p className="mt-2 font-sans text-sm text-foreground-muted">
-          This permanently deletes your account, profile, predictions, bets,
-          and fight cards. This cannot be undone.
+          {t("deleteSummary")}
         </p>
         <button
           type="button"
           onClick={() => setShowConfirm(true)}
           className="mt-3 rounded-sm border border-streak-loss/40 px-3 py-1.5 font-sans text-sm text-streak-loss hover:bg-streak-loss/10"
         >
-          Delete my account
+          {t("deleteMy")}
         </button>
       </div>
     );
@@ -53,12 +54,12 @@ export function DeleteAccountSection() {
   return (
     <div className="rounded-md border border-streak-loss/40 bg-streak-loss/[0.04] p-4">
       <h3 className="font-display text-sm uppercase tracking-widest text-streak-loss">
-        Confirm deletion
+        {t("confirmDeletionHeading")}
       </h3>
       <p className="mt-2 font-sans text-sm text-foreground-muted">
-        Type{" "}
+        {t("typeDeletePrefix")}{" "}
         <span className="font-mono font-medium text-foreground">DELETE</span>{" "}
-        to confirm. This action cannot be undone.
+        {t("typeDeleteSuffix")}
       </p>
       <input
         type="text"
@@ -80,7 +81,7 @@ export function DeleteAccountSection() {
           disabled={pending || confirmText !== "DELETE"}
           className="rounded-sm bg-streak-loss px-3 py-1.5 font-sans text-sm text-background-base hover:opacity-90 disabled:opacity-50"
         >
-          {pending ? "Deleting…" : "Yes, delete my account"}
+          {pending ? t("deleting") : t("deleteAccount")}
         </button>
         <button
           type="button"
@@ -92,7 +93,7 @@ export function DeleteAccountSection() {
           disabled={pending}
           className="rounded-sm border border-foreground/15 px-3 py-1.5 font-sans text-sm text-foreground-muted hover:bg-foreground/[0.05] disabled:opacity-50"
         >
-          Cancel
+          {t("cancel")}
         </button>
       </div>
     </div>

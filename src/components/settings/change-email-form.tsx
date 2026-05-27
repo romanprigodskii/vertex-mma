@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useTranslations } from "next-intl";
 
 import { changeEmailAction } from "@/app/[locale]/settings/actions";
 
@@ -12,6 +13,7 @@ interface Props {
 }
 
 export function ChangeEmailForm({ currentEmail }: Props) {
+  const t = useTranslations("settings");
   const [pending, setPending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [sent, setSent] = React.useState(false);
@@ -31,7 +33,7 @@ export function ChangeEmailForm({ currentEmail }: Props) {
     <form onSubmit={onSubmit} className="flex flex-col gap-4">
       <label className="flex flex-col gap-1.5">
         <span className="font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
-          Current email
+          {t("currentEmail")}
         </span>
         <input
           type="email"
@@ -42,7 +44,7 @@ export function ChangeEmailForm({ currentEmail }: Props) {
       </label>
       <label className="flex flex-col gap-1.5">
         <span className="font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
-          New email
+          {t("newEmail")}
         </span>
         <input
           type="email"
@@ -52,8 +54,7 @@ export function ChangeEmailForm({ currentEmail }: Props) {
           className={INPUT_CLASS}
         />
         <span className="font-sans text-[11px] text-foreground-subtle">
-          We&apos;ll send confirmation links to both addresses. Both must be
-          clicked before the change takes effect.
+          {t("emailDualConfirmHint")}
         </span>
       </label>
       {error ? (
@@ -63,7 +64,7 @@ export function ChangeEmailForm({ currentEmail }: Props) {
       ) : null}
       {sent ? (
         <p className="font-sans text-sm text-streak-win">
-          Confirmation sent. Check both your current and new inboxes.
+          {t("emailConfirmationSent")}
         </p>
       ) : null}
       <button
@@ -71,7 +72,7 @@ export function ChangeEmailForm({ currentEmail }: Props) {
         disabled={pending}
         className="self-start rounded-sm bg-primary px-4 py-2 font-display text-sm uppercase tracking-widest text-background-base hover:opacity-90 disabled:opacity-50"
       >
-        {pending ? "Sending…" : "Change email"}
+        {pending ? t("sending") : t("changeEmail")}
       </button>
     </form>
   );
