@@ -1,23 +1,7 @@
-import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 
+import { Link } from "@/i18n/navigation";
 import type { PeakVertexInfo } from "@/lib/score-history";
-
-const METHOD_SHORT: Record<string, string> = {
-  ko: "KO",
-  tko: "TKO",
-  submission: "Sub",
-  decision_unanimous: "U-Dec",
-  decision_split: "S-Dec",
-  decision_majority: "M-Dec",
-  draw: "Draw",
-  no_contest: "NC",
-  dq: "DQ",
-};
-
-function methodLabel(method: string | null): string {
-  if (!method) return "—";
-  return METHOD_SHORT[method] ?? method;
-}
 
 function ResultPill({ result }: { result: "W" | "L" | "D" | "NC" }) {
   const cls =
@@ -33,17 +17,27 @@ interface PeakVertexProps {
   info: PeakVertexInfo;
 }
 
-/**
- * Wave 31.7 — Peak Vertex profile panel. Surfaces the highest historical
- * vertex_score plus the bout that produced it and (if applicable) the
- * bout where the score first dropped below peak.
- *
- * Layout: large number on the left (peak), date + anchor bout chip on
- * the right. When endingBout is null the fighter is at-or-above their
- * historical peak — show a single-bout layout. When current < peak,
- * show the delta below the bouts row.
- */
-export function PeakVertex({ info }: PeakVertexProps) {
+const METHOD_KEY: Record<string, string> = {
+  ko: "methodKo",
+  tko: "methodTko",
+  submission: "methodSub",
+  decision_unanimous: "methodUDec",
+  decision_split: "methodSDec",
+  decision_majority: "methodMDec",
+  draw: "methodDraw",
+  no_contest: "methodNc",
+  dq: "methodDq",
+};
+
+export async function PeakVertex({ info }: PeakVertexProps) {
+  const t = await getTranslations("peakVertex");
+  const tHistory = await getTranslations("scoreHistory");
+  function methodLabel(method: string | null): string {
+    if (!method) return "—";
+    const key = METHOD_KEY[method];
+    if (!key) return method;
+    return tHistory(key as "methodKo");
+  }
   const {
     peak,
     peakDate,
@@ -53,10 +47,6 @@ export function PeakVertex({ info }: PeakVertexProps) {
     endingBout,
     currentScore,
   } = info;
-  // Only show the "vs current" delta when there's an actual current
-  // rating — retired fighters carry only an all-time score, and saying
-  // their peak is "−11 vs current" is misleading (it's comparing peak
-  // against all-time, two different scales).
   const delta = currentScore != null ? currentScore - peak : null;
   const isAtPeak = endingBout == null;
   const heldAcrossBouts = peakBoutCount > 1;
@@ -66,12 +56,12 @@ export function PeakVertex({ info }: PeakVertexProps) {
 
   return (
     <section
-      aria-label="Peak Vertex Score"
+      aria-label={t("aria")}
       className="rounded-md border border-foreground/10 bg-background-elevated/30 p-4 sm:p-5"
     >
       <div className="mb-3 flex items-baseline justify-between gap-3">
         <h3 className="font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-subtle">
-          Peak Vertex
+          {t("heading")}
         </h3>
         <span className="font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
           {dateRange}
@@ -85,7 +75,7 @@ export function PeakVertex({ info }: PeakVertexProps) {
           </span>
           {heldAcrossBouts ? (
             <span className="font-sans text-xs text-foreground-muted">
-              held {peakBoutCount} bouts
+              {t("heldNBouts", { n: peakBoutCount })}
             </span>
           ) : null}
           {delta != null && delta !== 0 ? (
@@ -95,11 +85,13 @@ export function PeakVertex({ info }: PeakVertexProps) {
                 (delta > 0 ? "text-streak-win" : "text-foreground-muted")
               }
             >
-              {delta > 0 ? `+${delta}` : delta} vs current
+              {t("deltaVsCurrent", {
+                delta: delta > 0 ? `+${delta}` : String(delta),
+              })}
             </span>
           ) : delta === 0 ? (
             <span className="font-sans text-xs text-foreground-muted">
-              currently at peak
+              {t("atPeakNow")}
             </span>
           ) : null}
         </div>
@@ -107,11 +99,11 @@ export function PeakVertex({ info }: PeakVertexProps) {
         <div className="min-w-[200px] flex-1 space-y-2 font-sans text-sm">
           <div>
             <span className="text-[11px] uppercase tracking-widest text-foreground-subtle">
-              {heldAcrossBouts ? "From" : "After"}
+              {heldAcrossBouts ? t("from") : t("after")}
             </span>
             <span className="ml-2 text-foreground-muted">
               <ResultPill result={anchorBout.result} />
-              <span className="ml-1.5">vs</span>{" "}
+              <span className="ml-1.5">{t("vs")}</span>{" "}
               <Link
                 href={`/fighters/${anchorBout.opponentSlug}`}
                 className="text-foreground transition-colors hover:text-primary"
@@ -128,11 +120,11 @@ export function PeakVertex({ info }: PeakVertexProps) {
           {heldAcrossBouts ? (
             <div>
               <span className="text-[11px] uppercase tracking-widest text-foreground-subtle">
-                Through
+                {t("through")}
               </span>
               <span className="ml-2 text-foreground-muted">
                 <ResultPill result={lastPeakBout.result} />
-                <span className="ml-1.5">vs</span>{" "}
+                <span className="ml-1.5">{t("vs")}</span>{" "}
                 <Link
                   href={`/fighters/${lastPeakBout.opponentSlug}`}
                   className="text-foreground transition-colors hover:text-primary"
@@ -150,11 +142,11 @@ export function PeakVertex({ info }: PeakVertexProps) {
           {endingBout ? (
             <div>
               <span className="text-[11px] uppercase tracking-widest text-foreground-subtle">
-                Ended
+                {t("ended")}
               </span>
               <span className="ml-2 text-foreground-muted">
                 <ResultPill result={endingBout.result} />
-                <span className="ml-1.5">vs</span>{" "}
+                <span className="ml-1.5">{t("vs")}</span>{" "}
                 <Link
                   href={`/fighters/${endingBout.opponentSlug}`}
                   className="text-foreground transition-colors hover:text-primary"
@@ -166,16 +158,14 @@ export function PeakVertex({ info }: PeakVertexProps) {
                   {methodLabel(endingBout.method)} · {endingBout.eventDate}
                   {" · "}
                   <span className="text-foreground-muted">
-                    score → {endingBout.scoreAfter}
+                    {t("scoreAfter", { score: endingBout.scoreAfter })}
                   </span>
                 </span>
               </span>
             </div>
           ) : isAtPeak ? (
             <div className="text-[11px] uppercase tracking-widest text-streak-win">
-              {currentScore != null
-                ? "Still at career peak"
-                : "Retired at career peak"}
+              {currentScore != null ? t("stillAtPeak") : t("retiredAtPeak")}
             </div>
           ) : null}
         </div>

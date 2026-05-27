@@ -973,6 +973,21 @@
     "loadingProfile": "Loading profile…",
     "loadingFightCard": "Loading fight card…"
   },
+  "peakVertex": {
+    "aria": "Peak Vertex Score",
+    "heading": "Peak Vertex",
+    "heldNBouts": "held {n} bouts",
+    "deltaVsCurrent": "{delta} vs current",
+    "atPeakNow": "currently at peak",
+    "from": "From",
+    "after": "After",
+    "through": "Through",
+    "ended": "Ended",
+    "scoreAfter": "score → {score}",
+    "stillAtPeak": "Still at career peak",
+    "retiredAtPeak": "Retired at career peak",
+    "vs": "vs"
+  },
   "scoreHistory": {
     "metaTitle": "{fighter} · {label} Vertex history",
     "metaDescription": "Per-bout {label} Vertex Score trajectory for {fighter}.",
@@ -997,7 +1012,26 @@
     "methodMDec": "M-Dec",
     "methodDraw": "Draw",
     "methodNc": "NC",
-    "methodDq": "DQ"
+    "methodDq": "DQ",
+    "chartAriaCurrent": "Current Vertex score per bout",
+    "chartAriaAllTime": "All-time Vertex score per bout",
+    "noHistory": "No score history available for this fighter.",
+    "noAllTimeReplay": "All-time replay not yet computed for this fighter — run the backfill script.",
+    "monthlySnapshot": "Monthly snapshot · no bout"
+  },
+  "otherDivisions": {
+    "aria": "Scores in other divisions",
+    "heading": "Other divisions",
+    "active": "Active",
+    "statusCurrent": "Current",
+    "statusProvisional": "Provisional",
+    "statusFormer": "Former",
+    "boutsCount": "{n} bouts",
+    "rowAria": "{division}: {status} rating {score}, {bouts} bouts"
+  },
+  "trophy": {
+    "interimChamp": "INTERIM CHAMP",
+    "champion": "CHAMPION"
   },
   "search": {
     "title": "Find a fighter",

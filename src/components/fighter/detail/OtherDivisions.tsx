@@ -1,3 +1,5 @@
+import { getTranslations } from "next-intl/server";
+
 import type { FighterDivisionalScoreRow } from "@/lib/fighter-detail";
 import { cn } from "@/lib/utils";
 
@@ -29,10 +31,13 @@ const WEIGHT_SHORT: Record<string, string> = {
   openweight: "OW",
 };
 
-const STATUS_LABEL: Record<FighterDivisionalScoreRow["divisional_status"], string> = {
-  current: "Current",
-  provisional: "Provisional",
-  former: "Former",
+const STATUS_KEY: Record<
+  FighterDivisionalScoreRow["divisional_status"],
+  "statusCurrent" | "statusProvisional" | "statusFormer"
+> = {
+  current: "statusCurrent",
+  provisional: "statusProvisional",
+  former: "statusFormer",
 };
 
 interface OtherDivisionsProps {
@@ -40,34 +45,37 @@ interface OtherDivisionsProps {
   currentDivision: string | null;
 }
 
-/**
- * Wave 14B.2 — sidebar/footer block summarising the fighter's score in
- * every division OTHER than the one driving the hero. Each chip surfaces
- * the divisional vertex_score, the status badge (current / provisional
- * / former), and a muted style when the row is ineligible for active
- * ranking display (`in_active_ranking = FALSE` — moved-up fighters in
- * old divisions, retired fighters, etc.).
- */
-export function OtherDivisions({ rows, currentDivision }: OtherDivisionsProps) {
+export async function OtherDivisions({ rows, currentDivision }: OtherDivisionsProps) {
   if (rows.length === 0) return null;
+  const t = await getTranslations("otherDivisions");
+  const tWeight = await getTranslations("weight");
   return (
     <section
-      aria-label="Scores in other divisions"
+      aria-label={t("aria")}
       className="rounded-md border border-foreground/10 bg-background-elevated/30 p-4"
     >
       <h3 className="mb-3 font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-subtle">
-        Other divisions
+        {t("heading")}
       </h3>
       <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {rows.map((row) => {
-          const label = WEIGHT_LABEL[row.division] ?? row.division;
+          const key = row.division;
+          const label = tWeight.has(key)
+            ? tWeight(key as "lightweight")
+            : WEIGHT_LABEL[row.division] ?? row.division;
           const short = WEIGHT_SHORT[row.division] ?? row.division.toUpperCase();
           const inactive = !row.in_active_ranking;
           const isCurrentDivision = row.division === currentDivision;
+          const statusLabel = t(STATUS_KEY[row.divisional_status]);
           return (
             <li
               key={row.division}
-              aria-label={`${label}: ${STATUS_LABEL[row.divisional_status]} rating ${row.vertex_score ?? "—"}, ${row.bouts_in_division} bouts`}
+              aria-label={t("rowAria", {
+                division: label,
+                status: statusLabel,
+                score: row.vertex_score ?? "—",
+                bouts: row.bouts_in_division,
+              })}
               className={cn(
                 "flex items-center justify-between gap-3 rounded-sm border border-foreground/10 bg-background-base/40 px-3 py-2",
                 inactive ? "opacity-60" : null,
@@ -80,16 +88,16 @@ export function OtherDivisions({ rows, currentDivision }: OtherDivisionsProps) {
                   </span>
                   {isCurrentDivision ? (
                     <span className="font-mono text-[9px] uppercase tracking-widest text-primary">
-                      Active
+                      {t("active")}
                     </span>
                   ) : null}
                 </span>
                 <span className="font-sans text-[10px] uppercase tracking-widest text-foreground-subtle">
-                  {STATUS_LABEL[row.divisional_status]}
+                  {statusLabel}
                   <span aria-hidden className="mx-1 text-foreground-subtle/40">
                     ·
                   </span>
-                  {row.bouts_in_division} bouts
+                  {t("boutsCount", { n: row.bouts_in_division })}
                 </span>
               </div>
               <span

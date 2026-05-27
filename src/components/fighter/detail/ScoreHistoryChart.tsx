@@ -1,25 +1,21 @@
 "use client";
 
 import * as React from "react";
+import { useLocale, useTranslations } from "next-intl";
 
 import type { ScoreHistoryPoint } from "@/lib/score-history";
 
-const METHOD_SHORT: Record<string, string> = {
-  ko: "KO",
-  tko: "TKO",
-  submission: "Sub",
-  decision_unanimous: "U-Dec",
-  decision_split: "S-Dec",
-  decision_majority: "M-Dec",
-  draw: "Draw",
-  no_contest: "NC",
-  dq: "DQ",
+const METHOD_KEY: Record<string, string> = {
+  ko: "methodKo",
+  tko: "methodTko",
+  submission: "methodSub",
+  decision_unanimous: "methodUDec",
+  decision_split: "methodSDec",
+  decision_majority: "methodMDec",
+  draw: "methodDraw",
+  no_contest: "methodNc",
+  dq: "methodDq",
 };
-
-function methodLabel(method: string | null): string {
-  if (!method) return "—";
-  return METHOD_SHORT[method] ?? method;
-}
 
 // SVG canvas. Width auto-scales via viewBox; height locked to keep
 // label space sensible.
@@ -34,9 +30,9 @@ const PLOT_H = H - PAD_T - PAD_B;
 
 const Y_GRID = [0, 25, 50, 75, 100];
 
-function formatDate(iso: string): string {
+function formatDate(iso: string, locale: string): string {
   const d = new Date(iso + "T00:00:00Z");
-  return d.toLocaleDateString("en-US", {
+  return d.toLocaleDateString(locale === "ru" ? "ru-RU" : "en-US", {
     month: "short",
     year: "numeric",
     timeZone: "UTC",
@@ -62,6 +58,15 @@ function valueOf(
 }
 
 export function ScoreHistoryChart({ history, mode }: ScoreHistoryChartProps) {
+  const t = useTranslations("scoreHistory");
+  const tPeak = useTranslations("peakVertex");
+  const locale = useLocale();
+  const methodLabel = (method: string | null): string => {
+    if (!method) return "—";
+    const key = METHOD_KEY[method];
+    if (!key) return method;
+    return t(key as "methodKo");
+  };
   const [hoverIdx, setHoverIdx] = React.useState<number | null>(null);
   const containerRef = React.useRef<SVGSVGElement | null>(null);
 
@@ -77,9 +82,7 @@ export function ScoreHistoryChart({ history, mode }: ScoreHistoryChartProps) {
   if (points.length === 0) {
     return (
       <div className="rounded-md border border-dashed border-foreground/15 bg-background-elevated/20 px-6 py-12 text-center font-sans text-sm text-foreground-muted">
-        {mode === "all_time"
-          ? "All-time replay not yet computed for this fighter — run the backfill script."
-          : "No score history available for this fighter."}
+        {mode === "all_time" ? t("noAllTimeReplay") : t("noHistory")}
       </div>
     );
   }
@@ -137,9 +140,7 @@ export function ScoreHistoryChart({ history, mode }: ScoreHistoryChartProps) {
         className="block w-full h-auto cursor-crosshair"
         role="img"
         aria-label={
-          mode === "current"
-            ? "Current Vertex score per bout"
-            : "All-time Vertex score per bout"
+          mode === "current" ? t("chartAriaCurrent") : t("chartAriaAllTime")
         }
         onPointerMove={onMove}
         onPointerLeave={() => setHoverIdx(null)}
@@ -239,7 +240,7 @@ export function ScoreHistoryChart({ history, mode }: ScoreHistoryChartProps) {
           fontSize={10}
           fontFamily="var(--font-mono)"
         >
-          {formatDate(points[0].eventDate)}
+          {formatDate(points[0].eventDate, locale)}
         </text>
         {n > 1 ? (
           <text
@@ -250,7 +251,7 @@ export function ScoreHistoryChart({ history, mode }: ScoreHistoryChartProps) {
             fontSize={10}
             fontFamily="var(--font-mono)"
           >
-            {formatDate(points[n - 1].eventDate)}
+            {formatDate(points[n - 1].eventDate, locale)}
           </text>
         ) : null}
       </svg>
@@ -273,7 +274,7 @@ export function ScoreHistoryChart({ history, mode }: ScoreHistoryChartProps) {
               <span style={{ color: resultColor(hoverPoint.result) }}>
                 {hoverPoint.result}
               </span>{" "}
-              vs{" "}
+              {tPeak("vs")}{" "}
               <span className="text-foreground">{hoverPoint.opponentName}</span>
               <span className="text-foreground-subtle">
                 {" · "}
@@ -282,7 +283,7 @@ export function ScoreHistoryChart({ history, mode }: ScoreHistoryChartProps) {
             </div>
           ) : (
             <div className="mt-1 font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
-              Monthly snapshot · no bout
+              {t("monthlySnapshot")}
             </div>
           )}
         </div>

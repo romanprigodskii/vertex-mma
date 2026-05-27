@@ -1,3 +1,4 @@
+import { useTranslations } from "next-intl";
 import { Trophy } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -17,7 +18,8 @@ export function TrophyBadge({
   isInterim = false,
   className,
 }: TrophyBadgeProps) {
-  const labelText = isInterim ? "INTERIM CHAMP" : "CHAMPION";
+  const t = useTranslations("trophy");
+  const labelText = isInterim ? t("interimChamp") : t("champion");
   const ariaLabel = `${divisionFull ?? divisionShort} ${labelText.toLowerCase()}`;
   return (
     <span
