@@ -4,7 +4,8 @@ import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import * as Dialog from "@radix-ui/react-dialog";
-import { Coins, LogOut, Menu, X } from "lucide-react";
+import { Coins, LogOut, Menu, Moon, Sun, X } from "lucide-react";
+import { useTheme } from "next-themes";
 
 import type { CurrentUser } from "@/lib/auth";
 import { NAV_SECTIONS } from "@/lib/navigation";
@@ -13,11 +14,16 @@ import { cn } from "@/lib/utils";
 export function MobileNav({ user }: { user: CurrentUser | null }) {
   const [open, setOpen] = React.useState(false);
   const pathname = usePathname();
+  const { resolvedTheme, setTheme } = useTheme();
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => setMounted(true), []);
 
   // Close the drawer whenever the route changes underneath us.
   React.useEffect(() => {
     setOpen(false);
   }, [pathname]);
+
+  const isLight = resolvedTheme === "light";
 
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
@@ -74,6 +80,29 @@ export function MobileNav({ user }: { user: CurrentUser | null }) {
             </ul>
 
             <hr className="my-4 border-foreground/10" />
+
+            <button
+              type="button"
+              onClick={() => setTheme(isLight ? "dark" : "light")}
+              className="mb-3 flex w-full items-center gap-2.5 rounded-sm border border-foreground/15 px-3 py-2.5 text-left font-sans text-sm text-foreground transition-colors hover:bg-foreground/[0.04]"
+            >
+              {mounted ? (
+                isLight ? (
+                  <Moon className="h-4 w-4" aria-hidden />
+                ) : (
+                  <Sun className="h-4 w-4" aria-hidden />
+                )
+              ) : (
+                <Sun className="h-4 w-4 opacity-0" aria-hidden />
+              )}
+              <span className="uppercase tracking-widest">
+                {mounted
+                  ? isLight
+                    ? "Switch to dark"
+                    : "Switch to light"
+                  : "Theme"}
+              </span>
+            </button>
 
             {user ? (
               <>
