@@ -1,11 +1,13 @@
 import { sql } from "drizzle-orm";
-import Link from "next/link";
+import type { Metadata } from "next";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 
 import { Container } from "@/components/layout/container";
 import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
 import { MarketCard } from "@/components/markets/market-card";
 import { RankingCard } from "@/components/rankings/ranking-card";
+import { Link } from "@/i18n/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { listOpenMarkets } from "@/lib/markets";
@@ -13,11 +15,18 @@ import { listRecentRankings } from "@/lib/rankings";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = {
-  title: "Vertex MMA — UFC scores, rankings, betting",
-  description:
-    "Vertex score for every active UFC fighter, community rankings, and virtual coin betting markets.",
-};
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "home" });
+  return {
+    title: t("metaTitle"),
+    description: t("metaDescription"),
+  };
+}
 
 type TopFighter = {
   id: string;
@@ -60,13 +69,26 @@ async function getTopFighters(limit: number): Promise<TopFighter[]> {
   return [...(result as unknown as TopFighter[])];
 }
 
-export default async function HomePage() {
+export default async function HomePage({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
+  setRequestLocale(locale);
+  const t = await getTranslations("home");
+  const tCommon = await getTranslations("common");
   const [user, topFighters, topMarkets, recentRankings] = await Promise.all([
     getCurrentUser(),
     getTopFighters(5),
     listOpenMarkets(6),
     listRecentRankings(3),
   ]);
+
+  // The hero title is two lines in both locales — store with a literal
+  // \n in the message file and split here. Avoids an i18n-specific
+  // `<br/>` rule and keeps the message a single key.
+  const heroLines = t("heroTitle").split("\n");
 
   return (
     <>
@@ -75,39 +97,38 @@ export default async function HomePage() {
         <section className="border-b border-foreground/[0.06]">
           <Container size="xl" className="py-16 md:py-24">
             <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-primary">
-              Vertex MMA · Beta
+              {t("kicker")}
             </p>
             <h1 className="mt-4 font-display uppercase tracking-tight text-foreground text-hero">
-              Every UFC fighter,
-              <br />
-              ranked and wagered.
+              {heroLines.map((line, i) => (
+                <span key={i} className="block">
+                  {line}
+                </span>
+              ))}
             </h1>
             <p className="mt-6 max-w-2xl font-sans text-base text-foreground-muted md:text-lg">
-              Vertex Score combines quality wins, championship pedigree,
-              recent form, finishing rate, and defensive vulnerability into
-              a 0–100 number for every active UFC fighter. Build your own
-              rankings, bet virtual coins on every bout.
+              {t("heroBody")}
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link
                 href="/fighters"
                 className="rounded-sm bg-primary px-5 py-2.5 font-display text-sm uppercase tracking-widest text-background-base hover:opacity-90"
               >
-                Browse fighters
+                {t("browseFighters")}
               </Link>
               {user ? (
                 <Link
                   href="/markets"
                   className="rounded-sm border border-foreground/15 px-5 py-2.5 font-display text-sm uppercase tracking-widest text-foreground hover:bg-foreground/[0.05]"
                 >
-                  Open markets
+                  {t("openMarkets")}
                 </Link>
               ) : (
                 <Link
                   href="/signup"
                   className="rounded-sm border border-foreground/15 px-5 py-2.5 font-display text-sm uppercase tracking-widest text-foreground hover:bg-foreground/[0.05]"
                 >
-                  Create account
+                  {t("createAccount")}
                 </Link>
               )}
             </div>
@@ -118,18 +139,18 @@ export default async function HomePage() {
           <Container size="xl" className="py-12 md:py-16">
             <div className="mb-6 flex items-baseline justify-between">
               <h2 className="font-display uppercase tracking-tight text-foreground text-h2">
-                Top fighters
+                {t("topFighters")}
               </h2>
               <Link
                 href="/fighters"
                 className="font-sans text-sm text-primary hover:underline"
               >
-                See all →
+                {tCommon("seeAll")} →
               </Link>
             </div>
             {topFighters.length === 0 ? (
               <p className="font-sans text-sm text-foreground-muted">
-                No fighters yet.
+                {t("noFighters")}
               </p>
             ) : (
               <ul className="flex flex-col gap-2">
@@ -170,7 +191,7 @@ export default async function HomePage() {
                           {f.score ?? "—"}
                         </p>
                         <p className="font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
-                          Vertex
+                          {tCommon("vertex")}
                         </p>
                       </div>
                     </Link>
@@ -185,22 +206,24 @@ export default async function HomePage() {
           <Container size="xl" className="py-12 md:py-16">
             <div className="mb-6 flex items-baseline justify-between">
               <h2 className="font-display uppercase tracking-tight text-foreground text-h2">
-                Open markets
+                {t("marketsHeading")}
               </h2>
               <Link
                 href="/markets"
                 className="font-sans text-sm text-primary hover:underline"
               >
-                All markets →
+                {t("allMarkets")} →
               </Link>
             </div>
             {topMarkets.length === 0 ? (
               <p className="font-sans text-sm text-foreground-muted">
-                No open markets yet — run{" "}
-                <code className="rounded-sm bg-foreground/[0.05] px-1 py-0.5 font-mono text-xs">
-                  pnpm markets:generate
-                </code>
-                .
+                {t.rich("noMarketsHint", {
+                  cmd: () => (
+                    <code className="rounded-sm bg-foreground/[0.05] px-1 py-0.5 font-mono text-xs">
+                      pnpm markets:generate
+                    </code>
+                  ),
+                })}
               </p>
             ) : (
               <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -218,25 +241,27 @@ export default async function HomePage() {
           <Container size="xl" className="py-12 md:py-16">
             <div className="mb-6 flex items-baseline justify-between">
               <h2 className="font-display uppercase tracking-tight text-foreground text-h2">
-                Community rankings
+                {t("communityRankings")}
               </h2>
               <Link
                 href="/rankings"
                 className="font-sans text-sm text-primary hover:underline"
               >
-                All rankings →
+                {t("allRankings")} →
               </Link>
             </div>
             {recentRankings.length === 0 ? (
               <p className="font-sans text-sm text-foreground-muted">
-                Be the first to publish —{" "}
-                <Link
-                  href="/rankings/create"
-                  className="text-primary hover:underline"
-                >
-                  create a ranking
-                </Link>
-                .
+                {t.rich("noRankingsLead", {
+                  link: (chunks) => (
+                    <Link
+                      href="/rankings/create"
+                      className="text-primary hover:underline"
+                    >
+                      {chunks}
+                    </Link>
+                  ),
+                })}
               </p>
             ) : (
               <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -254,16 +279,16 @@ export default async function HomePage() {
           <section>
             <Container size="md" className="py-16 text-center md:py-20">
               <h2 className="font-display uppercase tracking-tight text-foreground text-h2">
-                Get 10,000 free coins on signup.
+                {t("signupCtaTitle")}
               </h2>
               <p className="mt-3 font-sans text-base text-foreground-muted">
-                Build rankings, place bets, climb the leaderboard.
+                {t("signupCtaBody")}
               </p>
               <Link
                 href="/signup"
                 className="mt-6 inline-block rounded-sm bg-primary px-6 py-3 font-display text-sm uppercase tracking-widest text-background-base hover:opacity-90"
               >
-                Create account
+                {t("createAccount")}
               </Link>
             </Container>
           </section>

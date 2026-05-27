@@ -1,6 +1,7 @@
-import Link from "next/link";
+import { getLocale, getTranslations } from "next-intl/server";
 
 import { FighterAvatar } from "@/components/fighter/FighterAvatar";
+import { Link } from "@/i18n/navigation";
 import type { BoutDetail, BoutDetailFighter } from "@/lib/bout-detail";
 import { getCountryFlag } from "@/lib/fighter-helpers";
 import { abbreviateMethod } from "@/lib/method";
@@ -14,17 +15,19 @@ interface BoutHeroProps {
   weightLabel: string;
 }
 
-function formatEventDate(iso: string): string {
+function formatEventDate(iso: string, locale: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso.slice(0, 10);
-  return d.toLocaleDateString("en-US", {
+  return d.toLocaleDateString(locale === "ru" ? "ru-RU" : "en-US", {
     year: "numeric",
     month: "long",
     day: "numeric",
   });
 }
 
-export function BoutHero({ bout, weightLabel }: BoutHeroProps) {
+export async function BoutHero({ bout, weightLabel }: BoutHeroProps) {
+  const t = await getTranslations("bout");
+  const locale = await getLocale();
   const winnerId = bout.winner_id;
   const aWon = winnerId === bout.fighter_a.id;
   const bWon = winnerId === bout.fighter_b.id;
@@ -43,12 +46,12 @@ export function BoutHero({ bout, weightLabel }: BoutHeroProps) {
       : null;
 
   const placement = bout.is_main_event
-    ? "Main event"
+    ? t("mainEvent")
     : bout.is_co_main_event
-      ? "Co-main"
+      ? t("coMain")
       : null;
   const isTitle = isCuratedTitleFight(bout.id);
-  const dateStr = formatEventDate(bout.event.date);
+  const dateStr = formatEventDate(bout.event.date, locale);
   const location = [bout.event.venue, bout.event.location_city]
     .filter((v): v is string => Boolean(v))
     .join(", ");
@@ -57,7 +60,7 @@ export function BoutHero({ bout, weightLabel }: BoutHeroProps) {
     <section className="border-b border-foreground/10">
       <div className="py-8 md:py-10">
         <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground-subtle">
-          Bout
+          {t("kicker")}
           {placement ? (
             <>
               <span className="mx-2 text-foreground-subtle/50">·</span>
@@ -67,12 +70,12 @@ export function BoutHero({ bout, weightLabel }: BoutHeroProps) {
           <span className="mx-2 text-foreground-subtle/50">·</span>
           <span>{weightLabel}</span>
           <span className="mx-2 text-foreground-subtle/50">·</span>
-          <span>{bout.scheduled_rounds} rounds</span>
+          <span>{t("rounds", { count: bout.scheduled_rounds })}</span>
           {isTitle ? (
             <>
               <span className="mx-2 text-foreground-subtle/50">·</span>
               <span className="rounded-sm border border-primary/35 bg-primary/10 px-1.5 py-0.5 text-primary">
-                Title
+                {t("title")}
               </span>
             </>
           ) : null}
@@ -104,6 +107,7 @@ export function BoutHero({ bout, weightLabel }: BoutHeroProps) {
             isDraw={isDraw}
             isNc={isNc}
             align="left"
+            winnerLabel={t("winner")}
           />
           <div className="text-center">
             <p className="font-display text-3xl uppercase tracking-widest text-foreground-subtle">
@@ -113,9 +117,9 @@ export function BoutHero({ bout, weightLabel }: BoutHeroProps) {
               <div className="mt-2 space-y-0.5">
                 <p className="font-sans text-xs uppercase tracking-widest text-foreground-muted">
                   {isNc
-                    ? "No contest"
+                    ? t("noContest")
                     : isDraw
-                      ? `Draw${methodLabel !== "—" ? ` · ${methodLabel}` : ""}`
+                      ? `${t("draw")}${methodLabel !== "—" ? ` · ${methodLabel}` : ""}`
                       : methodLabel}
                 </p>
                 {finishDetail ? (
@@ -141,6 +145,7 @@ export function BoutHero({ bout, weightLabel }: BoutHeroProps) {
             isDraw={isDraw}
             isNc={isNc}
             align="right"
+            winnerLabel={t("winner")}
           />
         </div>
       </div>
@@ -154,12 +159,14 @@ function FighterSide({
   isDraw,
   isNc,
   align,
+  winnerLabel,
 }: {
   fighter: BoutDetailFighter;
   won: boolean;
   isDraw: boolean;
   isNc: boolean;
   align: "left" | "right";
+  winnerLabel: string;
 }) {
   const flag = getCountryFlag(fighter.country_code);
   return (
@@ -206,7 +213,7 @@ function FighterSide({
             {flag}
           </span>
           <span>{fighter.country_code ?? "—"}</span>
-          {won ? <span className="text-streak-win">· Winner</span> : null}
+          {won ? <span className="text-streak-win">· {winnerLabel}</span> : null}
         </span>
       </div>
     </Link>

@@ -8,6 +8,8 @@ interface BoutPositionBreakdownProps {
   fighterB: BoutDetailFighter;
   mapA: FighterPositionMap;
   mapB: FighterPositionMap;
+  /** i18n labels injected by the client-side tab wrapper. */
+  labels: { distance: string; clinch: string; ground: string };
 }
 
 export function BoutPositionBreakdown({
@@ -15,11 +17,12 @@ export function BoutPositionBreakdown({
   fighterB,
   mapA,
   mapB,
+  labels,
 }: BoutPositionBreakdownProps) {
   return (
     <div className="mx-auto max-w-2xl space-y-4">
-      <FighterPositionBar name={fighterA.name_en} map={mapA} />
-      <FighterPositionBar name={fighterB.name_en} map={mapB} />
+      <FighterPositionBar name={fighterA.name_en} map={mapA} labels={labels} />
+      <FighterPositionBar name={fighterB.name_en} map={mapB} labels={labels} />
     </div>
   );
 }
@@ -27,9 +30,11 @@ export function BoutPositionBreakdown({
 function FighterPositionBar({
   name,
   map,
+  labels,
 }: {
   name: string;
   map: FighterPositionMap;
+  labels: { distance: string; clinch: string; ground: string };
 }) {
   const total = map.distance + map.clinch + map.ground;
   if (total === 0) {
@@ -38,9 +43,7 @@ function FighterPositionBar({
         <p className="mb-1.5 font-sans text-[11px] uppercase tracking-widest text-foreground-muted">
           {name}
         </p>
-        <p className="font-mono text-xs text-foreground-subtle">
-          No significant strikes recorded
-        </p>
+        <p className="font-mono text-xs text-foreground-subtle">—</p>
       </article>
     );
   }
@@ -58,7 +61,7 @@ function FighterPositionBar({
           <div
             className="flex items-center justify-center bg-primary font-mono text-[10px] tabular text-background-base"
             style={{ width: `${widthOf(map.distance)}%` }}
-            title={`Distance: ${map.distance} (${pct(map.distance).toFixed(0)}%)`}
+            title={`${labels.distance}: ${map.distance} (${pct(map.distance).toFixed(0)}%)`}
           >
             {pct(map.distance) >= 12 ? map.distance : ""}
           </div>
@@ -67,7 +70,7 @@ function FighterPositionBar({
           <div
             className="flex items-center justify-center bg-foreground/40 font-mono text-[10px] tabular text-background-base"
             style={{ width: `${widthOf(map.clinch)}%` }}
-            title={`Clinch: ${map.clinch} (${pct(map.clinch).toFixed(0)}%)`}
+            title={`${labels.clinch}: ${map.clinch} (${pct(map.clinch).toFixed(0)}%)`}
           >
             {pct(map.clinch) >= 12 ? map.clinch : ""}
           </div>
@@ -76,7 +79,7 @@ function FighterPositionBar({
           <div
             className="flex items-center justify-center bg-streak-loss/60 font-mono text-[10px] tabular text-background-base"
             style={{ width: `${widthOf(map.ground)}%` }}
-            title={`Ground: ${map.ground} (${pct(map.ground).toFixed(0)}%)`}
+            title={`${labels.ground}: ${map.ground} (${pct(map.ground).toFixed(0)}%)`}
           >
             {pct(map.ground) >= 12 ? map.ground : ""}
           </div>
@@ -85,7 +88,7 @@ function FighterPositionBar({
       <dl className="mt-2 grid grid-cols-3 gap-2 font-mono text-[10px] tabular">
         <div>
           <dt className="text-[9px] uppercase tracking-widest text-foreground-subtle">
-            Distance
+            {labels.distance}
           </dt>
           <dd className="text-foreground">
             {map.distance} ({pct(map.distance).toFixed(0)}%)
@@ -93,7 +96,7 @@ function FighterPositionBar({
         </div>
         <div>
           <dt className="text-[9px] uppercase tracking-widest text-foreground-subtle">
-            Clinch
+            {labels.clinch}
           </dt>
           <dd className="text-foreground">
             {map.clinch} ({pct(map.clinch).toFixed(0)}%)
@@ -101,7 +104,7 @@ function FighterPositionBar({
         </div>
         <div>
           <dt className="text-[9px] uppercase tracking-widest text-foreground-subtle">
-            Ground
+            {labels.ground}
           </dt>
           <dd className="text-foreground">
             {map.ground} ({pct(map.ground).toFixed(0)}%)

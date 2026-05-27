@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useTranslations } from "next-intl";
 import { Play } from "lucide-react";
 
 import { Container } from "@/components/layout/container";
@@ -33,7 +34,7 @@ function thumbnailUrl(videoId: string): string {
 }
 
 export function BoutVideos({ videos }: BoutVideosProps) {
-  if (videos.length === 0) return null;
+  const t = useTranslations("bout");
 
   // Longer-running uploads float to the top — they're closer to the real
   // unedited fight than the short condensed clips.
@@ -43,18 +44,20 @@ export function BoutVideos({ videos }: BoutVideosProps) {
     );
   }, [videos]);
 
+  if (videos.length === 0) return null;
+
   return (
     <section
-      aria-label="Watch the fight"
+      aria-label={t("watch")}
       className="border-t border-foreground/10 py-10 md:py-12"
     >
       <Container size="xl">
         <div className="mb-5 flex items-end justify-between gap-4">
           <h2 className="font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
-            Watch
+            {t("watch")}
           </h2>
           <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-foreground-subtle">
-            Free uploads from the UFC YouTube channel
+            {t("watchSubtitle")}
           </p>
         </div>
         <div
@@ -66,7 +69,12 @@ export function BoutVideos({ videos }: BoutVideosProps) {
           )}
         >
           {sorted.map((v, i) => (
-            <VideoCard key={v.id} video={v} priority={i === 0} />
+            <VideoCard
+              key={v.id}
+              video={v}
+              priority={i === 0}
+              fullFightLabel={t("fullFight")}
+            />
           ))}
         </div>
       </Container>
@@ -77,9 +85,11 @@ export function BoutVideos({ videos }: BoutVideosProps) {
 function VideoCard({
   video,
   priority,
+  fullFightLabel,
 }: {
   video: BoutVideo;
   priority: boolean;
+  fullFightLabel: string;
 }) {
   const [playing, setPlaying] = React.useState(false);
   const thumb = thumbnailUrl(video.youtube_video_id);
@@ -119,7 +129,7 @@ function VideoCard({
               </span>
             </span>
             <span className="absolute left-3 top-3 inline-flex items-center rounded-[4px] bg-black/70 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-white">
-              Full fight
+              {fullFightLabel}
             </span>
             {duration ? (
               <span className="absolute bottom-3 right-3 inline-flex items-center rounded-[4px] bg-black/80 px-1.5 py-0.5 font-mono text-[11px] tracking-wide text-white">

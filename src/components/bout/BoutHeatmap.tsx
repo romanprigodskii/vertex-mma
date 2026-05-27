@@ -13,6 +13,9 @@ interface BoutHeatmapProps {
       Wave 32 uses red ("text-streak-loss") for landed and muted gray
       ("text-foreground-muted") for absorbed. */
   colorClass?: string;
+  /** i18n labels injected from the client-side tab wrapper so this
+   *  component can stay sync/dumb. */
+  labels: { head: string; body: string; legs: string };
 }
 
 export function BoutHeatmap({
@@ -21,6 +24,7 @@ export function BoutHeatmap({
   mapA,
   mapB,
   colorClass = "text-streak-loss",
+  labels,
 }: BoutHeatmapProps) {
   const maxStrike = Math.max(
     mapA.head,
@@ -39,12 +43,14 @@ export function BoutHeatmap({
         map={mapA}
         max={maxStrike}
         colorClass={colorClass}
+        labels={labels}
       />
       <FighterSilhouette
         name={fighterB.name_en}
         map={mapB}
         max={maxStrike}
         colorClass={colorClass}
+        labels={labels}
       />
     </div>
   );
@@ -55,11 +61,13 @@ function FighterSilhouette({
   map,
   max,
   colorClass,
+  labels,
 }: {
   name: string;
   map: FighterStrikeMap;
   max: number;
   colorClass: string;
+  labels: { head: string; body: string; legs: string };
 }) {
   // Opacity ramp: zone with 0 strikes → 0.10 (barely visible outline),
   // zone with `max` strikes → 1.0. Min floor 0.10 keeps silhouette readable
@@ -105,11 +113,11 @@ function FighterSilhouette({
         />
       </svg>
       <dl className="grid w-full max-w-[140px] grid-cols-2 gap-x-3 gap-y-1 font-mono text-xs tabular">
-        <dt className="text-foreground-subtle">Head</dt>
+        <dt className="text-foreground-subtle">{labels.head}</dt>
         <dd className="text-right tabular text-foreground">{map.head}</dd>
-        <dt className="text-foreground-subtle">Body</dt>
+        <dt className="text-foreground-subtle">{labels.body}</dt>
         <dd className="text-right tabular text-foreground">{map.body}</dd>
-        <dt className="text-foreground-subtle">Legs</dt>
+        <dt className="text-foreground-subtle">{labels.legs}</dt>
         <dd className="text-right tabular text-foreground">{map.legs}</dd>
       </dl>
     </article>

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import { ChevronLeft } from "lucide-react";
 
 import { BoutDecisionBanner } from "@/components/bout/BoutDecisionBanner";
@@ -14,23 +14,16 @@ import { Container } from "@/components/layout/container";
 import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
 import { ShareButton } from "@/components/share/share-button";
+import { Link } from "@/i18n/navigation";
 import {
   computeFighterPositionMap,
   computeFighterStrikeMap,
   getBoutById,
 } from "@/lib/bout-detail";
-import { WEIGHT_CLASSES } from "@/lib/constants";
-
 export const dynamic = "force-dynamic";
 
-const WEIGHT_LABEL: Record<string, string> = Object.fromEntries(
-  WEIGHT_CLASSES.map((w) => [w.id, w.label]),
-);
-WEIGHT_LABEL["catchweight"] = "Catchweight";
-WEIGHT_LABEL["openweight"] = "Openweight";
-
 interface PageProps {
-  params: Promise<{ id: string }>;
+  params: Promise<{ id: string; locale: string }>;
 }
 
 export async function generateMetadata({
@@ -68,12 +61,18 @@ export async function generateMetadata({
 }
 
 export default async function BoutDetailPage({ params }: PageProps) {
-  const { id } = await params;
+  const { id, locale } = await params;
+  setRequestLocale(locale);
+  const t = await getTranslations("bout");
+  const tWeight = await getTranslations("weight");
   const bout = await getBoutById(id);
   if (!bout) notFound();
 
-  const weightLabel =
-    WEIGHT_LABEL[bout.weight_class] ?? bout.weight_class;
+  // tWeight.has() guards against custom strings like a hand-typed
+  // catchweight that aren't in our enum; fall back to the raw value.
+  const weightLabel = tWeight.has(bout.weight_class)
+    ? tWeight(bout.weight_class)
+    : bout.weight_class;
   const backHref = `/events/${bout.event.slug}#bout-${bout.id}`;
 
   // Wave 32: pre-compute every map server-side so the client tabs only
@@ -97,14 +96,14 @@ export default async function BoutDetailPage({ params }: PageProps) {
               className="inline-flex items-center gap-1.5 font-sans text-sm text-foreground-muted transition-colors hover:text-primary"
             >
               <ChevronLeft className="h-4 w-4" aria-hidden />
-              Back to event
+              {t("back")}
             </Link>
             <ShareButton
               url={`/bouts/${bout.id}`}
               ogImageUrl={`/api/og/bouts/${bout.id}`}
               title={`${bout.fighter_a.name_en} vs ${bout.fighter_b.name_en} · Vertex MMA`}
               filename={`vertexmma-bout-${bout.id.slice(0, 8)}`}
-              label="Share fight"
+              label={t("shareLabel")}
               variant="icon"
             />
           </Container>
@@ -134,7 +133,7 @@ export default async function BoutDetailPage({ params }: PageProps) {
         <section className="border-t border-foreground/10 py-10 md:py-12">
           <Container size="xl">
             <h2 className="mb-4 font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
-              Round-by-round
+              {t("roundByRound")}
             </h2>
             <BoutRoundBreakdown bout={bout} />
           </Container>
@@ -144,7 +143,7 @@ export default async function BoutDetailPage({ params }: PageProps) {
           <section className="border-t border-foreground/10 py-10 md:py-12">
             <Container size="xl">
               <h2 className="mb-4 font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
-                Totals
+                {t("totals")}
               </h2>
               <BoutTotals bout={bout} />
             </Container>
