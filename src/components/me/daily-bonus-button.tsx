@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 
 import { claimDailyBonusAction } from "@/app/[locale]/me/actions";
 import { dailyBonusAmount } from "@/lib/tier";
@@ -21,6 +22,7 @@ function hoursUntilEligible(lastIso: string | null): number {
 
 export function DailyBonusButton({ lastDailyBonusAt, tier }: Props) {
   const router = useRouter();
+  const t = useTranslations("profile");
   const [pending, setPending] = React.useState(false);
   const [feedback, setFeedback] = React.useState<string | null>(null);
   // Track the "applied at" value locally so a fresh claim immediately
@@ -39,9 +41,10 @@ export function DailyBonusButton({ lastDailyBonusAt, tier }: Props) {
       setFeedback(res.error);
       return;
     }
-    let msg = `+${res.awarded?.toLocaleString() ?? amount} coins claimed!`;
+    const awardedAmount = res.awarded?.toLocaleString() ?? amount.toLocaleString();
+    let msg = t("claimedToast", { amount: awardedAmount });
     if (res.newlyUnlocked && res.newlyUnlocked.length > 0) {
-      msg += ` Unlocked: ${res.newlyUnlocked.join(", ")}`;
+      msg += ` ${t("unlockedToast", { list: res.newlyUnlocked.join(", ") })}`;
     }
     setFeedback(msg);
     setLastIso(new Date().toISOString());
@@ -52,7 +55,7 @@ export function DailyBonusButton({ lastDailyBonusAt, tier }: Props) {
     const hoursLeft = Math.ceil(hoursUntilEligible(lastIso));
     return (
       <div className="rounded-md border border-foreground/10 bg-background-elevated/30 px-3 py-2 font-sans text-sm text-foreground-subtle">
-        Daily bonus available in {hoursLeft}h
+        {t("dailyAvailableIn", { hours: hoursLeft })}
       </div>
     );
   }
@@ -65,7 +68,9 @@ export function DailyBonusButton({ lastDailyBonusAt, tier }: Props) {
         disabled={pending}
         className="rounded-sm bg-primary px-4 py-2 font-display text-sm uppercase tracking-widest text-background-base hover:opacity-90 disabled:opacity-50"
       >
-        {pending ? "Claiming…" : `Claim daily +${amount.toLocaleString()}`}
+        {pending
+          ? t("claiming")
+          : t("claimDaily", { amount: amount.toLocaleString() })}
       </button>
       {feedback ? (
         <p className="mt-2 font-sans text-sm text-streak-win">{feedback}</p>

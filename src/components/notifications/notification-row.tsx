@@ -1,9 +1,10 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
+import { useLocale, useTranslations } from "next-intl";
 
 import { markNotificationReadAction } from "@/app/[locale]/notifications/actions";
+import { Link } from "@/i18n/navigation";
 import type { NotificationRow as NotificationRowData } from "@/lib/notifications";
 import { cn } from "@/lib/utils";
 
@@ -18,18 +19,29 @@ interface Props {
   notification: NotificationRowData;
 }
 
-function formatAgo(iso: string): string {
-  const diffMs = Date.now() - new Date(iso).getTime();
-  if (!Number.isFinite(diffMs) || diffMs < 0) return "just now";
-  const diff = diffMs / 1000;
-  if (diff < 60) return "just now";
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  if (diff < 7 * 86400) return `${Math.floor(diff / 86400)}d ago`;
-  return new Date(iso).toLocaleDateString();
+function useFormatAgo() {
+  const t = useTranslations("notifications");
+  const locale = useLocale();
+  return React.useCallback(
+    (iso: string): string => {
+      const diffMs = Date.now() - new Date(iso).getTime();
+      if (!Number.isFinite(diffMs) || diffMs < 0) return t("justNow");
+      const diff = diffMs / 1000;
+      if (diff < 60) return t("justNow");
+      if (diff < 3600) return t("minutesAgo", { n: Math.floor(diff / 60) });
+      if (diff < 86400) return t("hoursAgo", { n: Math.floor(diff / 3600) });
+      if (diff < 7 * 86400) return t("daysAgo", { n: Math.floor(diff / 86400) });
+      return new Date(iso).toLocaleDateString(
+        locale === "ru" ? "ru-RU" : "en-US",
+      );
+    },
+    [t, locale],
+  );
 }
 
 export function NotificationRow({ notification: n }: Props) {
+  const t = useTranslations("notifications");
+  const formatAgo = useFormatAgo();
   // Local optimistic flip so the row visually quiets the moment the user
   // clicks — the server action also marks it server-side, and the next
   // page refresh confirms via revalidatePath.
@@ -74,7 +86,7 @@ export function NotificationRow({ notification: n }: Props) {
       {!readNow ? (
         <span
           className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary"
-          aria-label="Unread"
+          aria-label={t("unread")}
         />
       ) : null}
     </div>

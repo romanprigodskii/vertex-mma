@@ -1,3 +1,5 @@
+import { useTranslations } from "next-intl";
+
 import { nextTier, TIER_LABEL, type Tier } from "@/lib/tier";
 
 interface Props {
@@ -7,6 +9,7 @@ interface Props {
 }
 
 export function TierProgress({ currentTier, totalEarned, isOwner }: Props) {
+  const t = useTranslations("profile");
   if (!isOwner) return null;
 
   const next = nextTier(currentTier);
@@ -22,7 +25,7 @@ export function TierProgress({ currentTier, totalEarned, isOwner }: Props) {
           {TIER_LABEL[currentTier]} → {TIER_LABEL[next.tier]}
         </p>
         <p className="font-mono text-[10px] tabular text-foreground-muted">
-          {toNext.toLocaleString()} more coins
+          {t("moreCoins", { n: toNext.toLocaleString() })}
         </p>
       </div>
       <div className="h-1.5 w-full overflow-hidden rounded-sm bg-foreground/[0.06]">
@@ -32,8 +35,10 @@ export function TierProgress({ currentTier, totalEarned, isOwner }: Props) {
         />
       </div>
       <p className="mt-2 font-sans text-[11px] text-foreground-subtle">
-        Lifetime earned: {totalEarned.toLocaleString()} of{" "}
-        {next.threshold.toLocaleString()}
+        {t("lifetimeEarned", {
+          earned: totalEarned.toLocaleString(),
+          target: next.threshold.toLocaleString(),
+        })}
       </p>
     </div>
   );
