@@ -24,7 +24,17 @@
     "myPredictions": "My predictions",
     "notifications": "Notifications",
     "settings": "Settings",
-    "signOut": "Sign out"
+    "signOut": "Sign out",
+    "accountMenu": "Account menu"
+  },
+  "share": {
+    "share": "Share",
+    "copied": "Copied!",
+    "copyLink": "Copy link",
+    "downloading": "Downloading…",
+    "saveImage": "Save image",
+    "shareToX": "Share to X / Twitter",
+    "shareToTelegram": "Share to Telegram"
   },
   "footer": {
     "fighters": "Fighters",
@@ -443,6 +453,8 @@
     "daysAgo": "{n}d ago"
   },
   "auth": {
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
     "signInTitle": "Sign in",
     "signInWelcome": "Welcome back.",
     "signUpTitle": "Create account",

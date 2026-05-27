@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
+import { useTranslations } from "next-intl";
 import {
   Coins,
   ListChecks,
@@ -10,9 +10,11 @@ import {
   UserCircle,
 } from "lucide-react";
 
+import { Link } from "@/i18n/navigation";
 import type { CurrentUser } from "@/lib/auth";
 
 export function NavbarUserMenu({ user }: { user: CurrentUser }) {
+  const t = useTranslations("userMenu");
   const [open, setOpen] = React.useState(false);
   const ref = React.useRef<HTMLDivElement>(null);
 
@@ -37,7 +39,7 @@ export function NavbarUserMenu({ user }: { user: CurrentUser }) {
         className="inline-flex h-9 items-center gap-2 rounded-md border border-foreground/15 bg-background-elevated px-1.5 pr-3 text-foreground-muted transition-colors hover:border-foreground/25 hover:text-foreground"
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label="Account menu"
+        aria-label={t("accountMenu")}
       >
         <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/15 font-display text-[11px] uppercase text-primary">
           {initials}
@@ -74,7 +76,7 @@ export function NavbarUserMenu({ user }: { user: CurrentUser }) {
             className="flex items-center gap-2 rounded-sm px-2 py-1.5 font-sans text-sm text-foreground hover:bg-foreground/[0.05]"
           >
             <UserCircle className="h-4 w-4" />
-            Profile
+            {t("profile")}
           </Link>
           <Link
             href="/me/bets"
@@ -82,7 +84,7 @@ export function NavbarUserMenu({ user }: { user: CurrentUser }) {
             className="flex items-center gap-2 rounded-sm px-2 py-1.5 font-sans text-sm text-foreground hover:bg-foreground/[0.05]"
           >
             <Coins className="h-4 w-4" />
-            My bets
+            {t("myBets")}
           </Link>
           <Link
             href="/me/predictions"
@@ -90,7 +92,7 @@ export function NavbarUserMenu({ user }: { user: CurrentUser }) {
             className="flex items-center gap-2 rounded-sm px-2 py-1.5 font-sans text-sm text-foreground hover:bg-foreground/[0.05]"
           >
             <ListChecks className="h-4 w-4" />
-            My predictions
+            {t("myPredictions")}
           </Link>
           <Link
             href="/settings"
@@ -98,7 +100,7 @@ export function NavbarUserMenu({ user }: { user: CurrentUser }) {
             className="flex items-center gap-2 rounded-sm px-2 py-1.5 font-sans text-sm text-foreground hover:bg-foreground/[0.05]"
           >
             <SettingsIcon className="h-4 w-4" />
-            Settings
+            {t("settings")}
           </Link>
           <hr className="my-1 border-foreground/10" />
           <form action="/auth/signout" method="post">
@@ -107,7 +109,7 @@ export function NavbarUserMenu({ user }: { user: CurrentUser }) {
               className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left font-sans text-sm text-foreground hover:bg-foreground/[0.05]"
             >
               <LogOut className="h-4 w-4" />
-              Sign out
+              {t("signOut")}
             </button>
           </form>
         </div>

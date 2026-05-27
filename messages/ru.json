@@ -24,7 +24,17 @@
     "myPredictions": "Мои прогнозы",
     "notifications": "Уведомления",
     "settings": "Настройки",
-    "signOut": "Выйти"
+    "signOut": "Выйти",
+    "accountMenu": "Меню аккаунта"
+  },
+  "share": {
+    "share": "Поделиться",
+    "copied": "Скопировано!",
+    "copyLink": "Скопировать ссылку",
+    "downloading": "Загрузка…",
+    "saveImage": "Сохранить картинку",
+    "shareToX": "Поделиться в X / Twitter",
+    "shareToTelegram": "Поделиться в Telegram"
   },
   "footer": {
     "fighters": "Бойцы",
@@ -443,6 +453,8 @@
     "daysAgo": "{n} д назад"
   },
   "auth": {
+    "showPassword": "Показать пароль",
+    "hidePassword": "Скрыть пароль",
     "signInTitle": "Вход",
     "signInWelcome": "С возвращением.",
     "signUpTitle": "Регистрация",

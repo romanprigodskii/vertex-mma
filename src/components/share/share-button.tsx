@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useTranslations } from "next-intl";
 import * as Popover from "@radix-ui/react-popover";
 import { Check, Copy, Download, Share2 } from "lucide-react";
 
@@ -24,9 +25,11 @@ export function ShareButton({
   ogImageUrl,
   title,
   filename,
-  label = "Share",
+  label,
   variant = "primary",
 }: ShareButtonProps) {
+  const t = useTranslations("share");
+  const effectiveLabel = label ?? t("share");
   const [copied, setCopied] = React.useState(false);
   const [downloading, setDownloading] = React.useState(false);
 
@@ -89,8 +92,8 @@ export function ShareButton({
         {variant === "icon" ? (
           <button
             type="button"
-            aria-label={label}
-            title={label}
+            aria-label={effectiveLabel}
+            title={effectiveLabel}
             className="rounded-sm p-1.5 text-foreground-muted transition-colors hover:bg-foreground/[0.05] hover:text-foreground"
           >
             <Share2 className="h-4 w-4" />
@@ -101,7 +104,7 @@ export function ShareButton({
             className="inline-flex items-center gap-2 rounded-sm border border-foreground/15 px-3 py-1.5 font-sans text-sm text-foreground-muted transition-colors hover:bg-foreground/[0.05] hover:text-foreground"
           >
             <Share2 className="h-4 w-4" />
-            <span>{label}</span>
+            <span>{effectiveLabel}</span>
           </button>
         )}
       </Popover.Trigger>
@@ -121,7 +124,7 @@ export function ShareButton({
             ) : (
               <Copy className="h-4 w-4 text-foreground-muted" />
             )}
-            <span>{copied ? "Copied!" : "Copy link"}</span>
+            <span>{copied ? t("copied") : t("copyLink")}</span>
           </button>
           <button
             type="button"
@@ -130,7 +133,7 @@ export function ShareButton({
             className="flex w-full items-center gap-3 rounded-sm px-3 py-2 text-left font-sans text-sm text-foreground hover:bg-foreground/[0.05] disabled:opacity-50"
           >
             <Download className="h-4 w-4 text-foreground-muted" />
-            <span>{downloading ? "Downloading…" : "Save image"}</span>
+            <span>{downloading ? t("downloading") : t("saveImage")}</span>
           </button>
           <hr className="my-1 border-foreground/10" />
           <a
@@ -142,7 +145,7 @@ export function ShareButton({
             <span className="font-display text-base text-foreground-muted">
               X
             </span>
-            <span>Share to X / Twitter</span>
+            <span>{t("shareToX")}</span>
           </a>
           <a
             href={telegramIntent}
@@ -153,7 +156,7 @@ export function ShareButton({
             <span className="font-display text-base text-foreground-muted">
               TG
             </span>
-            <span>Share to Telegram</span>
+            <span>{t("shareToTelegram")}</span>
           </a>
         </Popover.Content>
       </Popover.Portal>
