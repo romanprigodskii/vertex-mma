@@ -1,3 +1,6 @@
+import type { Metadata } from "next";
+import { getTranslations, setRequestLocale } from "next-intl/server";
+
 import { Container } from "@/components/layout/container";
 import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
@@ -6,12 +9,18 @@ import { getLeaderboard, type LeaderboardSort } from "@/lib/leaderboard";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = {
-  title: "Leaderboard",
-  description: "Top Vertex MMA bettors and listmakers.",
-};
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "leaderboard" });
+  return { title: t("metaTitle"), description: t("metaDescription") };
+}
 
 interface PageProps {
+  params: Promise<{ locale: string }>;
   searchParams: Promise<{ sort?: string }>;
 }
 
@@ -20,9 +29,12 @@ function parseSort(raw: string | undefined): LeaderboardSort {
   return "profit";
 }
 
-export default async function LeaderboardPage({ searchParams }: PageProps) {
-  const params = await searchParams;
-  const sort = parseSort(params.sort);
+export default async function LeaderboardPage({ params, searchParams }: PageProps) {
+  const { locale } = await params;
+  setRequestLocale(locale);
+  const t = await getTranslations("leaderboard");
+  const sp = await searchParams;
+  const sort = parseSort(sp.sort);
   const rows = await getLeaderboard(sort, 100);
 
   return (
@@ -32,14 +44,13 @@ export default async function LeaderboardPage({ searchParams }: PageProps) {
         <Container size="xl" className="py-10 md:py-14">
           <header className="mb-8">
             <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground-subtle">
-              Community
+              {t("kicker")}
             </p>
             <h1 className="mt-2 font-display uppercase tracking-tight text-foreground text-h1">
-              Leaderboard
+              {t("heading")}
             </h1>
             <p className="mt-2 max-w-xl font-sans text-sm text-foreground-muted">
-              Top Vertex MMA bettors and listmakers. Pick a sort to switch
-              the ordering — every row links to that user&apos;s profile.
+              {t("lead")}
             </p>
           </header>
           <LeaderboardTable rows={rows} activeSort={sort} />

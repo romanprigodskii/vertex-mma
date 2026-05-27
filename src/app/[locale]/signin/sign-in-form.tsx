@@ -1,11 +1,12 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 
 import { signInAction } from "@/app/[locale]/signin/actions";
 import { PasswordInput } from "@/components/auth/PasswordInput";
+import { Link } from "@/i18n/navigation";
 
 const INPUT_CLASS =
   "rounded-sm border border-foreground/15 bg-background-elevated/30 px-3 py-2 font-sans text-sm text-foreground focus:border-primary focus:outline-none";
@@ -21,6 +22,7 @@ export function SignInForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const next = safeNext(searchParams.get("next"));
+  const t = useTranslations("auth");
 
   const [pending, setPending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(
@@ -45,16 +47,16 @@ export function SignInForm() {
   return (
     <>
       <h1 className="font-display text-3xl uppercase tracking-tight text-foreground sm:text-4xl">
-        Sign in
+        {t("signInTitle")}
       </h1>
       <p className="mt-2 font-sans text-sm text-foreground-muted">
-        Welcome back.
+        {t("signInWelcome")}
       </p>
 
       <form onSubmit={onSubmit} className="mt-8 flex flex-col gap-4">
         <label className="flex flex-col gap-1.5">
           <span className="font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
-            Email
+            {t("email")}
           </span>
           <input
             type="email"
@@ -68,13 +70,13 @@ export function SignInForm() {
         <label className="flex flex-col gap-1.5">
           <div className="flex items-baseline justify-between gap-3">
             <span className="font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
-              Password
+              {t("password")}
             </span>
             <Link
               href="/auth/forgot-password"
               className="font-sans text-[11px] text-primary hover:underline"
             >
-              Forgot password?
+              {t("forgotPassword")}
             </Link>
           </div>
           <PasswordInput
@@ -95,13 +97,13 @@ export function SignInForm() {
           disabled={pending}
           className="mt-2 rounded-sm bg-primary px-4 py-2.5 font-display text-sm uppercase tracking-widest text-background-base hover:opacity-90 disabled:opacity-50"
         >
-          {pending ? "Signing in..." : "Sign in"}
+          {pending ? t("signingIn") : t("signIn")}
         </button>
 
         <p className="text-center font-sans text-sm text-foreground-muted">
-          No account yet?{" "}
+          {t("noAccountYet")}{" "}
           <Link href="/signup" className="text-primary hover:underline">
-            Sign up
+            {t("signUp")}
           </Link>
         </p>
       </form>

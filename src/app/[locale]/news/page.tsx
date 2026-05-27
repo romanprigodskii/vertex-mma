@@ -1,11 +1,12 @@
-import Link from "next/link";
+import type { Metadata } from "next";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 
 import { Container } from "@/components/layout/container";
 import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
 import { NewsRow } from "@/components/news/news-row";
+import { Link } from "@/i18n/navigation";
 import {
-  formatNewsClassification,
   getNewsClassificationCounts,
   listNewsFeed,
   NEWS_CLASSIFICATION_LABELS,
@@ -14,12 +15,18 @@ import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = {
-  title: "News",
-  description: "Latest MMA news, auto-classified and linked to fighters.",
-};
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "news" });
+  return { title: t("metaTitle"), description: t("metaDescription") };
+}
 
 interface PageProps {
+  params: Promise<{ locale: string }>;
   searchParams: Promise<{ classification?: string }>;
 }
 
@@ -47,7 +54,10 @@ function FilterChip({
   );
 }
 
-export default async function NewsPage({ searchParams }: PageProps) {
+export default async function NewsPage({ params, searchParams }: PageProps) {
+  const { locale } = await params;
+  setRequestLocale(locale);
+  const t = await getTranslations("news");
   const { classification } = await searchParams;
   const active =
     classification && classification in NEWS_CLASSIFICATION_LABELS
@@ -67,38 +77,41 @@ export default async function NewsPage({ searchParams }: PageProps) {
         <Container size="md" className="py-10 md:py-14">
           <header className="mb-6">
             <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground-subtle">
-              MMA wire
+              {t("kicker")}
             </p>
             <h1 className="mt-2 font-display uppercase tracking-tight text-foreground text-h1">
-              News
+              {t("heading")}
             </h1>
             <p className="mt-2 max-w-xl font-sans text-sm text-foreground-muted">
-              Headlines from across MMA, auto-classified and linked to the
-              fighters they mention.
+              {t("lead")}
             </p>
           </header>
 
           {total > 0 ? (
             <div className="mb-6 flex flex-wrap gap-2">
-              <FilterChip href="/news" label="All" active={!active} />
-              {counts.map((c) => (
-                <FilterChip
-                  key={c.classification}
-                  href={`/news?classification=${c.classification}`}
-                  label={formatNewsClassification(c.classification)}
-                  active={active === c.classification}
-                />
-              ))}
+              <FilterChip href="/news" label={t("filterAll")} active={!active} />
+              {counts.map((c) => {
+                const labelKey = `class_${c.classification}`;
+                const label = t.has(labelKey) ? t(labelKey) : c.classification;
+                return (
+                  <FilterChip
+                    key={c.classification}
+                    href={`/news?classification=${c.classification}`}
+                    label={label}
+                    active={active === c.classification}
+                  />
+                );
+              })}
             </div>
           ) : null}
 
           {items.length === 0 ? (
             <div className="rounded-md border border-dashed border-foreground/15 bg-background-elevated/20 px-6 py-16 text-center">
               <p className="font-display text-2xl uppercase tracking-tight text-foreground">
-                No news yet
+                {t("emptyTitle")}
               </p>
               <p className="mx-auto mt-3 max-w-md font-sans text-sm text-foreground-muted">
-                The wire is quiet. Check back once the next ingest runs.
+                {t("emptyLead")}
               </p>
             </div>
           ) : (

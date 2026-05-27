@@ -1,4 +1,5 @@
-import { formatNewsClassification } from "@/lib/news";
+import { useTranslations } from "next-intl";
+
 import { cn } from "@/lib/utils";
 
 // Subtle per-category tint. Unknown values fall back to the neutral style.
@@ -14,11 +15,16 @@ const STYLES: Record<string, string> = {
   unrelated: "border-foreground/15 bg-foreground/[0.05] text-foreground-subtle",
 };
 
+/** Client component so any caller (server or client) can render it without
+ *  threading translations through props. */
 export function NewsClassificationBadge({
   classification,
 }: {
   classification: string;
 }) {
+  const t = useTranslations("news");
+  const labelKey = `class_${classification}`;
+  const label = t.has(labelKey) ? t(labelKey) : classification;
   return (
     <span
       className={cn(
@@ -26,7 +32,7 @@ export function NewsClassificationBadge({
         STYLES[classification] ?? STYLES.general_news,
       )}
     >
-      {formatNewsClassification(classification)}
+      {label}
     </span>
   );
 }

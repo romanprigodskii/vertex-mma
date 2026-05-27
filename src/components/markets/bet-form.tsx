@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 
 import { placeBetAction, previewBetCost } from "@/app/[locale]/markets/actions";
 import { priceToDecimalOdds } from "@/lib/lmsr";
@@ -19,6 +20,7 @@ type Preview = { shares: number; cost: number; newPrice: number };
 
 export function BetForm({ market, userBalance }: Props) {
   const router = useRouter();
+  const t = useTranslations("markets");
   const [outcomeId, setOutcomeId] = React.useState(market.outcomes[0]?.id ?? "");
   const [coins, setCoins] = React.useState<string>("100");
   const [preview, setPreview] = React.useState<Preview | null>(null);
@@ -54,11 +56,11 @@ export function BetForm({ market, userBalance }: Props) {
     setError(null);
     setSuccess(null);
     if (parsedCoins < 1) {
-      setError("Enter a positive amount.");
+      setError(t("enterPositive"));
       return;
     }
     if (parsedCoins > userBalance) {
-      setError("Not enough coins.");
+      setError(t("notEnoughCoins"));
       return;
     }
     setPending(true);
@@ -69,7 +71,10 @@ export function BetForm({ market, userBalance }: Props) {
       return;
     }
     setSuccess(
-      `Bought ${res.sharesBought?.toFixed(2)} shares for ${res.coinsSpent} coins.`,
+      t("boughtShares", {
+        shares: res.sharesBought?.toFixed(2) ?? "",
+        coins: res.coinsSpent ?? 0,
+      }),
     );
     setCoins("100");
     setPreview(null);
@@ -82,7 +87,7 @@ export function BetForm({ market, userBalance }: Props) {
       className="rounded-md border border-foreground/10 bg-background-elevated/30 p-5"
     >
       <h3 className="mb-4 font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
-        Place bet
+        {t("placeBet")}
       </h3>
 
       <div className="flex flex-col gap-3 sm:flex-row">
@@ -106,7 +111,7 @@ export function BetForm({ market, userBalance }: Props) {
           step={1}
           value={coins}
           onChange={(e) => setCoins(e.target.value)}
-          placeholder="Coins to spend"
+          placeholder={t("coinsToSpend")}
           className={`${INPUT_CLASS} flex-1`}
         />
 
@@ -115,14 +120,18 @@ export function BetForm({ market, userBalance }: Props) {
           disabled={pending || parsedCoins < 1 || parsedCoins > userBalance}
           className="rounded-sm bg-primary px-4 py-2 font-display text-sm uppercase tracking-widest text-background-base hover:opacity-90 disabled:opacity-50"
         >
-          {pending ? "Placing…" : "Place bet"}
+          {pending ? t("placing") : t("placeBet")}
         </button>
       </div>
 
       {preview ? (
         <p className="mt-3 font-mono text-[11px] tabular text-foreground-subtle">
-          → {preview.shares.toFixed(2)} shares · price moves to{" "}
-          {(preview.newPrice * 100).toFixed(1)}% ({priceToDecimalOdds(preview.newPrice)}x) · actual cost {preview.cost}c
+          {t("previewLine", {
+            shares: preview.shares.toFixed(2),
+            pct: (preview.newPrice * 100).toFixed(1),
+            odds: priceToDecimalOdds(preview.newPrice),
+            cost: preview.cost,
+          })}
         </p>
       ) : null}
       {error ? (
@@ -134,9 +143,7 @@ export function BetForm({ market, userBalance }: Props) {
         <p className="mt-3 font-sans text-sm text-streak-win">{success}</p>
       ) : null}
       <p className="mt-3 font-sans text-[11px] text-foreground-subtle">
-        Each share pays 1 coin if your outcome wins. Buying the opposite
-        outcome later is the only way to hedge in Wave 38 — explicit sell
-        flow lands in Wave 39.
+        {t("shareHint")}
       </p>
     </form>
   );

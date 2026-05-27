@@ -1,5 +1,6 @@
-import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 
+import { Link } from "@/i18n/navigation";
 import type { LeaderboardRow, LeaderboardSort } from "@/lib/leaderboard";
 import { cn } from "@/lib/utils";
 
@@ -8,36 +9,29 @@ interface Props {
   activeSort: LeaderboardSort;
 }
 
-const SORTS: Array<{ key: LeaderboardSort; label: string; hint: string }> = [
-  { key: "profit", label: "Profit", hint: "Net coins won minus lost" },
-  { key: "volume", label: "Volume", hint: "Total coins wagered" },
-  {
-    key: "achievements",
-    label: "Achievements",
-    hint: "Most achievements unlocked",
-  },
-];
+const SORT_KEYS: LeaderboardSort[] = ["profit", "volume", "achievements"];
 
-export function LeaderboardTable({ rows, activeSort }: Props) {
+export async function LeaderboardTable({ rows, activeSort }: Props) {
+  const t = await getTranslations("leaderboard");
   return (
     <div>
       <nav
         className="mb-6 flex gap-1 border-b border-foreground/10"
         role="tablist"
       >
-        {SORTS.map((s) => (
+        {SORT_KEYS.map((key) => (
           <Link
-            key={s.key}
-            href={`/leaderboard?sort=${s.key}`}
+            key={key}
+            href={`/leaderboard?sort=${key}`}
             className={cn(
               "px-3 py-2 font-sans text-sm uppercase tracking-widest transition-colors",
-              activeSort === s.key
+              activeSort === key
                 ? "border-b-2 border-foreground text-foreground"
                 : "border-b-2 border-transparent text-foreground-muted hover:text-foreground",
             )}
-            title={s.hint}
+            title={t(`sort_${key}_hint`)}
           >
-            {s.label}
+            {t(`sort_${key}`)}
           </Link>
         ))}
       </nav>
@@ -45,17 +39,16 @@ export function LeaderboardTable({ rows, activeSort }: Props) {
       {rows.length === 0 ? (
         <div className="rounded-md border border-dashed border-foreground/15 bg-background-elevated/20 px-6 py-16 text-center">
           <p className="font-display text-2xl uppercase tracking-tight text-foreground">
-            No bettors with activity yet
+            {t("emptyTitle")}
           </p>
           <p className="mx-auto mt-3 max-w-md font-sans text-sm text-foreground-muted">
-            Place a bet on any open market and land on the leaderboard the
-            moment it settles.
+            {t("emptyLead")}
           </p>
           <Link
             href="/markets"
             className="mt-6 inline-block rounded-sm bg-primary px-4 py-2 font-display text-sm uppercase tracking-widest text-background-base hover:opacity-90"
           >
-            Browse markets →
+            {t("browseMarkets")} →
           </Link>
         </div>
       ) : (
@@ -88,7 +81,7 @@ export function LeaderboardTable({ rows, activeSort }: Props) {
                   </p>
                   <p className="font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
                     @{r.username} · {r.tier.toUpperCase()} ·{" "}
-                    {r.achievement_count} ach
+                    {r.achievement_count} {t("achShort")}
                   </p>
                 </div>
                 <div className="shrink-0 text-right">
@@ -116,7 +109,7 @@ export function LeaderboardTable({ rows, activeSort }: Props) {
                     </p>
                   )}
                   <p className="font-mono text-[10px] tabular text-foreground-subtle">
-                    {r.bet_count} bet{r.bet_count === 1 ? "" : "s"}
+                    {t("betCount", { count: r.bet_count })}
                   </p>
                 </div>
               </Link>

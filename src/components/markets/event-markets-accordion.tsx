@@ -1,16 +1,9 @@
-import Link from "next/link";
+import { getLocale, getTranslations } from "next-intl/server";
 import { ChevronRight } from "lucide-react";
 
+import { Link } from "@/i18n/navigation";
 import { priceToDecimalOdds } from "@/lib/lmsr";
 import type { EventMarketsGroup } from "@/lib/markets";
-
-const TYPE_LABEL: Record<string, string> = {
-  winner: "Winner",
-  method: "Method",
-  round: "Round",
-  distance: "Distance",
-  prop: "Prop",
-};
 
 const TYPE_ORDER: Record<string, number> = {
   winner: 0,
@@ -20,26 +13,30 @@ const TYPE_ORDER: Record<string, number> = {
   prop: 4,
 };
 
-export function EventMarketsAccordion({
+export async function EventMarketsAccordion({
   events,
 }: {
   events: EventMarketsGroup[];
 }) {
+  const t = await getTranslations("markets");
+  const tWeight = await getTranslations("weight");
+  const locale = await getLocale();
+  const dateFmt = locale === "ru" ? "ru-RU" : "en-US";
+
   if (events.length === 0) {
     return (
       <div className="rounded-md border border-dashed border-foreground/15 bg-background-elevated/20 px-6 py-16 text-center">
         <p className="font-display text-2xl uppercase tracking-tight text-foreground">
-          No open markets
+          {t("noOpenMarkets")}
         </p>
         <p className="mx-auto mt-3 max-w-md font-sans text-sm text-foreground-muted">
-          New markets get generated automatically when the UFC schedules upcoming
-          bouts. Check back when the next card is announced.
+          {t("noOpenMarketsHint")}
         </p>
         <Link
           href="/events"
           className="mt-6 inline-block rounded-sm border border-foreground/15 px-4 py-2 font-sans text-sm text-foreground-muted hover:bg-foreground/[0.05] hover:text-foreground"
         >
-          Browse upcoming events →
+          {t("browseUpcoming")} →
         </Link>
       </div>
     );
@@ -67,26 +64,43 @@ export function EventMarketsAccordion({
             </div>
             <div className="shrink-0 text-right font-mono text-[11px] tabular text-foreground-subtle">
               <span>
-                {new Date(event.event_date).toLocaleDateString("en-US", {
+                {new Date(event.event_date).toLocaleDateString(dateFmt, {
                   month: "short",
                   day: "numeric",
                   year: "numeric",
                 })}
               </span>
               <span className="mx-2">·</span>
-              <span>
-                {event.bouts.length} bout
-                {event.bouts.length === 1 ? "" : "s"}
-              </span>
+              <span>{t("boutCount", { count: event.bouts.length })}</span>
               <span className="mx-2">·</span>
-              <span>{event.total_markets} markets</span>
+              <span>{t("marketCount", { count: event.total_markets })}</span>
             </div>
           </summary>
 
           <div className="flex flex-col gap-4 border-t border-foreground/10 px-4 py-4">
-            {event.bouts.map((bout) => (
-              <BoutMarketsBlock key={bout.bout_id} bout={bout} />
-            ))}
+            {event.bouts.map((bout) => {
+              const tag = bout.is_main_event
+                ? t("main")
+                : bout.is_co_main_event
+                  ? t("coMain")
+                  : null;
+              const weight = tWeight.has(bout.weight_class)
+                ? tWeight(bout.weight_class)
+                : bout.weight_class.replace(/_/g, " ");
+              return (
+                <BoutMarketsBlock
+                  key={bout.bout_id}
+                  bout={bout}
+                  tag={tag}
+                  weight={weight}
+                  titleLabel={t("title")}
+                  typeLabel={(type) =>
+                    t.has(`type_${type}`) ? t(`type_${type}`) : type
+                  }
+                  noOutcomesLabel={t("noOutcomes")}
+                />
+              );
+            })}
           </div>
         </details>
       ))}
@@ -96,18 +110,23 @@ export function EventMarketsAccordion({
 
 function BoutMarketsBlock({
   bout,
+  tag,
+  weight,
+  titleLabel,
+  typeLabel,
+  noOutcomesLabel,
 }: {
   bout: EventMarketsGroup["bouts"][number];
+  tag: string | null;
+  weight: string;
+  titleLabel: string;
+  typeLabel: (type: string) => string;
+  noOutcomesLabel: string;
 }) {
   const ordered = [...bout.markets].sort(
     (a, b) =>
       (TYPE_ORDER[a.type] ?? 99) - (TYPE_ORDER[b.type] ?? 99),
   );
-  const tag = bout.is_main_event
-    ? "Main"
-    : bout.is_co_main_event
-      ? "Co-main"
-      : null;
   return (
     <div>
       <div className="mb-2 flex items-baseline justify-between gap-3">
@@ -118,8 +137,8 @@ function BoutMarketsBlock({
         </h4>
         <p className="shrink-0 font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
           {tag ? `${tag} · ` : ""}
-          {bout.weight_class.replace(/_/g, " ")}
-          {bout.is_title_fight ? " · Title" : ""}
+          {weight}
+          {bout.is_title_fight ? ` · ${titleLabel}` : ""}
         </p>
       </div>
       <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -132,9 +151,12 @@ function BoutMarketsBlock({
             >
               <div className="min-w-0 flex-1">
                 <p className="font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
-                  {TYPE_LABEL[m.type] ?? m.type}
+                  {typeLabel(m.type)}
                 </p>
-                <TopOutcomePreview outcomes={m.outcomes} />
+                <TopOutcomePreview
+                  outcomes={m.outcomes}
+                  noOutcomesLabel={noOutcomesLabel}
+                />
               </div>
             </Link>
           </li>
@@ -146,17 +168,19 @@ function BoutMarketsBlock({
 
 function TopOutcomePreview({
   outcomes,
+  noOutcomesLabel,
 }: {
   outcomes: Array<{
     label: string;
     order_index: number;
     current_price: number;
   }>;
+  noOutcomesLabel: string;
 }) {
   if (!outcomes || outcomes.length === 0) {
     return (
       <p className="mt-1 font-sans text-xs text-foreground-subtle">
-        No outcomes
+        {noOutcomesLabel}
       </p>
     );
   }

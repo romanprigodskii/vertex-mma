@@ -1,15 +1,8 @@
-import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 
+import { Link } from "@/i18n/navigation";
 import { priceToDecimalOdds } from "@/lib/lmsr";
 import type { MarketCardOutcome, MarketListItem } from "@/lib/markets";
-
-const TYPE_LABEL: Record<string, string> = {
-  winner: "Winner",
-  method: "Method",
-  round: "Round",
-  distance: "Distance",
-  prop: "Prop",
-};
 
 function lastName(full: string): string {
   const parts = full.trim().split(/\s+/);
@@ -22,7 +15,11 @@ function truncate(s: string, max: number): string {
 
 const METHOD_SHORT = ["KO", "Sub", "Dec"];
 
-export function MarketCard({ market }: { market: MarketListItem }) {
+export async function MarketCard({ market }: { market: MarketListItem }) {
+  const t = await getTranslations("markets");
+  const typeLabel = t.has(`type_${market.type}`)
+    ? t(`type_${market.type}`)
+    : market.type;
   return (
     <Link
       href={`/markets/${market.id}`}
@@ -34,7 +31,7 @@ export function MarketCard({ market }: { market: MarketListItem }) {
           {market.event_name}
         </p>
         <span className="shrink-0 rounded-sm border border-foreground/15 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-foreground-muted">
-          {TYPE_LABEL[market.type] ?? market.type}
+          {typeLabel}
         </span>
       </div>
       <h3 className="mt-2 font-display text-lg uppercase tracking-tight text-foreground">
@@ -43,18 +40,27 @@ export function MarketCard({ market }: { market: MarketListItem }) {
         {market.fighter_b_name}
       </h3>
 
-      <MarketBody market={market} />
+      <MarketBody market={market} favoriteLabel={t("favorite")} plusMore={(n) => t("plusMore", { n })} />
 
       <p className="mt-3 font-mono text-[10px] tabular text-foreground-subtle">
-        Vol {market.total_volume.toLocaleString()} ·{" "}
-        {market.unique_traders} trader
-        {market.unique_traders === 1 ? "" : "s"}
+        {t("volTraders", {
+          vol: market.total_volume.toLocaleString(),
+          count: market.unique_traders,
+        })}
       </p>
     </Link>
   );
 }
 
-function MarketBody({ market }: { market: MarketListItem }) {
+function MarketBody({
+  market,
+  favoriteLabel,
+  plusMore,
+}: {
+  market: MarketListItem;
+  favoriteLabel: string;
+  plusMore: (n: number) => string;
+}) {
   if (market.type === "method") {
     const aOutcomes = market.outcomes.filter((o) => o.order_index < 3);
     const bOutcomes = market.outcomes.filter((o) => o.order_index >= 3);
@@ -66,7 +72,13 @@ function MarketBody({ market }: { market: MarketListItem }) {
     );
   }
   if (market.type === "round") {
-    return <RoundCompact outcomes={market.outcomes} />;
+    return (
+      <RoundCompact
+        outcomes={market.outcomes}
+        favoriteLabel={favoriteLabel}
+        plusMore={plusMore}
+      />
+    );
   }
   if (market.type === "distance" || market.type === "prop") {
     return <BinaryCompact outcomes={market.outcomes} />;
@@ -159,7 +171,15 @@ function BinaryCompact({ outcomes }: { outcomes: MarketCardOutcome[] }) {
   );
 }
 
-function RoundCompact({ outcomes }: { outcomes: MarketCardOutcome[] }) {
+function RoundCompact({
+  outcomes,
+  favoriteLabel,
+  plusMore,
+}: {
+  outcomes: MarketCardOutcome[];
+  favoriteLabel: string;
+  plusMore: (n: number) => string;
+}) {
   if (outcomes.length === 0) return null;
   const top = [...outcomes].sort(
     (a, b) => b.current_price - a.current_price,
@@ -167,7 +187,7 @@ function RoundCompact({ outcomes }: { outcomes: MarketCardOutcome[] }) {
   return (
     <div className="mt-3 rounded-sm bg-foreground/[0.04] px-2 py-1.5">
       <p className="font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
-        Favorite · {top.label}
+        {favoriteLabel} · {top.label}
       </p>
       <p className="font-display text-base tabular text-foreground">
         {(top.current_price * 100).toFixed(0)}%
@@ -175,7 +195,7 @@ function RoundCompact({ outcomes }: { outcomes: MarketCardOutcome[] }) {
           {priceToDecimalOdds(top.current_price)}x
         </span>
         <span className="ml-2 font-mono text-[10px] text-foreground-subtle">
-          +{outcomes.length - 1} more
+          {plusMore(outcomes.length - 1)}
         </span>
       </p>
     </div>
