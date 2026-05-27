@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Image from "next/image";
+import { useTranslations } from "next-intl";
 
 import { postCommentAction } from "@/app/[locale]/news/[id]/actions";
 import type { CommentAuthorSnapshot } from "@/lib/news-comments";
@@ -89,6 +90,7 @@ export function CommentComposer({
   autoFocus,
   compact,
 }: CommentComposerProps) {
+  const t = useTranslations("news");
   const [body, setBody] = React.useState("");
   const [submitting, setSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -122,7 +124,7 @@ export function CommentComposer({
       setBody("");
       onCancel?.();
     } catch {
-      setError("Couldn't post. Try again.");
+      setError(t("couldntPost"));
     } finally {
       setSubmitting(false);
     }
@@ -142,9 +144,7 @@ export function CommentComposer({
           ref={textareaRef}
           value={body}
           onChange={(e) => setBody(e.target.value.slice(0, MAX_LEN))}
-          placeholder={
-            parentId ? "Write a reply…" : "Add to the conversation…"
-          }
+          placeholder={parentId ? t("writeReply") : t("addToConversation")}
           rows={compact ? 2 : 3}
           className="w-full resize-y rounded-md border border-foreground/15 bg-background-base px-3 py-2 font-sans text-sm text-foreground outline-none focus:border-primary/60"
           disabled={submitting}
@@ -155,8 +155,8 @@ export function CommentComposer({
         <div className="flex items-center justify-between gap-3">
           <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-foreground-subtle">
             {remaining < 100
-              ? `${remaining} chars left`
-              : "Be civil · Markdown not yet"}
+              ? t("charsLeft", { n: remaining })
+              : t("beCivil")}
           </span>
           <div className="flex gap-2">
             {onCancel ? (
@@ -166,7 +166,7 @@ export function CommentComposer({
                 disabled={submitting}
                 className="rounded-sm border border-foreground/15 px-3 py-1.5 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-foreground-muted transition-colors hover:border-foreground/30 hover:text-foreground disabled:opacity-50"
               >
-                Cancel
+                {t("cancel")}
               </button>
             ) : null}
             <button
@@ -174,7 +174,11 @@ export function CommentComposer({
               disabled={!canSubmit}
               className="rounded-sm bg-primary px-3.5 py-1.5 font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-primary-foreground transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {submitting ? "Posting…" : parentId ? "Reply" : "Post"}
+              {submitting
+                ? t("posting")
+                : parentId
+                  ? t("replyAction")
+                  : t("postComment")}
             </button>
           </div>
         </div>

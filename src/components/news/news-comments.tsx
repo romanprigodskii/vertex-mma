@@ -1,13 +1,16 @@
-import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 
 import { CommentComposer } from "@/components/news/news-comment-composer";
 import { CommentItem } from "@/components/news/news-comment-item";
+import { Link } from "@/i18n/navigation";
 import {
   getCommentAuthor,
   listCommentsForNews,
 } from "@/lib/news-comments";
 
 export async function NewsComments({ newsItemId }: { newsItemId: string }) {
+  const t = await getTranslations("news");
+  const tNav = await getTranslations("nav");
   const [{ comments, total }, currentUser] = await Promise.all([
     listCommentsForNews(newsItemId),
     getCommentAuthor(),
@@ -17,7 +20,7 @@ export async function NewsComments({ newsItemId }: { newsItemId: string }) {
     <section className="mt-14 border-t border-foreground/10 pt-8">
       <div className="mb-5 flex items-baseline justify-between gap-4">
         <h3 className="font-display text-2xl uppercase tracking-tight text-foreground">
-          Comments{" "}
+          {t("comments")}{" "}
           <span className="ml-1 font-mono text-xs tracking-wider text-foreground-subtle">
             · {total}
           </span>
@@ -38,9 +41,9 @@ export async function NewsComments({ newsItemId }: { newsItemId: string }) {
               prefetch={false}
               className="text-primary hover:underline"
             >
-              Sign in
+              {tNav("signIn")}
             </Link>{" "}
-            to join the conversation.
+            {t("signInToJoinPrefix")}
           </p>
         </div>
       )}
@@ -48,7 +51,7 @@ export async function NewsComments({ newsItemId }: { newsItemId: string }) {
       <div className="mt-7 flex flex-col gap-6">
         {comments.length === 0 ? (
           <p className="rounded-md border border-dashed border-foreground/10 bg-background-elevated/20 px-4 py-10 text-center font-sans text-sm text-foreground-subtle">
-            No comments yet — be the first to weigh in.
+            {t("weighIn")}
           </p>
         ) : (
           comments.map((comment) => (

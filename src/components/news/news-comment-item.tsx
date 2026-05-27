@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useLocale, useTranslations } from "next-intl";
 import { ArrowBigUp, ArrowBigDown, MoreHorizontal } from "lucide-react";
 
 import { deleteCommentAction } from "@/app/[locale]/news/[id]/actions";
@@ -12,20 +13,27 @@ import {
 import type { CommentNode, CommentAuthorSnapshot } from "@/lib/news-comments";
 import { cn } from "@/lib/utils";
 
-function relativeTime(iso: string): string {
-  const then = new Date(iso).getTime();
-  const diffMs = Math.max(0, Date.now() - then);
-  const minutes = Math.round(diffMs / 60_000);
-  if (minutes < 1) return "just now";
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.round(hours / 24);
-  if (days < 7) return `${days}d ago`;
-  return new Date(iso).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-  });
+function useRelativeTime() {
+  const t = useTranslations("news");
+  const locale = useLocale();
+  return React.useCallback(
+    (iso: string): string => {
+      const then = new Date(iso).getTime();
+      const diffMs = Math.max(0, Date.now() - then);
+      const minutes = Math.round(diffMs / 60_000);
+      if (minutes < 1) return t("justNow");
+      if (minutes < 60) return t("minutesAgo", { n: minutes });
+      const hours = Math.round(minutes / 60);
+      if (hours < 24) return t("hoursAgo", { n: hours });
+      const days = Math.round(hours / 24);
+      if (days < 7) return t("daysAgo", { n: days });
+      return new Date(iso).toLocaleDateString(
+        locale === "ru" ? "ru-RU" : "en-US",
+        { month: "short", day: "numeric" },
+      );
+    },
+    [t, locale],
+  );
 }
 
 interface CommentItemProps {
@@ -43,6 +51,8 @@ export function CommentItem({
   currentAuthor,
   isReply = false,
 }: CommentItemProps) {
+  const t = useTranslations("news");
+  const relativeTime = useRelativeTime();
   const [replying, setReplying] = React.useState(false);
   const [deleted, setDeleted] = React.useState(false);
   const isOwner = currentAuthor?.userProfileId === comment.author.userProfileId;
@@ -77,14 +87,14 @@ export function CommentItem({
           <button
             type="button"
             className="inline-flex items-center gap-1 transition-colors hover:text-foreground"
-            aria-label="Upvote"
+            aria-label={t("upvote")}
           >
             <ArrowBigUp className="h-3.5 w-3.5" /> {comment.upvotes}
           </button>
           <button
             type="button"
             className="inline-flex items-center gap-1 transition-colors hover:text-foreground"
-            aria-label="Downvote"
+            aria-label={t("downvote")}
           >
             <ArrowBigDown className="h-3.5 w-3.5" /> {comment.downvotes}
           </button>
@@ -94,24 +104,24 @@ export function CommentItem({
               onClick={() => setReplying((v) => !v)}
               className="transition-colors hover:text-foreground"
             >
-              {replying ? "Cancel" : "Reply"}
+              {replying ? t("cancel") : t("replyAction")}
             </button>
           ) : null}
           {isOwner ? (
             <button
               type="button"
               onClick={async () => {
-                if (!confirm("Delete this comment?")) return;
+                if (!confirm(t("deleteConfirm"))) return;
                 const result = await deleteCommentAction({
                   commentId: comment.id,
                 });
                 if (result.ok) setDeleted(true);
               }}
               className="ml-auto inline-flex items-center transition-colors hover:text-foreground"
-              aria-label="More"
+              aria-label={t("deleteAction")}
             >
               <MoreHorizontal className="h-3.5 w-3.5" />
-              <span className="ml-1">Delete</span>
+              <span className="ml-1">{t("deleteAction")}</span>
             </button>
           ) : null}
         </div>
