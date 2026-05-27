@@ -1,24 +1,25 @@
 "use client";
 
 import * as React from "react";
+import { useTranslations } from "next-intl";
 import * as Popover from "@radix-ui/react-popover";
 import { Check, ChevronDown } from "lucide-react";
 
 import type { CatalogSort } from "@/lib/fighter-search";
 import { cn } from "@/lib/utils";
 
-const SORT_OPTIONS: Array<{ id: CatalogSort; label: string }> = [
-  { id: "vertex_current", label: "Vertex Score (current form)" },
-  { id: "vertex_all_time", label: "Vertex Score (all-time)" },
-  { id: "elite_first", label: "Top fighters now (legacy)" },
-  { id: "all_time", label: "All-time greats (legacy)" },
-  { id: "fights", label: "Most fights" },
-  { id: "recent", label: "Recently active" },
-  { id: "wins", label: "Most wins" },
-  { id: "winrate", label: "Highest win rate" },
-  { id: "champions_first", label: "Champions first" },
-  { id: "name_asc", label: "Name A–Z" },
-  { id: "name_desc", label: "Name Z–A" },
+const SORT_IDS: CatalogSort[] = [
+  "vertex_current",
+  "vertex_all_time",
+  "elite_first",
+  "all_time",
+  "fights",
+  "recent",
+  "wins",
+  "winrate",
+  "champions_first",
+  "name_asc",
+  "name_desc",
 ];
 
 interface SortDropdownProps {
@@ -28,15 +29,17 @@ interface SortDropdownProps {
 }
 
 export function SortDropdown({ value, onChange, className }: SortDropdownProps) {
+  const t = useTranslations("catalog");
   const [open, setOpen] = React.useState(false);
-  const current = SORT_OPTIONS.find((o) => o.id === value);
+  const labelFor = (id: CatalogSort): string => t(`sort_${id}` as "sort_fights");
+  const currentLabel = labelFor(value);
 
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
       <Popover.Trigger asChild>
         <button
           type="button"
-          aria-label="Sort fighters"
+          aria-label={t("sortAria")}
           className={cn(
             "inline-flex h-9 w-full min-w-[220px] items-center justify-between gap-2 rounded-md border border-border bg-background-base pl-3 pr-2 text-xs text-foreground",
             "hover:bg-foreground/[0.04]",
@@ -45,7 +48,7 @@ export function SortDropdown({ value, onChange, className }: SortDropdownProps) 
             className,
           )}
         >
-          <span className="truncate">{current?.label ?? "Sort by…"}</span>
+          <span className="truncate">{currentLabel ?? t("sortBy")}</span>
           <ChevronDown
             aria-hidden
             className={cn(
@@ -66,14 +69,14 @@ export function SortDropdown({ value, onChange, className }: SortDropdownProps) 
           )}
         >
           <ul className="flex flex-col">
-            {SORT_OPTIONS.map((opt) => {
-              const isSelected = opt.id === value;
+            {SORT_IDS.map((id) => {
+              const isSelected = id === value;
               return (
-                <li key={opt.id}>
+                <li key={id}>
                   <button
                     type="button"
                     onClick={() => {
-                      onChange(opt.id);
+                      onChange(id);
                       setOpen(false);
                     }}
                     className={cn(
@@ -83,7 +86,7 @@ export function SortDropdown({ value, onChange, className }: SortDropdownProps) 
                         : "text-foreground-muted hover:bg-foreground/[0.05] hover:text-foreground",
                     )}
                   >
-                    <span className="truncate">{opt.label}</span>
+                    <span className="truncate">{labelFor(id)}</span>
                     {isSelected ? (
                       <Check
                         aria-hidden

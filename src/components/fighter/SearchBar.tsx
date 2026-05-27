@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useTranslations } from "next-intl";
 import { Search, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -17,9 +18,12 @@ export function SearchBar({
   value,
   onChange,
   loading = false,
-  placeholder = "Search by name, nickname…",
+  placeholder,
   className,
 }: SearchBarProps) {
+  const t = useTranslations("catalog");
+  const tSearch = useTranslations("search");
+  const effectivePlaceholder = placeholder ?? t("searchPlaceholder");
   const inputRef = React.useRef<HTMLInputElement | null>(null);
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
@@ -54,7 +58,7 @@ export function SearchBar({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={handleKeyDown}
-        placeholder={placeholder}
+        placeholder={effectivePlaceholder}
         className={cn(
           "h-full w-full bg-transparent pl-10 pr-12 text-sm text-foreground",
           "placeholder:text-foreground-subtle",
@@ -62,14 +66,14 @@ export function SearchBar({
           "[&::-webkit-search-cancel-button]:hidden",
           "[&::-webkit-search-decoration]:hidden",
         )}
-        aria-label="Search fighters"
+        aria-label={t("searchAria")}
         autoComplete="off"
         spellCheck={false}
       />
       <div className="absolute right-2 flex items-center gap-1.5">
         {loading ? (
           <span
-            aria-label="Searching"
+            aria-label={tSearch("searching")}
             role="status"
             className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary"
           />
@@ -79,7 +83,7 @@ export function SearchBar({
             type="button"
             onClick={handleClear}
             className="inline-flex h-7 w-7 items-center justify-center rounded-md text-foreground-subtle hover:bg-background-elevated hover:text-foreground transition-colors"
-            aria-label="Clear search"
+            aria-label={t("clearSearch")}
           >
             <X className="h-3.5 w-3.5" />
           </button>

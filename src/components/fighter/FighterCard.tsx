@@ -1,8 +1,9 @@
-import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { ArrowLeftRight, ArrowRight, Crown, RotateCcw } from "lucide-react";
 
 import { BmfBadge } from "@/components/fighter/detail/BmfBadge";
 import { FighterAvatar } from "@/components/fighter/FighterAvatar";
+import { Link } from "@/i18n/navigation";
 import { WEIGHT_CLASSES } from "@/lib/constants";
 import { getCountryFlag } from "@/lib/fighter-helpers";
 import type { FighterCatalogRow } from "@/lib/fighter-search";
@@ -71,6 +72,8 @@ export function FighterCard({
   className,
   scoreMode = "current",
 }: FighterCardProps) {
+  const t = useTranslations("catalog");
+  const tWeight = useTranslations("weight");
   // Wave 14B.2: when the catalog query joined a divisional row (single-
   // weight filter), prefer the per-division score for "current"
   // classification. all_time always stays global. divisional_score is
@@ -98,9 +101,12 @@ export function FighterCard({
   // tier breaks (Apex 75+, Elite 55-74 etc.) are calibrated against [0, 100].
   const displayScore =
     rawScore == null ? null : Math.min(100, Math.max(0, rawScore));
-  const weightLabel = fighter.weight_class_primary
-    ? WEIGHT_LABELS[fighter.weight_class_primary] ?? null
-    : null;
+  const weightLabel = (() => {
+    if (!fighter.weight_class_primary) return null;
+    const key = fighter.weight_class_primary.replace(/-/g, "_");
+    if (tWeight.has(key)) return tWeight(key as "lightweight");
+    return WEIGHT_LABELS[fighter.weight_class_primary] ?? null;
+  })();
   const flag = getCountryFlag(fighter.country_code);
   const hasNickname = Boolean(fighter.nickname?.trim());
 
@@ -115,25 +121,33 @@ export function FighterCard({
     ? `${Math.round((wins / denominator) * 100)}%`
     : "—";
 
-  const stanceText = fighter.stance
-    ? fighter.stance[0].toUpperCase() + fighter.stance.slice(1)
-    : "Stance unknown";
+  const stanceText = (() => {
+    if (!fighter.stance) return t("stanceUnknown");
+    const key = `stance${fighter.stance[0].toUpperCase()}${fighter.stance.slice(1)}`;
+    if (t.has(key)) return t(key as "stanceOrthodox");
+    return fighter.stance[0].toUpperCase() + fighter.stance.slice(1);
+  })();
 
   const streakType = fighter.current_streak_type;
   const streakCount = fighter.current_streak_count ?? 0;
   const streakLabel =
     streakType && streakCount > 0
-      ? `${streakType}${streakCount} streak`
-      : "No streak";
+      ? streakType === "W"
+        ? t("winStreakBadge", { n: streakCount })
+        : t("lossStreakBadge", { n: streakCount })
+      : t("noStreak");
 
   const lastMethod = fighter.last_fight_method
     ? METHOD_LABELS[fighter.last_fight_method] ?? null
     : null;
   const lastFightLabel = fighter.last_fight_result
     ? lastMethod
-      ? `Last: ${fighter.last_fight_result} (${lastMethod})`
-      : `Last: ${fighter.last_fight_result}`
-    : "Last: —";
+      ? t("lastResultMethod", {
+          result: fighter.last_fight_result,
+          method: lastMethod,
+        })
+      : t("lastResult", { result: fighter.last_fight_result })
+    : t("lastEmpty");
 
   // Wave 6F: champions get a denser tier gradient (alpha boost + extended
   // stop) plus a subtle warm gold tint at the bottom 25% of the card —
@@ -173,11 +187,20 @@ export function FighterCard({
         "focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background-base",
         className,
       )}
-      aria-label={`${fighter.name_en}${
-        hasNickname ? ` (${fighter.nickname})` : ""
-      }, record ${record}, ${streakLabel}${
-        showTierBadge ? `, ${tierStyle.label} tier` : ""
-      }${championStyle.label ? `, ${championStyle.label}` : ""}`}
+      aria-label={
+        t("cardAriaBase", {
+          name: fighter.name_en,
+          record,
+          streak: streakLabel,
+        }) +
+        (hasNickname
+          ? t("cardAriaNickname", { nickname: fighter.nickname ?? "" })
+          : "") +
+        (showTierBadge ? t("cardAriaTier", { tier: tierStyle.label }) : "") +
+        (championStyle.label
+          ? t("cardAriaChampion", { champion: championStyle.label })
+          : "")
+      }
     >
       {/* Avatar (with optional crown / 2× champion overlays) */}
       <div className="relative shrink-0">
@@ -210,7 +233,7 @@ export function FighterCard({
         ) : null}
         {championStyle.hasCrown && classification.isDoubleChampion ? (
           <span
-            aria-label="Two-division champion"
+            aria-label={t("doubleChampionAria")}
             style={{
               color: championStyle.crownColor ?? championStyle.borderColor,
               borderColor:
@@ -262,7 +285,7 @@ export function FighterCard({
               ·
             </span>
             <span className="font-mono tabular">{fighter.bout_count}</span>
-            <span>fights</span>
+            <span>{t("fightsLabel")}</span>
           </p>
           <p className="flex items-center gap-1.5 truncate font-sans text-[11px] text-foreground-muted">
             <StanceIcon stance={fighter.stance} />
@@ -297,7 +320,7 @@ export function FighterCard({
         </span>
         {ncs > 0 ? (
           <span className="font-sans text-[10px] uppercase tracking-wider text-foreground-subtle">
-            · {ncs} NC
+            {t("ncSuffix", { n: ncs })}
           </span>
         ) : null}
       </div>
@@ -324,10 +347,10 @@ export function FighterCard({
           all_time mode and when the active catalog isn't divisional. */}
       {isProvisional ? (
         <span
-          aria-label="Provisional rating — fewer than 5 bouts in this division"
+          aria-label={t("provisionalAria")}
           className="pointer-events-none absolute bottom-12 right-4 select-none rounded-sm border border-foreground/15 bg-background-elevated/85 px-1.5 py-0.5 font-sans text-[9px] uppercase tracking-widest text-foreground-muted"
         >
-          Prov
+          {t("provisionalLabel")}
         </span>
       ) : null}
     </Link>

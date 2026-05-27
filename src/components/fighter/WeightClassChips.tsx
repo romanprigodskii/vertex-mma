@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import { WEIGHT_CLASSES } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
@@ -9,10 +11,15 @@ interface WeightClassChipsProps {
 }
 
 export function WeightClassChips({ selected, onToggle }: WeightClassChipsProps) {
+  const tWeight = useTranslations("weight");
   return (
     <div className="flex flex-wrap gap-1">
       {WEIGHT_CLASSES.map((wc) => {
         const isActive = selected.includes(wc.id);
+        const key = wc.id.replace(/-/g, "_");
+        const label = tWeight.has(key)
+          ? tWeight(key as "lightweight")
+          : wc.label;
         return (
           <button
             key={wc.id}
@@ -26,7 +33,7 @@ export function WeightClassChips({ selected, onToggle }: WeightClassChipsProps) 
                 : "border-foreground/10 bg-transparent text-foreground-muted hover:border-foreground/30 hover:text-foreground",
             )}
           >
-            <span className="truncate">{wc.label}</span>
+            <span className="truncate">{label}</span>
             <span
               className={cn(
                 "font-mono text-[9px]",

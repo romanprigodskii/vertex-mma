@@ -1,12 +1,17 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import { cn } from "@/lib/utils";
 
-const STANCES: Array<{ id: string; label: string }> = [
-  { id: "orthodox", label: "Orthodox" },
-  { id: "southpaw", label: "Southpaw" },
-  { id: "switch", label: "Switch" },
-  { id: "unknown", label: "Unknown" },
+const STANCES: ReadonlyArray<{
+  id: string;
+  key: "stanceOrthodox" | "stanceSouthpaw" | "stanceSwitch" | "stanceUnknownLabel";
+}> = [
+  { id: "orthodox", key: "stanceOrthodox" },
+  { id: "southpaw", key: "stanceSouthpaw" },
+  { id: "switch", key: "stanceSwitch" },
+  { id: "unknown", key: "stanceUnknownLabel" },
 ];
 
 interface StanceChipsProps {
@@ -15,6 +20,7 @@ interface StanceChipsProps {
 }
 
 export function StanceChips({ selected, onToggle }: StanceChipsProps) {
+  const t = useTranslations("catalog");
   return (
     <div className="flex flex-wrap gap-1">
       {STANCES.map((s) => {
@@ -32,7 +38,7 @@ export function StanceChips({ selected, onToggle }: StanceChipsProps) {
                 : "border-foreground/10 bg-transparent text-foreground-muted hover:border-foreground/30 hover:text-foreground",
             )}
           >
-            {s.label}
+            {t(s.key)}
           </button>
         );
       })}

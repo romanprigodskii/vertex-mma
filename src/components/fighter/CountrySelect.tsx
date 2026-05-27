@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useTranslations } from "next-intl";
 import { Check, Search } from "lucide-react";
 
 import { getCountryFlag } from "@/lib/fighter-helpers";
@@ -21,6 +22,7 @@ export function CountrySelect({
   onToggle,
   topN = 12,
 }: CountrySelectProps) {
+  const t = useTranslations("catalog");
   const [query, setQuery] = React.useState("");
   const [expanded, setExpanded] = React.useState(false);
 
@@ -50,20 +52,20 @@ export function CountrySelect({
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Find country…"
+          placeholder={t("findCountry")}
           className={cn(
             "h-7 w-full rounded-sm border border-foreground/10 bg-background-base pl-7 pr-2 text-[11px] text-foreground",
             "placeholder:text-foreground-subtle",
             "focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/40",
             "transition-colors",
           )}
-          aria-label="Search countries"
+          aria-label={t("searchCountriesAria")}
         />
       </div>
 
       <ul className="max-h-64 space-y-0.5 overflow-y-auto pr-1">
         {visibleCountries.length === 0 ? (
-          <li className="px-1 py-2 text-xs text-foreground-subtle">No match</li>
+          <li className="px-1 py-2 text-xs text-foreground-subtle">{t("noMatch")}</li>
         ) : (
           visibleCountries.map((c) => {
             const isActive = selected.includes(c.code);
@@ -114,8 +116,8 @@ export function CountrySelect({
           className="text-xs text-foreground-muted hover:text-foreground transition-colors"
         >
           {expanded
-            ? "Show less"
-            : `Show all ${countries.length} countries`}
+            ? t("showLess")
+            : t("showAllN", { n: countries.length })}
         </button>
       ) : null}
     </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useTranslations } from "next-intl";
 import { ChevronDown, X } from "lucide-react";
 
 import { CountrySelect } from "@/components/fighter/CountrySelect";
@@ -153,6 +154,7 @@ export function FilterSidebar({
   dense = false,
   className,
 }: FilterSidebarProps) {
+  const t = useTranslations("catalog");
   const toggleInArray = React.useCallback(
     (key: "weight" | "country" | "stance", id: string) => {
       const current = filters[key];
@@ -198,27 +200,27 @@ export function FilterSidebar({
               className="h-6 px-1.5 text-[11px] uppercase tracking-wider"
             >
               <X className="h-3 w-3" />
-              Clear
+              {t("clearShort")}
             </Button>
           ) : null}
         </div>
       ) : null}
 
-      <Section title="Weight class">
+      <Section title={t("weightClass")}>
         <WeightClassChips
           selected={filters.weight}
           onToggle={(id) => toggleInArray("weight", id)}
         />
       </Section>
 
-      <Section title="Gender">
+      <Section title={t("filterGender")}>
         <GenderToggle
           value={filters.gender}
           onChange={(gender) => onChange({ gender })}
         />
       </Section>
 
-      <Section title="Status">
+      <Section title={t("filterStatus")}>
         <StatusRadio
           value={
             filters.status as "all" | "active" | "inactive" | "retired"
@@ -227,21 +229,21 @@ export function FilterSidebar({
         />
       </Section>
 
-      <Section title="Tier">
+      <Section title={t("filterTier")}>
         <TierRadio
           value={filters.tier}
           onChange={(tier) => onChange({ tier })}
         />
       </Section>
 
-      <Section title="Champion">
+      <Section title={t("filterChampion")}>
         <ChampionRadio
           value={filters.champion}
           onChange={(champion) => onChange({ champion })}
         />
       </Section>
 
-      <Section title="Country">
+      <Section title={t("country")}>
         <CountrySelect
           countries={countries}
           selected={filters.country}
@@ -249,22 +251,22 @@ export function FilterSidebar({
         />
       </Section>
 
-      <Section title="Stance">
+      <Section title={t("stance")}>
         <StanceChips
           selected={filters.stance}
           onToggle={(id) => toggleInArray("stance", id)}
         />
       </Section>
 
-      <Section title="Special">
+      <Section title={t("filterSpecial")}>
         <div className="space-y-1">
           <ToggleRow
-            label="Has photo"
+            label={t("hasPhoto")}
             checked={filters.hasPhoto}
             onChange={(hasPhoto) => onChange({ hasPhoto })}
           />
           <ToggleRow
-            label="Hall of Fame"
+            label={t("hallOfFame")}
             checked={filters.hallOfFame}
             onChange={(hallOfFame) => onChange({ hallOfFame })}
           />

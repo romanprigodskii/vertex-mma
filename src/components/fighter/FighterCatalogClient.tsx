@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { AnimatePresence, motion } from "framer-motion";
 
 import { CatalogSkeleton } from "@/components/fighter/CatalogSkeleton";
@@ -91,6 +92,7 @@ export function FighterCatalogClient({
   countries,
   totalAll,
 }: FighterCatalogClientProps) {
+  const t = useTranslations("catalog");
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -159,7 +161,7 @@ export function FighterCatalogClient({
       })
       .catch((err: unknown) => {
         if ((err as Error).name === "AbortError") return;
-        setError("Could not load fighters. Try again.");
+        setError(t("loadError"));
       })
       .finally(() => {
         if (inflightKeyRef.current === key) {
@@ -267,14 +269,18 @@ export function FighterCatalogClient({
             />
           </div>
           <p className="hidden sm:block whitespace-nowrap font-sans text-xs text-foreground-muted">
-            Showing{" "}
-            <span className="font-mono tabular text-foreground">
-              {formatNumber(fighters.length)}
-            </span>{" "}
-            of{" "}
-            <span className="font-mono tabular text-foreground">
-              {formatNumber(total)}
-            </span>
+            {t.rich("showingOf", {
+              shown: () => (
+                <span className="font-mono tabular text-foreground">
+                  {formatNumber(fighters.length)}
+                </span>
+              ),
+              total: () => (
+                <span className="font-mono tabular text-foreground">
+                  {formatNumber(total)}
+                </span>
+              ),
+            }) as React.ReactNode}
           </p>
           <div className="ml-auto flex items-center gap-2">
             <div className="hidden w-48 lg:block">
@@ -296,13 +302,13 @@ export function FighterCatalogClient({
         </div>
         {activeCount > 0 ? (
           <p className="mt-2 font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
-            {activeCount} filter{activeCount === 1 ? "" : "s"} active ·{" "}
+            {t("filtersActive", { n: activeCount })} ·{" "}
             <button
               type="button"
               onClick={onClear}
               className="text-primary hover:underline"
             >
-              clear all
+              {t("clearAll")}
             </button>
           </p>
         ) : null}
@@ -334,16 +340,21 @@ export function FighterCatalogClient({
           {/* Roster header above the catalog list. */}
           <div className="mb-3 mt-2 flex items-baseline justify-between gap-3 border-b border-foreground/10 px-1 pb-3 sm:mt-4 sm:px-2">
             <p className="font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
-              Roster
+              {t("roster")}
             </p>
             <p className="font-sans text-[11px] uppercase tracking-widest text-foreground-subtle">
-              <span className="font-mono tabular text-foreground">
-                {formatNumber(total)}
-              </span>{" "}
-              of{" "}
-              <span className="font-mono tabular">
-                {formatNumber(totalAll)}
-              </span>
+              {t.rich("rosterCounts", {
+                total: () => (
+                  <span className="font-mono tabular text-foreground">
+                    {formatNumber(total)}
+                  </span>
+                ),
+                totalAll: () => (
+                  <span className="font-mono tabular">
+                    {formatNumber(totalAll)}
+                  </span>
+                ),
+              }) as React.ReactNode}
             </p>
           </div>
 
@@ -386,8 +397,10 @@ export function FighterCatalogClient({
 
               <div className="mt-10 flex flex-col items-center gap-3 text-center">
                 <p className="font-mono text-[10px] uppercase tracking-widest text-foreground-subtle tabular">
-                  Loaded {formatNumber(fighters.length)} of{" "}
-                  {formatNumber(total)}
+                  {t("loadedOf", {
+                    shown: formatNumber(fighters.length),
+                    total: formatNumber(total),
+                  })}
                 </p>
                 {hasMore ? (
                   <Button
@@ -396,11 +409,11 @@ export function FighterCatalogClient({
                     onClick={loadMore}
                     loading={loadingMore}
                   >
-                    Load more
+                    {t("loadMore")}
                   </Button>
                 ) : fighters.length > 0 ? (
                   <p className="text-xs text-foreground-subtle">
-                    End of results
+                    {t("endOfResults")}
                   </p>
                 ) : null}
                 <div ref={sentinelRef} aria-hidden className="h-1 w-full" />

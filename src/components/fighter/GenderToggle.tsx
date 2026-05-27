@@ -1,12 +1,17 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import type { CatalogGenderFilter } from "@/lib/fighter-search";
 import { cn } from "@/lib/utils";
 
-const OPTIONS: Array<{ id: CatalogGenderFilter; label: string }> = [
-  { id: "all", label: "All" },
-  { id: "male", label: "Men" },
-  { id: "female", label: "Women" },
+const OPTIONS: ReadonlyArray<{
+  id: CatalogGenderFilter;
+  key: "anyGender" | "men" | "women";
+}> = [
+  { id: "all", key: "anyGender" },
+  { id: "male", key: "men" },
+  { id: "female", key: "women" },
 ];
 
 interface GenderToggleProps {
@@ -15,10 +20,11 @@ interface GenderToggleProps {
 }
 
 export function GenderToggle({ value, onChange }: GenderToggleProps) {
+  const t = useTranslations("catalog");
   return (
     <div
       role="radiogroup"
-      aria-label="Gender"
+      aria-label={t("filterGender")}
       className="grid grid-cols-3 gap-1"
     >
       {OPTIONS.map((opt) => {
@@ -37,7 +43,7 @@ export function GenderToggle({ value, onChange }: GenderToggleProps) {
                 : "border-foreground/10 bg-transparent text-foreground-muted hover:border-foreground/30 hover:text-foreground",
             )}
           >
-            {opt.label}
+            {t(opt.key)}
           </button>
         );
       })}

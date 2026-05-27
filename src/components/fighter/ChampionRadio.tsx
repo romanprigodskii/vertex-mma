@@ -1,18 +1,24 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import type { CatalogChampionFilter } from "@/lib/fighter-search";
 import { cn } from "@/lib/utils";
 
-// `any` (the catch-all "any champion sub-tier") is intentionally absent —
-// it's reachable only via URL ?champion=any. UI users hit Active /
-// Dominant / Former separately so the displayed result count matches a
-// single sub-tier instead of a union.
-const CHAMPIONS: Array<{ id: CatalogChampionFilter; label: string }> = [
-  { id: "all", label: "All" },
-  { id: "active", label: "Active" },
-  { id: "dominant", label: "Dominant" },
-  { id: "former", label: "Former" },
-  { id: "none", label: "None" },
+const CHAMPIONS: ReadonlyArray<{
+  id: CatalogChampionFilter;
+  key:
+    | "championAll"
+    | "statusActive"
+    | "championDominant"
+    | "championFormer"
+    | "championNone";
+}> = [
+  { id: "all", key: "championAll" },
+  { id: "active", key: "statusActive" },
+  { id: "dominant", key: "championDominant" },
+  { id: "former", key: "championFormer" },
+  { id: "none", key: "championNone" },
 ];
 
 interface ChampionRadioProps {
@@ -21,10 +27,11 @@ interface ChampionRadioProps {
 }
 
 export function ChampionRadio({ value, onChange }: ChampionRadioProps) {
+  const t = useTranslations("catalog");
   return (
     <div
       role="radiogroup"
-      aria-label="Champion status"
+      aria-label={t("filterChampion")}
       className="grid grid-cols-2 gap-1"
     >
       {CHAMPIONS.map((c) => {
@@ -43,7 +50,7 @@ export function ChampionRadio({ value, onChange }: ChampionRadioProps) {
                 : "border-foreground/10 bg-transparent text-foreground-muted hover:border-foreground/30 hover:text-foreground",
             )}
           >
-            {c.label}
+            {t(c.key)}
           </button>
         );
       })}

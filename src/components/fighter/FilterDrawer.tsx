@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useTranslations } from "next-intl";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { SlidersHorizontal, X } from "lucide-react";
 
@@ -41,6 +42,7 @@ export function FilterDrawer({
   resultCount,
   triggerClassName,
 }: FilterDrawerProps) {
+  const t = useTranslations("catalog");
   const [open, setOpen] = React.useState(false);
   const count = activeFilterCount(filters);
 
@@ -57,7 +59,7 @@ export function FilterDrawer({
           )}
         >
           <SlidersHorizontal className="h-4 w-4 text-foreground-muted" />
-          Filters
+          {t("filters")}
           {count > 0 ? (
             <span className="ml-1 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-primary px-1.5 font-mono text-[10px] text-primary-foreground">
               {count}
@@ -85,11 +87,11 @@ export function FilterDrawer({
         >
           <header className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
             <DialogPrimitive.Title className="font-display text-xl uppercase tracking-wide text-foreground">
-              Filters
+              {t("filters")}
             </DialogPrimitive.Title>
             <DialogPrimitive.Close
               className="inline-flex h-8 w-8 items-center justify-center rounded-md text-foreground-muted hover:bg-background-elevated hover:text-foreground transition-colors"
-              aria-label="Close filters"
+              aria-label={t("closeFilters")}
             >
               <X className="h-4 w-4" />
             </DialogPrimitive.Close>
@@ -113,7 +115,7 @@ export function FilterDrawer({
               disabled={count === 0}
               className="flex-1"
             >
-              Reset
+              {t("reset")}
             </Button>
             <Button
               size="sm"
@@ -121,8 +123,8 @@ export function FilterDrawer({
               className="flex-1"
             >
               {resultCount
-                ? `Show ${formatNumber(resultCount.shown)}`
-                : "Apply"}
+                ? t("showN", { n: formatNumber(resultCount.shown) })
+                : t("apply")}
             </Button>
           </footer>
         </DialogPrimitive.Content>
