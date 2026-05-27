@@ -244,41 +244,49 @@
      tinted chip (light bg + dark text) so it still reads next to plain
      text. The card-gradient alpha is dialed way down because the same
      value that was a hint against black becomes a wash against white. */
+  /* Tier gradients in light: keep hues but push alpha to ~50-60% of dark
+     so purple / blue / teal stay legibly different on a near-white card.
+     Sat is bumped slightly (chroma .22→.24 on apex) because high-luminance
+     surfaces eat saturation. */
   --tier-apex-badge-bg: oklch(0.94 0.05 295);
   --tier-apex-badge-text: oklch(0.4 0.18 295);
   --tier-apex-badge-border: oklch(0.65 0.18 295);
-  --tier-apex-gradient-from: oklch(0.5 0.22 295 / 0.07);
-  --tier-apex-gradient-from-champion: oklch(0.5 0.22 295 / 0.154);
-  --tier-apex-gradient-to: oklch(0.5 0.22 295 / 0);
+  --tier-apex-gradient-from: oklch(0.55 0.24 295 / 0.12);
+  --tier-apex-gradient-from-champion: oklch(0.55 0.24 295 / 0.26);
+  --tier-apex-gradient-to: oklch(0.55 0.24 295 / 0);
   --tier-apex-score: oklch(0.42 0.2 295);
 
   --tier-elite-badge-bg: oklch(0.93 0.04 235);
   --tier-elite-badge-text: oklch(0.4 0.16 235);
   --tier-elite-badge-border: oklch(0.6 0.16 235);
-  --tier-elite-gradient-from: oklch(0.5 0.18 235 / 0.06);
-  --tier-elite-gradient-from-champion: oklch(0.5 0.18 235 / 0.132);
-  --tier-elite-gradient-to: oklch(0.5 0.18 235 / 0);
+  --tier-elite-gradient-from: oklch(0.55 0.2 235 / 0.11);
+  --tier-elite-gradient-from-champion: oklch(0.55 0.2 235 / 0.24);
+  --tier-elite-gradient-to: oklch(0.55 0.2 235 / 0);
   --tier-elite-score: oklch(0.42 0.16 235);
 
   --tier-established-badge-bg: oklch(0.93 0.02 200);
   --tier-established-badge-text: oklch(0.4 0.06 200);
   --tier-established-badge-border: oklch(0.6 0.07 200);
-  --tier-established-gradient-from: oklch(0.55 0.08 200 / 0.05);
-  --tier-established-gradient-from-champion: oklch(0.55 0.08 200 / 0.11);
-  --tier-established-gradient-to: oklch(0.55 0.08 200 / 0);
+  --tier-established-gradient-from: oklch(0.6 0.1 200 / 0.09);
+  --tier-established-gradient-from-champion: oklch(0.6 0.1 200 / 0.2);
+  --tier-established-gradient-to: oklch(0.6 0.1 200 / 0);
   --tier-established-score: oklch(0.42 0.07 200);
 
   --tier-roster-badge-bg: oklch(0.94 0 0);
   --tier-roster-badge-text: oklch(0.4 0.02 240);
   --tier-roster-badge-border: oklch(0.75 0.02 240);
-  --tier-roster-gradient-from: oklch(0.5 0.02 240 / 0.04);
-  --tier-roster-gradient-from-champion: oklch(0.5 0.02 240 / 0.088);
-  --tier-roster-gradient-to: oklch(0.5 0.02 240 / 0);
+  --tier-roster-gradient-from: oklch(0.55 0.03 240 / 0.07);
+  --tier-roster-gradient-from-champion: oklch(0.55 0.03 240 / 0.15);
+  --tier-roster-gradient-to: oklch(0.55 0.03 240 / 0);
   --tier-roster-score: oklch(0.42 0.03 240);
 
   --fighter-card-unranked-bg: oklch(0.95 0.005 240);
-  --fighter-card-gold-tint-from: oklch(0.7 0.18 70 / 0.06);
-  --fighter-card-gold-tint-to: oklch(0.7 0.18 70 / 0);
+  /* Pull the champion gold tint toward pure yellow (hue 85 vs 70) and drop
+     the alpha — at 70°/0.06 over a purple-tinted card it reads as a pink
+     wash and collapses tier distinctions; 85°/0.04 reads as a soft warm
+     hint without pulling the hue. */
+  --fighter-card-gold-tint-from: oklch(0.85 0.16 85 / 0.04);
+  --fighter-card-gold-tint-to: oklch(0.85 0.16 85 / 0);
 
   /* Black-on-light shadows need way less alpha than white-on-dark. */
   --shadow-glow-primary: 0 0 18px oklch(0.68 0.17 70 / 0.32);
