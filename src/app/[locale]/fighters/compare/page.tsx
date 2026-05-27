@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import { ChevronLeft } from "lucide-react";
 
 import { CommonOpponents } from "@/components/compare/CommonOpponents";
@@ -20,6 +20,7 @@ import { TaleOfTheTape } from "@/components/compare/TaleOfTheTape";
 import { Container } from "@/components/layout/container";
 import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
+import { Link } from "@/i18n/navigation";
 import { CHAMPION_BY_SLUG } from "@/lib/champions";
 import {
   getCommonOpponents,
@@ -35,19 +36,26 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
-  title: "Compare fighters",
-  description:
-    "Side-by-side comparison of two UFC fighters — tale of the tape, striking and grappling stats, common opponents.",
-  openGraph: {
-    title: "Compare fighters · Vertex MMA",
-    description:
-      "Side-by-side comparison of two UFC fighters — tale of the tape, striking and grappling stats, common opponents.",
-    type: "website",
-  },
-};
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "compare" });
+  return {
+    title: t("metaTitle"),
+    description: t("metaDescription"),
+    openGraph: {
+      title: t("ogTitle"),
+      description: t("metaDescription"),
+      type: "website",
+    },
+  };
+}
 
 interface PageProps {
+  params: Promise<{ locale: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
@@ -60,10 +68,13 @@ function readSlug(
   return v ?? null;
 }
 
-export default async function ComparePage({ searchParams }: PageProps) {
-  const params = await searchParams;
-  const slugA = readSlug(params, "a");
-  const slugB = readSlug(params, "b");
+export default async function ComparePage({ params, searchParams }: PageProps) {
+  const { locale } = await params;
+  setRequestLocale(locale);
+  const t = await getTranslations("compare");
+  const sp = await searchParams;
+  const slugA = readSlug(sp, "a");
+  const slugB = readSlug(sp, "b");
 
   const [fighterA, fighterB] = await Promise.all([
     slugA ? getFighterBySlug(slugA) : Promise.resolve(null),
@@ -83,7 +94,7 @@ export default async function ComparePage({ searchParams }: PageProps) {
                 className="inline-flex items-center gap-1.5 font-sans text-sm text-foreground-muted transition-colors hover:text-primary"
               >
                 <ChevronLeft className="h-4 w-4" aria-hidden />
-                Back to roster
+                {t("backToRoster")}
               </Link>
             </Container>
           </div>
@@ -91,15 +102,13 @@ export default async function ComparePage({ searchParams }: PageProps) {
           <section className="border-b border-foreground/10">
             <Container size="xl" className="py-10 md:py-14">
               <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground-subtle">
-                Side-by-side
+                {t("kicker")}
               </p>
               <h1 className="mt-3 font-display uppercase tracking-tight text-foreground text-hero">
-                Compare fighters
+                {t("heading")}
               </h1>
               <p className="mt-4 max-w-xl font-sans text-sm text-foreground-muted">
-                Pick two UFC fighters and compare their tale of the tape,
-                striking and grappling output, finishing rates, and any common
-                opponents they share.
+                {t("lead")}
               </p>
             </Container>
           </section>
@@ -118,8 +127,10 @@ export default async function ComparePage({ searchParams }: PageProps) {
               />
               {(slugA && !fighterA) || (slugB && !fighterB) ? (
                 <p className="mt-6 text-center font-sans text-xs text-foreground-subtle">
-                  {slugA && !fighterA ? `"${slugA}" not in roster. ` : ""}
-                  {slugB && !fighterB ? `"${slugB}" not in roster.` : ""}
+                  {slugA && !fighterA
+                    ? t("notInRoster", { slug: slugA }) + " "
+                    : ""}
+                  {slugB && !fighterB ? t("notInRoster", { slug: slugB }) : ""}
                 </p>
               ) : null}
             </Container>
@@ -159,7 +170,7 @@ export default async function ComparePage({ searchParams }: PageProps) {
               className="inline-flex items-center gap-1.5 font-sans text-sm text-foreground-muted transition-colors hover:text-primary"
             >
               <ChevronLeft className="h-4 w-4" aria-hidden />
-              Back to roster
+              {t("backToRoster")}
             </Link>
           </Container>
         </div>
@@ -167,17 +178,13 @@ export default async function ComparePage({ searchParams }: PageProps) {
         <section className="pt-6 md:pt-8">
           <Container size="xl" className="mb-8 md:mb-12">
             <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground-subtle">
-              Side-by-side
+              {t("kicker")}
             </p>
             <h1 className="mt-2 font-display uppercase tracking-tight text-foreground text-h1">
-              Compare fighters
+              {t("heading")}
             </h1>
           </Container>
 
-          {/* Cinematic banner: spans the full viewport width so the photos
-              bleed edge-to-edge. The banner has its own top + bottom fade to
-              background, so it sits flush against the next section without a
-              visible seam. */}
           <CompareHero
             a={fighterA}
             b={fighterB}
@@ -187,15 +194,15 @@ export default async function ComparePage({ searchParams }: PageProps) {
         </section>
 
         <CompareSection
-          label="Tale of the tape"
-          explainer="Physical and career roll-up — leader for each measurable shown in green."
+          label={t("taleOfTheTape")}
+          explainer={t("taleOfTheTapeExplainer")}
         >
           <TaleOfTheTape a={fighterA} b={fighterB} />
         </CompareSection>
 
         <CompareSection
-          label="Attributes"
-          explainer="Six-attribute radar derived from striking, grappling, and finishing rates."
+          label={t("attributes")}
+          explainer={t("attributesExplainer")}
         >
           <div className="flex flex-col items-center gap-8">
             <OverlapRadar
@@ -210,8 +217,8 @@ export default async function ComparePage({ searchParams }: PageProps) {
         </CompareSection>
 
         <CompareSection
-          label="Score breakdown"
-          explainer="Vertex current-score components — leader per row in bold. Negative-weight rows reward smaller raw values."
+          label={t("scoreBreakdown")}
+          explainer={t("scoreBreakdownExplainer")}
         >
           <ScoreCompare
             fighterAName={fighterA.name_en}
@@ -226,8 +233,8 @@ export default async function ComparePage({ searchParams }: PageProps) {
         </CompareSection>
 
         <CompareSection
-          label="Recent form"
-          explainer="Last five completed UFC bouts — click any cell to open the bout detail."
+          label={t("recentForm")}
+          explainer={t("recentFormExplainer")}
         >
           <RecentForm
             fighterAName={fighterA.name_en}
@@ -238,32 +245,32 @@ export default async function ComparePage({ searchParams }: PageProps) {
         </CompareSection>
 
         <CompareSection
-          label="Striking"
-          explainer="Per-minute output, accuracy, and defense from UFCStats."
+          label={t("striking")}
+          explainer={t("strikingExplainer")}
         >
           <StrikingCompare a={fighterA} b={fighterB} />
         </CompareSection>
 
         <CompareSection
-          label="Grappling"
-          explainer="Takedown and submission rates per 15 minutes of fight time."
+          label={t("grappling")}
+          explainer={t("grapplingExplainer")}
         >
           <GrapplingCompare a={fighterA} b={fighterB} />
         </CompareSection>
 
         <CompareSection
-          label="Finishing"
-          explainer="UFC win breakdown — KO/TKO and submission counts and overall finish rate."
+          label={t("finishing")}
+          explainer={t("finishingExplainer")}
         >
           <FinishingCompare a={fighterA} b={fighterB} />
         </CompareSection>
 
         <CompareSection
-          label="Common opponents"
-          explainer="UFC fighters both have faced. Most recent meeting for each."
+          label={t("commonOpponents")}
+          explainer={t("commonOpponentsExplainer")}
           meta={
             common.length > 0
-              ? `${common.length} shared opponent${common.length === 1 ? "" : "s"}`
+              ? t("sharedCount", { n: common.length })
               : null
           }
         >
@@ -275,8 +282,8 @@ export default async function ComparePage({ searchParams }: PageProps) {
         </CompareSection>
 
         <CompareSection
-          label="Head-to-head"
-          explainer="UFC bouts where these two have faced each other directly."
+          label={t("headToHead")}
+          explainer={t("headToHeadExplainer")}
           className="pb-16 sm:pb-20"
         >
           <HeadToHead

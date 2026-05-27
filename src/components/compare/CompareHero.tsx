@@ -1,29 +1,16 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { motion, useReducedMotion } from "framer-motion";
 import { ChevronLeft, ChevronRight, Trophy } from "lucide-react";
 
 import { Container } from "@/components/layout/container";
+import { Link } from "@/i18n/navigation";
 import { type ChampionEntry } from "@/lib/champions";
 import type { FighterDetail } from "@/lib/fighter-detail";
 import { getCountryFlag } from "@/lib/fighter-helpers";
 import { cn } from "@/lib/utils";
-
-const WEIGHT_LABEL: Record<string, string> = {
-  strawweight: "Strawweight",
-  flyweight: "Flyweight",
-  bantamweight: "Bantamweight",
-  featherweight: "Featherweight",
-  lightweight: "Lightweight",
-  welterweight: "Welterweight",
-  middleweight: "Middleweight",
-  light_heavyweight: "Light Heavyweight",
-  heavyweight: "Heavyweight",
-  catchweight: "Catchweight",
-  openweight: "Openweight",
-};
 
 const PALETTE: readonly string[] = [
   "oklch(0.35 0.12 27)",
@@ -134,11 +121,15 @@ interface IdentityProps {
 }
 
 function FighterIdentity({ fighter, champion, align }: IdentityProps) {
+  const t = useTranslations("compare");
+  const tWeight = useTranslations("weight");
   const flag = getCountryFlag(fighter.country_code);
-  const weightLabel = fighter.weight_class_primary
-    ? WEIGHT_LABEL[fighter.weight_class_primary] ??
-      fighter.weight_class_primary
-    : null;
+  const weightLabel = (() => {
+    if (!fighter.weight_class_primary) return null;
+    const key = fighter.weight_class_primary.replace(/-/g, "_");
+    if (tWeight.has(key)) return tWeight(key as "lightweight");
+    return fighter.weight_class_primary;
+  })();
   const denom = fighter.wins_total + fighter.losses_total;
   const wr = denom > 0 ? Math.round((fighter.wins_total / denom) * 100) : null;
   const record =
@@ -159,10 +150,12 @@ function FighterIdentity({ fighter, champion, align }: IdentityProps) {
       {champion ? (
         <span
           className="inline-flex items-center gap-1.5 rounded-md border border-primary/45 bg-primary/15 px-2 py-1 font-sans text-[11px] uppercase tracking-[0.2em] text-primary backdrop-blur-sm"
-          aria-label={`${champion.division} champion`}
+          aria-label={t("championAria", { division: champion.division })}
         >
           <Trophy className="h-3 w-3" aria-hidden />
-          {champion.isInterim ? "Interim" : champion.divisionShort} · Champion
+          {champion.isInterim
+            ? t("interimChampion")
+            : t("champion", { division: champion.divisionShort })}
         </span>
       ) : null}
 
@@ -207,7 +200,7 @@ function FighterIdentity({ fighter, champion, align }: IdentityProps) {
         </span>
         {wr != null ? (
           <span className="font-sans text-sm text-foreground-muted">
-            {wr}% win rate
+            {t("winRate", { n: wr })}
           </span>
         ) : null}
       </div>
@@ -219,13 +212,13 @@ function FighterIdentity({ fighter, champion, align }: IdentityProps) {
       >
         {isLeft ? (
           <>
-            View profile
+            {t("viewProfile")}
             <ChevronRight className="h-3.5 w-3.5" aria-hidden />
           </>
         ) : (
           <>
             <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
-            View profile
+            {t("viewProfile")}
           </>
         )}
       </Link>
@@ -234,6 +227,7 @@ function FighterIdentity({ fighter, champion, align }: IdentityProps) {
 }
 
 function VsBlock() {
+  const t = useTranslations("compare");
   return (
     <span
       aria-hidden
@@ -245,7 +239,7 @@ function VsBlock() {
           "0 0 28px oklch(0.78 0.15 70 / 0.55), 0 6px 18px oklch(0 0 0 / 0.85)",
       }}
     >
-      VS
+      {t("vsBig")}
     </span>
   );
 }
@@ -260,6 +254,7 @@ function MobileBanner({
   champion: ChampionEntry | null;
   align: "left" | "right";
 }) {
+  const t = useTranslations("compare");
   const insetGlow =
     champion !== null
       ? "inset 0 0 60px 16px oklch(0.78 0.15 70 / 0.28)"
@@ -311,7 +306,9 @@ function MobileBanner({
         {champion ? (
           <span className="inline-flex items-center gap-1 rounded-md border border-primary/45 bg-primary/15 px-1.5 py-0.5 font-sans text-[9px] uppercase tracking-[0.2em] text-primary backdrop-blur-sm">
             <Trophy className="h-2.5 w-2.5" aria-hidden />
-            {champion.isInterim ? "Interim" : champion.divisionShort} · Champion
+            {champion.isInterim
+              ? t("interimChampion")
+              : t("champion", { division: champion.divisionShort })}
           </span>
         ) : null}
         <p
@@ -338,6 +335,7 @@ interface CompareHeroProps {
 }
 
 export function CompareHero({ a, b, championA, championB }: CompareHeroProps) {
+  const t = useTranslations("compare");
   const reduced = useReducedMotion();
   const photoIn = reduced
     ? { opacity: 1 }
@@ -357,7 +355,7 @@ export function CompareHero({ a, b, championA, championB }: CompareHeroProps) {
       {/* ============================================================
           Desktop / tablet — single cinematic banner */}
       <section
-        aria-label={`${a.name_en} versus ${b.name_en}`}
+        aria-label={t("heroAria", { a: a.name_en, b: b.name_en })}
         className="relative hidden h-[520px] w-full overflow-hidden sm:block md:h-[600px]"
       >
         <motion.div
@@ -458,7 +456,7 @@ export function CompareHero({ a, b, championA, championB }: CompareHeroProps) {
       {/* ============================================================
           Mobile — stacked photo banners with VS sandwiched between */}
       <section
-        aria-label={`${a.name_en} versus ${b.name_en}`}
+        aria-label={t("heroAria", { a: a.name_en, b: b.name_en })}
         className="flex flex-col items-center gap-3 px-4 sm:hidden"
       >
         <MobileBanner fighter={a} champion={championA} align="left" />
@@ -472,7 +470,7 @@ export function CompareHero({ a, b, championA, championB }: CompareHeroProps) {
               "0 0 18px oklch(0.78 0.15 70 / 0.55), 0 4px 12px oklch(0 0 0 / 0.85)",
           }}
         >
-          VS
+          {t("vsBig")}
         </span>
         <MobileBanner fighter={b} champion={championB} align="right" />
       </section>

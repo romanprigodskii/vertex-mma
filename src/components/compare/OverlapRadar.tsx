@@ -1,6 +1,7 @@
+import { useTranslations } from "next-intl";
+
 import {
   ATTRIBUTE_KEYS,
-  ATTRIBUTE_LABELS,
   type FighterAttributes,
 } from "@/lib/fighter-attributes";
 import { cn } from "@/lib/utils";
@@ -50,6 +51,7 @@ export function OverlapRadar({
   size = 420,
   className,
 }: OverlapRadarProps) {
+  const t = useTranslations("compare");
   const cx = size / 2;
   const cy = size / 2;
   const outerRadius = size / 2 - 80;
@@ -79,7 +81,7 @@ export function OverlapRadar({
     const [lx, ly] = pointAt(cx, cy, a, outerRadius + 38);
     return {
       key: k,
-      label: ATTRIBUTE_LABELS[k],
+      label: t(`attr_${k}` as "attr_striking"),
       x: lx,
       y: ly,
       anchor: textAnchorFor(a),
@@ -114,7 +116,7 @@ export function OverlapRadar({
         preserveAspectRatio="xMidYMid meet"
         className={cn("h-auto w-full max-w-[560px]", className)}
         role="img"
-        aria-label="Six-attribute radar comparison"
+        aria-label={t("radarAria")}
       >
         {gridPolys.map((poly, idx) => (
           <polygon

@@ -1,18 +1,19 @@
-import Link from "next/link";
+import { useTranslations } from "next-intl";
 
+import { Link } from "@/i18n/navigation";
 import type { CommonOpponentBout, CommonOpponentEntry } from "@/lib/compare-fighters";
 import { cn } from "@/lib/utils";
 
-const METHOD_SHORT: Record<string, string> = {
-  ko: "KO",
-  tko: "TKO",
-  submission: "Sub",
-  decision_unanimous: "U-Dec",
-  decision_split: "S-Dec",
-  decision_majority: "M-Dec",
-  draw: "Draw",
-  no_contest: "NC",
-  dq: "DQ",
+const METHOD_KEY: Record<string, string> = {
+  ko: "methodKo",
+  tko: "methodTko",
+  submission: "methodSub",
+  decision_unanimous: "methodUDec",
+  decision_split: "methodSDec",
+  decision_majority: "methodMDec",
+  draw: "methodDraw",
+  no_contest: "methodNc",
+  dq: "methodDq",
 };
 
 function formatRoundTime(sec: number | null): string {
@@ -40,10 +41,17 @@ function BoutLine({
   label: string;
   bout: CommonOpponentBout;
 }) {
-  const method = bout.method ? METHOD_SHORT[bout.method] ?? bout.method : null;
-  const t = formatRoundTime(bout.time_finished_seconds);
+  const tHistory = useTranslations("scoreHistory");
+  const tCompare = useTranslations("compare");
+  const method = (() => {
+    if (!bout.method) return null;
+    const key = METHOD_KEY[bout.method];
+    if (key) return tHistory(key as "methodKo");
+    return bout.method;
+  })();
+  const timeStr = formatRoundTime(bout.time_finished_seconds);
   const finishDetail = bout.round_finished
-    ? `R${bout.round_finished}${t ? ` · ${t}` : ""}`
+    ? `${tCompare("roundShort", { n: bout.round_finished })}${timeStr ? ` · ${timeStr}` : ""}`
     : null;
   return (
     <div className="grid grid-cols-[64px_auto_1fr] items-baseline gap-2 font-sans text-sm text-foreground-muted sm:grid-cols-[88px_auto_1fr] sm:gap-3">
@@ -91,11 +99,12 @@ export function CommonOpponents({
   fighterAName,
   fighterBName,
 }: CommonOpponentsProps) {
+  const t = useTranslations("compare");
   if (entries.length === 0) {
     return (
       <div className="rounded-md border border-dashed border-foreground/10 bg-background-elevated/30 px-6 py-10 text-center">
         <p className="font-sans text-base text-foreground-muted">
-          No common UFC opponents between {fighterAName} and {fighterBName}.
+          {t("noCommonBetween", { a: fighterAName, b: fighterBName })}
         </p>
       </div>
     );

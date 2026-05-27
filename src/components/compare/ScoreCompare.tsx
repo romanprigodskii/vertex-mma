@@ -1,3 +1,5 @@
+import { useTranslations } from "next-intl";
+
 import type { ScoreBreakdownData } from "@/lib/fighter-detail";
 import { cn } from "@/lib/utils";
 
@@ -27,10 +29,11 @@ export function ScoreCompare({
   vertexAllTimeA,
   vertexAllTimeB,
 }: ScoreCompareProps) {
+  const t = useTranslations("compare");
   if (!breakdownA && !breakdownB) {
     return (
       <p className="py-6 text-center font-sans text-sm text-foreground-muted">
-        Neither fighter has enough bouts for a score breakdown.
+        {t("noBreakdown")}
       </p>
     );
   }
@@ -49,18 +52,18 @@ export function ScoreCompare({
             {vertexA != null ? vertexA : vertexAllTimeA ?? "—"}
           </p>
           <p className="mt-0.5 font-sans text-[10px] uppercase tracking-widest text-foreground-subtle">
-            {vertexA != null ? "Current" : "All-time"}
+            {vertexA != null ? t("scoreModeCurrent") : t("scoreModeAllTime")}
           </p>
         </div>
         <p className="font-mono text-[11px] uppercase tracking-widest text-foreground-subtle">
-          Vertex
+          {t("vertexLabel")}
         </p>
         <div>
           <p className="font-display text-3xl tabular text-foreground sm:text-4xl">
             {vertexB != null ? vertexB : vertexAllTimeB ?? "—"}
           </p>
           <p className="mt-0.5 font-sans text-[10px] uppercase tracking-widest text-foreground-subtle">
-            {vertexB != null ? "Current" : "All-time"}
+            {vertexB != null ? t("scoreModeCurrent") : t("scoreModeAllTime")}
           </p>
         </div>
       </div>
@@ -73,7 +76,7 @@ export function ScoreCompare({
                 {labelA}
               </th>
               <th className="px-2 py-1.5 text-center font-sans text-[10px] font-medium uppercase tracking-widest">
-                Component
+                {t("componentLabel")}
               </th>
               <th className="w-[30%] px-2 py-1.5 text-left font-sans text-[10px] font-medium uppercase tracking-widest">
                 {labelB}

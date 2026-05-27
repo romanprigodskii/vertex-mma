@@ -1,7 +1,8 @@
+import { useTranslations } from "next-intl";
+
 import { StatCompareRow } from "@/components/compare/StatCompareRow";
 import {
   ATTRIBUTE_KEYS,
-  ATTRIBUTE_LABELS,
   type FighterAttributes,
 } from "@/lib/fighter-attributes";
 import type { FighterDetail } from "@/lib/fighter-detail";
@@ -12,10 +13,6 @@ function finishRate(f: FighterDetail): number | null {
   return (f.ufc_wins_ko + f.ufc_wins_sub) / total;
 }
 
-/**
- * Compact numeric companion to the OverlapRadar — same six attributes,
- * but as a table with leader arrows. Placed directly under the radar.
- */
 export function AttributesTable({
   attributesA,
   attributesB,
@@ -23,12 +20,13 @@ export function AttributesTable({
   attributesA: FighterAttributes;
   attributesB: FighterAttributes;
 }) {
+  const t = useTranslations("compare");
   return (
     <div className="mx-auto max-w-3xl">
       {ATTRIBUTE_KEYS.map((key) => (
         <StatCompareRow
           key={key}
-          label={ATTRIBUTE_LABELS[key]}
+          label={t(`attr_${key}` as "attr_striking")}
           valueA={attributesA[key]}
           valueB={attributesB[key]}
           format="integer"
@@ -40,10 +38,11 @@ export function AttributesTable({
 }
 
 export function StrikingCompare({ a, b }: { a: FighterDetail; b: FighterDetail }) {
+  const t = useTranslations("compare");
   return (
     <div className="mx-auto max-w-3xl">
       <StatCompareRow
-        label="Sig Str / min"
+        label={t("stat_slpm")}
         valueA={a.slpm}
         valueB={b.slpm}
         format="number"
@@ -51,26 +50,25 @@ export function StrikingCompare({ a, b }: { a: FighterDetail; b: FighterDetail }
         higherIsBetter
       />
       <StatCompareRow
-        label="Strike accuracy"
+        label={t("stat_strikeAcc")}
         valueA={a.str_acc}
         valueB={b.str_acc}
         format="percent"
         higherIsBetter
       />
       <StatCompareRow
-        label="Strike defense"
+        label={t("stat_strikeDef")}
         valueA={a.str_def}
         valueB={b.str_def}
         format="percent"
         higherIsBetter
       />
       <StatCompareRow
-        label="Sig Str absorbed / min"
+        label={t("stat_sapm")}
         valueA={a.sapm}
         valueB={b.sapm}
         format="number"
         decimals={2}
-        // Lower is better — less damage taken per minute.
         higherIsBetter={false}
       />
     </div>
@@ -78,10 +76,11 @@ export function StrikingCompare({ a, b }: { a: FighterDetail; b: FighterDetail }
 }
 
 export function GrapplingCompare({ a, b }: { a: FighterDetail; b: FighterDetail }) {
+  const t = useTranslations("compare");
   return (
     <div className="mx-auto max-w-3xl">
       <StatCompareRow
-        label="TD avg / 15min"
+        label={t("stat_tdAvg")}
         valueA={a.td_avg}
         valueB={b.td_avg}
         format="number"
@@ -89,21 +88,21 @@ export function GrapplingCompare({ a, b }: { a: FighterDetail; b: FighterDetail 
         higherIsBetter
       />
       <StatCompareRow
-        label="TD accuracy"
+        label={t("stat_tdAcc")}
         valueA={a.td_acc}
         valueB={b.td_acc}
         format="percent"
         higherIsBetter
       />
       <StatCompareRow
-        label="TD defense"
+        label={t("stat_tdDef")}
         valueA={a.td_def}
         valueB={b.td_def}
         format="percent"
         higherIsBetter
       />
       <StatCompareRow
-        label="Sub avg / 15min"
+        label={t("stat_subAvg")}
         valueA={a.sub_avg}
         valueB={b.sub_avg}
         format="number"
@@ -115,30 +114,31 @@ export function GrapplingCompare({ a, b }: { a: FighterDetail; b: FighterDetail 
 }
 
 export function FinishingCompare({ a, b }: { a: FighterDetail; b: FighterDetail }) {
+  const t = useTranslations("compare");
   return (
     <div className="mx-auto max-w-3xl">
       <StatCompareRow
-        label="KO/TKO wins"
+        label={t("stat_koWins")}
         valueA={a.ufc_wins_ko}
         valueB={b.ufc_wins_ko}
         format="integer"
         higherIsBetter
       />
       <StatCompareRow
-        label="Submission wins"
+        label={t("stat_subWins")}
         valueA={a.ufc_wins_sub}
         valueB={b.ufc_wins_sub}
         format="integer"
         higherIsBetter
       />
       <StatCompareRow
-        label="Decision wins"
+        label={t("stat_decWins")}
         valueA={a.ufc_wins_dec}
         valueB={b.ufc_wins_dec}
         format="integer"
       />
       <StatCompareRow
-        label="Finish rate"
+        label={t("stat_finishRate")}
         valueA={finishRate(a)}
         valueB={finishRate(b)}
         format="percent"
@@ -147,4 +147,3 @@ export function FinishingCompare({ a, b }: { a: FighterDetail; b: FighterDetail 
     </div>
   );
 }
-

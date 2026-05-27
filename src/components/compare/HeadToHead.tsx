@@ -1,5 +1,6 @@
-import Link from "next/link";
+import { useTranslations } from "next-intl";
 
+import { Link } from "@/i18n/navigation";
 import type { HeadToHeadBout } from "@/lib/compare-fighters";
 import { abbreviateMethod } from "@/lib/method";
 
@@ -21,10 +22,11 @@ export function HeadToHead({
   fighterAName,
   fighterBName,
 }: HeadToHeadProps) {
+  const t = useTranslations("compare");
   if (bouts.length === 0) {
     return (
       <p className="py-6 text-center font-sans text-sm text-foreground-muted">
-        {fighterAName} and {fighterBName} have never met in UFC competition.
+        {t("neverMet", { a: fighterAName, b: fighterBName })}
       </p>
     );
   }
@@ -36,7 +38,7 @@ export function HeadToHead({
         const methodLabel = abbreviateMethod(bout.method);
         const time = formatRoundTime(bout.time_finished_seconds);
         const finishDetail = bout.round_finished
-          ? `R${bout.round_finished}${time ? ` · ${time}` : ""}`
+          ? `${t("roundShort", { n: bout.round_finished })}${time ? ` · ${time}` : ""}`
           : null;
         const winnerName =
           bout.a_result === "W"
@@ -57,23 +59,24 @@ export function HeadToHead({
               <div className="min-w-0">
                 <p className="truncate font-sans text-sm text-foreground">
                   {winnerName ? (
-                    <>
-                      <span className="text-streak-win">{winnerName}</span>
-                      {" by "}
+                    <span>
+                      <span className="text-streak-win">{winnerName}</span>{" "}
                       <span className="text-foreground-muted">
-                        {methodLabel}
+                        {t("byMethodConnector", { method: methodLabel })}
                       </span>
-                    </>
+                    </span>
                   ) : bout.a_result === "D" ? (
                     <span className="text-foreground-muted">
-                      Draw · {methodLabel}
+                      {t("drawByMethod", { method: methodLabel })}
                     </span>
                   ) : (
-                    <span className="text-foreground-muted">No contest</span>
+                    <span className="text-foreground-muted">
+                      {t("noContestLabel")}
+                    </span>
                   )}
                   {bout.is_title_fight ? (
                     <span className="ml-2 rounded-sm border border-primary/35 bg-primary/10 px-1.5 py-0.5 font-sans text-[9px] uppercase tracking-widest text-primary">
-                      Title
+                      {t("titleBadge")}
                     </span>
                   ) : null}
                 </p>

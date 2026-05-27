@@ -1,11 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { ArrowRight, Loader2, Search, X } from "lucide-react";
 
 import { FighterAvatar } from "@/components/fighter/FighterAvatar";
 import { Button } from "@/components/ui/button";
+import { useRouter } from "@/i18n/navigation";
 import type {
   FighterCatalogResponse,
   FighterCatalogRow,
@@ -30,6 +31,8 @@ interface PickerInputProps {
 }
 
 function PickerInput({ label, slot, onSelect, onClear }: PickerInputProps) {
+  const t = useTranslations("compare");
+  const tWeight = useTranslations("weight");
   const [query, setQuery] = React.useState("");
   const [results, setResults] = React.useState<FighterCatalogRow[]>([]);
   const [loading, setLoading] = React.useState(false);
@@ -103,7 +106,7 @@ function PickerInput({ label, slot, onSelect, onClear }: PickerInputProps) {
               window.setTimeout(() => inputRef.current?.focus(), 0);
             }}
             className="inline-flex h-7 w-7 items-center justify-center rounded-md text-foreground-subtle hover:bg-foreground/5 hover:text-foreground transition-colors"
-            aria-label={`Clear ${label}`}
+            aria-label={t("clearSlot", { label })}
           >
             <X className="h-3.5 w-3.5" />
           </button>
@@ -131,7 +134,7 @@ function PickerInput({ label, slot, onSelect, onClear }: PickerInputProps) {
             setOpen(true);
           }}
           onFocus={() => results.length > 0 && setOpen(true)}
-          placeholder="Search fighter by name…"
+          placeholder={t("searchByName")}
           className={cn(
             "h-12 w-full rounded-md border border-border bg-background-base pl-10 pr-10 text-sm text-foreground",
             "placeholder:text-foreground-subtle",
@@ -183,7 +186,12 @@ function PickerInput({ label, slot, onSelect, onClear }: PickerInputProps) {
                             ·
                           </span>
                           <span className="uppercase tracking-widest">
-                            {f.weight_class_primary.replace(/_/g, " ")}
+                            {(() => {
+                              const key = f.weight_class_primary.replace(/-/g, "_");
+                              return tWeight.has(key)
+                                ? tWeight(key as "lightweight")
+                                : f.weight_class_primary.replace(/_/g, " ");
+                            })()}
                           </span>
                         </>
                       ) : null}
@@ -200,6 +208,7 @@ function PickerInput({ label, slot, onSelect, onClear }: PickerInputProps) {
 }
 
 export function FighterPicker({ initialA, initialB }: FighterPickerProps) {
+  const t = useTranslations("compare");
   const router = useRouter();
   const [a, setA] = React.useState<PickerSlot>(initialA);
   const [b, setB] = React.useState<PickerSlot>(initialB);
@@ -216,13 +225,13 @@ export function FighterPicker({ initialA, initialB }: FighterPickerProps) {
     <div className="mx-auto flex max-w-3xl flex-col gap-6">
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
         <PickerInput
-          label="Fighter A"
+          label={t("fighterA")}
           slot={a}
           onSelect={setA}
           onClear={() => setA({ slug: null, name: null })}
         />
         <PickerInput
-          label="Fighter B"
+          label={t("fighterB")}
           slot={b}
           onSelect={setB}
           onClear={() => setB({ slug: null, name: null })}
@@ -235,12 +244,12 @@ export function FighterPicker({ initialA, initialB }: FighterPickerProps) {
           size="lg"
           className="w-full max-w-xs"
         >
-          Compare
+          {t("compareCta")}
           <ArrowRight className="h-4 w-4" />
         </Button>
         {a.slug && b.slug && a.slug === b.slug ? (
           <p className="font-sans text-xs text-foreground-muted">
-            Pick two different fighters.
+            {t("pickTwoDifferent")}
           </p>
         ) : null}
       </div>

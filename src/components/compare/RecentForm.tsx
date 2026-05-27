@@ -1,5 +1,6 @@
-import Link from "next/link";
+import { useTranslations } from "next-intl";
 
+import { Link } from "@/i18n/navigation";
 import type { RecentFormEntry } from "@/lib/compare-fighters";
 import { cn } from "@/lib/utils";
 
@@ -30,6 +31,7 @@ function ResultRow({
   name: string;
   recent: RecentFormEntry[];
 }) {
+  const t = useTranslations("compare");
   if (recent.length === 0) {
     return (
       <article>
@@ -37,7 +39,7 @@ function ResultRow({
           {name}
         </p>
         <p className="font-sans text-xs text-foreground-subtle">
-          No recent bouts
+          {t("noRecentBouts")}
         </p>
       </article>
     );
@@ -49,7 +51,7 @@ function ResultRow({
       <p className="mb-2 font-sans text-[11px] uppercase tracking-widest text-foreground-muted">
         {name}
         <span className="ml-2 font-mono normal-case text-foreground-subtle">
-          {wins}-{losses} last {recent.length}
+          {t("wlLastN", { w: wins, l: losses, n: recent.length })}
         </span>
       </p>
       <ol className="flex gap-1.5">
@@ -58,7 +60,11 @@ function ResultRow({
             <Link
               href={`/bouts/${r.bout_id}`}
               prefetch={false}
-              title={`${r.result} vs ${r.opponent_name} (${r.event_date.slice(0, 10)})`}
+              title={t("cellTooltip", {
+                result: r.result,
+                opp: r.opponent_name,
+                date: r.event_date.slice(0, 10),
+              })}
               className={cn(
                 "flex h-8 w-8 items-center justify-center rounded-sm border font-display text-sm tabular transition-colors hover:opacity-80",
                 resultClass(r.result),
