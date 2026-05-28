@@ -25,3 +25,18 @@ export function localizedNameSql(alias: string, isRu: boolean): SQL {
     ? sql.raw(`COALESCE(NULLIF(${alias}.name_ru, ''), ${alias}.name_en)`)
     : sql.raw(`${alias}.name_en`);
 }
+
+/** Generic locale-aware column: on RU resolve `ruCol` with a fallback to
+ *  `enCol`, otherwise just `enCol`. Both args are raw column expressions
+ *  (e.g. "ni.title", "ni.title_ru"). Same name-overloading caveat as
+ *  localizedNameSql — alias the result as the English column to keep
+ *  consumers unchanged. */
+export function localizedColSql(
+  enCol: string,
+  ruCol: string,
+  isRu: boolean,
+): SQL {
+  return isRu
+    ? sql.raw(`COALESCE(NULLIF(${ruCol}, ''), ${enCol})`)
+    : sql.raw(enCol);
+}

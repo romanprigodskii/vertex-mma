@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
-import { isRuLocale, localizedNameSql } from "@/lib/i18n-name";
+import { isRuLocale, localizedColSql, localizedNameSql } from "@/lib/i18n-name";
 import type { NewsExternalRef } from "@/lib/db/schema/news";
 
 const UUID_RE =
@@ -144,12 +144,13 @@ function toFeedItem(row: FeedRow, fighters: NewsFighter[]): NewsFeedItem {
   };
 }
 
-const FEED_SELECT = sql`
+function feedSelect(isRu: boolean) {
+  return sql`
   SELECT
     ni.id::text AS id,
     ni.url,
-    ni.title,
-    ni.body_rephrased,
+    ${localizedColSql("ni.title", "ni.title_ru", isRu)} AS title,
+    ${localizedColSql("ni.body_rephrased", "ni.body_rephrased_ru", isRu)} AS body_rephrased,
     ni.published_at::text AS published_at,
     ni.classification::text AS classification,
     ni.related_fighter_ids,
@@ -157,11 +158,13 @@ const FEED_SELECT = sql`
   FROM news_item ni
   JOIN news_source ns ON ns.id = ni.source_id
 `;
+}
 
 /** Approved news, newest first, optionally filtered to one classification. */
 export async function listNewsFeed(
   opts: { classification?: string; limit?: number } = {},
 ): Promise<NewsFeedItem[]> {
+  const isRu = await isRuLocale();
   const limit = Math.min(300, Math.max(1, opts.limit ?? 200));
   const cls =
     opts.classification && opts.classification in NEWS_CLASSIFICATION_LABELS
@@ -172,7 +175,7 @@ export async function listNewsFeed(
     : sql``;
 
   const rows = (await db.execute<FeedRow>(sql`
-    ${FEED_SELECT}
+    ${feedSelect(isRu)}
     WHERE ni.status IN ('approved', 'auto_approved')
     ${where}
     ORDER BY ni.published_at DESC
@@ -213,12 +216,13 @@ export async function listLatestNewsExcluding(
   excludeId: string | null,
   limit = 5,
 ): Promise<NewsFeedItem[]> {
+  const isRu = await isRuLocale();
   const exclude = excludeId && UUID_RE.test(excludeId) ? excludeId : null;
   const where = exclude
     ? sql`AND ni.id != ${exclude}::uuid`
     : sql``;
   const rows = (await db.execute<FeedRow>(sql`
-    ${FEED_SELECT}
+    ${feedSelect(isRu)}
     WHERE ni.status IN ('approved', 'auto_approved')
     ${where}
     ORDER BY ni.published_at DESC
@@ -238,6 +242,7 @@ export async function listRelatedNews(opts: {
   limit?: number;
 }): Promise<NewsFeedItem[]> {
   if (!UUID_RE.test(opts.excludeId)) return [];
+  const isRu = await isRuLocale();
   const limit = Math.min(8, Math.max(1, opts.limit ?? 4));
   const fighterIds = opts.fighterIds.filter((id) => UUID_RE.test(id));
   const fighterValues =
@@ -259,8 +264,8 @@ export async function listRelatedNews(opts: {
     SELECT
       ni.id::text AS id,
       ni.url,
-      ni.title,
-      ni.body_rephrased,
+      ${localizedColSql("ni.title", "ni.title_ru", isRu)} AS title,
+      ${localizedColSql("ni.body_rephrased", "ni.body_rephrased_ru", isRu)} AS body_rephrased,
       ni.published_at::text AS published_at,
       ni.classification::text AS classification,
       ni.related_fighter_ids,
@@ -318,8 +323,9 @@ export async function listNewsForFighter(
   limit = 6,
 ): Promise<NewsFeedItem[]> {
   if (!UUID_RE.test(fighterId)) return [];
+  const isRu = await isRuLocale();
   const rows = (await db.execute<FeedRow>(sql`
-    ${FEED_SELECT}
+    ${feedSelect(isRu)}
     WHERE ni.status IN ('approved', 'auto_approved')
       AND ${fighterId}::uuid = ANY(ni.related_fighter_ids)
     ORDER BY ni.published_at DESC
@@ -361,6 +367,7 @@ export async function getNewsItemById(
   id: string,
 ): Promise<NewsItemDetail | null> {
   if (!UUID_RE.test(id)) return null;
+  const isRu = await isRuLocale();
 
   // Try the new SELECT with external_refs; fall back when the column hasn't
   // been pushed yet (drizzle-kit push needs an interactive TTY for new
@@ -371,9 +378,9 @@ export async function getNewsItemById(
       SELECT
         ni.id::text AS id,
         ni.url,
-        ni.title,
+        ${localizedColSql("ni.title", "ni.title_ru", isRu)} AS title,
         ni.body,
-        ni.body_rephrased,
+        ${localizedColSql("ni.body_rephrased", "ni.body_rephrased_ru", isRu)} AS body_rephrased,
         ni.published_at::text AS published_at,
         ni.classification::text AS classification,
         ni.related_fighter_ids,
@@ -391,9 +398,9 @@ export async function getNewsItemById(
       SELECT
         ni.id::text AS id,
         ni.url,
-        ni.title,
+        ${localizedColSql("ni.title", "ni.title_ru", isRu)} AS title,
         ni.body,
-        ni.body_rephrased,
+        ${localizedColSql("ni.body_rephrased", "ni.body_rephrased_ru", isRu)} AS body_rephrased,
         ni.published_at::text AS published_at,
         ni.classification::text AS classification,
         ni.related_fighter_ids,

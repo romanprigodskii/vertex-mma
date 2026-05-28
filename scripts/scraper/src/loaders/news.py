@@ -411,3 +411,47 @@ def save_rephrase(
             "UPDATE news_item SET body_rephrased = %s WHERE id = %s::uuid",
             (body_rephrased, item_id),
         )
+
+
+@dataclass
+class UntranslatedNewsItem:
+    id: str
+    title: str
+    body: str | None
+
+
+def fetch_untranslated_news(
+    conn: psycopg.Connection, limit: int | None = None
+) -> list[UntranslatedNewsItem]:
+    """Approved items still missing a Russian title, newest first. body is the
+    displayed (rephrased) text — may be null when rephrasing didn't run, in which
+    case only the title gets translated."""
+    sql = (
+        "SELECT id::text, title, body_rephrased FROM news_item "
+        "WHERE status IN ('approved', 'auto_approved') AND title_ru IS NULL "
+        "ORDER BY published_at DESC"
+    )
+    params: tuple = ()
+    if limit is not None:
+        sql += " LIMIT %s"
+        params = (limit,)
+    with conn.cursor() as cur:
+        cur.execute(sql, params)
+        return [
+            UntranslatedNewsItem(id=r[0], title=r[1], body=r[2])
+            for r in cur.fetchall()
+        ]
+
+
+def save_news_translation(
+    conn: psycopg.Connection,
+    item_id: str,
+    title_ru: str,
+    body_rephrased_ru: str | None,
+) -> None:
+    with conn.cursor() as cur:
+        cur.execute(
+            "UPDATE news_item SET title_ru = %s, body_rephrased_ru = %s "
+            "WHERE id = %s::uuid",
+            (title_ru, body_rephrased_ru, item_id),
+        )

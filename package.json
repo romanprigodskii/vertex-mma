@@ -41,7 +41,8 @@
     "news:extract": "cd scripts/scraper && ./venv/bin/python scripts/09b_extract_article_bodies.py",
     "news:classify": "cd scripts/scraper && ./venv/bin/python scripts/10_classify_news.py",
     "news:rephrase": "cd scripts/scraper && ./venv/bin/python scripts/11_rephrase_news.py",
-    "news:ingest": "pnpm news:scrape && pnpm news:extract && pnpm news:classify && pnpm news:rephrase",
+    "news:translate": "cd scripts/scraper && ./venv/bin/python scripts/15_translate_news.py",
+    "news:ingest": "pnpm news:scrape && pnpm news:extract && pnpm news:classify && pnpm news:rephrase && pnpm news:translate",
     "news:watch": "tsx scripts/news_watch.ts",
     "predictions:generate": "tsx scripts/generate_prediction_events.ts"
   },
