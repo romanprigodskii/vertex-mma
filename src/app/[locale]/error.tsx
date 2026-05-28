@@ -1,10 +1,11 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 
 import { Container } from "@/components/layout/container";
+import { Link } from "@/i18n/navigation";
 
 export default function ErrorPage({
   error,
@@ -13,6 +14,7 @@ export default function ErrorPage({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const t = useTranslations("error");
   const router = useRouter();
 
   React.useEffect(() => {
@@ -34,18 +36,17 @@ export default function ErrorPage({
     <main className="flex-1">
       <Container size="md" className="py-20 text-center md:py-32">
         <p className="font-display text-8xl leading-none tabular text-streak-loss">
-          500
+          {t("code")}
         </p>
         <h1 className="mt-6 font-display text-4xl uppercase tracking-tight text-foreground">
-          Something broke
+          {t("title")}
         </h1>
         <p className="mx-auto mt-4 max-w-md font-sans text-base text-foreground-muted">
-          Hit an unexpected error rendering this page. We&rsquo;ve logged it.
-          Try again, or head somewhere else.
+          {t("lead")}
         </p>
         {error.digest ? (
           <p className="mt-2 font-mono text-[10px] text-foreground-subtle">
-            Error ID: {error.digest}
+            {t("errorId", { id: error.digest })}
           </p>
         ) : null}
         <div className="mt-8 flex flex-wrap justify-center gap-3">
@@ -54,13 +55,13 @@ export default function ErrorPage({
             onClick={handleRetry}
             className="rounded-sm bg-primary px-5 py-2.5 font-display text-sm uppercase tracking-widest text-background-base hover:opacity-90"
           >
-            Try again
+            {t("tryAgain")}
           </button>
           <Link
             href="/"
             className="rounded-sm border border-foreground/15 px-5 py-2.5 font-display text-sm uppercase tracking-widest text-foreground-muted hover:bg-foreground/[0.05] hover:text-foreground"
           >
-            Home
+            {t("home")}
           </Link>
         </div>
       </Container>

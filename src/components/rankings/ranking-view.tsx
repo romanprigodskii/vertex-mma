@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 
 import { Container } from "@/components/layout/container";
 import type { RankingDetail } from "@/lib/rankings";

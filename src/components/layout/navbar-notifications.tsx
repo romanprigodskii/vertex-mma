@@ -1,10 +1,10 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Bell } from "lucide-react";
 
+import { Link } from "@/i18n/navigation";
 import type { NotificationRow } from "@/lib/notifications";
 
 interface Props {

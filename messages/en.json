@@ -971,6 +971,14 @@
     "predictingCount": "{count, plural, one {# predicting} other {# predicting}}",
     "closesInHours": "closes in {h}h"
   },
+  "error": {
+    "code": "500",
+    "title": "Something broke",
+    "lead": "Hit an unexpected error rendering this page. We've logged it. Try again, or head somewhere else.",
+    "errorId": "Error ID: {id}",
+    "tryAgain": "Try again",
+    "home": "Home"
+  },
   "notFound": {
     "metaTitle": "Not found · Vertex MMA",
     "code": "404",
