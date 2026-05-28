@@ -62,6 +62,7 @@ OUTPUT_SCHEMA = {
 }
 
 _CYRILLIC = re.compile(r"[А-Яа-яЁё]")
+_LATIN = re.compile(r"[A-Za-z]")
 
 
 @dataclass
@@ -127,7 +128,10 @@ def translate_batch(items: list[NameInput]) -> dict[int, str]:
         if not isinstance(ru, str):
             continue
         ru = ru.strip()
-        if not ru or not _CYRILLIC.search(ru):
+        # Require Cyrillic and reject any leftover Latin — Claude occasionally
+        # transliterates only part of an awkward name (e.g. "Пол Варелans"),
+        # which reads worse than the clean English fallback.
+        if not ru or not _CYRILLIC.search(ru) or _LATIN.search(ru):
             continue
         out[idx] = ru
     return out
