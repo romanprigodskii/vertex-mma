@@ -1,10 +1,6 @@
 import * as React from "react";
 import { notFound } from "next/navigation";
-import {
-  getLocale,
-  getTranslations,
-  setRequestLocale,
-} from "next-intl/server";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import { ChevronLeft, ExternalLink } from "lucide-react";
 
 import { Container } from "@/components/layout/container";
@@ -13,6 +9,7 @@ import { Navbar } from "@/components/layout/navbar";
 import { NewsClassificationBadge } from "@/components/news/news-classification-badge";
 import { NewsComments } from "@/components/news/news-comments";
 import { NewsSidebar } from "@/components/news/news-sidebar";
+import { NewsTimestamp } from "@/components/news/news-timestamp";
 import { RelatedNews } from "@/components/news/related-news";
 import {
   SocialEmbed,
@@ -102,12 +99,6 @@ export default async function NewsArticlePage({ params }: PageProps) {
   // first 1-2 names usually make it into related_fighter_ids).
   const allFighters: NewsFighter[] = [...item.fighters, ...detectedFighters];
 
-  const activeLocale = await getLocale();
-  const date = new Date(item.published_at).toLocaleDateString(
-    activeLocale === "ru" ? "ru-RU" : "en-US",
-    { month: "long", day: "numeric", year: "numeric" },
-  );
-
   const paragraphs = body
     .split(/\n{2,}/)
     .map((p) => p.trim())
@@ -153,7 +144,11 @@ export default async function NewsArticlePage({ params }: PageProps) {
                     {item.source_name}
                   </span>
                   <span aria-hidden>·</span>
-                  <span className="shrink-0 tabular-nums">{date}</span>
+                  <NewsTimestamp
+                    iso={item.published_at}
+                    variant="full"
+                    className="shrink-0 tabular-nums"
+                  />
                   {paragraphs.length > 0 ? (
                     <>
                       <span aria-hidden>·</span>

@@ -1,15 +1,9 @@
-import { getLocale, getTranslations } from "next-intl/server";
+import { getTranslations } from "next-intl/server";
 
 import { NewsClassificationBadge } from "@/components/news/news-classification-badge";
+import { NewsTimestamp } from "@/components/news/news-timestamp";
 import { Link } from "@/i18n/navigation";
 import type { NewsFeedItem } from "@/lib/news";
-
-function formatShort(iso: string, locale: string): string {
-  return new Date(iso).toLocaleDateString(
-    locale === "ru" ? "ru-RU" : "en-US",
-    { month: "short", day: "numeric" },
-  );
-}
 
 export async function RelatedNews({
   items,
@@ -20,7 +14,6 @@ export async function RelatedNews({
 }) {
   if (items.length === 0) return null;
   const t = await getTranslations("news");
-  const locale = await getLocale();
   const headingLabel = heading ?? t("moreLikeThis");
   return (
     <section className="mt-14 border-t border-foreground/10 pt-8">
@@ -46,9 +39,11 @@ export async function RelatedNews({
             >
               <div className="flex flex-wrap items-center gap-2 font-mono text-[10px] uppercase tracking-[0.16em] text-foreground-subtle">
                 <NewsClassificationBadge classification={item.classification} />
-                <span className="tabular-nums">
-                  {formatShort(item.published_at, locale).toUpperCase()}
-                </span>
+                <NewsTimestamp
+                  iso={item.published_at}
+                  variant="compact"
+                  className="tabular-nums"
+                />
               </div>
               <p className="mt-2 line-clamp-3 text-sm leading-snug text-foreground">
                 {item.title}

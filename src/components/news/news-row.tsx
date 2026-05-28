@@ -1,17 +1,11 @@
-import { getLocale } from "next-intl/server";
 import { ChevronRight } from "lucide-react";
 
 import { NewsClassificationBadge } from "@/components/news/news-classification-badge";
+import { NewsTimestamp } from "@/components/news/news-timestamp";
 import { Link } from "@/i18n/navigation";
 import type { NewsFeedItem } from "@/lib/news";
 
-export async function NewsRow({ item }: { item: NewsFeedItem }) {
-  const locale = await getLocale();
-  const date = new Date(item.published_at).toLocaleDateString(
-    locale === "ru" ? "ru-RU" : "en-US",
-    { month: "short", day: "numeric", year: "numeric" },
-  );
-
+export function NewsRow({ item }: { item: NewsFeedItem }) {
   return (
     <div className="rounded-md border border-foreground/10 bg-background-elevated/30 p-4 transition-colors hover:border-foreground/20 hover:bg-foreground/[0.04]">
       <div className="flex flex-wrap items-center gap-2 font-mono text-[11px] uppercase tracking-widest text-foreground-subtle">
@@ -20,7 +14,11 @@ export async function NewsRow({ item }: { item: NewsFeedItem }) {
           {item.source_name}
         </span>
         <span aria-hidden>·</span>
-        <span className="shrink-0 tabular">{date}</span>
+        <NewsTimestamp
+          iso={item.published_at}
+          variant="short"
+          className="shrink-0 tabular"
+        />
       </div>
 
       <Link
