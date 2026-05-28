@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 
 import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
@@ -84,26 +85,27 @@ export default async function FightersPage({ searchParams }: PageProps) {
   );
 }
 
-function CatalogHero({ totalAll }: { totalAll: number }) {
+async function CatalogHero({ totalAll }: { totalAll: number }) {
+  const t = await getTranslations("catalog");
   return (
     <section className="relative border-b border-foreground/10">
       <Container size="xl" className="pb-16 pt-20 md:pt-24">
         <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground-subtle">
-          The roster
+          {t("rosterKicker")}
         </p>
         <h1 className="mt-3 font-display uppercase tracking-[-0.01em] text-foreground text-hero">
-          FIGHTERS
+          {t("rosterTitle")}
         </h1>
         <div className="mt-6 flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <span className="font-display text-[28px] leading-none text-primary">
             {formatNumber(totalAll)}
           </span>
           <span className="font-sans text-base text-foreground-muted">
-            fighters indexed
+            {t("fightersIndexed")}
           </span>
         </div>
         <p className="mt-4 font-sans text-[11px] uppercase tracking-[0.24em] text-foreground-muted">
-          8 Divisions · 12 Active Champions · UFC, 1993 → Today
+          {t("rosterStats")}
         </p>
       </Container>
     </section>

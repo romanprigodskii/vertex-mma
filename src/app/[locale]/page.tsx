@@ -10,6 +10,7 @@ import { RankingCard } from "@/components/rankings/ranking-card";
 import { Link } from "@/i18n/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { isRuLocale, localizedNameSql } from "@/lib/i18n-name";
 import { listOpenMarkets } from "@/lib/markets";
 import { listRecentRankings } from "@/lib/rankings";
 
@@ -45,11 +46,12 @@ async function getTopFighters(limit: number): Promise<TopFighter[]> {
   // exists. Sort AND display by that one canonical number so the home
   // list never contradicts the profile (e.g. Pereira 80 LHW, not the
   // global 85).
+  const isRu = await isRuLocale();
   const result = await db.execute<TopFighter>(sql`
     SELECT
       f.id::text AS id,
       f.slug,
-      f.name_en,
+      ${localizedNameSql("f", isRu)} AS name_en,
       f.photo_thumbnail_url,
       f.photo_url,
       COALESCE(f.current_division, f.weight_class_primary::text) AS division,
@@ -78,6 +80,12 @@ export default async function HomePage({
   setRequestLocale(locale);
   const t = await getTranslations("home");
   const tCommon = await getTranslations("common");
+  const tWeight = await getTranslations("weight");
+  const weightLabel = (division: string | null): string => {
+    if (!division) return "—";
+    const key = division.replace(/-/g, "_");
+    return tWeight.has(key) ? tWeight(key as "lightweight") : division.replace(/_/g, " ");
+  };
   const [user, topFighters, topMarkets, recentRankings] = await Promise.all([
     getCurrentUser(),
     getTopFighters(5),
@@ -183,7 +191,7 @@ export default async function HomePage({
                           {f.name_en}
                         </p>
                         <p className="font-mono text-[11px] uppercase tracking-widest text-foreground-subtle">
-                          {f.division?.replace(/_/g, " ") ?? "—"}
+                          {weightLabel(f.division)}
                         </p>
                       </div>
                       <div className="shrink-0 text-right">

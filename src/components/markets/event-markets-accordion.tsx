@@ -132,7 +132,7 @@ function BoutMarketsBlock({
       <div className="mb-2 flex items-baseline justify-between gap-3">
         <h4 className="font-display text-base uppercase tracking-tight text-foreground">
           {bout.fighter_a_name}{" "}
-          <span className="text-foreground-subtle">vs</span>{" "}
+          <span className="mx-1.5 align-middle font-sans text-[0.55em] font-medium normal-case text-foreground-subtle">vs</span>{" "}
           {bout.fighter_b_name}
         </h4>
         <p className="shrink-0 font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">

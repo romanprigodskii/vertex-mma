@@ -810,6 +810,10 @@
     "toggle": "Сменить тему"
   },
   "catalog": {
+    "rosterKicker": "Ростер",
+    "rosterTitle": "Бойцы",
+    "fightersIndexed": "бойцов в базе",
+    "rosterStats": "8 дивизионов · 12 действующих чемпионов · UFC, 1993 → сегодня",
     "sortAria": "Сортировать бойцов",
     "sortBy": "Сортировка…",
     "sort_vertex_current": "Vertex Score (актуальный)",

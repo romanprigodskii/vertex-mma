@@ -127,7 +127,7 @@ export default async function MarketDetailPage({ params }: PageProps) {
             ) : (
               <>
                 {market.fighter_a_name}{" "}
-                <span className="text-foreground-subtle">vs</span>{" "}
+                <span className="mx-1.5 align-middle font-sans text-[0.55em] font-medium normal-case text-foreground-subtle">vs</span>{" "}
                 {market.fighter_b_name}
               </>
             )}

@@ -810,6 +810,10 @@
     "toggle": "Toggle theme"
   },
   "catalog": {
+    "rosterKicker": "The roster",
+    "rosterTitle": "Fighters",
+    "fightersIndexed": "fighters indexed",
+    "rosterStats": "8 Divisions · 12 Active Champions · UFC, 1993 → Today",
     "sortAria": "Sort fighters",
     "sortBy": "Sort by…",
     "sort_vertex_current": "Vertex Score (current form)",
