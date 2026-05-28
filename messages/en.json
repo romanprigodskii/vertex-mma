@@ -145,6 +145,7 @@
     "keyStats": "Key stats",
     "keyStatsExplainer": "Six attributes derived from striking, grappling, and finishing rates.",
     "keyStatsCaveat": "Fighters with sparse method data (older bouts) will read lower on Power and Cardio.",
+    "radarAria": "Fighter attribute radar",
     "physical": "Physical",
     "careerOverview": "Career overview",
     "strikingHeatmap": "Striking heatmap",
@@ -273,7 +274,12 @@
       "cardio": "Cardio",
       "power": "Power",
       "activity": "Activity"
-    }
+    },
+    "cardNotFound": "Fighter card not found",
+    "cardMetaTitle": "{name} · Collectible card",
+    "cardMetaDescription": "Vertex MMA collectible holographic card for {name}.",
+    "cardOgTitle": "{name} · Vertex card",
+    "cardOgDescription": "Vertex MMA collectible card for {name}."
   },
   "eventsList": {
     "metaTitle": "UFC events",
@@ -329,6 +335,15 @@
     "metaDescription": "Bet virtual coins on upcoming UFC bouts.",
     "kicker": "Bookmaker",
     "heading": "Open markets",
+    "allMarkets": "All markets",
+    "shareMarket": "Share market",
+    "marketDetailMetaDescription": "{event} · betting market on Vertex MMA",
+    "marketOgDescription": "Live odds at Vertex MMA · {event}",
+    "marketImageAlt": "{title} — betting market",
+    "shareTitleSuffix": "{a} vs {b} · betting market",
+    "methodHeading": "How will it end?",
+    "roundHeading": "Which round?",
+    "distanceHeading": "Goes the distance?",
     "lead": "Bet virtual coins on upcoming UFC bouts. Prices are set by an LMSR market maker — every trade nudges the implied odds.",
     "yourBalance": "Your balance",
     "coins": "coins",
@@ -660,7 +675,14 @@
     "saving": "Saving…",
     "deleteRanking": "Delete ranking",
     "deleteConfirm": "Delete this ranking? This cannot be undone.",
-    "noResolvedUrl": "Could not determine the ranking URL after save."
+    "noResolvedUrl": "Could not determine the ranking URL after save.",
+    "createMetaTitle": "Create ranking",
+    "editMetaTitle": "Edit ranking",
+    "newRanking": "New ranking",
+    "createHeading": "Create ranking",
+    "allRankings": "All rankings",
+    "editHeading": "Edit ranking",
+    "backToRanking": "Back to ranking"
   },
   "cards": {
     "metaTitle": "Fight Cards",

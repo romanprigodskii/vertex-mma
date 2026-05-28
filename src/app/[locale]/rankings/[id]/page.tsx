@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import { ChevronLeft, Edit3 } from "lucide-react";
 
 import { Container } from "@/components/layout/container";
@@ -7,19 +7,23 @@ import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
 import { RankingView } from "@/components/rankings/ranking-view";
 import { ShareButton } from "@/components/share/share-button";
+import { Link } from "@/i18n/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { getRankingById } from "@/lib/rankings";
 
 export const dynamic = "force-dynamic";
 
 interface PageProps {
-  params: Promise<{ id: string }>;
+  params: Promise<{ id: string; locale: string }>;
 }
 
 export async function generateMetadata({ params }: PageProps) {
-  const { id } = await params;
+  const { id, locale } = await params;
   const r = await getRankingById(id);
-  if (!r) return { title: "Ranking not found" };
+  if (!r) {
+    const tNF = await getTranslations({ locale, namespace: "notFound" });
+    return { title: tNF("rankingTitle") };
+  }
   const desc = r.description
     ? `${r.description.slice(0, 140)}${r.description.length > 140 ? "…" : ""}`
     : `${r.entry_count} fighter${r.entry_count === 1 ? "" : "s"} ranked by @${r.author_username}.`;

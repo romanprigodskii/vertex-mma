@@ -145,6 +145,7 @@
     "keyStats": "Ключевая статистика",
     "keyStatsExplainer": "Шесть атрибутов на основе ударной техники, борьбы и процента финишей.",
     "keyStatsCaveat": "У бойцов со скудными данными по методам (старые бои) будут ниже показатели Power и Cardio.",
+    "radarAria": "Радар атрибутов бойца",
     "physical": "Физика",
     "careerOverview": "Обзор карьеры",
     "strikingHeatmap": "Тепловая карта ударов",
@@ -273,7 +274,12 @@
       "cardio": "Кардио",
       "power": "Сила",
       "activity": "Активность"
-    }
+    },
+    "cardNotFound": "Карта бойца не найдена",
+    "cardMetaTitle": "{name} · Коллекционная карта",
+    "cardMetaDescription": "Коллекционная голографическая карта Vertex MMA — {name}.",
+    "cardOgTitle": "{name} · Карта Vertex",
+    "cardOgDescription": "Коллекционная карта Vertex MMA — {name}."
   },
   "eventsList": {
     "metaTitle": "Турниры UFC",
@@ -329,6 +335,15 @@
     "metaDescription": "Ставь виртуальные монеты на предстоящие бои UFC.",
     "kicker": "Букмекер",
     "heading": "Открытые маркеты",
+    "allMarkets": "Все маркеты",
+    "shareMarket": "Поделиться маркетом",
+    "marketDetailMetaDescription": "{event} · ставочный маркет на Vertex MMA",
+    "marketOgDescription": "Живые шансы на Vertex MMA · {event}",
+    "marketImageAlt": "{title} — ставочный маркет",
+    "shareTitleSuffix": "{a} vs {b} · ставочный маркет",
+    "methodHeading": "Как закончится бой?",
+    "roundHeading": "В каком раунде?",
+    "distanceHeading": "Пройдёт ли всю дистанцию?",
     "lead": "Ставь виртуальные монеты на предстоящие бои UFC. Цены задаёт LMSR маркет-мейкер — каждая сделка двигает подразумеваемые шансы.",
     "yourBalance": "Твой баланс",
     "coins": "монет",
@@ -660,7 +675,14 @@
     "saving": "Сохранение…",
     "deleteRanking": "Удалить рейтинг",
     "deleteConfirm": "Удалить этот рейтинг? Действие нельзя отменить.",
-    "noResolvedUrl": "Не удалось определить адрес рейтинга после сохранения."
+    "noResolvedUrl": "Не удалось определить адрес рейтинга после сохранения.",
+    "createMetaTitle": "Создать рейтинг",
+    "editMetaTitle": "Редактировать рейтинг",
+    "newRanking": "Новый рейтинг",
+    "createHeading": "Создать рейтинг",
+    "allRankings": "Все рейтинги",
+    "editHeading": "Редактировать рейтинг",
+    "backToRanking": "Назад к рейтингу"
   },
   "cards": {
     "metaTitle": "Карды",

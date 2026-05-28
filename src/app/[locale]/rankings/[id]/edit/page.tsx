@@ -1,32 +1,45 @@
-import Link from "next/link";
+import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import { ChevronLeft } from "lucide-react";
 
 import { Container } from "@/components/layout/container";
 import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
 import { RankingForm } from "@/components/rankings/ranking-form";
+import { Link } from "@/i18n/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { getRankingById } from "@/lib/rankings";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "Edit ranking" };
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string; locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "rankings" });
+  return { title: t("editMetaTitle") };
+}
 
 interface PageProps {
-  params: Promise<{ id: string }>;
+  params: Promise<{ id: string; locale: string }>;
 }
 
 export default async function EditRankingPage({ params }: PageProps) {
-  const { id } = await params;
+  const { id, locale } = await params;
+  setRequestLocale(locale);
+  const t = await getTranslations("rankings");
+  const localePrefix = locale === "en" ? "" : `/${locale}`;
   const [ranking, user] = await Promise.all([
     getRankingById(id),
     getCurrentUser(),
   ]);
   if (!ranking) notFound();
-  if (!user) redirect(`/signin?next=/rankings/${id}/edit`);
+  if (!user) redirect(`${localePrefix}/signin?next=/rankings/${id}/edit`);
   if (user.userProfileId !== ranking.user_id) {
-    redirect(`/rankings/${id}`);
+    redirect(`${localePrefix}/rankings/${id}`);
   }
 
   return (
@@ -39,7 +52,7 @@ export default async function EditRankingPage({ params }: PageProps) {
               href={`/rankings/${ranking.id}`}
               className="inline-flex items-center gap-1.5 font-sans text-sm text-foreground-muted hover:text-primary"
             >
-              <ChevronLeft className="h-4 w-4" aria-hidden /> Back to ranking
+              <ChevronLeft className="h-4 w-4" aria-hidden /> {t("backToRanking")}
             </Link>
           </Container>
         </div>
@@ -47,7 +60,7 @@ export default async function EditRankingPage({ params }: PageProps) {
         <Container size="lg" className="py-10 md:py-14">
           <header className="mb-8">
             <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground-subtle">
-              Edit ranking
+              {t("editHeading")}
             </p>
             <h1 className="mt-2 font-display text-3xl uppercase tracking-tight text-foreground sm:text-4xl">
               {ranking.title}

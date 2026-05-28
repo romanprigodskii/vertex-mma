@@ -29,9 +29,12 @@ interface PageProps {
 export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
-  const { id } = await params;
+  const { id, locale } = await params;
   const bout = await getBoutById(id);
-  if (!bout) return { title: "Bout not found" };
+  if (!bout) {
+    const tNF = await getTranslations({ locale, namespace: "notFound" });
+    return { title: tNF("boutTitle") };
+  }
   const title = `${bout.fighter_a.name_en} vs ${bout.fighter_b.name_en}`;
   const eventLabel = bout.event.short_name || bout.event.name;
   const desc = `${title} — ${eventLabel}.`;

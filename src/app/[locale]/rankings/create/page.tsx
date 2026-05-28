@@ -1,20 +1,39 @@
-import Link from "next/link";
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import { ChevronLeft } from "lucide-react";
 
 import { Container } from "@/components/layout/container";
 import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
 import { RankingForm } from "@/components/rankings/ranking-form";
+import { Link } from "@/i18n/navigation";
 import { getCurrentUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "Create ranking" };
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "rankings" });
+  return { title: t("createMetaTitle") };
+}
 
-export default async function CreateRankingPage() {
+export default async function CreateRankingPage({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
+  setRequestLocale(locale);
+  const t = await getTranslations("rankings");
   const user = await getCurrentUser();
-  if (!user) redirect("/signin?next=/rankings/create");
+  if (!user) {
+    redirect(`/${locale === "en" ? "" : `${locale}/`}signin?next=/rankings/create`);
+  }
 
   return (
     <>
@@ -26,7 +45,7 @@ export default async function CreateRankingPage() {
               href="/rankings"
               className="inline-flex items-center gap-1.5 font-sans text-sm text-foreground-muted hover:text-primary"
             >
-              <ChevronLeft className="h-4 w-4" aria-hidden /> All rankings
+              <ChevronLeft className="h-4 w-4" aria-hidden /> {t("allRankings")}
             </Link>
           </Container>
         </div>
@@ -34,10 +53,10 @@ export default async function CreateRankingPage() {
         <Container size="lg" className="py-10 md:py-14">
           <header className="mb-8">
             <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground-subtle">
-              New ranking
+              {t("newRanking")}
             </p>
             <h1 className="mt-2 font-display text-3xl uppercase tracking-tight text-foreground sm:text-4xl">
-              Create ranking
+              {t("createHeading")}
             </h1>
           </header>
           <RankingForm mode="create" />

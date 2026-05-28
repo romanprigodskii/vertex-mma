@@ -298,7 +298,11 @@ export default async function FighterDetailPage({ params }: PageProps) {
         >
           <div className="grid grid-cols-1 gap-10 lg:grid-cols-2 lg:gap-16">
             <div className="flex flex-col items-center lg:items-start">
-              <RadarChart attributes={attributes} labels={radarLabels} />
+              <RadarChart
+                attributes={attributes}
+                labels={radarLabels}
+                ariaLabel={t("radarAria")}
+              />
               <p className="mt-4 max-w-sm text-center font-sans text-[11px] text-foreground-subtle lg:text-left">
                 {t("keyStatsCaveat")}
               </p>

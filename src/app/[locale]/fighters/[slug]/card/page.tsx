@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import { ChevronLeft } from "lucide-react";
 
 import { CardShare } from "@/components/fighter/card/CardShare";
@@ -8,6 +8,7 @@ import { HolographicCard } from "@/components/fighter/card/HolographicCard";
 import { Container } from "@/components/layout/container";
 import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
+import { Link } from "@/i18n/navigation";
 import { CHAMPION_BY_SLUG } from "@/lib/champions";
 import { computeAttributes } from "@/lib/fighter-attributes";
 import { getFightHistory, getFighterBySlug } from "@/lib/fighter-detail";
@@ -15,21 +16,22 @@ import { getFightHistory, getFighterBySlug } from "@/lib/fighter-detail";
 export const dynamic = "force-dynamic";
 
 interface PageProps {
-  params: Promise<{ slug: string }>;
+  params: Promise<{ slug: string; locale: string }>;
 }
 
 export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
-  const { slug } = await params;
+  const { slug, locale } = await params;
+  const t = await getTranslations({ locale, namespace: "fighter" });
   const fighter = await getFighterBySlug(slug);
-  if (!fighter) return { title: "Fighter card not found" };
+  if (!fighter) return { title: t("cardNotFound") };
   return {
-    title: `${fighter.name_en} · Collectible card`,
-    description: `Vertex MMA collectible holographic card for ${fighter.name_en}.`,
+    title: t("cardMetaTitle", { name: fighter.name_en }),
+    description: t("cardMetaDescription", { name: fighter.name_en }),
     openGraph: {
-      title: `${fighter.name_en} · Vertex card`,
-      description: `Vertex MMA collectible card for ${fighter.name_en}.`,
+      title: t("cardOgTitle", { name: fighter.name_en }),
+      description: t("cardOgDescription", { name: fighter.name_en }),
       images: fighter.photo_url ? [fighter.photo_url] : [],
     },
   };

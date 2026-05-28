@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import { ChevronLeft } from "lucide-react";
 
 import { Container } from "@/components/layout/container";
@@ -8,6 +8,7 @@ import { Navbar } from "@/components/layout/navbar";
 import { BetForm } from "@/components/markets/bet-form";
 import { SportsbookConsensus } from "@/components/markets/sportsbook-consensus";
 import { ShareButton } from "@/components/share/share-button";
+import { Link } from "@/i18n/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { priceToDecimalOdds } from "@/lib/lmsr";
 import { getBoutExternalOdds, getMarketById } from "@/lib/markets";
@@ -15,22 +16,26 @@ import { getBoutExternalOdds, getMarketById } from "@/lib/markets";
 export const dynamic = "force-dynamic";
 
 interface PageProps {
-  params: Promise<{ id: string }>;
+  params: Promise<{ id: string; locale: string }>;
 }
 
 export async function generateMetadata({ params }: PageProps) {
-  const { id } = await params;
+  const { id, locale } = await params;
   const m = await getMarketById(id);
-  if (!m) return { title: "Market not found" };
+  if (!m) {
+    const tNF = await getTranslations({ locale, namespace: "notFound" });
+    return { title: tNF("marketTitle") };
+  }
+  const t = await getTranslations({ locale, namespace: "markets" });
   const title = `${m.fighter_a_name} vs ${m.fighter_b_name}`;
-  const desc = `${m.event_name} · betting market on Vertex MMA`;
+  const desc = t("marketDetailMetaDescription", { event: m.event_name });
   const ogImage = `/api/og/markets/${m.id}`;
   return {
     title,
     description: desc,
     openGraph: {
       title,
-      description: `Live odds at Vertex MMA · ${m.event_name}`,
+      description: t("marketOgDescription", { event: m.event_name }),
       siteName: "Vertex MMA",
       type: "website",
       images: [
@@ -38,7 +43,7 @@ export async function generateMetadata({ params }: PageProps) {
           url: ogImage,
           width: 1200,
           height: 630,
-          alt: `${title} — betting market`,
+          alt: t("marketImageAlt", { title }),
         },
       ],
     },
@@ -50,7 +55,10 @@ export async function generateMetadata({ params }: PageProps) {
 }
 
 export default async function MarketDetailPage({ params }: PageProps) {
-  const { id } = await params;
+  const { id, locale } = await params;
+  setRequestLocale(locale);
+  const t = await getTranslations("markets");
+  const dateLocale = locale === "ru" ? "ru-RU" : "en-US";
   const market = await getMarketById(id);
   if (!market) notFound();
 
@@ -73,14 +81,17 @@ export default async function MarketDetailPage({ params }: PageProps) {
               href="/markets"
               className="inline-flex items-center gap-1.5 font-sans text-sm text-foreground-muted hover:text-primary"
             >
-              <ChevronLeft className="h-4 w-4" aria-hidden /> All markets
+              <ChevronLeft className="h-4 w-4" aria-hidden /> {t("allMarkets")}
             </Link>
             <ShareButton
               url={`/markets/${market.id}`}
               ogImageUrl={`/api/og/markets/${market.id}`}
-              title={`${market.fighter_a_name} vs ${market.fighter_b_name} · betting market`}
+              title={t("shareTitleSuffix", {
+                a: market.fighter_a_name,
+                b: market.fighter_b_name,
+              })}
               filename={`vertexmma-market-${market.id.slice(0, 8)}`}
-              label="Share market"
+              label={t("shareMarket")}
               variant="icon"
             />
           </Container>
@@ -95,7 +106,7 @@ export default async function MarketDetailPage({ params }: PageProps) {
               {market.event_name}
             </Link>
             {" · "}
-            {new Date(market.event_date).toLocaleDateString("en-US", {
+            {new Date(market.event_date).toLocaleDateString(dateLocale, {
               month: "long",
               day: "numeric",
               year: "numeric",
@@ -106,11 +117,11 @@ export default async function MarketDetailPage({ params }: PageProps) {
             style={{ fontSize: "clamp(32px, 4vw, 56px)" }}
           >
             {market.type === "method" ? (
-              "How will it end?"
+              t("methodHeading")
             ) : market.type === "round" ? (
-              "Which round?"
+              t("roundHeading")
             ) : market.type === "distance" ? (
-              "Goes the distance?"
+              t("distanceHeading")
             ) : market.type === "prop" ? (
               market.question
             ) : (
