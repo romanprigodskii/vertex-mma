@@ -46,7 +46,7 @@ export async function NavbarInner({
           <NavSections />
           <div className="flex items-center gap-2">
             <FighterSearchTrigger className="hidden lg:inline-flex" />
-            <LanguageToggle className="hidden md:inline-flex" />
+            <LanguageToggle />
             <ThemeToggle className="hidden md:inline-flex" />
             {user ? (
               <>
