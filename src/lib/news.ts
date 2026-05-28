@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
+import { isRuLocale, localizedNameSql } from "@/lib/i18n-name";
 import type { NewsExternalRef } from "@/lib/db/schema/news";
 
 const UUID_RE =
@@ -107,6 +108,7 @@ type FeedRow = {
 async function resolveNewsFighters(
   ids: string[],
 ): Promise<Map<string, NewsFighter>> {
+  const isRu = await isRuLocale();
   const unique = [...new Set(ids.filter((id) => UUID_RE.test(id)))];
   if (unique.length === 0) return new Map();
   const values = sql.join(
@@ -118,7 +120,7 @@ async function resolveNewsFighters(
     slug: string;
     name_en: string;
   }>(sql`
-    SELECT id::text AS id, slug, name_en
+    SELECT id::text AS id, slug, ${localizedNameSql("fighter", isRu)} AS name_en
     FROM fighter
     WHERE id IN (${values})
   `)) as unknown as Array<{ id: string; slug: string; name_en: string }>;
@@ -296,8 +298,9 @@ export async function detectMentionedFighters(
   excludeIds: Set<string>,
 ): Promise<NewsFighter[]> {
   if (!body || body.trim().length === 0) return [];
+  const isRu = await isRuLocale();
   const rows = (await db.execute<{ id: string; slug: string; name: string }>(sql`
-    SELECT id::text AS id, slug, name_en AS name
+    SELECT id::text AS id, slug, ${localizedNameSql("fighter", isRu)} AS name
     FROM fighter
     WHERE name_en IS NOT NULL
       AND char_length(name_en) >= 5

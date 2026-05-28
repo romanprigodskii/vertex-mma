@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
+import { isRuLocale, localizedNameSql } from "@/lib/i18n-name";
 
 /**
  * Full row from `fighter_with_stats` (the same view that backs the catalog),
@@ -507,11 +508,12 @@ export type FighterBoutRound = {
 export async function getFighterBySlug(
   slug: string,
 ): Promise<FighterDetail | null> {
+  const isRu = await isRuLocale();
   const result = await db.execute<FighterDetail>(sql`
     SELECT
       f.id::text AS id,
       f.slug,
-      f.name_en,
+      ${localizedNameSql("f", isRu)} AS name_en,
       f.name_ru,
       f.nickname,
       f.dob::text AS dob,
@@ -748,6 +750,7 @@ export async function getFighterBoutRounds(
 export async function getFightHistory(
   fighterId: string,
 ): Promise<FightHistoryEntry[]> {
+  const isRu = await isRuLocale();
   const result = await db.execute<FightHistoryEntry>(sql`
     SELECT
       b.id::text AS bout_id,
@@ -756,7 +759,7 @@ export async function getFightHistory(
       e.date::text AS event_date,
       opp.id::text AS opponent_id,
       opp.slug AS opponent_slug,
-      opp.name_en AS opponent_name,
+      ${localizedNameSql("opp", isRu)} AS opponent_name,
       opp.nickname AS opponent_nickname,
       CASE
         WHEN b.method::text = 'no_contest' THEN 'NC'

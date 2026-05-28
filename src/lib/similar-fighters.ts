@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
+import { isRuLocale, localizedNameSql } from "@/lib/i18n-name";
 import type { FighterDetail } from "@/lib/fighter-detail";
 
 /**
@@ -93,11 +94,12 @@ export async function getSimilarFighters(
     current.slpm != null || current.td_avg != null || current.sub_avg != null;
   if (!sourceHasStats) return [];
 
+  const isRu = await isRuLocale();
   const result = await db.execute<Candidate>(sql`
     SELECT
       f.id::text AS id,
       f.slug,
-      f.name_en,
+      ${localizedNameSql("f", isRu)} AS name_en,
       f.nickname,
       f.photo_url,
       f.country_code,

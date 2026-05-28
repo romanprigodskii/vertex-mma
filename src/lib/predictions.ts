@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
+import { isRuLocale, localizedNameSql } from "@/lib/i18n-name";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -104,6 +105,7 @@ export async function getPredictionEventForUser(
     ? userProfileId
     : null;
 
+  const isRu = await isRuLocale();
   const boutRows = await db.execute<PredictionBoutRow>(sql`
     SELECT
       b.id::text AS bout_id,
@@ -113,11 +115,11 @@ export async function getPredictionEventForUser(
       b.is_co_main_event,
       b.is_title_fight,
       fa.id::text AS fighter_a_id,
-      fa.name_en AS fighter_a_name,
+      ${localizedNameSql("fa", isRu)} AS fighter_a_name,
       fa.slug AS fighter_a_slug,
       fa.photo_thumbnail_url AS fighter_a_photo_thumbnail_url,
       fb.id::text AS fighter_b_id,
-      fb.name_en AS fighter_b_name,
+      ${localizedNameSql("fb", isRu)} AS fighter_b_name,
       fb.slug AS fighter_b_slug,
       fb.photo_thumbnail_url AS fighter_b_photo_thumbnail_url,
       pp.picked_fighter_id::text AS picked_fighter_id,

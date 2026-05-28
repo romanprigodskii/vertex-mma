@@ -2,6 +2,7 @@ import { sql, type SQL } from "drizzle-orm";
 
 import { CHAMPION_SLUGS } from "@/lib/champions";
 import { db } from "@/lib/db";
+import { isRuLocale, localizedNameSql } from "@/lib/i18n-name";
 
 export type FighterSearchResult = {
   id: string;
@@ -34,11 +35,12 @@ export async function searchFighters(
   const trimmed = query.trim();
   if (!trimmed) return [];
 
+  const isRu = await isRuLocale();
   const result = await db.execute<FighterSearchResult>(sql`
     SELECT DISTINCT ON (f.id)
       f.id::text AS id,
       f.slug,
-      f.name_en,
+      ${localizedNameSql("f", isRu)} AS name_en,
       f.name_ru,
       f.nickname,
       f.photo_url,
@@ -507,6 +509,7 @@ export async function searchFightersWithFilters(
   );
 
   const trimmedQ = filters.q?.trim();
+  const isRu = await isRuLocale();
   const where = buildWhere(filters);
   const orderBy = buildOrderBy(filters);
 
@@ -549,7 +552,7 @@ export async function searchFightersWithFilters(
     SELECT
       f.id::text AS id,
       f.slug,
-      f.name_en,
+      ${localizedNameSql("f", isRu)} AS name_en,
       f.name_ru,
       f.nickname,
       f.photo_url,
@@ -654,11 +657,12 @@ export async function getFightersBySlug(
     slugs.map((s) => sql`${s}`),
     sql`, `,
   );
+  const isRu = await isRuLocale();
   const result = await db.execute<FighterCatalogRow>(sql`
     SELECT
       f.id::text AS id,
       f.slug,
-      f.name_en,
+      ${localizedNameSql("f", isRu)} AS name_en,
       f.name_ru,
       f.nickname,
       f.photo_url,

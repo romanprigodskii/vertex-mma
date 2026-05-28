@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
+import { isRuLocale, localizedNameSql } from "@/lib/i18n-name";
 
 export type CommonOpponentBout = {
   event_name: string;
@@ -57,6 +58,7 @@ export async function getCommonOpponents(
 ): Promise<CommonOpponentEntry[]> {
   if (fighterAId === fighterBId) return [];
 
+  const isRu = await isRuLocale();
   const result = await db.execute<RawRow>(sql`
     WITH a_latest AS (
       SELECT DISTINCT ON (opp_id)
@@ -128,7 +130,7 @@ export async function getCommonOpponents(
     )
     SELECT
       f.slug AS opponent_slug,
-      f.name_en AS opponent_name,
+      ${localizedNameSql("f", isRu)} AS opponent_name,
       f.nickname AS opponent_nickname,
       a.event_name AS a_event_name,
       a.event_slug AS a_event_slug,
@@ -236,6 +238,7 @@ export async function getRecentForm(
   fighterId: string,
   limit = 5,
 ): Promise<RecentFormEntry[]> {
+  const isRu = await isRuLocale();
   const result = await db.execute<RecentFormEntry>(sql`
     SELECT
       b.id::text AS bout_id,
@@ -245,7 +248,7 @@ export async function getRecentForm(
         WHEN b.winner_id IS NOT NULL THEN 'L'
         ELSE 'D'
       END AS result,
-      f_opp.name_en AS opponent_name,
+      ${localizedNameSql("f_opp", isRu)} AS opponent_name,
       f_opp.slug AS opponent_slug,
       e.date::text AS event_date,
       b.method::text AS method

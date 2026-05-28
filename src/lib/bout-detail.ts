@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
+import { isRuLocale, localizedNameSql } from "@/lib/i18n-name";
 
 export type BoutDetailFighter = {
   id: string;
@@ -129,6 +130,7 @@ const UUID_RE =
 export async function getBoutById(id: string): Promise<BoutDetail | null> {
   if (!UUID_RE.test(id)) return null;
 
+  const isRu = await isRuLocale();
   const headerResult = await db.execute<BoutHeaderRow>(sql`
     SELECT
       b.id::text AS id,
@@ -142,14 +144,14 @@ export async function getBoutById(id: string): Promise<BoutDetail | null> {
       e.venue AS event_venue,
       fa.id::text AS fighter_a_id,
       fa.slug AS fighter_a_slug,
-      fa.name_en AS fighter_a_name_en,
+      ${localizedNameSql("fa", isRu)} AS fighter_a_name_en,
       fa.nickname AS fighter_a_nickname,
       fa.photo_url AS fighter_a_photo_url,
       fa.photo_thumbnail_url AS fighter_a_photo_thumbnail_url,
       fa.country_code AS fighter_a_country_code,
       fb.id::text AS fighter_b_id,
       fb.slug AS fighter_b_slug,
-      fb.name_en AS fighter_b_name_en,
+      ${localizedNameSql("fb", isRu)} AS fighter_b_name_en,
       fb.nickname AS fighter_b_nickname,
       fb.photo_url AS fighter_b_photo_url,
       fb.photo_thumbnail_url AS fighter_b_photo_thumbnail_url,

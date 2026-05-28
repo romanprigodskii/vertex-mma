@@ -18,6 +18,44 @@ class UpsertCounts:
     skipped: int = 0
 
 
+@dataclass
+class UntranslatedFighter:
+    id: str
+    name_en: str
+    country_code: str | None
+
+
+def fetch_untranslated_names(
+    conn: psycopg.Connection, *, limit: int | None = None
+) -> list[UntranslatedFighter]:
+    """Fighters still missing a Russian name. Most-prominent first so a partial
+    run covers the highest-traffic profiles."""
+    sql = (
+        "SELECT id::text, name_en, country_code FROM fighter "
+        "WHERE name_ru IS NULL OR name_ru = '' "
+        "ORDER BY vertex_score DESC NULLS LAST, name_en"
+    )
+    if limit is not None:
+        sql += " LIMIT %s"
+    with conn.cursor() as cur:
+        cur.execute(sql, (limit,) if limit is not None else ())
+        return [
+            UntranslatedFighter(id=r[0], name_en=r[1], country_code=r[2])
+            for r in cur.fetchall()
+        ]
+
+
+def save_fighter_name_ru(
+    conn: psycopg.Connection, fighter_id: str, name_ru: str
+) -> None:
+    with conn.cursor() as cur:
+        cur.execute(
+            "UPDATE fighter SET name_ru = %s, updated_at = now() "
+            "WHERE id = %s::uuid",
+            (name_ru, fighter_id),
+        )
+
+
 def upsert_fighter_listing(
     conn: psycopg.Connection,
     items: Iterable[FighterListItem],

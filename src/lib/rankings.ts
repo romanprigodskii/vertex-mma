@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
+import { isRuLocale, localizedNameSql } from "@/lib/i18n-name";
 
 // Snake-case shapes mirror the raw column names returned by db.execute.
 
@@ -110,6 +111,7 @@ export async function getRankingById(
   if (rankingRows.length === 0) return null;
   const r = rankingRows[0];
 
+  const isRu = await isRuLocale();
   const entries = await db.execute<RankingEntryRow>(sql`
     SELECT
       cre.id::text AS id,
@@ -117,7 +119,7 @@ export async function getRankingById(
       cre.note,
       f.id::text AS fighter_id,
       f.slug AS fighter_slug,
-      f.name_en AS fighter_name,
+      ${localizedNameSql("f", isRu)} AS fighter_name,
       f.photo_thumbnail_url AS fighter_photo_thumbnail_url,
       f.country_code AS fighter_country_code,
       f.weight_class_primary::text AS fighter_weight_class

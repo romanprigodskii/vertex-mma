@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
+import { isRuLocale, localizedNameSql } from "@/lib/i18n-name";
 
 /**
  * Wave 31.7 — peak vertex history for a fighter.
@@ -163,6 +164,7 @@ export async function getPeakVertex(
 
   // Hydrate bout details for first-peak, last-peak (if different), and
   // ending bout in one query via OR — small set, FK lookup, fast.
+  const isRu = await isRuLocale();
   const boutDetailRowsResult = await db.execute<BoutDetailRow>(sql`
     SELECT
       b.id::text,
@@ -173,9 +175,9 @@ export async function getPeakVertex(
       b.winner_id::text AS winner_id,
       b.fighter_a_id::text AS fighter_a_id,
       b.fighter_b_id::text AS fighter_b_id,
-      fa.name_en AS fighter_a_name,
+      ${localizedNameSql("fa", isRu)} AS fighter_a_name,
       fa.slug AS fighter_a_slug,
-      fb.name_en AS fighter_b_name,
+      ${localizedNameSql("fb", isRu)} AS fighter_b_name,
       fb.slug AS fighter_b_slug
     FROM bout b
     JOIN event e ON e.id = b.event_id
@@ -303,6 +305,7 @@ export async function getScoreHistory(
     opponent_name: string | null;
     opponent_slug: string | null;
   };
+  const isRu = await isRuLocale();
   const rows = (await db.execute<Row>(sql`
     SELECT
       h.as_of_bout_id::text AS bout_id,
@@ -318,8 +321,8 @@ export async function getScoreHistory(
       CASE
         WHEN b.id IS NULL THEN NULL
         WHEN b.fighter_a_id::text = ${fighterId}
-          THEN fb.name_en
-        ELSE fa.name_en
+          THEN ${localizedNameSql("fb", isRu)}
+        ELSE ${localizedNameSql("fa", isRu)}
       END AS opponent_name,
       CASE
         WHEN b.id IS NULL THEN NULL

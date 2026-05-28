@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
+import { isRuLocale, localizedNameSql } from "@/lib/i18n-name";
 
 export type EventListItem = {
   id: string;
@@ -170,6 +171,7 @@ export async function getEventBySlug(slug: string): Promise<EventDetail | null> 
  * order is null.
  */
 export async function getEventBouts(eventId: string): Promise<EventBout[]> {
+  const isRu = await isRuLocale();
   const result = await db.execute<EventBout>(sql`
     SELECT
       b.id::text AS id,
@@ -187,7 +189,7 @@ export async function getEventBouts(eventId: string): Promise<EventBout[]> {
       json_build_object(
         'id', fa.id::text,
         'slug', fa.slug,
-        'name_en', fa.name_en,
+        'name_en', ${localizedNameSql("fa", isRu)},
         'nickname', fa.nickname,
         'photo_url', fa.photo_url,
         'country_code', fa.country_code
@@ -195,7 +197,7 @@ export async function getEventBouts(eventId: string): Promise<EventBout[]> {
       json_build_object(
         'id', fb.id::text,
         'slug', fb.slug,
-        'name_en', fb.name_en,
+        'name_en', ${localizedNameSql("fb", isRu)},
         'nickname', fb.nickname,
         'photo_url', fb.photo_url,
         'country_code', fb.country_code
@@ -276,6 +278,7 @@ export type UpcomingEventSidebar = {
 /** Single-query helper for the news sidebar: the next upcoming event plus
  *  the names of its main-event corners. Returns null when nothing upcoming. */
 export async function getNextUpcomingEventForSidebar(): Promise<UpcomingEventSidebar | null> {
+  const isRu = await isRuLocale();
   const rows = (await db.execute<UpcomingEventSidebar>(sql`
     SELECT
       e.id::text AS id,
@@ -291,8 +294,8 @@ export async function getNextUpcomingEventForSidebar(): Promise<UpcomingEventSid
     FROM event e
     LEFT JOIN LATERAL (
       SELECT
-        fa.name_en AS fighter_a_name,
-        fb.name_en AS fighter_b_name,
+        ${localizedNameSql("fa", isRu)} AS fighter_a_name,
+        ${localizedNameSql("fb", isRu)} AS fighter_b_name,
         b.weight_class::text AS weight_class
       FROM bout b
       JOIN fighter fa ON fa.id = b.fighter_a_id

@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
+import { isRuLocale, localizedNameSql } from "@/lib/i18n-name";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -31,6 +32,7 @@ export type MarketListItem = {
 };
 
 export async function listOpenMarkets(limit = 50): Promise<MarketListItem[]> {
+  const isRu = await isRuLocale();
   const rows = await db.execute<MarketListItem>(sql`
     SELECT
       m.id::text AS id,
@@ -44,9 +46,9 @@ export async function listOpenMarkets(limit = 50): Promise<MarketListItem[]> {
       e.name AS event_name,
       e.slug AS event_slug,
       e.date::text AS event_date,
-      fa.name_en AS fighter_a_name,
+      ${localizedNameSql("fa", isRu)} AS fighter_a_name,
       fa.slug AS fighter_a_slug,
-      fb.name_en AS fighter_b_name,
+      ${localizedNameSql("fb", isRu)} AS fighter_b_name,
       fb.slug AS fighter_b_slug,
       COALESCE(
         (
@@ -114,6 +116,7 @@ export type EventMarketsGroup = {
 export async function listOpenMarketsByEvent(
   limit = 20,
 ): Promise<EventMarketsGroup[]> {
+  const isRu = await isRuLocale();
   const rows = await db.execute<{
     event_id: string;
     event_slug: string;
@@ -149,9 +152,9 @@ export async function listOpenMarketsByEvent(
       b.is_main_event,
       b.is_co_main_event,
       b.is_title_fight,
-      fa.name_en AS fighter_a_name,
+      ${localizedNameSql("fa", isRu)} AS fighter_a_name,
       fa.slug AS fighter_a_slug,
-      fb.name_en AS fighter_b_name,
+      ${localizedNameSql("fb", isRu)} AS fighter_b_name,
       fb.slug AS fighter_b_slug,
       m.id::text AS market_id,
       m.type::text AS market_type,
@@ -266,6 +269,7 @@ export type MarketDetail = Omit<MarketListItem, "outcomes"> & {
 export async function getMarketById(id: string): Promise<MarketDetail | null> {
   if (!UUID_RE.test(id)) return null;
 
+  const isRu = await isRuLocale();
   const marketRows = await db.execute<{
     id: string;
     type: string;
@@ -297,9 +301,9 @@ export async function getMarketById(id: string): Promise<MarketDetail | null> {
       e.name AS event_name,
       e.slug AS event_slug,
       e.date::text AS event_date,
-      fa.name_en AS fighter_a_name,
+      ${localizedNameSql("fa", isRu)} AS fighter_a_name,
       fa.slug AS fighter_a_slug,
-      fb.name_en AS fighter_b_name,
+      ${localizedNameSql("fb", isRu)} AS fighter_b_name,
       fb.slug AS fighter_b_slug
     FROM market m
     JOIN bout b ON b.id = m.bout_id
@@ -409,6 +413,7 @@ export async function getBoutExternalOdds(
 
 export async function listMyBets(userProfileId: string): Promise<MyBetRow[]> {
   if (!UUID_RE.test(userProfileId)) return [];
+  const isRu = await isRuLocale();
   const rows = await db.execute<MyBetRow>(sql`
     SELECT
       bt.id::text AS bet_id,
@@ -424,8 +429,8 @@ export async function listMyBets(userProfileId: string): Promise<MyBetRow[]> {
       bt.created_at::text AS created_at,
       m.status::text AS market_status,
       mo.is_winning,
-      fa.name_en AS fighter_a_name,
-      fb.name_en AS fighter_b_name
+      ${localizedNameSql("fa", isRu)} AS fighter_a_name,
+      ${localizedNameSql("fb", isRu)} AS fighter_b_name
     FROM bet bt
     JOIN market m ON m.id = bt.market_id
     JOIN market_outcome mo ON mo.id = bt.outcome_id

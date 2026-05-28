@@ -1,6 +1,7 @@
 import { sql, type SQL } from "drizzle-orm";
 
 import { db } from "@/lib/db";
+import { isRuLocale, localizedNameSql } from "@/lib/i18n-name";
 import type { FightCardBout } from "@/lib/db/schema/cards";
 
 // Snake-case shapes mirror the raw column names returned by db.execute.
@@ -103,11 +104,12 @@ async function resolveFighters(
     unique.map((id) => sql`${id}::uuid`),
     sql`, `,
   );
+  const isRu = await isRuLocale();
   const rows = (await db.execute<FighterRow>(sql`
     SELECT
       f.id::text AS id,
       f.slug,
-      f.name_en,
+      ${localizedNameSql("f", isRu)} AS name_en,
       f.photo_thumbnail_url,
       f.country_code,
       f.wins_total,
