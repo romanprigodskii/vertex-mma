@@ -16,7 +16,8 @@
     "switchToLight": "Светлая тема",
     "switchToDark": "Тёмная тема",
     "switchToEnglish": "Switch to English",
-    "switchToRussian": "Перейти на русский"
+    "switchToRussian": "Перейти на русский",
+    "brandHome": "Vertex MMA — на главную"
   },
   "userMenu": {
     "profile": "Профиль",
@@ -457,6 +458,8 @@
     "nextEventLabel": "Ближайший турнир",
     "latestNewsLabel": "Свежие новости",
     "findFighter": "Найти бойца",
+    "searchFightersPlaceholder": "Поиск бойцов…",
+    "noFightersMatch": "Бойцов по запросу «{query}» не найдено.",
     "mainEventLabel": "Главный бой",
     "fightCountSidebar": "{count, plural, one {# бой} few {# боя} many {# боёв} other {# боя}}",
     "today": "сегодня",

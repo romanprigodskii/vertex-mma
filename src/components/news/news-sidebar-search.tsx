@@ -1,10 +1,11 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
+import { useTranslations } from "next-intl";
 import Image from "next/image";
 import { Search } from "lucide-react";
 
+import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 
 type Result = {
@@ -16,6 +17,7 @@ type Result = {
 };
 
 export function NewsSidebarSearch() {
+  const t = useTranslations("news");
   const [value, setValue] = React.useState("");
   const [results, setResults] = React.useState<Result[]>([]);
   const [loading, setLoading] = React.useState(false);
@@ -64,7 +66,7 @@ export function NewsSidebarSearch() {
           type="search"
           value={value}
           onChange={(e) => setValue(e.target.value)}
-          placeholder="Search fighters…"
+          placeholder={t("searchFightersPlaceholder")}
           className={cn(
             "h-full flex-1 bg-transparent text-sm text-foreground outline-none",
             "placeholder:text-foreground-subtle",
@@ -116,7 +118,7 @@ export function NewsSidebarSearch() {
         </ul>
       ) : hasQuery && !loading ? (
         <p className="mt-3 border-t border-foreground/10 pt-3 font-sans text-xs text-foreground-subtle">
-          No fighters match &ldquo;{trimmedQuery}&rdquo;.
+          {t("noFightersMatch", { query: trimmedQuery })}
         </p>
       ) : null}
     </div>

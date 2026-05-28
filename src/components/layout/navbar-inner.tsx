@@ -1,5 +1,4 @@
 import { getTranslations } from "next-intl/server";
-import Link from "next/link";
 import { Coins } from "lucide-react";
 
 import { Container } from "@/components/layout/container";
@@ -10,6 +9,7 @@ import { NavbarNotifications } from "@/components/layout/navbar-notifications";
 import { NavbarUserMenu } from "@/components/layout/navbar-user-menu";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { FighterSearchTrigger } from "@/components/search/fighter-search-palette";
+import { Link } from "@/i18n/navigation";
 import type { CurrentUser } from "@/lib/auth";
 import type { NotificationRow } from "@/lib/notifications";
 
@@ -19,12 +19,12 @@ interface Props {
   recentNotifications: NotificationRow[];
 }
 
-function Logo() {
+function Logo({ ariaLabel }: { ariaLabel: string }) {
   return (
     <Link
       href="/"
       className="select-none font-display text-2xl leading-none tracking-wider"
-      aria-label="Vertex MMA — home"
+      aria-label={ariaLabel}
     >
       <span className="text-primary">V</span>
       <span className="text-foreground">ERTEX</span>
@@ -42,7 +42,7 @@ export async function NavbarInner({
     <header className="sticky top-0 z-40 border-b border-foreground/[0.06] bg-background-base/85 backdrop-blur-md">
       <Container size="xl">
         <div className="flex h-14 items-center justify-between gap-4 md:h-16 md:gap-6">
-          <Logo />
+          <Logo ariaLabel={t("brandHome")} />
           <NavSections />
           <div className="flex items-center gap-2">
             <FighterSearchTrigger className="hidden lg:inline-flex" />

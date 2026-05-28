@@ -16,7 +16,8 @@
     "switchToLight": "Switch to light",
     "switchToDark": "Switch to dark",
     "switchToEnglish": "Switch to English",
-    "switchToRussian": "Перейти на русский"
+    "switchToRussian": "Перейти на русский",
+    "brandHome": "Vertex MMA — home"
   },
   "userMenu": {
     "profile": "Profile",
@@ -457,6 +458,8 @@
     "nextEventLabel": "Next event",
     "latestNewsLabel": "Latest news",
     "findFighter": "Find a fighter",
+    "searchFightersPlaceholder": "Search fighters…",
+    "noFightersMatch": "No fighters match “{query}”.",
     "mainEventLabel": "Main event",
     "fightCountSidebar": "{count, plural, =1 {1 fight} other {# fights}}",
     "today": "today",
