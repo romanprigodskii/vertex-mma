@@ -1,3 +1,5 @@
+import { getTranslations } from "next-intl/server";
+
 import type { BoutExternalOddsRow } from "@/lib/markets";
 
 interface Props {
@@ -31,22 +33,22 @@ function pairImpliedPct(
   return `${((raw / total) * 100).toFixed(0)}%`;
 }
 
-function relativeHours(iso: string): string {
-  const ms = Date.now() - new Date(iso).getTime();
-  if (!Number.isFinite(ms) || ms < 0) return "just now";
-  const hours = Math.floor(ms / 3_600_000);
-  if (hours < 1) return "just now";
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
-}
-
-export function SportsbookConsensus({
+export async function SportsbookConsensus({
   odds,
   marketType,
   fighterAName,
   fighterBName,
 }: Props) {
+  const t = await getTranslations("markets");
+  const relativeHours = (iso: string): string => {
+    const ms = Date.now() - new Date(iso).getTime();
+    if (!Number.isFinite(ms) || ms < 0) return t("justNow");
+    const hours = Math.floor(ms / 3_600_000);
+    if (hours < 1) return t("justNow");
+    if (hours < 24) return t("hoursAgoShort", { n: hours });
+    const days = Math.floor(hours / 24);
+    return t("daysAgoShort", { n: days });
+  };
   const isMethod = marketType === "method";
   const hasMethodOdds =
     odds.method_a_kotko_decimal != null ||
@@ -57,7 +59,7 @@ export function SportsbookConsensus({
     <section className="mt-8 rounded-md border border-foreground/10 bg-background-elevated/20 p-4">
       <div className="flex items-baseline justify-between gap-2">
         <h3 className="font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
-          Sportsbook consensus
+          {t("consensusHeading")}
         </h3>
         <p className="font-mono text-[10px] tabular text-foreground-subtle">
           {odds.source} · {relativeHours(odds.fetched_at)}
@@ -72,17 +74,27 @@ export function SportsbookConsensus({
               kotko={odds.method_a_kotko_decimal}
               sub={odds.method_a_sub_decimal}
               dec={odds.method_a_dec_decimal}
+              labels={{
+                kotko: t("methodKoTko"),
+                sub: t("methodSub"),
+                dec: t("methodDec"),
+              }}
             />
             <FighterMethodOdds
               name={fighterBName}
               kotko={odds.method_b_kotko_decimal}
               sub={odds.method_b_sub_decimal}
               dec={odds.method_b_dec_decimal}
+              labels={{
+                kotko: t("methodKoTko"),
+                sub: t("methodSub"),
+                dec: t("methodDec"),
+              }}
             />
           </div>
         ) : (
           <p className="mt-3 font-sans text-xs text-foreground-subtle">
-            Per-method consensus not available for this bout.
+            {t("noMethodConsensus")}
           </p>
         )
       ) : (
@@ -90,6 +102,7 @@ export function SportsbookConsensus({
           <WinnerCell
             name={fighterAName}
             decimal={odds.winner_a_decimal}
+            decLabel={t("decSuffix")}
             impliedNoVig={pairImpliedPct(
               odds.winner_a_decimal,
               odds.winner_b_decimal,
@@ -99,6 +112,7 @@ export function SportsbookConsensus({
           <WinnerCell
             name={fighterBName}
             decimal={odds.winner_b_decimal}
+            decLabel={t("decSuffix")}
             impliedNoVig={pairImpliedPct(
               odds.winner_a_decimal,
               odds.winner_b_decimal,
@@ -109,9 +123,7 @@ export function SportsbookConsensus({
       )}
 
       <p className="mt-3 font-sans text-[11px] text-foreground-subtle">
-        Implied probability with sportsbook overround removed. Reference
-        only — Vertex market prices come from user trades via LMSR and can
-        drift away from consensus.
+        {t("consensusCaveat")}
       </p>
     </section>
   );
@@ -121,10 +133,12 @@ function WinnerCell({
   name,
   decimal,
   impliedNoVig,
+  decLabel,
 }: {
   name: string;
   decimal: number | null;
   impliedNoVig: string;
+  decLabel: string;
 }) {
   return (
     <div className="rounded-sm border border-foreground/10 bg-foreground/[0.04] px-3 py-2">
@@ -135,7 +149,7 @@ function WinnerCell({
         {impliedNoVig}
       </p>
       <p className="font-mono text-[10px] tabular text-foreground-subtle">
-        {decimal ? decimal.toFixed(2) : "—"} dec
+        {decimal ? decimal.toFixed(2) : "—"} {decLabel}
       </p>
     </div>
   );
@@ -146,11 +160,13 @@ function FighterMethodOdds({
   kotko,
   sub,
   dec,
+  labels,
 }: {
   name: string;
   kotko: number | null;
   sub: number | null;
   dec: number | null;
+  labels: { kotko: string; sub: string; dec: string };
 }) {
   return (
     <div className="rounded-sm border border-foreground/10 bg-foreground/[0.04] px-3 py-2">
@@ -159,9 +175,9 @@ function FighterMethodOdds({
       </p>
       <div className="mt-1 flex flex-col gap-1">
         {[
-          { label: "KO/TKO", v: kotko },
-          { label: "Sub", v: sub },
-          { label: "Dec", v: dec },
+          { label: labels.kotko, v: kotko },
+          { label: labels.sub, v: sub },
+          { label: labels.dec, v: dec },
         ].map((r) => (
           <div
             key={r.label}

@@ -373,7 +373,17 @@
     "shareHint": "Each share pays 1 coin if your outcome wins. Buying the opposite outcome later is the only way to hedge for now — an explicit sell flow lands next.",
     "volTraders": "Vol {vol} · {count, plural, =1 {1 trader} other {# traders}}",
     "favorite": "Favorite",
-    "plusMore": "+{n} more"
+    "plusMore": "+{n} more",
+    "consensusHeading": "Sportsbook consensus",
+    "justNow": "just now",
+    "hoursAgoShort": "{n}h ago",
+    "daysAgoShort": "{n}d ago",
+    "noMethodConsensus": "Per-method consensus not available for this bout.",
+    "consensusCaveat": "Implied probability with sportsbook overround removed. Reference only — Vertex market prices come from user trades via LMSR and can drift away from consensus.",
+    "decSuffix": "dec",
+    "methodKoTko": "KO/TKO",
+    "methodSub": "Sub",
+    "methodDec": "Dec"
   },
   "leaderboard": {
     "metaTitle": "Leaderboard",
