@@ -23,7 +23,7 @@ const bebasNeue = Bebas_Neue({
 // per-glyph fallback in the --font-display stack, so Latin still renders in Bebas.
 const oswald = Oswald({
   variable: "--font-display-oswald",
-  weight: "600",
+  weight: "400",
   subsets: ["latin", "cyrillic"],
   display: "swap",
 });

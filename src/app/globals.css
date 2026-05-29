@@ -322,6 +322,12 @@
     --font-display: var(--font-display-oswald), "Oswald", sans-serif;
   }
 
+  /* Oswald sits a touch taller than Bebas per em; normalize the cap height so
+     RU display headings don't read larger than their EN (Bebas) counterparts. */
+  html[lang="ru"] .font-display {
+    font-size-adjust: cap-height 0.66;
+  }
+
   body {
     background-color: var(--color-background-base);
     color: var(--color-foreground);
