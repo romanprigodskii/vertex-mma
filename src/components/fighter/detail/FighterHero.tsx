@@ -45,18 +45,13 @@ function initialsOf(name: string): string {
 function HeroPhoto({
   name,
   photoUrl,
-  isChampion,
 }: {
   name: string;
   photoUrl: string | null;
-  isChampion: boolean;
 }) {
   const wrapper = cn(
     "relative aspect-[3/4] w-full overflow-hidden rounded-md",
     "lg:aspect-auto lg:h-[480px] lg:w-[360px]",
-    isChampion
-      ? "border-2 border-primary/40 shadow-glow-primary"
-      : "border border-foreground/10",
   );
   if (photoUrl) {
     return (
@@ -104,7 +99,6 @@ export async function FighterHero({ fighter, championEntry }: FighterHeroProps) 
     fighter.status && tFighter.has(`status.${fighter.status}`)
       ? tFighter(`status.${fighter.status}`)
       : null;
-  const isChampion = championEntry !== null;
 
   const wins = fighter.wins_total;
   const losses = fighter.losses_total;
@@ -131,7 +125,6 @@ export async function FighterHero({ fighter, championEntry }: FighterHeroProps) 
           <HeroPhoto
             name={fighter.name_en}
             photoUrl={fighter.photo_url}
-            isChampion={isChampion}
           />
           {championEntry ? (
             <div className="absolute right-2 top-2">

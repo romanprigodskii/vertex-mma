@@ -180,7 +180,7 @@ export function FighterCard({
               : `${tierGradient}, ${cardBase}`,
       }}
       className={cn(
-        "group relative flex min-h-[168px] gap-4 rounded-lg border border-foreground/10 p-4",
+        "group relative flex min-h-[168px] gap-4 rounded-lg p-4",
         "transition-[background-color] duration-200 ease-out",
         "hover:bg-foreground/[0.02]",
         "focus-visible:outline-none focus-visible:bg-foreground/[0.02]",

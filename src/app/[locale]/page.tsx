@@ -179,7 +179,7 @@ export default async function HomePage({
                             f.photo_thumbnail_url ?? f.photo_url ?? undefined
                           }
                           alt={f.name_en}
-                          className="h-12 w-12 shrink-0 rounded-sm border border-foreground/15 object-cover"
+                          className="h-12 w-12 shrink-0 rounded-sm object-cover"
                         />
                       ) : (
                         <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-sm bg-primary/15 font-display text-sm uppercase text-primary">
