@@ -48,4 +48,13 @@ def _patch_connection_string_for_dns(url: str) -> str:
 
 
 def get_connection() -> psycopg.Connection:
-    return psycopg.connect(_patch_connection_string_for_dns(DATABASE_URL), autocommit=False)
+    # TCP keepalives so the Supabase pooler doesn't drop the connection while it
+    # sits idle during slow UFC page/image fetches between DB writes.
+    return psycopg.connect(
+        _patch_connection_string_for_dns(DATABASE_URL),
+        autocommit=False,
+        keepalives=1,
+        keepalives_idle=30,
+        keepalives_interval=10,
+        keepalives_count=5,
+    )

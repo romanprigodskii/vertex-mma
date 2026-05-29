@@ -18,6 +18,8 @@ import argparse
 import time
 from pathlib import Path
 
+import psycopg
+
 import _path  # noqa: F401
 
 from src.db import get_connection
@@ -84,71 +86,94 @@ def run(
     if dry_run:
         SAMPLE_DIR.mkdir(parents=True, exist_ok=True)
 
-    with get_connection() as conn:
+    conn = get_connection()
+    try:
         targets = _targets(conn, top, limit, all_missing)
         scope = "all missing" if all_missing else f"top-{top}"
         log.info(
             f"UFC photos: {len(targets)} {scope} fighter(s) without a photo "
             f"(dry_run={dry_run})"
         )
-        for i, f in enumerate(targets):
+        for f in targets:
             fid, slug, name = f["id"], f["slug"], f["name_en"]
             img, reason = fetch_ufc_image(name)
-            if img is None:
-                totals["no_photo"] += 1
-                log.warning(f"  {name}: no UFC photo ({reason})")
-                # A network blip isn't a real miss — leave it unmarked so a rerun
-                # retries. A genuine miss (404 / no image) gets marked so reruns
-                # skip it; status-only update PRESERVES any existing photo.
-                if not dry_run and not reason.startswith("network_error"):
-                    with conn.cursor() as cur:
-                        cur.execute(
-                            "UPDATE fighter SET photo_fetch_status = %s WHERE id = %s::uuid",
-                            (NO_PHOTO_STATUS, fid),
-                        )
-                    conn.commit()
-                time.sleep(DELAY_SECONDS)
-                continue
             try:
-                processed = process_cutout(img.raw)
-            except Exception as exc:
-                totals["error"] += 1
-                log.error(f"  {name}: processing failed — {exc!r}")
-                continue
+                if img is None:
+                    totals["no_photo"] += 1
+                    log.warning(f"  {name}: no UFC photo ({reason})")
+                    # A network blip isn't a real miss — leave it unmarked so a
+                    # rerun retries. A genuine miss (404 / no image) gets marked
+                    # so reruns skip it; status-only update PRESERVES any
+                    # existing photo.
+                    if not dry_run and not reason.startswith("network_error"):
+                        with conn.cursor() as cur:
+                            cur.execute(
+                                "UPDATE fighter SET photo_fetch_status = %s WHERE id = %s::uuid",
+                                (NO_PHOTO_STATUS, fid),
+                            )
+                        conn.commit()
+                    time.sleep(DELAY_SECONDS)
+                    continue
 
-            if dry_run:
-                out = SAMPLE_DIR / f"{slug}.webp"
-                out.write_bytes(processed.full_webp)
-                (SAMPLE_DIR / f"{slug}_thumb.webp").write_bytes(processed.thumbnail_webp)
+                try:
+                    processed = process_cutout(img.raw)
+                except Exception as exc:
+                    totals["error"] += 1
+                    log.error(f"  {name}: processing failed — {exc!r}")
+                    continue
+
+                if dry_run:
+                    out = SAMPLE_DIR / f"{slug}.webp"
+                    out.write_bytes(processed.full_webp)
+                    (SAMPLE_DIR / f"{slug}_thumb.webp").write_bytes(
+                        processed.thumbnail_webp
+                    )
+                    totals["fetched"] += 1
+                    log.info(f"  {name}: sample → {out}")
+                    continue
+
+                try:
+                    full_url = upload(f"{slug}/full.webp", content=processed.full_webp)
+                    upload(f"{slug}/thumbnail.webp", content=processed.thumbnail_webp)
+                except Exception as exc:
+                    totals["error"] += 1
+                    log.error(f"  {name}: upload failed — {exc!r}")
+                    continue
+
+                update_fighter_photo(
+                    conn,
+                    row=PhotoRow(
+                        fighter_id=fid,
+                        photo_url=full_url,
+                        photo_thumbnail_url=public_url(f"{slug}/thumbnail.webp"),
+                        photo_license="ufc_editorial",
+                        photo_source_url=img.page_url,
+                        photo_attribution="© UFC",
+                        wikipedia_url=None,
+                        status="success",
+                    ),
+                )
+                conn.commit()
                 totals["fetched"] += 1
-                log.info(f"  {name}: sample → {out}")
-                continue
-
-            try:
-                full_url = upload(f"{slug}/full.webp", content=processed.full_webp)
-                upload(f"{slug}/thumbnail.webp", content=processed.thumbnail_webp)
-            except Exception as exc:
+                log.info(f"  {name}: uploaded {full_url}")
+                time.sleep(DELAY_SECONDS)
+            except psycopg.OperationalError as exc:
+                # Pooler dropped the connection (idle during a slow fetch, or a
+                # network blip). Reconnect and move on — this fighter is left
+                # uncommitted and a rerun will pick it up.
                 totals["error"] += 1
-                log.error(f"  {name}: upload failed — {exc!r}")
-                continue
-
-            update_fighter_photo(
-                conn,
-                row=PhotoRow(
-                    fighter_id=fid,
-                    photo_url=full_url,
-                    photo_thumbnail_url=public_url(f"{slug}/thumbnail.webp"),
-                    photo_license="ufc_editorial",
-                    photo_source_url=img.page_url,
-                    photo_attribution="© UFC",
-                    wikipedia_url=None,
-                    status="success",
-                ),
-            )
-            conn.commit()
-            totals["fetched"] += 1
-            log.info(f"  {name}: uploaded {full_url}")
-            time.sleep(DELAY_SECONDS)
+                log.warning(f"  {name}: DB connection lost ({exc!r}) — reconnecting")
+                try:
+                    conn.close()
+                except Exception:  # noqa: BLE001
+                    pass
+                conn = get_connection()
+                time.sleep(DELAY_SECONDS)
+    finally:
+        try:
+            conn.close()
+        except Exception:  # noqa: BLE001
+            pass
 
     log.info(
         f"UFC photos done: fetched={totals['fetched']} "
