@@ -1047,6 +1047,7 @@
     "scoreAfter": "счёт → {score}",
     "stillAtPeak": "Сейчас на пике карьеры",
     "retiredAtPeak": "Завершил карьеру на пике",
+    "softenedSincePeak": "Снизился со времени пика",
     "vs": "против"
   },
   "compare": {

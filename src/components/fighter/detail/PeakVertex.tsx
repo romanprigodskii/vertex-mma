@@ -164,9 +164,18 @@ export async function PeakVertex({ info }: PeakVertexProps) {
               </span>
             </div>
           ) : isAtPeak ? (
-            <div className="text-[11px] uppercase tracking-widest text-streak-win">
-              {currentScore != null ? t("stillAtPeak") : t("retiredAtPeak")}
-            </div>
+            // No bout ended the peak — but the live score can still have eased
+            // below it via inactivity / time-decay. Only claim "still at peak"
+            // when the current score actually equals the peak.
+            currentScore != null && delta != null && delta < 0 ? (
+              <div className="text-[11px] uppercase tracking-widest text-foreground-subtle">
+                {t("softenedSincePeak")}
+              </div>
+            ) : (
+              <div className="text-[11px] uppercase tracking-widest text-streak-win">
+                {currentScore != null ? t("stillAtPeak") : t("retiredAtPeak")}
+              </div>
+            )
           ) : null}
         </div>
       </div>
