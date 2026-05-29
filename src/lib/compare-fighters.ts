@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
-import { isRuLocale, localizedNameSql } from "@/lib/i18n-name";
+import { isRuLocale, localizedEventNameSql, localizedNameSql } from "@/lib/i18n-name";
 
 export type CommonOpponentBout = {
   event_name: string;
@@ -75,7 +75,7 @@ export async function getCommonOpponents(
         SELECT
           CASE WHEN b.fighter_a_id = ${fighterAId}::uuid THEN b.fighter_b_id ELSE b.fighter_a_id END AS opp_id,
           b.id AS bout_id,
-          COALESCE(e.short_name, e.name) AS event_name,
+          ${localizedEventNameSql("e", isRu)} AS event_name,
           e.slug AS event_slug,
           e.date AS event_date,
           CASE
@@ -109,7 +109,7 @@ export async function getCommonOpponents(
         SELECT
           CASE WHEN b.fighter_a_id = ${fighterBId}::uuid THEN b.fighter_b_id ELSE b.fighter_a_id END AS opp_id,
           b.id AS bout_id,
-          COALESCE(e.short_name, e.name) AS event_name,
+          ${localizedEventNameSql("e", isRu)} AS event_name,
           e.slug AS event_slug,
           e.date AS event_date,
           CASE
@@ -197,10 +197,11 @@ export async function getHeadToHeadBouts(
 ): Promise<HeadToHeadBout[]> {
   if (fighterAId === fighterBId) return [];
 
+  const isRu = await isRuLocale();
   const result = await db.execute<HeadToHeadBout>(sql`
     SELECT
       b.id::text AS bout_id,
-      COALESCE(e.short_name, e.name) AS event_name,
+      ${localizedEventNameSql("e", isRu)} AS event_name,
       e.slug AS event_slug,
       e.date::text AS event_date,
       CASE

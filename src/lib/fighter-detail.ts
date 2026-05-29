@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
-import { isRuLocale, localizedNameSql } from "@/lib/i18n-name";
+import { isRuLocale, localizedEventNameSql, localizedNameSql } from "@/lib/i18n-name";
 
 /**
  * Full row from `fighter_with_stats` (the same view that backs the catalog),
@@ -754,7 +754,7 @@ export async function getFightHistory(
   const result = await db.execute<FightHistoryEntry>(sql`
     SELECT
       b.id::text AS bout_id,
-      COALESCE(e.short_name, e.name) AS event_name,
+      ${localizedEventNameSql("e", isRu)} AS event_name,
       e.slug AS event_slug,
       e.date::text AS event_date,
       opp.id::text AS opponent_id,

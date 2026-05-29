@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
-import { isRuLocale, localizedColSql, localizedNameSql } from "@/lib/i18n-name";
+import { isRuLocale, localizedColSql, localizedEventNameSql, localizedNameSql } from "@/lib/i18n-name";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -144,7 +144,7 @@ export async function listOpenMarketsByEvent(
       e.id::text AS event_id,
       e.slug AS event_slug,
       ${localizedColSql("e.name", "e.name_ru", isRu)} AS event_name,
-      e.short_name AS event_short_name,
+      ${localizedEventNameSql("e", isRu)} AS event_short_name,
       e.date::text AS event_date,
       b.id::text AS bout_id,
       b.bout_order,

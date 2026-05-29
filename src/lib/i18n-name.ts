@@ -26,6 +26,18 @@ export function localizedNameSql(alias: string, isRu: boolean): SQL {
     : sql.raw(`${alias}.name_en`);
 }
 
+/** Event display name for the active locale. Many UIs prefer `short_name`
+ *  (which in this DB duplicates `name`), so on RU we resolve name_ru first,
+ *  then fall back to short_name / name. `alias` is the event row's table alias
+ *  (e.g. "e"). Alias the result as whichever column the consumer reads. */
+export function localizedEventNameSql(alias: string, isRu: boolean): SQL {
+  return isRu
+    ? sql.raw(
+        `COALESCE(NULLIF(${alias}.name_ru, ''), ${alias}.short_name, ${alias}.name)`,
+      )
+    : sql.raw(`COALESCE(${alias}.short_name, ${alias}.name)`);
+}
+
 /** Generic locale-aware column: on RU resolve `ruCol` with a fallback to
  *  `enCol`, otherwise just `enCol`. Both args are raw column expressions
  *  (e.g. "ni.title", "ni.title_ru"). Same name-overloading caveat as

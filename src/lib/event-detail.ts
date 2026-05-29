@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
-import { isRuLocale, localizedColSql, localizedNameSql } from "@/lib/i18n-name";
+import { isRuLocale, localizedColSql, localizedEventNameSql, localizedNameSql } from "@/lib/i18n-name";
 
 export type EventListItem = {
   id: string;
@@ -42,7 +42,7 @@ export async function listEvents(
         e.id::text AS id,
         e.slug,
         ${localizedColSql("e.name", "e.name_ru", isRu)} AS name,
-        e.short_name,
+        ${localizedEventNameSql("e", isRu)} AS short_name,
         e.date::text AS date,
         e.location_city,
         e.location_country,
@@ -65,7 +65,7 @@ export async function listEvents(
         e.id::text AS id,
         e.slug,
         ${localizedColSql("e.name", "e.name_ru", isRu)} AS name,
-        e.short_name,
+        ${localizedEventNameSql("e", isRu)} AS short_name,
         e.date::text AS date,
         e.location_city,
         e.location_country,
@@ -86,7 +86,7 @@ export async function listEvents(
       e.id::text AS id,
       e.slug,
       ${localizedColSql("e.name", "e.name_ru", isRu)} AS name,
-      e.short_name,
+      ${localizedEventNameSql("e", isRu)} AS short_name,
       e.date::text AS date,
       e.location_city,
       e.location_country,
@@ -244,7 +244,7 @@ export async function detectMentionedEvents(
         e.id,
         e.slug,
         ${localizedColSql("e.name", "e.name_ru", isRu)} AS name,
-        e.short_name,
+        ${localizedEventNameSql("e", isRu)} AS short_name,
         TRIM(split_part(COALESCE(e.short_name, e.name), ':', 1)) AS prefix
       FROM event e
       WHERE COALESCE(e.short_name, e.name) IS NOT NULL
@@ -286,7 +286,7 @@ export async function getNextUpcomingEventForSidebar(): Promise<UpcomingEventSid
       e.id::text AS id,
       e.slug,
       ${localizedColSql("e.name", "e.name_ru", isRu)} AS name,
-      e.short_name,
+      ${localizedEventNameSql("e", isRu)} AS short_name,
       e.date::text AS date,
       e.promotion::text AS promotion,
       (SELECT COUNT(*)::int FROM bout WHERE event_id = e.id) AS bout_count,

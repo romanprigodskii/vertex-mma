@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
-import { isRuLocale, localizedNameSql } from "@/lib/i18n-name";
+import { isRuLocale, localizedEventNameSql, localizedNameSql } from "@/lib/i18n-name";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -22,12 +22,13 @@ export type PredictionEventListItem = {
 export async function listOpenPredictionEvents(
   limit = 20,
 ): Promise<PredictionEventListItem[]> {
+  const isRu = await isRuLocale();
   const rows = await db.execute<PredictionEventListItem>(sql`
     SELECT
       pe.id::text AS id,
       pe.event_id::text AS event_id,
       e.slug AS event_slug,
-      COALESCE(e.short_name, e.name) AS event_name,
+      ${localizedEventNameSql("e", isRu)} AS event_name,
       e.date::text AS event_date,
       pe.status,
       pe.opens_at::text AS opens_at,
@@ -77,12 +78,13 @@ export async function getPredictionEventForUser(
 ): Promise<PredictionEventDetail | null> {
   if (!UUID_RE.test(predictionEventId)) return null;
 
+  const isRu = await isRuLocale();
   const headerRows = await db.execute<PredictionEventListItem>(sql`
     SELECT
       pe.id::text AS id,
       pe.event_id::text AS event_id,
       e.slug AS event_slug,
-      COALESCE(e.short_name, e.name) AS event_name,
+      ${localizedEventNameSql("e", isRu)} AS event_name,
       e.date::text AS event_date,
       pe.status,
       pe.opens_at::text AS opens_at,
@@ -105,7 +107,6 @@ export async function getPredictionEventForUser(
     ? userProfileId
     : null;
 
-  const isRu = await isRuLocale();
   const boutRows = await db.execute<PredictionBoutRow>(sql`
     SELECT
       b.id::text AS bout_id,
@@ -158,11 +159,12 @@ export async function listMyPredictions(
   userProfileId: string,
 ): Promise<MyPredictionRow[]> {
   if (!UUID_RE.test(userProfileId)) return [];
+  const isRu = await isRuLocale();
   const rows = await db.execute<MyPredictionRow>(sql`
     SELECT
       pe.id::text AS prediction_event_id,
       e.slug AS event_slug,
-      COALESCE(e.short_name, e.name) AS event_name,
+      ${localizedEventNameSql("e", isRu)} AS event_name,
       e.date::text AS event_date,
       pe.status,
       COUNT(pp.id)::int AS picks_count,

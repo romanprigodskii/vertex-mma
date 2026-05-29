@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
-import { isRuLocale, localizedColSql, localizedNameSql } from "@/lib/i18n-name";
+import { isRuLocale, localizedColSql, localizedEventNameSql, localizedNameSql } from "@/lib/i18n-name";
 
 export type BoutDetailFighter = {
   id: string;
@@ -137,7 +137,7 @@ export async function getBoutById(id: string): Promise<BoutDetail | null> {
       b.event_id::text AS event_id,
       e.slug AS event_slug,
       ${localizedColSql("e.name", "e.name_ru", isRu)} AS event_name,
-      e.short_name AS event_short_name,
+      ${localizedEventNameSql("e", isRu)} AS event_short_name,
       e.date::text AS event_date,
       e.location_city AS event_location_city,
       e.location_country AS event_location_country,
