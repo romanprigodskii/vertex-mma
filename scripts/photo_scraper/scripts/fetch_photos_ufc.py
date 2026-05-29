@@ -37,14 +37,16 @@ NO_PHOTO_STATUS = "ufc_no_photo"  # marks a UFC miss so reruns skip it
 def _targets(conn, top: int, limit: int | None, all_missing: bool) -> list[dict]:
     with conn.cursor() as cur:
         if all_missing:
-            # Every fighter without a photo, most-ranked first, skipping ones a
-            # previous UFC run already failed on.
+            # Every fighter not yet sourced from UFC, most-ranked first. Includes
+            # those with an existing (e.g. Wikipedia) photo so they get the
+            # uniform transparent UFC cutout — skipping ones already UFC-sourced
+            # or that a previous UFC run already failed on.
             cur.execute(
                 """
                 SELECT id::text, slug, name_en
                 FROM fighter
-                WHERE photo_url IS NULL
-                  AND photo_fetch_status IS DISTINCT FROM %s
+                WHERE photo_fetch_status IS DISTINCT FROM %s
+                  AND photo_license IS DISTINCT FROM 'ufc_editorial'
                 ORDER BY vertex_score DESC NULLS LAST, name_en
                 """,
                 (NO_PHOTO_STATUS,),
@@ -95,21 +97,15 @@ def run(
             if img is None:
                 totals["no_photo"] += 1
                 log.warning(f"  {name}: no UFC photo ({reason})")
-                if not dry_run:
-                    # Mark the miss so a rerun skips it; leaves photo_url NULL.
-                    update_fighter_photo(
-                        conn,
-                        row=PhotoRow(
-                            fighter_id=fid,
-                            photo_url=None,
-                            photo_thumbnail_url=None,
-                            photo_license=None,
-                            photo_source_url=None,
-                            photo_attribution=None,
-                            wikipedia_url=None,
-                            status=NO_PHOTO_STATUS,
-                        ),
-                    )
+                # A network blip isn't a real miss — leave it unmarked so a rerun
+                # retries. A genuine miss (404 / no image) gets marked so reruns
+                # skip it; status-only update PRESERVES any existing photo.
+                if not dry_run and not reason.startswith("network_error"):
+                    with conn.cursor() as cur:
+                        cur.execute(
+                            "UPDATE fighter SET photo_fetch_status = %s WHERE id = %s::uuid",
+                            (NO_PHOTO_STATUS, fid),
+                        )
                     conn.commit()
                 time.sleep(DELAY_SECONDS)
                 continue

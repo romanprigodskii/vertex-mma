@@ -55,24 +55,29 @@ class UfcImage:
 
 
 def fetch_ufc_image(name_en: str) -> tuple[UfcImage | None, str]:
-    """Returns (UfcImage, reason). On failure UfcImage is None and reason says why."""
+    """Returns (UfcImage, reason). On failure UfcImage is None and reason says
+    why. Network errors are caught and reported as 'network_error' so a flaky
+    connection never crashes a long run."""
     slug = ufc_slug(name_en)
     page_url = UFC_ATHLETE_URL.format(slug=slug)
-    with _client() as c:
-        r = c.get(page_url)
-        if r.status_code == 404:
-            return None, "page_404"
-        if r.status_code != 200:
-            return None, f"page_http_{r.status_code}"
-        img_url = _find_image_url(r.text)
-        if not img_url:
-            return None, "no_image_on_page"
-        ir = c.get(img_url)
-        if ir.status_code != 200:
-            return None, f"image_http_{ir.status_code}"
-        if not ir.headers.get("content-type", "").startswith("image/"):
-            return None, "image_not_image"
-        return UfcImage(raw=ir.content, page_url=page_url), "ok"
+    try:
+        with _client() as c:
+            r = c.get(page_url)
+            if r.status_code == 404:
+                return None, "page_404"
+            if r.status_code != 200:
+                return None, f"page_http_{r.status_code}"
+            img_url = _find_image_url(r.text)
+            if not img_url:
+                return None, "no_image_on_page"
+            ir = c.get(img_url)
+            if ir.status_code != 200:
+                return None, f"image_http_{ir.status_code}"
+            if not ir.headers.get("content-type", "").startswith("image/"):
+                return None, "image_not_image"
+            return UfcImage(raw=ir.content, page_url=page_url), "ok"
+    except Exception as exc:  # noqa: BLE001 — never let a network hiccup kill the run
+        return None, f"network_error:{type(exc).__name__}"
 
 
 @dataclass
