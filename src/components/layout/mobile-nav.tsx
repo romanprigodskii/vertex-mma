@@ -5,6 +5,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { Coins, LogOut, Menu, Moon, Sun, X } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useTheme } from "next-themes";
+import { useSearchParams } from "next/navigation";
 
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { routing } from "@/i18n/routing";
@@ -16,6 +17,7 @@ export function MobileNav({ user }: { user: CurrentUser | null }) {
   const [open, setOpen] = React.useState(false);
   const pathname = usePathname();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const locale = useLocale();
   const t = useTranslations("nav");
   const tUser = useTranslations("userMenu");
@@ -89,11 +91,12 @@ export function MobileNav({ user }: { user: CurrentUser | null }) {
 
             <button
               type="button"
-              onClick={() =>
-                router.replace(pathname, {
+              onClick={() => {
+                const qs = searchParams.toString();
+                router.replace(`${pathname}${qs ? `?${qs}` : ""}`, {
                   locale: otherLocale as (typeof routing.locales)[number],
-                })
-              }
+                });
+              }}
               className="mb-3 flex w-full items-center gap-2.5 rounded-sm border border-foreground/15 px-3 py-2.5 text-left font-sans text-sm text-foreground transition-colors hover:bg-foreground/[0.04]"
             >
               <span className="inline-flex h-4 w-4 items-center justify-center rounded-sm border border-foreground/30 font-mono text-[9px] tracking-tighter">

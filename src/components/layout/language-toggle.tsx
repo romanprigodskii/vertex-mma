@@ -2,6 +2,7 @@
 
 import { useLocale } from "next-intl";
 import { Languages } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 
 import { usePathname, useRouter } from "@/i18n/navigation";
 import { routing } from "@/i18n/routing";
@@ -15,6 +16,7 @@ export function LanguageToggle({ className }: { className?: string }) {
   const locale = useLocale();
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   const other = locale === "ru" ? "en" : "ru";
   const otherLabel = other === "ru" ? "RU" : "EN";
@@ -22,11 +24,14 @@ export function LanguageToggle({ className }: { className?: string }) {
   return (
     <button
       type="button"
-      onClick={() =>
-        router.replace(pathname, {
+      onClick={() => {
+        // Keep the query string (compare selections, catalog filters, etc.) —
+        // usePathname() drops it, so switching locale would otherwise reset state.
+        const qs = searchParams.toString();
+        router.replace(`${pathname}${qs ? `?${qs}` : ""}`, {
           locale: other as (typeof routing.locales)[number],
-        })
-      }
+        });
+      }}
       aria-label={`Switch language to ${otherLabel}`}
       title={`Switch language to ${otherLabel}`}
       className={cn(
