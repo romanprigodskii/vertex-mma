@@ -109,7 +109,7 @@
   /* ============================================================
      Typography
      ============================================================ */
-  --font-display: var(--font-display-bebas), "Bebas Neue", var(--font-display-oswald), "Oswald", sans-serif;
+  --font-display: var(--font-display-bebas), "Bebas Neue", sans-serif;
   --font-sans: var(--font-sans-inter), "Inter", system-ui, sans-serif;
   --font-mono: var(--font-mono-jetbrains), "JetBrains Mono", monospace;
 
@@ -313,6 +313,13 @@
 
   html[data-theme="light"] {
     color-scheme: light;
+  }
+
+  /* Bebas Neue has no Cyrillic, so on the RU site display headings render the
+     whole word (Latin prefixes + Cyrillic) in Oswald — a condensed display face
+     that covers both scripts — instead of mixing Bebas with a plain sans. */
+  html[lang="ru"] {
+    --font-display: var(--font-display-oswald), "Oswald", sans-serif;
   }
 
   body {
