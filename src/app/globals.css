@@ -109,7 +109,7 @@
   /* ============================================================
      Typography
      ============================================================ */
-  --font-display: var(--font-display-bebas), "Bebas Neue", sans-serif;
+  --font-display: var(--font-display-bebas), "Bebas Neue", var(--font-display-oswald), "Oswald", sans-serif;
   --font-sans: var(--font-sans-inter), "Inter", system-ui, sans-serif;
   --font-mono: var(--font-mono-jetbrains), "JetBrains Mono", monospace;
 

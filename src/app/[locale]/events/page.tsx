@@ -133,7 +133,8 @@ export default async function EventsListPage({
                         </p>
                       ) : null}
                       <p className="mt-3 font-mono text-[10px] tabular text-foreground-subtle">
-                        {t("boutCount", { count: e.bout_count })} · {statusLabel}
+                        {t("boutCount", { count: e.bout_count })}
+                        {e.status === "upcoming" ? "" : ` · ${statusLabel}`}
                       </p>
                     </Link>
                   </li>

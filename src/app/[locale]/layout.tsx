@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Bebas_Neue, Inter, JetBrains_Mono } from "next/font/google";
+import { Bebas_Neue, Inter, JetBrains_Mono, Oswald } from "next/font/google";
 import { notFound } from "next/navigation";
 import { hasLocale, NextIntlClientProvider } from "next-intl";
 import { setRequestLocale } from "next-intl/server";
@@ -15,6 +15,16 @@ const bebasNeue = Bebas_Neue({
   variable: "--font-display-bebas",
   weight: "400",
   subsets: ["latin"],
+  display: "swap",
+});
+
+// Bebas Neue has no Cyrillic glyphs, so RU display headings fell back to a plain
+// sans. Oswald is a condensed display face that covers Cyrillic — used only as a
+// per-glyph fallback in the --font-display stack, so Latin still renders in Bebas.
+const oswald = Oswald({
+  variable: "--font-display-oswald",
+  weight: "600",
+  subsets: ["latin", "cyrillic"],
   display: "swap",
 });
 
@@ -72,7 +82,7 @@ export default async function RootLayout({
   return (
     <html
       lang={locale}
-      className={`${bebasNeue.variable} ${inter.variable} ${jetbrainsMono.variable} h-full`}
+      className={`${bebasNeue.variable} ${oswald.variable} ${inter.variable} ${jetbrainsMono.variable} h-full`}
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col bg-background-base text-foreground font-sans antialiased">
