@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 
 import { signInAction } from "@/app/[locale]/signin/actions";
+import { GoogleAuthButton } from "@/components/auth/GoogleAuthButton";
 import { PasswordInput } from "@/components/auth/PasswordInput";
 import { Link } from "@/i18n/navigation";
 
@@ -53,7 +54,18 @@ export function SignInForm() {
         {t("signInWelcome")}
       </p>
 
-      <form onSubmit={onSubmit} className="mt-8 flex flex-col gap-4">
+      <div className="mt-8">
+        <GoogleAuthButton next={next} />
+      </div>
+      <div className="my-6 flex items-center gap-3">
+        <span className="h-px flex-1 bg-foreground/10" />
+        <span className="font-sans text-[11px] uppercase tracking-widest text-foreground-subtle">
+          {t("orDivider")}
+        </span>
+        <span className="h-px flex-1 bg-foreground/10" />
+      </div>
+
+      <form onSubmit={onSubmit} className="flex flex-col gap-4">
         <label className="flex flex-col gap-1.5">
           <span className="font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
             {t("email")}

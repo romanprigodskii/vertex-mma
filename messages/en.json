@@ -481,6 +481,8 @@
     "daysAgo": "{n}d ago"
   },
   "auth": {
+    "continueWithGoogle": "Continue with Google",
+    "orDivider": "or",
     "showPassword": "Show password",
     "hidePassword": "Hide password",
     "signInTitle": "Sign in",

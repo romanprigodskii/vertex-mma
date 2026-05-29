@@ -481,6 +481,8 @@
     "daysAgo": "{n} д назад"
   },
   "auth": {
+    "continueWithGoogle": "Войти через Google",
+    "orDivider": "или",
     "showPassword": "Показать пароль",
     "hidePassword": "Скрыть пароль",
     "signInTitle": "Вход",
