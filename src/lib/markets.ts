@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
-import { isRuLocale, localizedNameSql } from "@/lib/i18n-name";
+import { isRuLocale, localizedColSql, localizedNameSql } from "@/lib/i18n-name";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -43,7 +43,7 @@ export async function listOpenMarkets(limit = 50): Promise<MarketListItem[]> {
       m.closes_at::text AS closes_at,
       m.total_volume,
       m.unique_traders,
-      e.name AS event_name,
+      ${localizedColSql("e.name", "e.name_ru", isRu)} AS event_name,
       e.slug AS event_slug,
       e.date::text AS event_date,
       ${localizedNameSql("fa", isRu)} AS fighter_a_name,
@@ -143,7 +143,7 @@ export async function listOpenMarketsByEvent(
     SELECT
       e.id::text AS event_id,
       e.slug AS event_slug,
-      e.name AS event_name,
+      ${localizedColSql("e.name", "e.name_ru", isRu)} AS event_name,
       e.short_name AS event_short_name,
       e.date::text AS event_date,
       b.id::text AS bout_id,
@@ -298,7 +298,7 @@ export async function getMarketById(id: string): Promise<MarketDetail | null> {
       m.b_parameter,
       m.total_volume,
       m.unique_traders,
-      e.name AS event_name,
+      ${localizedColSql("e.name", "e.name_ru", isRu)} AS event_name,
       e.slug AS event_slug,
       e.date::text AS event_date,
       ${localizedNameSql("fa", isRu)} AS fighter_a_name,

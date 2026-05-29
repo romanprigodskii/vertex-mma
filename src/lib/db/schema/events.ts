@@ -28,6 +28,9 @@ export const event = pgTable(
     slug: text("slug").notNull().unique(),
 
     name: text("name").notNull(),
+    // Russian event name for the RU locale (matchup surnames transliterated by
+    // scripts/16_translate_events.py). Null until translated; UI falls back to name.
+    nameRu: text("name_ru"),
     shortName: text("short_name"),
     promotion: promotionEnum("promotion").notNull(),
 

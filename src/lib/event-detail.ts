@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
-import { isRuLocale, localizedNameSql } from "@/lib/i18n-name";
+import { isRuLocale, localizedColSql, localizedNameSql } from "@/lib/i18n-name";
 
 export type EventListItem = {
   id: string;
@@ -35,12 +35,13 @@ export async function listEvents(
   filter: EventListFilter = "all",
   limit = 60,
 ): Promise<EventListItem[]> {
+  const isRu = await isRuLocale();
   if (filter === "upcoming") {
     const rows = await db.execute<EventListItem>(sql`
       SELECT
         e.id::text AS id,
         e.slug,
-        e.name,
+        ${localizedColSql("e.name", "e.name_ru", isRu)} AS name,
         e.short_name,
         e.date::text AS date,
         e.location_city,
@@ -63,7 +64,7 @@ export async function listEvents(
       SELECT
         e.id::text AS id,
         e.slug,
-        e.name,
+        ${localizedColSql("e.name", "e.name_ru", isRu)} AS name,
         e.short_name,
         e.date::text AS date,
         e.location_city,
@@ -84,7 +85,7 @@ export async function listEvents(
     SELECT
       e.id::text AS id,
       e.slug,
-      e.name,
+      ${localizedColSql("e.name", "e.name_ru", isRu)} AS name,
       e.short_name,
       e.date::text AS date,
       e.location_city,
@@ -236,12 +237,13 @@ export async function detectMentionedEvents(
   body: string,
 ): Promise<MentionedEvent[]> {
   if (!body || body.trim().length === 0) return [];
+  const isRu = await isRuLocale();
   const rows = (await db.execute<MentionedEvent>(sql`
     WITH candidate AS (
       SELECT
         e.id,
         e.slug,
-        e.name,
+        ${localizedColSql("e.name", "e.name_ru", isRu)} AS name,
         e.short_name,
         TRIM(split_part(COALESCE(e.short_name, e.name), ':', 1)) AS prefix
       FROM event e
@@ -283,7 +285,7 @@ export async function getNextUpcomingEventForSidebar(): Promise<UpcomingEventSid
     SELECT
       e.id::text AS id,
       e.slug,
-      e.name,
+      ${localizedColSql("e.name", "e.name_ru", isRu)} AS name,
       e.short_name,
       e.date::text AS date,
       e.promotion::text AS promotion,

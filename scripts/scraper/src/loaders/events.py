@@ -247,3 +247,36 @@ def upsert_bouts(
                 counts.updated += 1
 
     return counts
+
+
+@dataclass
+class UntranslatedEvent:
+    id: str
+    name: str
+
+
+def fetch_untranslated_events(
+    conn: psycopg.Connection, limit: int | None = None
+) -> list[UntranslatedEvent]:
+    """Events still missing a Russian name, newest first."""
+    sql = (
+        "SELECT id::text, name FROM event "
+        "WHERE name_ru IS NULL ORDER BY date DESC NULLS LAST"
+    )
+    params: tuple = ()
+    if limit is not None:
+        sql += " LIMIT %s"
+        params = (limit,)
+    with conn.cursor() as cur:
+        cur.execute(sql, params)
+        return [UntranslatedEvent(id=r[0], name=r[1]) for r in cur.fetchall()]
+
+
+def save_event_name_ru(
+    conn: psycopg.Connection, event_id: str, name_ru: str
+) -> None:
+    with conn.cursor() as cur:
+        cur.execute(
+            "UPDATE event SET name_ru = %s WHERE id = %s::uuid",
+            (name_ru, event_id),
+        )

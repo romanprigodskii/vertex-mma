@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
-import { isRuLocale, localizedNameSql } from "@/lib/i18n-name";
+import { isRuLocale, localizedColSql, localizedNameSql } from "@/lib/i18n-name";
 
 /**
  * Wave 31.7 — peak vertex history for a fighter.
@@ -169,7 +169,7 @@ export async function getPeakVertex(
     SELECT
       b.id::text,
       e.date::text AS event_date,
-      e.name AS event_name,
+      ${localizedColSql("e.name", "e.name_ru", isRu)} AS event_name,
       e.slug AS event_slug,
       b.method::text AS method,
       b.winner_id::text AS winner_id,
@@ -311,7 +311,7 @@ export async function getScoreHistory(
       h.as_of_bout_id::text AS bout_id,
       h.as_of_date::text AS event_date,
       h.kind AS kind,
-      ev.name AS event_name,
+      ${localizedColSql("ev.name", "ev.name_ru", isRu)} AS event_name,
       ev.slug AS event_slug,
       b.method::text AS method,
       b.winner_id::text AS winner_id,
