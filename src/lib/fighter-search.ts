@@ -19,6 +19,7 @@ export type FighterSearchResult = {
   losses_total: number | null;
   draws_total: number | null;
   similarity: number;
+  rank_score?: number;
 };
 
 /**
@@ -59,7 +60,20 @@ export async function searchFighters(
           FROM fighter_alias fa
           WHERE fa.fighter_id = f.id
         ), 0)
-      )::float AS similarity
+      )::float AS similarity,
+      (
+        (CASE
+          WHEN lower(f.name_en) = lower(${trimmed}) THEN 4
+          WHEN f.name_en ILIKE ${trimmed + "%"}
+            OR f.name_en ILIKE ${"% " + trimmed + "%"} THEN 3
+          WHEN COALESCE(f.nickname, '') ILIKE ${trimmed + "%"}
+            OR COALESCE(f.nickname, '') ILIKE ${"% " + trimmed + "%"} THEN 2
+          WHEN f.name_en ILIKE ${"%" + trimmed + "%"}
+            OR COALESCE(f.nickname, '') ILIKE ${"%" + trimmed + "%"} THEN 1
+          ELSE 0
+        END) * 1000
+        + GREATEST(COALESCE(f.vertex_score, 0), COALESCE(f.vertex_score_all_time, 0))
+      )::float AS rank_score
     FROM fighter f
     LEFT JOIN fighter_stats_aggregate fsa ON fsa.fighter_id = f.id
     WHERE
@@ -72,13 +86,15 @@ export async function searchFighters(
         WHERE fa2.fighter_id = f.id
           AND similarity(fa2.alias, ${trimmed}) > 0.3
       )
-    ORDER BY f.id, similarity DESC
+    ORDER BY f.id, rank_score DESC
     LIMIT ${limit}
   `);
 
-  // postgres-js returns rows as the array itself.
+  // Rank known/higher-rated fighters above nonames within the same match tier.
   const rows = result as unknown as FighterSearchResult[];
-  return [...rows].sort((a, b) => b.similarity - a.similarity);
+  return [...rows].sort(
+    (a, b) => (b.rank_score ?? 0) - (a.rank_score ?? 0),
+  );
 }
 
 /* -------------------------------------------------------------------------- */
@@ -386,18 +402,18 @@ function buildOrderBy(filters: FighterCatalogFilters): SQL {
     case "vertex_current":
       if (!multiWeight) {
         return hasQuery
-          ? sql`match_score DESC, divisional_sort_score DESC NULLS LAST`
+          ? sql`match_tier DESC, GREATEST(COALESCE(f.vertex_score, 0), COALESCE(f.vertex_score_all_time, 0)) DESC, f.bout_count DESC, match_score DESC`
           : sql`divisional_sort_score DESC NULLS LAST, f.vertex_score_all_time DESC NULLS LAST, f.bout_count DESC`;
       }
       // Active fighters' current Vertex Score, falling back to all-time so
       // retired legends still rank somewhere. NULL scores (<3 UFC bouts)
       // sink to the bottom.
       return hasQuery
-        ? sql`match_score DESC, COALESCE(f.vertex_score, f.vertex_score_all_time) DESC NULLS LAST`
+        ? sql`match_tier DESC, GREATEST(COALESCE(f.vertex_score, 0), COALESCE(f.vertex_score_all_time, 0)) DESC, f.bout_count DESC, match_score DESC`
         : sql`f.vertex_score DESC NULLS LAST, f.vertex_score_all_time DESC NULLS LAST, f.bout_count DESC`;
     case "vertex_all_time":
       return hasQuery
-        ? sql`match_score DESC, f.vertex_score_all_time DESC NULLS LAST`
+        ? sql`match_tier DESC, f.vertex_score_all_time DESC NULLS LAST, f.bout_count DESC, match_score DESC`
         : sql`f.vertex_score_all_time DESC NULLS LAST, f.bout_count DESC`;
     case "name_asc":
       return sql`f.name_en ASC`;
@@ -429,7 +445,7 @@ function buildOrderBy(filters: FighterCatalogFilters): SQL {
       // over champion-status (the user almost certainly wants the matching
       // person at the top, not unrelated champions).
       return hasQuery
-        ? sql`match_score DESC, (CASE WHEN slug IN (${slugList}) THEN 0 ELSE 1 END), bout_count DESC`
+        ? sql`match_tier DESC, (CASE WHEN slug IN (${slugList}) THEN 0 ELSE 1 END), f.bout_count DESC, match_score DESC`
         : sql`(CASE WHEN slug IN (${slugList}) THEN 0 ELSE 1 END), bout_count DESC, COALESCE(wins_total, 0) DESC`;
     }
     case "fights":
@@ -521,6 +537,24 @@ export async function searchFightersWithFilters(
       )::float AS match_score`
     : sql``;
 
+  // Coarse relevance bucket so prominence (vertex_score) decides the order
+  // *within* a bucket — e.g. typing "jon" puts Jon Jones above an obscure
+  // "Jon …", instead of letting a hair of extra trigram similarity float a
+  // noname to the top. exact > name-prefix > nickname-prefix > substring > fuzzy.
+  const matchTierSelect = trimmedQ
+    ? sql`,
+      (CASE
+        WHEN lower(f.name_en) = lower(${trimmedQ}) THEN 4
+        WHEN f.name_en ILIKE ${trimmedQ + "%"}
+          OR f.name_en ILIKE ${"% " + trimmedQ + "%"} THEN 3
+        WHEN COALESCE(f.nickname, '') ILIKE ${trimmedQ + "%"}
+          OR COALESCE(f.nickname, '') ILIKE ${"% " + trimmedQ + "%"} THEN 2
+        WHEN f.name_en ILIKE ${"%" + trimmedQ + "%"}
+          OR COALESCE(f.nickname, '') ILIKE ${"%" + trimmedQ + "%"} THEN 1
+        ELSE 0
+      END)::int AS match_tier`
+    : sql``;
+
   // Divisional score join. Single-weight filter → join the FILTERED
   // division. No weight filter → join the fighter's OWN current division
   // so the catalog shows the canonical headline score (same as the
@@ -584,6 +618,7 @@ export async function searchFightersWithFilters(
       COALESCE(f.ufc_total, 0)::int AS ufc_bouts
       ${divisionalSelect}
       ${matchScoreSelect}
+      ${matchTierSelect}
     FROM fighter_with_stats f
     ${divisionalJoin}
     ${where}
