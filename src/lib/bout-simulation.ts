@@ -27,6 +27,72 @@ export interface BoutSimulationRounds {
   finishByRound: Array<number | null>;
 }
 
+/**
+ * Rescale the raw MC method probabilities so each side's six cells
+ * (ko/sub/dec × A/B) sum to the ENSEMBLE's winner_prob for that side,
+ * rather than the MC's standalone winner_prob.
+ *
+ * Motivation: MC and ensemble use different signals and can disagree
+ * on who wins. The MC is the better model of HOW a fighter typically
+ * wins (KO-heavy vs grappling-heavy vs decision-leaning); the ensemble
+ * is the better model of WHICH fighter wins. Conditioning method
+ * proportions on the ensemble's winner lets the UI tell one
+ * consistent story — "Mingyang wins 79% · most likely by KO" — instead
+ * of contradicting itself ("79% Mingyang… most likely KO for
+ * Menifield").
+ *
+ * Implementation: per side we keep MC's relative method mix
+ * (e.g. "if Mingyang wins, 95% chance it's by KO") and scale by the
+ * ensemble winner prob. Degenerate sides (MC says 0% winner prob)
+ * fall back to a 50/50 KO-Dec mix to avoid divide-by-zero.
+ */
+export function reconcileMcMethodProbs(
+  rounds: BoutSimulationRounds,
+  ensembleProbA: number,
+): {
+  probKoA: number;
+  probKoB: number;
+  probSubA: number;
+  probSubB: number;
+  probDecisionA: number;
+  probDecisionB: number;
+} {
+  const ensembleProbB = 1 - ensembleProbA;
+  const FALLBACK = { ko: 0.5, sub: 0.0, dec: 0.5 };
+
+  function condProbs(
+    side: "a" | "b",
+  ): { ko: number; sub: number; dec: number } {
+    const total =
+      side === "a"
+        ? rounds.probKoA + rounds.probSubA + rounds.probDecisionA
+        : rounds.probKoB + rounds.probSubB + rounds.probDecisionB;
+    if (total <= 1e-6) return FALLBACK;
+    if (side === "a") {
+      return {
+        ko: rounds.probKoA / total,
+        sub: rounds.probSubA / total,
+        dec: rounds.probDecisionA / total,
+      };
+    }
+    return {
+      ko: rounds.probKoB / total,
+      sub: rounds.probSubB / total,
+      dec: rounds.probDecisionB / total,
+    };
+  }
+  const condA = condProbs("a");
+  const condB = condProbs("b");
+  return {
+    probKoA: ensembleProbA * condA.ko,
+    probSubA: ensembleProbA * condA.sub,
+    probDecisionA: ensembleProbA * condA.dec,
+    probKoB: ensembleProbB * condB.ko,
+    probSubB: ensembleProbB * condB.sub,
+    probDecisionB: ensembleProbB * condB.dec,
+  };
+}
+
 export interface BoutSimulationRow {
   modelVersion: string;
   probA: number;

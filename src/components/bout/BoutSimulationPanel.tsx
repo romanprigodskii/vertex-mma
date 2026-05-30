@@ -3,6 +3,7 @@ import { ArrowLeft, ArrowRight } from "lucide-react";
 
 import type { BoutDetail } from "@/lib/bout-detail";
 import {
+  reconcileMcMethodProbs,
   selectDisplayFeatures,
   type BoutSimulationRow,
   type FeatureMeta,
@@ -215,7 +216,7 @@ export async function BoutSimulationPanel({ bout, sim }: Props) {
       ) : null}
 
       {sim.rounds ? (
-        <MonteCarloBlock bout={bout} rounds={sim.rounds} />
+        <MonteCarloBlock bout={bout} rounds={sim.rounds} ensembleProbA={sim.probA} />
       ) : null}
 
       <p className="mt-4 font-sans text-[11px] leading-relaxed text-foreground-subtle">
@@ -235,11 +236,19 @@ function formatFinishTime(seconds: number | null): string {
 async function MonteCarloBlock({
   bout,
   rounds,
+  ensembleProbA,
 }: {
   bout: BoutDetail;
   rounds: NonNullable<BoutSimulationRow["rounds"]>;
+  ensembleProbA: number;
 }) {
   const t = await getTranslations("boutSimulation");
+  // Method totals + headline cell come from the RECONCILED MC numbers
+  // (raw MC sometimes picks an underdog as the most-likely finisher,
+  // which contradicts the ensemble's winner pick at the top of the
+  // panel — see reconcileMcMethodProbs).
+  const m = reconcileMcMethodProbs(rounds, ensembleProbA);
+
   // Find the most likely (method, round) cell — used for the headline
   // sentence. Decision sits at "round = scheduled_rounds + 1" so it
   // sorts after all round-finish cells.
@@ -249,22 +258,21 @@ async function MonteCarloBlock({
   const scheduledRounds = finishByRound.length;
   type Cell = { kind: "ko" | "sub" | "dec"; round: number; prob: number };
   const cells: Cell[] = [];
-  // Per-round KO + Sub finishes (collapsed across sides for the
-  // headline cell — direction is shown in the method strip below).
   for (let i = 0; i < scheduledRounds; i += 1) {
     cells.push({ kind: "ko", round: i + 1, prob: finishByRound[i] });
   }
-  // KO share within method-prob already includes side; this approximation
-  // is fine for "what's the modal outcome".
-  const decisionProb = rounds.probDecisionA + rounds.probDecisionB;
+  const decisionProb = m.probDecisionA + m.probDecisionB;
   cells.push({ kind: "dec", round: scheduledRounds + 1, prob: decisionProb });
   cells.sort((x, y) => y.prob - x.prob);
   const top = cells[0];
 
-  // Method totals strip.
-  const totalKo = rounds.probKoA + rounds.probKoB;
-  const totalSub = rounds.probSubA + rounds.probSubB;
+  // Method totals strip — reconciled, so the KO/Sub/Dec totals
+  // numerically sum to the same 100% the headline winner prob is
+  // drawn from.
+  const totalKo = m.probKoA + m.probKoB;
+  const totalSub = m.probSubA + m.probSubB;
   const totalDec = decisionProb;
+  const reconciledRounds = { ...rounds, ...m };
 
   // Per-round bars + decision bar.
   const maxRoundProb = Math.max(
@@ -340,7 +348,8 @@ async function MonteCarloBlock({
             <span>
               {t("mcMethodKo")} · {(totalKo * 100).toFixed(0)}% ·{" "}
               <span className="text-foreground-muted">
-                {(rounds.probKoA * 100).toFixed(0)}/{(rounds.probKoB * 100).toFixed(0)}
+                {(reconciledRounds.probKoA * 100).toFixed(0)}/
+                {(reconciledRounds.probKoB * 100).toFixed(0)}
               </span>
             </span>
           </span>
@@ -349,7 +358,8 @@ async function MonteCarloBlock({
             <span>
               {t("mcMethodSub")} · {(totalSub * 100).toFixed(0)}% ·{" "}
               <span className="text-foreground-muted">
-                {(rounds.probSubA * 100).toFixed(0)}/{(rounds.probSubB * 100).toFixed(0)}
+                {(reconciledRounds.probSubA * 100).toFixed(0)}/
+                {(reconciledRounds.probSubB * 100).toFixed(0)}
               </span>
             </span>
           </span>
@@ -358,8 +368,8 @@ async function MonteCarloBlock({
             <span>
               {t("mcMethodDec")} · {(totalDec * 100).toFixed(0)}% ·{" "}
               <span className="text-foreground-muted">
-                {(rounds.probDecisionA * 100).toFixed(0)}/
-                {(rounds.probDecisionB * 100).toFixed(0)}
+                {(reconciledRounds.probDecisionA * 100).toFixed(0)}/
+                {(reconciledRounds.probDecisionB * 100).toFixed(0)}
               </span>
             </span>
           </span>

@@ -3,6 +3,7 @@ import { ChevronRight } from "lucide-react";
 
 import { FighterAvatar } from "@/components/fighter/FighterAvatar";
 import { Link } from "@/i18n/navigation";
+import { reconcileMcMethodProbs } from "@/lib/bout-simulation";
 import type { SimulationIndexBout } from "@/lib/simulation-index";
 import { cn } from "@/lib/utils";
 
@@ -24,10 +25,13 @@ function pct(p: number): string {
 }
 
 /**
- * Picks the headline method+side for the bout. Returns the (method,
- * favored fighter, probability) triple with the highest joint MC
- * probability — that's what the headline tag should advertise.
- * Falls back to null when no MC row was joined for this bout.
+ * Picks the headline method+side for the bout, AFTER reconciling MC
+ * method probabilities with the ensemble's winner_prob. The raw MC
+ * sometimes picks an underdog as the most-likely finisher (it only
+ * knows historical KO/sub rates, not the ensemble's signal); the
+ * reconciliation keeps MC's relative method mix per side but scales
+ * absolute totals so each side's six cells sum to the ensemble's
+ * winner_prob for that side.
  */
 function pickHeadlineMethod(bout: SimulationIndexBout): {
   method: "ko" | "sub" | "dec";
@@ -35,13 +39,31 @@ function pickHeadlineMethod(bout: SimulationIndexBout): {
   prob: number;
 } | null {
   if (bout.mcProbKoA == null) return null;
-  const candidates: Array<{ method: "ko" | "sub" | "dec"; side: "a" | "b"; prob: number }> = [
-    { method: "ko", side: "a", prob: bout.mcProbKoA ?? 0 },
-    { method: "ko", side: "b", prob: bout.mcProbKoB ?? 0 },
-    { method: "sub", side: "a", prob: bout.mcProbSubA ?? 0 },
-    { method: "sub", side: "b", prob: bout.mcProbSubB ?? 0 },
-    { method: "dec", side: "a", prob: bout.mcProbDecisionA ?? 0 },
-    { method: "dec", side: "b", prob: bout.mcProbDecisionB ?? 0 },
+  const rounds = {
+    nSimulations: 0,
+    mcWinnerProbA: 0,
+    mcWinnerProbB: 0,
+    probKoA: bout.mcProbKoA ?? 0,
+    probKoB: bout.mcProbKoB ?? 0,
+    probSubA: bout.mcProbSubA ?? 0,
+    probSubB: bout.mcProbSubB ?? 0,
+    probDecisionA: bout.mcProbDecisionA ?? 0,
+    probDecisionB: bout.mcProbDecisionB ?? 0,
+    avgFinishSeconds: bout.mcAvgFinishSeconds ?? null,
+    finishByRound: [],
+  };
+  const reconciled = reconcileMcMethodProbs(rounds, bout.probA);
+  const candidates: Array<{
+    method: "ko" | "sub" | "dec";
+    side: "a" | "b";
+    prob: number;
+  }> = [
+    { method: "ko", side: "a", prob: reconciled.probKoA },
+    { method: "ko", side: "b", prob: reconciled.probKoB },
+    { method: "sub", side: "a", prob: reconciled.probSubA },
+    { method: "sub", side: "b", prob: reconciled.probSubB },
+    { method: "dec", side: "a", prob: reconciled.probDecisionA },
+    { method: "dec", side: "b", prob: reconciled.probDecisionB },
   ];
   candidates.sort((x, y) => y.prob - x.prob);
   return candidates[0];
