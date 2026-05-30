@@ -27,7 +27,7 @@ export async function MarketCard({ market }: { market: MarketListItem }) {
       className="block rounded-md border border-foreground/10 bg-background-elevated/30 p-4 transition-colors hover:border-foreground/20 hover:bg-foreground/[0.04]"
     >
       <div className="flex items-center justify-between gap-2">
-        <p className="truncate font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
+        <p className="min-w-0 flex-1 truncate font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
           {market.event_name}
         </p>
         <span className="shrink-0 rounded-sm border border-foreground/15 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-foreground-muted">

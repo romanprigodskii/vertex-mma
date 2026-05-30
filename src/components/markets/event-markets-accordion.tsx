@@ -52,7 +52,7 @@ export async function EventMarketsAccordion({
           open={idx === 0}
           className="group overflow-hidden rounded-md border border-foreground/10 bg-background-elevated/30"
         >
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 hover:bg-foreground/[0.04]">
+          <summary className="flex cursor-pointer list-none flex-wrap items-baseline justify-between gap-x-3 gap-y-1 px-4 py-3 hover:bg-foreground/[0.04]">
             <div className="flex min-w-0 flex-1 items-baseline gap-3">
               <ChevronRight
                 className="h-4 w-4 shrink-0 text-foreground-muted transition-transform group-open:rotate-90"
@@ -62,18 +62,18 @@ export async function EventMarketsAccordion({
                 {event.event_short_name ?? event.event_name}
               </h3>
             </div>
-            <div className="shrink-0 text-right font-mono text-[11px] tabular text-foreground-subtle">
-              <span>
+            <div className="ml-auto flex flex-wrap items-baseline justify-end gap-x-1.5 font-mono text-[11px] tabular text-foreground-subtle">
+              <span className="whitespace-nowrap">
                 {new Date(event.event_date).toLocaleDateString(dateFmt, {
                   month: "short",
                   day: "numeric",
                   year: "numeric",
                 })}
               </span>
-              <span className="mx-2">·</span>
-              <span>{t("boutCount", { count: event.bouts.length })}</span>
-              <span className="mx-2">·</span>
-              <span>{t("marketCount", { count: event.total_markets })}</span>
+              <span aria-hidden>·</span>
+              <span className="whitespace-nowrap">{t("boutCount", { count: event.bouts.length })}</span>
+              <span aria-hidden>·</span>
+              <span className="whitespace-nowrap">{t("marketCount", { count: event.total_markets })}</span>
             </div>
           </summary>
 
@@ -129,13 +129,13 @@ function BoutMarketsBlock({
   );
   return (
     <div>
-      <div className="mb-2 flex items-baseline justify-between gap-3">
-        <h4 className="font-display text-base uppercase tracking-tight text-foreground">
+      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <h4 className="min-w-0 font-display text-base uppercase tracking-tight text-foreground">
           {bout.fighter_a_name}{" "}
           <span className="mx-1.5 align-middle font-sans text-[0.55em] font-medium normal-case text-foreground-subtle">vs</span>{" "}
           {bout.fighter_b_name}
         </h4>
-        <p className="shrink-0 font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
+        <p className="font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
           {tag ? `${tag} · ` : ""}
           {weight}
           {bout.is_title_fight ? ` · ${titleLabel}` : ""}

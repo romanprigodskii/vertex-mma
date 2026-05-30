@@ -178,7 +178,7 @@ export function FighterSearchPalette() {
         <DialogPrimitive.Content
           aria-describedby={undefined}
           className={cn(
-            "fixed left-1/2 top-[18%] z-50 w-full max-w-xl -translate-x-1/2",
+            "fixed left-1/2 top-[12%] z-50 w-[calc(100%-1.5rem)] max-w-xl -translate-x-1/2 sm:top-[18%]",
             "overflow-hidden rounded-lg border border-foreground/15 bg-background-elevated/95 shadow-elevation-2 backdrop-blur",
             "data-[state=open]:animate-in data-[state=closed]:animate-out",
             "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
