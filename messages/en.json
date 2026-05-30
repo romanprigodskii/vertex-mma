@@ -1051,6 +1051,18 @@
     "vs": "vs",
     "boutsAtPeak": "Bouts at peak"
   },
+  "boutSimulation": {
+    "aria": "Vertex MMA simulation prediction",
+    "heading": "Vertex Simulation",
+    "vs": "vs",
+    "confidence": {
+      "low": "Low confidence",
+      "medium": "Medium confidence",
+      "high": "High confidence"
+    },
+    "vsMarket": "{edge} vs market ({market})",
+    "disclaimer": "LightGBM model trained on historical UFC bouts with isotonic calibration. Reflects statistical baseline only — not a betting recommendation."
+  },
   "compare": {
     "metaTitle": "Compare fighters",
     "metaDescription": "Side-by-side comparison of two UFC fighters — tale of the tape, striking and grappling stats, common opponents.",

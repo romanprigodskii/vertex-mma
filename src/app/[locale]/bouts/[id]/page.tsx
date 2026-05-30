@@ -7,6 +7,7 @@ import { BoutDecisionBanner } from "@/components/bout/BoutDecisionBanner";
 import { BoutHero } from "@/components/bout/BoutHero";
 import { BoutRoundBreakdown } from "@/components/bout/BoutRoundBreakdown";
 import { BoutScorecards } from "@/components/bout/BoutScorecards";
+import { BoutSimulationPanel } from "@/components/bout/BoutSimulationPanel";
 import { BoutStrikeAnalysis } from "@/components/bout/BoutStrikeAnalysis";
 import { BoutTotals } from "@/components/bout/BoutTotals";
 import { BoutVideos } from "@/components/bout/BoutVideos";
@@ -20,6 +21,7 @@ import {
   computeFighterStrikeMap,
   getBoutById,
 } from "@/lib/bout-detail";
+import { getBoutSimulation } from "@/lib/bout-simulation";
 export const dynamic = "force-dynamic";
 
 interface PageProps {
@@ -88,6 +90,12 @@ export default async function BoutDetailPage({ params }: PageProps) {
   const positionA = computeFighterPositionMap(bout.rounds, bout.fighter_a.id);
   const positionB = computeFighterPositionMap(bout.rounds, bout.fighter_b.id);
 
+  // Phase 1 ML simulation: only render for upcoming/scheduled bouts.
+  // Once the bout completes the actual result is the truth, so we hide
+  // the predicted-winner panel (avoids second-guessing past results).
+  const isUpcoming = bout.status !== "completed";
+  const simulation = isUpcoming ? await getBoutSimulation(bout.id) : null;
+
   return (
     <>
       <Navbar />
@@ -115,6 +123,12 @@ export default async function BoutDetailPage({ params }: PageProps) {
         <Container size="xl">
           <BoutHero bout={bout} weightLabel={weightLabel} />
         </Container>
+
+        {simulation ? (
+          <Container size="xl" className="pt-4">
+            <BoutSimulationPanel bout={bout} sim={simulation} />
+          </Container>
+        ) : null}
 
         <BoutDecisionBanner bout={bout} />
 

@@ -1,0 +1,13 @@
+[project]
+name = "vertex-mma-simulation"
+version = "0.1.0"
+description = "ML simulation pipeline for Vertex MMA — bout winner prediction, SHAP explainability, Monte Carlo round simulator"
+requires-python = ">=3.12"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+ignore = ["E501"]
