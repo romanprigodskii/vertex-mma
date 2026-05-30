@@ -42,6 +42,19 @@ DIFF_COLUMNS = [
     "recent5_wins",
     "vertex_score",
     "vertex_score_all_time",
+    # Phase 4 — only the high-signal additions kept. Strike location
+    # shares + reversals + control absorbed were tried first and hurt
+    # val log-loss (noisy on a 5,400-bout train, model latched onto
+    # quirks). Survived the cull:
+    #   * current_streak — momentum signal, hard to redundantly derive
+    #     from prior_wins/losses alone.
+    #   * finish_against_per_bout — durability proxy that's NOT a ratio
+    #     (ratio is noisy when prior_losses is small).
+    #   * avg_bout_seconds — distinguishes grinders from finishers
+    #     better than prior_finish_rate alone.
+    "current_streak",
+    "finish_against_per_bout",
+    "avg_bout_seconds",
 ]
 
 # Per-fighter columns we ALSO keep as-is for A and B (sometimes absolute
@@ -53,6 +66,9 @@ ABSOLUTE_KEEP = [
     "vertex_score_all_time",
     "layoff_days",
     "prior_bouts",
+    "current_streak",
+    "kd_per_fight",
+    "kd_absorbed_per_fight",
 ]
 
 CONTEXT_COLUMNS = [
@@ -97,6 +113,33 @@ def build_feature_matrix(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series, pd.
         for val in ("orthodox", "southpaw", "switch"):
             out[f"{col_name}_{val}"] = (cat == val).astype("int8")
 
+    # Interaction features — small set, each one a known MMA-signal
+    # asymmetry that LightGBM finds harder to discover from raw inputs.
+    stance_a = df["stance_a"].fillna("unknown").astype(str)
+    stance_b = df["stance_b"].fillna("unknown").astype(str)
+    # Orthodox-vs-southpaw is the classic asymmetric matchup (different
+    # power-side angles); flagged here so the model gets one feature
+    # that already encodes the pairing.
+    out["stance_asymmetry"] = (
+        ((stance_a == "orthodox") & (stance_b == "southpaw"))
+        | ((stance_a == "southpaw") & (stance_b == "orthodox"))
+    ).astype("int8")
+    # Reach-to-height ratio gap — wingspan advantage decoupled from
+    # raw reach gap, so a tall fighter with average reach reads
+    # differently from a short fighter with freakish reach.
+    h_a = pd.to_numeric(df["height_a"], errors="coerce")
+    h_b = pd.to_numeric(df["height_b"], errors="coerce")
+    r_a = pd.to_numeric(df["reach_a"], errors="coerce")
+    r_b = pd.to_numeric(df["reach_b"], errors="coerce")
+    out["reach_height_ratio_diff"] = (r_a / h_a) - (r_b / h_b)
+    # Age curve: distance from 30 (typical MMA peak), squared so both
+    # very young (skill not yet locked) and very old (athleticism faded)
+    # read as negative signal. Scaled down so LightGBM doesn't treat it
+    # as a high-cardinality feature.
+    age_a = pd.to_numeric(df["age_a"], errors="coerce")
+    age_b = pd.to_numeric(df["age_b"], errors="coerce")
+    out["age_curve_diff"] = (((age_b - 30) ** 2 - (age_a - 30) ** 2) / 100).astype("float32")
+
     weight_cat = df["weight_class"].fillna("unknown").astype(str)
     for wc in (
         "strawweight",
@@ -133,6 +176,11 @@ def feature_names() -> list[str]:
     ]
     for side in ("stance_a", "stance_b"):
         cols += [f"{side}_orthodox", f"{side}_southpaw", f"{side}_switch"]
+    cols += [
+        "stance_asymmetry",
+        "reach_height_ratio_diff",
+        "age_curve_diff",
+    ]
     cols += [
         "wc_strawweight",
         "wc_flyweight",

@@ -1,6 +1,6 @@
 {
-  "model_version": "v0.2.0",
-  "trained_at": "2026-05-30T12:02:12.205610Z",
+  "model_version": "v0.3.0",
+  "trained_at": "2026-05-30T12:21:29.634604Z",
   "feature_columns": [
     "diff_height",
     "diff_reach",
@@ -31,6 +31,9 @@
     "diff_recent5_wins",
     "diff_vertex_score",
     "diff_vertex_score_all_time",
+    "diff_current_streak",
+    "diff_finish_against_per_bout",
+    "diff_avg_bout_seconds",
     "abs_age_a",
     "abs_age_b",
     "abs_vertex_score_a",
@@ -41,6 +44,12 @@
     "abs_layoff_days_b",
     "abs_prior_bouts_a",
     "abs_prior_bouts_b",
+    "abs_current_streak_a",
+    "abs_current_streak_b",
+    "abs_kd_per_fight_a",
+    "abs_kd_per_fight_b",
+    "abs_kd_absorbed_per_fight_a",
+    "abs_kd_absorbed_per_fight_b",
     "is_title_fight",
     "is_main_event",
     "scheduled_rounds",
@@ -52,6 +61,9 @@
     "stance_b_orthodox",
     "stance_b_southpaw",
     "stance_b_switch",
+    "stance_asymmetry",
+    "reach_height_ratio_diff",
+    "age_curve_diff",
     "wc_strawweight",
     "wc_flyweight",
     "wc_bantamweight",
@@ -64,7 +76,7 @@
   ],
   "train_end": "2024-01-01",
   "val_end": "2025-01-01",
-  "best_iteration": 45,
+  "best_iteration": 60,
   "params": {
     "objective": "binary",
     "metric": [
@@ -83,24 +95,24 @@
   "metrics": {
     "train": {
       "n": 5415,
-      "accuracy": 0.7205909510618652,
-      "log_loss": 0.5722779784368749,
-      "brier": 0.18997466866709534,
-      "roc_auc": 0.7971341847072481
+      "accuracy": 0.6710987996306556,
+      "log_loss": 0.6172991996107791,
+      "brier": 0.21393908594159644,
+      "roc_auc": 0.7192847220308375
     },
     "val": {
       "n": 433,
-      "accuracy": 0.6351039260969977,
-      "log_loss": 0.6302627658019253,
-      "brier": 0.22139342278683213,
-      "roc_auc": 0.6838973237261966
+      "accuracy": 0.6420323325635104,
+      "log_loss": 0.6395518044411169,
+      "brier": 0.22427035408760485,
+      "roc_auc": 0.6749765318313707
     },
     "test": {
       "n": 593,
-      "accuracy": 0.6357504215851602,
-      "log_loss": 0.666778620640237,
-      "brier": 0.22692403321057844,
-      "roc_auc": 0.6805568202513202
+      "accuracy": 0.6340640809443507,
+      "log_loss": 0.6478157062037628,
+      "brier": 0.22774145526071107,
+      "roc_auc": 0.6678213879408418
     }
   },
   "n_train": 5415,

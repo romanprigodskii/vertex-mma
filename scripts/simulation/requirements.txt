@@ -9,3 +9,4 @@ joblib>=1.4
 rich>=13.7
 dnspython>=2.6
 pyarrow>=17.0
+optuna>=4.0

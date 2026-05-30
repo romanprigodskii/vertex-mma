@@ -63,11 +63,18 @@ SELECT
   brs.fighter_id::text AS fighter_id,
   SUM(brs.sig_str_landed)::int AS sig_str_landed,
   SUM(brs.sig_str_attempted)::int AS sig_str_attempted,
+  SUM(brs.sig_str_head_landed)::int AS sig_str_head_landed,
+  SUM(brs.sig_str_body_landed)::int AS sig_str_body_landed,
+  SUM(brs.sig_str_legs_landed)::int AS sig_str_legs_landed,
+  SUM(brs.sig_str_distance_landed)::int AS sig_str_distance_landed,
+  SUM(brs.sig_str_clinch_landed)::int AS sig_str_clinch_landed,
+  SUM(brs.sig_str_ground_landed)::int AS sig_str_ground_landed,
   SUM(brs.total_str_landed)::int AS total_str_landed,
   SUM(brs.total_str_attempted)::int AS total_str_attempted,
   SUM(brs.takedowns_landed)::int AS td_landed,
   SUM(brs.takedowns_attempted)::int AS td_attempted,
   SUM(brs.sub_attempts)::int AS sub_attempts,
+  SUM(brs.reversals)::int AS reversals,
   SUM(brs.knockdowns)::int AS knockdowns,
   SUM(brs.control_time_seconds)::int AS control_seconds,
   COUNT(*)::int AS rounds_recorded
@@ -190,11 +197,18 @@ class FighterHistory:
         "sig_str_landed",
         "sig_str_attempted",
         "sig_str_absorbed",  # opponent's landed against us
+        "sig_str_head_landed",
+        "sig_str_body_landed",
+        "sig_str_legs_landed",
+        "sig_str_distance_landed",
+        "sig_str_clinch_landed",
+        "sig_str_ground_landed",
         "td_landed",
         "td_attempted",
         "td_def_attempted",  # opp attempts against us
         "td_def_stopped",  # opp attempts we stopped
         "sub_attempts",
+        "reversals",
         "knockdowns",
         "knockdowns_absorbed",
         "control_seconds",
@@ -205,6 +219,7 @@ class FighterHistory:
         "recent_results",  # list of "W"/"L" for last N bouts
         "last_vertex_score",
         "last_vertex_score_all_time",
+        "current_streak",  # +N for N-win streak, -N for losing streak
     )
 
     def __init__(self) -> None:
@@ -220,11 +235,18 @@ class FighterHistory:
         self.sig_str_landed = 0
         self.sig_str_attempted = 0
         self.sig_str_absorbed = 0
+        self.sig_str_head_landed = 0
+        self.sig_str_body_landed = 0
+        self.sig_str_legs_landed = 0
+        self.sig_str_distance_landed = 0
+        self.sig_str_clinch_landed = 0
+        self.sig_str_ground_landed = 0
         self.td_landed = 0
         self.td_attempted = 0
         self.td_def_attempted = 0
         self.td_def_stopped = 0
         self.sub_attempts = 0
+        self.reversals = 0
         self.knockdowns = 0
         self.knockdowns_absorbed = 0
         self.control_seconds = 0
@@ -235,6 +257,7 @@ class FighterHistory:
         self.recent_results: list[str] = []
         self.last_vertex_score: int | None = None
         self.last_vertex_score_all_time: int | None = None
+        self.current_streak: int = 0
 
     def snapshot(self, event_dt: date) -> dict[str, Any]:
         """Features as of just before `event_dt`."""
@@ -269,6 +292,45 @@ class FighterHistory:
             layoff_days = (event_dt - self.last_bout_date).days
         recent3_wins = sum(1 for r in self.recent_results[-3:] if r == "W")
         recent5_wins = sum(1 for r in self.recent_results[-5:] if r == "W")
+
+        # Phase 4 additions ------------------------------------------------
+        sig_total_landed = self.sig_str_landed or 0
+        # Strike-location preferences (share of landed sig strikes by zone).
+        head_share = self.sig_str_head_landed / sig_total_landed if sig_total_landed else None
+        body_share = self.sig_str_body_landed / sig_total_landed if sig_total_landed else None
+        legs_share = self.sig_str_legs_landed / sig_total_landed if sig_total_landed else None
+        # Range preference: what % of landed sig strikes happened at
+        # distance (vs in clinch / on the ground). Distance share +
+        # ground share roughly read as striker vs grappler.
+        distance_share = (
+            self.sig_str_distance_landed / sig_total_landed if sig_total_landed else None
+        )
+        clinch_share = (
+            self.sig_str_clinch_landed / sig_total_landed if sig_total_landed else None
+        )
+        ground_share = (
+            self.sig_str_ground_landed / sig_total_landed if sig_total_landed else None
+        )
+        # Durability proxies.
+        kd_absorbed_per_fight = (
+            self.knockdowns_absorbed / self.bouts if self.bouts else None
+        )
+        control_absorbed_per_min = (
+            self.control_seconds_absorbed / per_min if per_min else None
+        )
+        reversals_per_fight = self.reversals / self.bouts if self.bouts else None
+        # Career pacing.
+        avg_bout_seconds = self.total_seconds / self.bouts if self.bouts else None
+        title_bouts_ratio = self.title_bouts / self.bouts if self.bouts else None
+        # Finish "for" vs "against" — separate from finish_rate which is
+        # "share of WINS that were finishes" (this is finishes per bout).
+        finish_for_per_bout = (
+            (self.wins_ko + self.wins_sub) / self.bouts if self.bouts else None
+        )
+        finish_against_per_bout = (
+            (self.losses_ko + self.losses_sub) / self.bouts if self.bouts else None
+        )
+
         return {
             "prior_bouts": self.bouts,
             "prior_wins": self.wins,
@@ -296,6 +358,21 @@ class FighterHistory:
             "recent5_wins": recent5_wins,
             "vertex_score": self.last_vertex_score,
             "vertex_score_all_time": self.last_vertex_score_all_time,
+            # Phase 4
+            "head_share": head_share,
+            "body_share": body_share,
+            "legs_share": legs_share,
+            "distance_share": distance_share,
+            "clinch_share": clinch_share,
+            "ground_share": ground_share,
+            "kd_absorbed_per_fight": kd_absorbed_per_fight,
+            "control_absorbed_per_min": control_absorbed_per_min,
+            "reversals_per_fight": reversals_per_fight,
+            "avg_bout_seconds": avg_bout_seconds,
+            "title_bouts_ratio": title_bouts_ratio,
+            "finish_for_per_bout": finish_for_per_bout,
+            "finish_against_per_bout": finish_against_per_bout,
+            "current_streak": self.current_streak,
         }
 
     def apply_bout(
@@ -327,6 +404,7 @@ class FighterHistory:
             elif method.startswith("decision"):
                 self.wins_dec += 1
             self.recent_results.append("W")
+            self.current_streak = max(1, self.current_streak + 1) if self.current_streak >= 0 else 1
         else:
             self.losses += 1
             if method in ("ko", "tko"):
@@ -336,6 +414,7 @@ class FighterHistory:
             elif method.startswith("decision"):
                 self.losses_dec += 1
             self.recent_results.append("L")
+            self.current_streak = min(-1, self.current_streak - 1) if self.current_streak <= 0 else -1
         # Keep recent_results bounded so it doesn't grow forever; only the
         # tail matters for recent-form features.
         if len(self.recent_results) > 10:
@@ -345,9 +424,16 @@ class FighterHistory:
         if own_stats:
             self.sig_str_landed += own_stats.get("sig_str_landed", 0) or 0
             self.sig_str_attempted += own_stats.get("sig_str_attempted", 0) or 0
+            self.sig_str_head_landed += own_stats.get("sig_str_head_landed", 0) or 0
+            self.sig_str_body_landed += own_stats.get("sig_str_body_landed", 0) or 0
+            self.sig_str_legs_landed += own_stats.get("sig_str_legs_landed", 0) or 0
+            self.sig_str_distance_landed += own_stats.get("sig_str_distance_landed", 0) or 0
+            self.sig_str_clinch_landed += own_stats.get("sig_str_clinch_landed", 0) or 0
+            self.sig_str_ground_landed += own_stats.get("sig_str_ground_landed", 0) or 0
             self.td_landed += own_stats.get("td_landed", 0) or 0
             self.td_attempted += own_stats.get("td_attempted", 0) or 0
             self.sub_attempts += own_stats.get("sub_attempts", 0) or 0
+            self.reversals += own_stats.get("reversals", 0) or 0
             self.knockdowns += own_stats.get("knockdowns", 0) or 0
             self.control_seconds += own_stats.get("control_seconds", 0) or 0
         if opp_stats:

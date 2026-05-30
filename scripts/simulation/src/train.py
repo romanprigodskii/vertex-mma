@@ -68,6 +68,17 @@ def temporal_split(
     return Xs, ys, metas
 
 
+def _load_tuned_params() -> dict:
+    """Pick up Optuna-tuned hyperparameters when present. Falls back to
+    the defaults in LGB_PARAMS so the pipeline still trains end-to-end
+    on a clean checkout where tune.py hasn't been run yet."""
+    path = ARTIFACTS_DIR / "best_params.json"
+    if not path.exists():
+        return {}
+    payload = json.loads(path.read_text())
+    return payload.get("best_params", {})
+
+
 def train_lgb(
     X_train: pd.DataFrame, y_train: pd.Series, X_val: pd.DataFrame, y_val: pd.Series
 ) -> lgb.Booster:
@@ -78,7 +89,10 @@ def train_lgb(
     feature_contri = [
         FEATURE_CONTRI_OVERRIDES.get(col, 1.0) for col in X_train.columns
     ]
-    params = {**LGB_PARAMS, "feature_contri": feature_contri}
+    tuned = _load_tuned_params()
+    params = {**LGB_PARAMS, **tuned, "feature_contri": feature_contri}
+    if tuned:
+        console.log(f"using Optuna-tuned params · {len(tuned)} overrides")
     dtrain = lgb.Dataset(X_train, label=y_train)
     dval = lgb.Dataset(X_val, label=y_val, reference=dtrain)
     booster = lgb.train(
