@@ -11,6 +11,7 @@ type FooterTKey =
   | "markets"
   | "openMarkets"
   | "myBets"
+  | "simulation"
   | "community"
   | "predictions"
   | "rankings"
@@ -35,6 +36,7 @@ const COLUMNS: Array<{
     titleKey: "markets",
     links: [
       { href: "/markets", labelKey: "openMarkets" },
+      { href: "/simulation", labelKey: "simulation" },
       { href: "/me/bets", labelKey: "myBets" },
     ],
   },
