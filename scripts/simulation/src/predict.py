@@ -2,8 +2,10 @@
 
 Three things get written per bout:
 
-  1. bout_simulation                  — calibrated LightGBM winner prob
-  2. bout_simulation_features         — top-N SHAP attributions (Phase 2)
+  1. bout_simulation                  — calibrated ensemble winner prob
+  2. bout_simulation_features         — top-N SHAP attributions (Phase 2,
+                                        sourced from the ensemble's
+                                        global LightGBM — interpretable)
   3. bout_simulation_rounds           — Monte Carlo method × round (Phase 3)
 
 Re-running for the same (bout_id, model_version) is an UPSERT so the
@@ -12,19 +14,17 @@ cron can be invoked multiple times safely (idempotent)."""
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
-import joblib
-import lightgbm as lgb
 import numpy as np
 import pandas as pd
 from psycopg.types.json import Jsonb
 from rich.console import Console
 
-from .config import ARTIFACTS_DIR, MODEL_VERSION, confidence_label
+from .config import ARTIFACTS_DIR, confidence_label
 from .db import get_connection
+from .ensemble import EnsembleModel, weight_group
 from .export import build_dataset, fetch_raw
-from .features import build_feature_matrix, feature_names
+from .features import build_feature_matrix
 from .monte_carlo import FighterMC, simulate_bout
 
 console = Console()
@@ -34,34 +34,35 @@ console = Console()
 # inspection room without re-running the model.
 TOP_N_FEATURES = 8
 
+ENSEMBLE_DIR = ARTIFACTS_DIR / "ensemble"
+
 
 class LoadedModel:
     def __init__(self) -> None:
         meta_path = ARTIFACTS_DIR / "metadata.json"
-        model_path = ARTIFACTS_DIR / "model.lgb"
-        iso_path = ARTIFACTS_DIR / "calibrator.pkl"
-        if not (meta_path.exists() and model_path.exists() and iso_path.exists()):
+        if not meta_path.exists() or not ENSEMBLE_DIR.exists():
             raise RuntimeError(
-                "Trained artifacts missing. Run scripts/run_train.py first."
+                "Trained ensemble artifacts missing. Run scripts/run_train.py first."
             )
         self.metadata = json.loads(meta_path.read_text())
-        self.booster = lgb.Booster(model_file=str(model_path))
-        self.calibrator = joblib.load(iso_path)
+        self.ensemble = EnsembleModel.load(ENSEMBLE_DIR)
         self.feature_columns: list[str] = self.metadata["feature_columns"]
         self.model_version: str = self.metadata["model_version"]
 
-    def predict_proba_a(self, X: pd.DataFrame) -> np.ndarray:
+    def predict_proba_a(self, X: pd.DataFrame, groups: pd.Series) -> np.ndarray:
         X = X[self.feature_columns]
-        raw = self.booster.predict(X)
-        return self.calibrator.transform(raw)
+        return self.ensemble.predict_proba_a(X, groups)
 
     def shap_contributions(self, X: pd.DataFrame) -> np.ndarray:
-        """TreeSHAP values for each row. Returns shape (n_samples, n_features).
-        The last LightGBM-emitted column is the expected_value bias term —
-        we drop it; the bias is constant across bouts so it doesn't help
-        the per-bout "why" UI."""
+        """TreeSHAP values from the ENSEMBLE's global LightGBM. The
+        blended probability comes from 4 learners, but SHAP only makes
+        sense per single tree model — and the global LGB is the most
+        interpretable choice (linear LogReg coefs and XGB-vs-LGB
+        differences would muddle the "why" panel)."""
         X = X[self.feature_columns]
-        contribs = self.booster.predict(X, pred_contrib=True)
+        booster = self.ensemble.lgb_global
+        assert booster is not None
+        contribs = booster.predict(X, pred_contrib=True)
         return contribs[:, :-1]
 
 
@@ -85,8 +86,12 @@ def predict_upcoming(*, force_version: str | None = None) -> int:
     upcoming_fill = upcoming.copy()
     upcoming_fill["target_a_wins"] = 0
     X, _, meta = build_feature_matrix(upcoming_fill)
+    # Weight-group per bout — needed so the ensemble can route to the
+    # right per-class specialist. Pulled from the upcoming DataFrame
+    # which carries weight_class through from build_dataset.
+    groups = upcoming["weight_class"].apply(weight_group).reset_index(drop=True)
 
-    probs_a = model.predict_proba_a(X)
+    probs_a = model.predict_proba_a(X, groups)
     shap_matrix = model.shap_contributions(X)  # (n_bouts, n_features)
     confidences = [confidence_label(max(p, 1 - p)) for p in probs_a]
     pred_winners = [

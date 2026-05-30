@@ -10,3 +10,4 @@ rich>=13.7
 dnspython>=2.6
 pyarrow>=17.0
 optuna>=4.0
+xgboost>=2.1

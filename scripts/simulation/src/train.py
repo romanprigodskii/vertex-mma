@@ -1,5 +1,6 @@
-"""Train LightGBM with temporal split + isotonic calibration. Saves
-artifacts to scripts/simulation/artifacts/."""
+"""Phase 5 — train the EnsembleModel (LightGBM + XGBoost + LogReg + per-class
+LightGBM specialists, blended by a small LogReg + isotonic calibration).
+Artifacts go to scripts/simulation/artifacts/ensemble/."""
 
 from __future__ import annotations
 
@@ -7,13 +8,10 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-import joblib
-import lightgbm as lgb
 import numpy as np
 import pandas as pd
 from rich.console import Console
 from rich.table import Table
-from sklearn.isotonic import IsotonicRegression
 from sklearn.metrics import (
     accuracy_score,
     brier_score_loss,
@@ -31,16 +29,21 @@ from .config import (
     TRAIN_END,
     VAL_END,
 )
+from .ensemble import EnsembleModel, weight_group
 from .features import build_feature_matrix, feature_names
 
 console = Console()
 
+ENSEMBLE_DIR = ARTIFACTS_DIR / "ensemble"
+
 
 def temporal_split(
     X: pd.DataFrame, y: pd.Series, meta: pd.DataFrame
-) -> tuple[dict[str, pd.DataFrame], dict[str, pd.Series]]:
-    """Train / val / test split by event_date."""
+) -> tuple[dict, dict, dict, dict]:
+    """Train / val / test split by event_date, plus per-row weight-group
+    assignment so the ensemble's specialists can pick their subset."""
     dt = pd.to_datetime(meta["event_date"])
+    groups = meta["weight_class"].apply(weight_group).reset_index(drop=True)
     train_end = pd.to_datetime(TRAIN_END)
     val_end = pd.to_datetime(VAL_END)
     train_mask = dt < train_end
@@ -61,11 +64,16 @@ def temporal_split(
         "val": meta.loc[val_mask].reset_index(drop=True),
         "test": meta.loc[test_mask].reset_index(drop=True),
     }
+    gs = {
+        "train": groups.loc[train_mask].reset_index(drop=True),
+        "val": groups.loc[val_mask].reset_index(drop=True),
+        "test": groups.loc[test_mask].reset_index(drop=True),
+    }
     console.log(
         f"split sizes — train {len(Xs['train']):,} · val {len(Xs['val']):,} · "
         f"test {len(Xs['test']):,}"
     )
-    return Xs, ys, metas
+    return Xs, ys, metas, gs
 
 
 def _load_tuned_params() -> dict:
@@ -79,60 +87,18 @@ def _load_tuned_params() -> dict:
     return payload.get("best_params", {})
 
 
-def train_lgb(
-    X_train: pd.DataFrame, y_train: pd.Series, X_val: pd.DataFrame, y_val: pd.Series
-) -> lgb.Booster:
-    # Per-feature gain multiplier: <1 makes a feature pay more "gain
-    # tax" before being split on, so its share of total SHAP shrinks
-    # without us hand-removing it. Defaults to 1.0 for anything not in
-    # the overrides map.
-    feature_contri = [
-        FEATURE_CONTRI_OVERRIDES.get(col, 1.0) for col in X_train.columns
-    ]
-    tuned = _load_tuned_params()
-    params = {**LGB_PARAMS, **tuned, "feature_contri": feature_contri}
-    if tuned:
-        console.log(f"using Optuna-tuned params · {len(tuned)} overrides")
-    dtrain = lgb.Dataset(X_train, label=y_train)
-    dval = lgb.Dataset(X_val, label=y_val, reference=dtrain)
-    booster = lgb.train(
-        params,
-        dtrain,
-        num_boost_round=LGB_NUM_ROUNDS,
-        valid_sets=[dtrain, dval],
-        valid_names=["train", "val"],
-        callbacks=[
-            lgb.early_stopping(stopping_rounds=LGB_EARLY_STOPPING_ROUNDS, verbose=False),
-            lgb.log_evaluation(period=100),
-        ],
-    )
-    return booster
-
-
-def fit_calibrator(booster: lgb.Booster, X_val: pd.DataFrame, y_val: pd.Series) -> IsotonicRegression:
-    """Isotonic on validation. Maps raw LGB sigmoid prob → calibrated prob."""
-    raw = booster.predict(X_val, num_iteration=booster.best_iteration)
-    iso = IsotonicRegression(out_of_bounds="clip")
-    iso.fit(raw, y_val)
-    return iso
-
-
-def evaluate(
-    booster: lgb.Booster,
-    iso: IsotonicRegression,
-    X: pd.DataFrame,
+def evaluate_probs(
+    probs: np.ndarray,
     y: pd.Series,
     market_prob_a: pd.Series | None = None,
 ) -> dict[str, float]:
-    raw = booster.predict(X, num_iteration=booster.best_iteration)
-    cal = iso.transform(raw)
-    pred = (cal >= 0.5).astype(int)
-    out = {
+    pred = (probs >= 0.5).astype(int)
+    out: dict[str, float] = {
         "n": int(len(y)),
         "accuracy": float(accuracy_score(y, pred)),
-        "log_loss": float(log_loss(y, cal.clip(1e-4, 1 - 1e-4))),
-        "brier": float(brier_score_loss(y, cal)),
-        "roc_auc": float(roc_auc_score(y, cal)),
+        "log_loss": float(log_loss(y, probs.clip(1e-4, 1 - 1e-4))),
+        "brier": float(brier_score_loss(y, probs)),
+        "roc_auc": float(roc_auc_score(y, probs)),
     }
     if market_prob_a is not None:
         m = market_prob_a.copy()
@@ -149,15 +115,13 @@ def evaluate(
 
 
 def print_metrics_table(metrics: dict[str, dict[str, float]]) -> None:
-    table = Table(title=f"Backtest — {MODEL_VERSION}")
+    table = Table(title=f"Backtest — {MODEL_VERSION} (ensemble)")
     table.add_column("Split")
     table.add_column("N", justify="right")
     table.add_column("Acc", justify="right")
     table.add_column("LogLoss", justify="right")
     table.add_column("Brier", justify="right")
     table.add_column("AUC", justify="right")
-    table.add_column("Mkt Acc", justify="right")
-    table.add_column("Mkt LogLoss", justify="right")
     for name in ("train", "val", "test"):
         m = metrics[name]
         table.add_row(
@@ -167,62 +131,117 @@ def print_metrics_table(metrics: dict[str, dict[str, float]]) -> None:
             f"{m['log_loss']:.3f}",
             f"{m['brier']:.3f}",
             f"{m['roc_auc']:.3f}",
-            f"{m.get('market_accuracy', float('nan')):.3f}" if "market_accuracy" in m else "—",
-            f"{m.get('market_log_loss', float('nan')):.3f}" if "market_log_loss" in m else "—",
+        )
+    console.print(table)
+
+
+def print_breakdown_table(
+    by_learner: dict[str, dict[str, float]],
+) -> None:
+    """Compare each individual learner against the blended output."""
+    table = Table(title="Per-learner test performance")
+    table.add_column("Learner")
+    table.add_column("Acc", justify="right")
+    table.add_column("LogLoss", justify="right")
+    table.add_column("AUC", justify="right")
+    for name, m in by_learner.items():
+        table.add_row(
+            name,
+            f"{m['accuracy']:.3f}",
+            f"{m['log_loss']:.3f}",
+            f"{m['roc_auc']:.3f}",
         )
     console.print(table)
 
 
 def run_training(df: pd.DataFrame) -> dict[str, dict[str, float]]:
     X, y, meta = build_feature_matrix(df)
-    # Lock column order so predict.py can rebuild identical feature
-    # arrays for one-off bouts.
     cols = feature_names()
     X = X[cols]
-    Xs, ys, metas = temporal_split(X, y, meta)
 
+    # meta needs weight_class for the splitter; build_feature_matrix
+    # drops it, so pull from the source df via the bout_id join.
+    meta = meta.merge(
+        df[["bout_id", "weight_class"]], on="bout_id", how="left"
+    )
+
+    Xs, ys, metas, gs = temporal_split(X, y, meta)
     if len(Xs["train"]) == 0 or len(Xs["val"]) == 0:
         raise RuntimeError(
             "Empty train or val split. Check TRAIN_END / VAL_END vs your data range."
         )
 
-    console.log(f"training LightGBM with {len(cols)} features…")
-    booster = train_lgb(Xs["train"], ys["train"], Xs["val"], ys["val"])
-    console.log(
-        f"best_iteration={booster.best_iteration} of {LGB_NUM_ROUNDS} (early stop on val)"
+    feature_contri = [FEATURE_CONTRI_OVERRIDES.get(col, 1.0) for col in cols]
+    tuned = _load_tuned_params()
+    lgb_params = {**LGB_PARAMS, **tuned, "feature_contri": feature_contri}
+    if tuned:
+        console.log(f"using Optuna-tuned LGB params · {len(tuned)} overrides")
+
+    ensemble = EnsembleModel(
+        feature_columns=cols,
+        lgb_params=lgb_params,
+        lgb_num_rounds=LGB_NUM_ROUNDS,
+        lgb_early_stopping=LGB_EARLY_STOPPING_ROUNDS,
     )
 
-    iso = fit_calibrator(booster, Xs["val"], ys["val"])
+    console.log("training ensemble (LGB + XGB + LogReg + per-class specialists)…")
+    train_meta = ensemble.fit(
+        X_train=Xs["train"],
+        y_train=ys["train"],
+        groups_train=gs["train"],
+        X_val=Xs["val"],
+        y_val=ys["val"],
+        groups_val=gs["val"],
+    )
+    console.log(
+        "blender coefs: "
+        + " ".join(f"{k}={v:+.2f}" for k, v in train_meta["blender_coefs"].items())
+        + f" · specialists trained: {train_meta['specialists']}"
+    )
 
+    # Headline blended metrics per split.
     metrics: dict[str, dict[str, float]] = {}
     for name in ("train", "val", "test"):
+        probs = ensemble.predict_proba_a(Xs[name], gs[name])
         market = (
             df.loc[metas[name].index, "market_prob_a"]
             if "market_prob_a" in df.columns
             else None
         )
-        metrics[name] = evaluate(booster, iso, Xs[name], ys[name], market)
+        metrics[name] = evaluate_probs(probs, ys[name], market)
     print_metrics_table(metrics)
 
+    # Per-learner test performance so we see whether the ensemble is
+    # actually pulling its weight vs the strongest single model.
+    test_breakdown = ensemble.predict_proba_breakdown(Xs["test"], gs["test"])
+    by_learner: dict[str, dict[str, float]] = {}
+    for learner_name, probs in test_breakdown.items():
+        by_learner[learner_name] = evaluate_probs(probs, ys["test"])
+    print_breakdown_table(by_learner)
+
     # Persist artifacts.
-    model_path = ARTIFACTS_DIR / "model.lgb"
-    iso_path = ARTIFACTS_DIR / "calibrator.pkl"
-    meta_path = ARTIFACTS_DIR / "metadata.json"
-    booster.save_model(str(model_path), num_iteration=booster.best_iteration)
-    joblib.dump(iso, iso_path)
+    ENSEMBLE_DIR.mkdir(exist_ok=True)
+    ensemble.save(ENSEMBLE_DIR)
+
     metadata = {
         "model_version": MODEL_VERSION,
+        "model_kind": "ensemble",
         "trained_at": datetime.utcnow().isoformat() + "Z",
         "feature_columns": cols,
         "train_end": TRAIN_END,
         "val_end": VAL_END,
-        "best_iteration": booster.best_iteration,
-        "params": LGB_PARAMS,
+        "lgb_params": lgb_params,
+        "blender": train_meta,
         "metrics": metrics,
+        "test_breakdown_by_learner": {k: v for k, v in by_learner.items()},
         "n_train": int(len(Xs["train"])),
         "n_val": int(len(Xs["val"])),
         "n_test": int(len(Xs["test"])),
     }
-    Path(meta_path).write_text(json.dumps(metadata, indent=2, default=str))
-    console.log(f"saved: {model_path.name} · {iso_path.name} · {meta_path.name}")
+    (ARTIFACTS_DIR / "metadata.json").write_text(
+        json.dumps(metadata, indent=2, default=str)
+    )
+    console.log(
+        f"saved ensemble to {ENSEMBLE_DIR.name}/ · metadata.json refreshed"
+    )
     return metrics
