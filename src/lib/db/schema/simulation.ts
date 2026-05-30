@@ -2,6 +2,7 @@ import {
   index,
   pgTable,
   real,
+  smallint,
   text,
   timestamp,
   unique,
@@ -54,3 +55,50 @@ export const boutSimulation = pgTable(
 
 export type BoutSimulation = typeof boutSimulation.$inferSelect;
 export type NewBoutSimulation = typeof boutSimulation.$inferInsert;
+
+// Phase 2: per-prediction SHAP attributions. One row per
+// (bout, model_version, feature) — we keep the top N (default 8) so the
+// UI can render a "why" breakdown without re-running the model. shapValue
+// is the raw TreeSHAP contribution in the model's log-odds space (signed,
+// positive = pushed prediction toward fighter A winning). featureValue
+// stores the raw input that fed the model so the UI can show the actual
+// number alongside the attribution (e.g. "Reach +6 cm").
+export const boutSimulationFeatures = pgTable(
+  "bout_simulation_features",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    boutId: uuid("bout_id")
+      .notNull()
+      .references(() => bout.id, { onDelete: "cascade" }),
+    modelVersion: text("model_version").notNull(),
+    featureName: text("feature_name").notNull(),
+    /** Signed TreeSHAP contribution toward "A wins". */
+    shapValue: real("shap_value").notNull(),
+    /** Raw feature value at prediction time. NULL when the feature was
+     *  itself missing (LightGBM handles missingness natively, SHAP
+     *  attribution still computes). */
+    featureValue: real("feature_value"),
+    /** 1-indexed rank by |shap_value| within this (bout, model_version) —
+     *  lets the UI ORDER BY abs_rank ASC LIMIT N without re-sorting. */
+    absRank: smallint("abs_rank").notNull(),
+    generatedAt: timestamp("generated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    unique("bout_simulation_features_unique").on(
+      table.boutId,
+      table.modelVersion,
+      table.featureName,
+    ),
+    index("bout_simulation_features_bout_idx").on(table.boutId),
+    index("bout_simulation_features_bout_rank_idx").on(
+      table.boutId,
+      table.modelVersion,
+      table.absRank,
+    ),
+  ],
+);
+
+export type BoutSimulationFeatureRow = typeof boutSimulationFeatures.$inferSelect;
+export type NewBoutSimulationFeatureRow = typeof boutSimulationFeatures.$inferInsert;

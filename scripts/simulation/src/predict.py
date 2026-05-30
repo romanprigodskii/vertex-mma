@@ -23,6 +23,11 @@ from .features import build_feature_matrix, feature_names
 
 console = Console()
 
+# Number of top features (by |shap|) we persist per bout. The UI shows
+# at most ~5, but keeping a couple extras gives Phase 3 / debug
+# inspection room without re-running the model.
+TOP_N_FEATURES = 8
+
 
 class LoadedModel:
     def __init__(self) -> None:
@@ -43,6 +48,15 @@ class LoadedModel:
         X = X[self.feature_columns]
         raw = self.booster.predict(X)
         return self.calibrator.transform(raw)
+
+    def shap_contributions(self, X: pd.DataFrame) -> np.ndarray:
+        """TreeSHAP values for each row. Returns shape (n_samples, n_features).
+        The last LightGBM-emitted column is the expected_value bias term —
+        we drop it; the bias is constant across bouts so it doesn't help
+        the per-bout "why" UI."""
+        X = X[self.feature_columns]
+        contribs = self.booster.predict(X, pred_contrib=True)
+        return contribs[:, :-1]
 
 
 def predict_upcoming(*, force_version: str | None = None) -> int:
@@ -67,6 +81,7 @@ def predict_upcoming(*, force_version: str | None = None) -> int:
     X, _, meta = build_feature_matrix(upcoming_fill)
 
     probs_a = model.predict_proba_a(X)
+    shap_matrix = model.shap_contributions(X)  # (n_bouts, n_features)
     confidences = [confidence_label(max(p, 1 - p)) for p in probs_a]
     pred_winners = [
         row.fighter_a_id if p >= 0.5 else row.fighter_b_id
@@ -97,7 +112,28 @@ def predict_upcoming(*, force_version: str | None = None) -> int:
             )
         )
 
-    upsert_sql = """
+    # Build per-bout top-N SHAP rows. abs_rank is 1-indexed for human-
+    # readable ORDER BY. feature_value carries the raw input so the UI can
+    # show "Reach +6 cm" without re-fetching the source row.
+    feature_rows: list[tuple] = []
+    for i, m in enumerate(meta.itertuples(index=False)):
+        shap_row = shap_matrix[i]
+        x_row = X.iloc[i]
+        abs_order = np.argsort(-np.abs(shap_row))
+        for rank, col_idx in enumerate(abs_order[:TOP_N_FEATURES], start=1):
+            feature_name = model.feature_columns[col_idx]
+            shap_value = float(shap_row[col_idx])
+            raw_val = x_row.iloc[col_idx]
+            feature_value = (
+                None
+                if raw_val is None or (isinstance(raw_val, float) and pd.isna(raw_val))
+                else float(raw_val)
+            )
+            feature_rows.append(
+                (m.bout_id, version, feature_name, shap_value, feature_value, rank)
+            )
+
+    upsert_sim_sql = """
         INSERT INTO bout_simulation
           (bout_id, model_version, prob_a, prob_b, predicted_winner_id,
            confidence_label, market_prob_a, edge_a)
@@ -111,9 +147,33 @@ def predict_upcoming(*, force_version: str | None = None) -> int:
           edge_a = EXCLUDED.edge_a,
           generated_at = now()
     """
+    upsert_features_sql = """
+        INSERT INTO bout_simulation_features
+          (bout_id, model_version, feature_name, shap_value, feature_value, abs_rank)
+        VALUES (%s::uuid, %s, %s, %s, %s, %s)
+        ON CONFLICT (bout_id, model_version, feature_name) DO UPDATE SET
+          shap_value = EXCLUDED.shap_value,
+          feature_value = EXCLUDED.feature_value,
+          abs_rank = EXCLUDED.abs_rank,
+          generated_at = now()
+    """
+    # Re-running for the same (bout, version) under fewer top-N or
+    # different rank could leave stale rows around. Wipe the prior set
+    # in the same transaction before inserting the fresh top-N.
+    bout_ids = sorted({r[0] for r in rows})
     with get_connection() as conn:
         with conn.cursor() as cur:
-            cur.executemany(upsert_sql, rows)
+            cur.executemany(upsert_sim_sql, rows)
+            if bout_ids:
+                cur.execute(
+                    "DELETE FROM bout_simulation_features "
+                    "WHERE model_version = %s AND bout_id = ANY(%s::uuid[])",
+                    (version, bout_ids),
+                )
+            cur.executemany(upsert_features_sql, feature_rows)
         conn.commit()
-    console.log(f"wrote {len(rows):,} predictions to bout_simulation")
+    console.log(
+        f"wrote {len(rows):,} predictions · {len(feature_rows):,} SHAP rows "
+        f"(top {TOP_N_FEATURES} per bout)"
+    )
     return len(rows)
