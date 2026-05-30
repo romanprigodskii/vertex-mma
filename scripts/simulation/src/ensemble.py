@@ -219,16 +219,51 @@ class EnsembleModel:
         # 3. Build val-set base predictions for the blender.
         val_preds = self._base_predict_matrix(X_val, groups_val)
 
-        # 4. Train blender. LogReg on the 4-dim stacked predictions.
-        # Heavy L2 here is important: the blender fits on val (~430
-        # bouts), so a high-C LogReg memorizes val-specific noise and
-        # tanks test log-loss. C=0.1 keeps the blend close to a
-        # weighted average.
+        # 4. Pick the best of three blend strategies on val log-loss:
+        #
+        #   * "logreg"        — full LogReg blender (C=0.1). Best when
+        #                       val signal is strong; can over-weight
+        #                       one learner on small val sets.
+        #   * "mean"          — plain arithmetic mean. Most conservative,
+        #                       robust to small-val noise.
+        #   * "weighted_mean" — mean weighted by softmax(-val_logloss).
+        #                       Gives more weight to learners that do
+        #                       well on val without the extreme
+        #                       coefficients of full LogReg.
+        #
+        # Best of three is picked on val log-loss. All three are cheap
+        # to compute so this stays fast.
+        from sklearn.metrics import log_loss as _log_loss
+
         blender = LogisticRegression(
             max_iter=500, C=0.1, solver="liblinear", random_state=42
         )
         blender.fit(val_preds, y_val.astype(int))
+        p_lr = blender.predict_proba(val_preds)[:, 1]
+        p_mean = val_preds.mean(axis=1)
+
+        # Per-learner val log-loss → softmax weights.
+        per_learner_ll = np.array(
+            [
+                _log_loss(y_val.astype(int), val_preds[:, j].clip(1e-4, 1 - 1e-4))
+                for j in range(val_preds.shape[1])
+            ]
+        )
+        scaled = -per_learner_ll / max(per_learner_ll.std(), 1e-6)
+        e = np.exp(scaled - scaled.max())
+        weights = e / e.sum()
+        p_wmean = val_preds @ weights
+
+        ll_lr = _log_loss(y_val.astype(int), p_lr.clip(1e-4, 1 - 1e-4))
+        ll_mean = _log_loss(y_val.astype(int), p_mean.clip(1e-4, 1 - 1e-4))
+        ll_wmean = _log_loss(y_val.astype(int), p_wmean.clip(1e-4, 1 - 1e-4))
+        options = {"logreg": ll_lr, "mean": ll_mean, "weighted_mean": ll_wmean}
+        best_mode = min(options, key=lambda k: options[k])
+
         self.blender = blender
+        self._blend_mode = best_mode
+        self._blend_weights = weights.tolist()
+        self._val_blend_logloss = {k: float(v) for k, v in options.items()}
 
         # NB: no post-blender isotonic calibration. LogReg blender
         # already outputs well-calibrated sigmoid probabilities; adding
@@ -239,9 +274,20 @@ class EnsembleModel:
         # source of overfit.
         self.calibrator = None
 
-        # Bookkeeping — store the blender weights for the metadata
-        # report so the human can see which learner won.
+        # Bookkeeping — store the blender weights AND the chosen blend
+        # mode so the metadata report shows both options' val log-loss
+        # and which one we shipped.
         self.training_meta = {
+            "blend_mode": self._blend_mode,
+            "val_blend_logloss": self._val_blend_logloss,
+            "weighted_mean_weights": {
+                name: float(w)
+                for name, w in zip(
+                    ["p_lgb_global", "p_xgb_global", "p_logreg", "p_specialist"],
+                    self._blend_weights,
+                    strict=False,
+                )
+            },
             "blender_intercept": float(blender.intercept_[0]),
             "blender_coefs": {
                 name: float(c)
@@ -287,10 +333,20 @@ class EnsembleModel:
     def predict_proba_a(
         self, X: pd.DataFrame, groups: pd.Series
     ) -> np.ndarray:
-        """Final P(A wins) — the headline UI number. LogReg blender's
-        sigmoid output is already calibrated; no post-isotonic."""
+        """Final P(A wins). Blend mode is picked at fit() time on val
+        log-loss — see EnsembleModel.fit for the three options
+        (logreg / mean / weighted_mean)."""
         assert self.blender is not None
         base = self._base_predict_matrix(X, groups)
+        mode = getattr(self, "_blend_mode", None)
+        if mode == "mean":
+            return base.mean(axis=1)
+        if mode == "weighted_mean":
+            weights = np.array(getattr(self, "_blend_weights", []))
+            if weights.size != base.shape[1]:
+                weights = np.ones(base.shape[1]) / base.shape[1]
+            return base @ weights
+        # Default / "logreg" mode.
         return self.blender.predict_proba(base)[:, 1]
 
     def predict_proba_breakdown(
@@ -327,6 +383,15 @@ class EnsembleModel:
         (dir_path / "feature_columns.json").write_text(
             json.dumps(self.feature_columns)
         )
+        # Persist the chosen blend mode + weights so load() reproduces
+        # predictions byte-for-byte.
+        (dir_path / "blend_mode.json").write_text(
+            json.dumps({
+                "blend_mode": getattr(self, "_blend_mode", "logreg"),
+                "blend_weights": getattr(self, "_blend_weights", []),
+                "val_blend_logloss": getattr(self, "_val_blend_logloss", {}),
+            })
+        )
 
     @classmethod
     def load(cls, dir_path: Path) -> "EnsembleModel":
@@ -345,4 +410,14 @@ class EnsembleModel:
         m.blender = joblib.load(dir_path / "blender.pkl")
         cal_path = dir_path / "calibrator.pkl"
         m.calibrator = joblib.load(cal_path) if cal_path.exists() else None
+        blend_mode_path = dir_path / "blend_mode.json"
+        if blend_mode_path.exists():
+            payload = json.loads(blend_mode_path.read_text())
+            m._blend_mode = payload.get("blend_mode", "logreg")
+            m._blend_weights = payload.get("blend_weights", [])
+            m._val_blend_logloss = payload.get("val_blend_logloss", {})
+        else:
+            m._blend_mode = "logreg"
+            m._blend_weights = []
+            m._val_blend_logloss = {}
         return m

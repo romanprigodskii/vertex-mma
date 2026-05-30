@@ -1,0 +1,13 @@
+[project]
+name = "vertex-mma-odds-scraper"
+version = "0.1.0"
+description = "bestfightodds.com backfill for Vertex MMA — opening lines per UFC bout"
+requires-python = ">=3.12"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+ignore = ["E501"]
