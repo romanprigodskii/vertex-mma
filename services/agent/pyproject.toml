@@ -1,0 +1,13 @@
+[project]
+name = "vertex-agent"
+version = "0.1.0"
+description = "Personal Telegram-driven Claude agent for the Vertex MMA project — long-running tasks with TG-relayed I/O"
+requires-python = ">=3.12"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+ignore = ["E501"]

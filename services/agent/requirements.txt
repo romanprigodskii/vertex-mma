@@ -1,0 +1,9 @@
+anthropic>=0.40
+mcp>=1.1
+python-telegram-bot>=21.7
+python-dotenv>=1.0
+rich>=13.7
+tenacity>=8.2
+httpx[http2]>=0.27
+fastapi>=0.115
+uvicorn[standard]>=0.32

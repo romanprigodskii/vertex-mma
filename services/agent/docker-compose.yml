@@ -1,0 +1,31 @@
+# Local dev compose — two services from one image. For Coolify you'd
+# split into two "applications" with this same Dockerfile and override
+# the CMD.
+
+services:
+  mcp:
+    build: .
+    image: vertex-agent:latest
+    command: ["python", "scripts/run_mcp.py"]
+    environment:
+      - AGENT_WORKDIR=/workspace
+    env_file:
+      - .env.local
+    ports:
+      - "8765:8765"
+    volumes:
+      # Mount the host's vertexmma checkout — the agent operates on
+      # the real repo, not a copy. Adjust the host path if yours
+      # differs.
+      - ../../:/workspace
+
+  bridge:
+    build: .
+    image: vertex-agent:latest
+    command: ["python", "scripts/run_bridge.py"]
+    env_file:
+      - .env.local
+    depends_on:
+      - mcp
+    volumes:
+      - ./data:/app/data
