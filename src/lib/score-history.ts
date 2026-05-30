@@ -37,6 +37,9 @@ export interface PeakVertexInfo {
   lastPeakBout: PeakBout;
   /** Number of consecutive (in event order) bouts at the peak score. */
   peakBoutCount: number;
+  /** Every bout in the peak streak, chronological. Includes anchorBout +
+   *  lastPeakBout and everything in between when held across multiple bouts. */
+  peakBouts: PeakBout[];
   /**
    * First bout AFTER the peak where score dropped below peak. Null when
    * the peak is the most recent anchor (fighter is at or above their
@@ -84,6 +87,7 @@ export async function getPeakVertex(
     end_score: number | null;
     current_score: number | null;
     all_time_score: number | null;
+    peak_bout_ids: string[];
   };
   const combinedResult = await db.execute<CombinedRow>(sql`
     WITH peak_score AS (
@@ -151,7 +155,15 @@ export async function getPeakVertex(
       fd.as_of_date::text AS end_date,
       fd.vertex_score AS end_score,
       f.vertex_score AS current_score,
-      f.vertex_score_all_time AS all_time_score
+      f.vertex_score_all_time AS all_time_score,
+      COALESCE((
+        SELECT array_agg(h.as_of_bout_id::text ORDER BY h.as_of_date ASC, h.as_of_bout_id ASC)
+        FROM fighter_score_history h
+        WHERE h.fighter_id = ${fighterId}::uuid
+          AND h.vertex_score = ps.peak
+          AND h.as_of_date >= fp.as_of_date
+          AND (fd.as_of_date IS NULL OR h.as_of_date < fd.as_of_date)
+      ), '{}'::text[]) AS peak_bout_ids
     FROM peak_score ps
     JOIN peak_count pc ON true
     JOIN first_peak fp ON true
@@ -162,9 +174,15 @@ export async function getPeakVertex(
   const combined = (combinedResult as unknown as CombinedRow[])[0];
   if (!combined) return null;
 
-  // Hydrate bout details for first-peak, last-peak (if different), and
-  // ending bout in one query via OR — small set, FK lookup, fast.
+  // Hydrate every bout in the peak streak (+ the ending bout if any) in one
+  // query — small set, FK lookup, fast.
   const isRu = await isRuLocale();
+  const idsToFetch = [...combined.peak_bout_ids];
+  if (combined.end_bout_id) idsToFetch.push(combined.end_bout_id);
+  const idList = sql.join(
+    idsToFetch.map((id) => sql`${id}::uuid`),
+    sql`, `,
+  );
   const boutDetailRowsResult = await db.execute<BoutDetailRow>(sql`
     SELECT
       b.id::text,
@@ -183,9 +201,7 @@ export async function getPeakVertex(
     JOIN event e ON e.id = b.event_id
     JOIN fighter fa ON fa.id = b.fighter_a_id
     JOIN fighter fb ON fb.id = b.fighter_b_id
-    WHERE b.id = ${combined.first_peak_bout_id}::uuid
-       OR b.id = ${combined.last_peak_bout_id}::uuid
-       OR b.id = ${combined.end_bout_id ?? combined.first_peak_bout_id}::uuid
+    WHERE b.id IN (${idList})
   `);
   const boutDetailRows = boutDetailRowsResult as unknown as BoutDetailRow[];
   const boutMap = new Map<string, BoutDetailRow>();
@@ -228,12 +244,17 @@ export async function getPeakVertex(
     ? hydrate(combined.end_bout_id)
     : null;
 
+  const peakBouts: PeakBout[] = combined.peak_bout_ids
+    .map((id) => hydrate(id))
+    .filter((b): b is PeakBout => b !== null);
+
   return {
     peak: combined.peak_score,
     peakDate: combined.first_peak_date.slice(0, 10),
     anchorBout,
     lastPeakBout,
     peakBoutCount: combined.peak_count,
+    peakBouts,
     endingBout:
       endingHydrated && combined.end_score != null
         ? { ...endingHydrated, scoreAfter: combined.end_score }

@@ -41,9 +41,9 @@ export async function PeakVertex({ info }: PeakVertexProps) {
   const {
     peak,
     peakDate,
-    anchorBout,
     lastPeakBout,
     peakBoutCount,
+    peakBouts,
     endingBout,
     currentScore,
   } = info;
@@ -53,6 +53,10 @@ export async function PeakVertex({ info }: PeakVertexProps) {
   const dateRange = heldAcrossBouts
     ? `${peakDate} → ${lastPeakBout.eventDate}`
     : peakDate;
+  // ±4 tolerance — within 4 points of peak still reads as "at peak" rather
+  // than rendering a noisy "-2 vs current" while also claiming "still at peak".
+  const AT_PEAK_TOLERANCE = 4;
+  const isCurrentAtPeak = delta != null && delta >= -AT_PEAK_TOLERANCE;
 
   return (
     <section
@@ -78,18 +82,11 @@ export async function PeakVertex({ info }: PeakVertexProps) {
               {t("heldNBouts", { n: peakBoutCount })}
             </span>
           ) : null}
-          {delta != null && delta !== 0 ? (
-            <span
-              className={
-                "font-sans text-xs " +
-                (delta > 0 ? "text-streak-win" : "text-foreground-muted")
-              }
-            >
-              {t("deltaVsCurrent", {
-                delta: delta > 0 ? `+${delta}` : String(delta),
-              })}
+          {delta != null && !isCurrentAtPeak ? (
+            <span className="font-sans text-xs text-foreground-muted">
+              {t("deltaVsCurrent", { delta: String(delta) })}
             </span>
-          ) : delta === 0 ? (
+          ) : delta != null ? (
             <span className="font-sans text-xs text-foreground-muted">
               {t("atPeakNow")}
             </span>
@@ -99,45 +96,28 @@ export async function PeakVertex({ info }: PeakVertexProps) {
         <div className="min-w-[200px] flex-1 space-y-2 font-sans text-sm">
           <div>
             <span className="text-[11px] uppercase tracking-widest text-foreground-subtle">
-              {heldAcrossBouts ? t("from") : t("after")}
+              {heldAcrossBouts ? t("boutsAtPeak") : t("after")}
             </span>
-            <span className="ml-2 text-foreground-muted">
-              <ResultPill result={anchorBout.result} />
-              <span className="ml-1.5">{t("vs")}</span>{" "}
-              <Link
-                href={`/fighters/${anchorBout.opponentSlug}`}
-                className="text-foreground transition-colors hover:text-primary"
-              >
-                {anchorBout.opponentName}
-              </Link>
-              <span className="text-foreground-subtle">
-                {" · "}
-                {methodLabel(anchorBout.method)}
-              </span>
-            </span>
+            <ul className="mt-1 space-y-1.5">
+              {peakBouts.map((b) => (
+                <li key={b.id} className="text-foreground-muted">
+                  <ResultPill result={b.result} />
+                  <span className="ml-1.5">{t("vs")}</span>{" "}
+                  <Link
+                    href={`/fighters/${b.opponentSlug}`}
+                    className="text-foreground transition-colors hover:text-primary"
+                  >
+                    {b.opponentName}
+                  </Link>
+                  <span className="text-foreground-subtle">
+                    {" · "}
+                    {methodLabel(b.method)}
+                    {heldAcrossBouts ? ` · ${b.eventDate}` : ""}
+                  </span>
+                </li>
+              ))}
+            </ul>
           </div>
-
-          {heldAcrossBouts ? (
-            <div>
-              <span className="text-[11px] uppercase tracking-widest text-foreground-subtle">
-                {t("through")}
-              </span>
-              <span className="ml-2 text-foreground-muted">
-                <ResultPill result={lastPeakBout.result} />
-                <span className="ml-1.5">{t("vs")}</span>{" "}
-                <Link
-                  href={`/fighters/${lastPeakBout.opponentSlug}`}
-                  className="text-foreground transition-colors hover:text-primary"
-                >
-                  {lastPeakBout.opponentName}
-                </Link>
-                <span className="text-foreground-subtle">
-                  {" · "}
-                  {methodLabel(lastPeakBout.method)}
-                </span>
-              </span>
-            </div>
-          ) : null}
 
           {endingBout ? (
             <div>
@@ -164,10 +144,10 @@ export async function PeakVertex({ info }: PeakVertexProps) {
               </span>
             </div>
           ) : isAtPeak ? (
-            // No bout ended the peak — but the live score can still have eased
-            // below it via inactivity / time-decay. Only claim "still at peak"
-            // when the current score actually equals the peak.
-            currentScore != null && delta != null && delta < 0 ? (
+            // No bout ended the peak — but live score can have eased below it
+            // via inactivity / time-decay. Treat within ±AT_PEAK_TOLERANCE as
+            // still at peak; only flag "softened" once the gap exceeds it.
+            currentScore != null && !isCurrentAtPeak ? (
               <div className="text-[11px] uppercase tracking-widest text-foreground-subtle">
                 {t("softenedSincePeak")}
               </div>

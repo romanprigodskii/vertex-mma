@@ -1048,7 +1048,8 @@
     "stillAtPeak": "Сейчас на пике карьеры",
     "retiredAtPeak": "Завершил карьеру на пике",
     "softenedSincePeak": "Снизился со времени пика",
-    "vs": "против"
+    "vs": "против",
+    "boutsAtPeak": "Бои на пике"
   },
   "compare": {
     "metaTitle": "Сравнение бойцов",

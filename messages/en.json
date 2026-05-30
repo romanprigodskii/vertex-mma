@@ -1048,7 +1048,8 @@
     "stillAtPeak": "Still at career peak",
     "retiredAtPeak": "Retired at career peak",
     "softenedSincePeak": "Eased since the peak",
-    "vs": "vs"
+    "vs": "vs",
+    "boutsAtPeak": "Bouts at peak"
   },
   "compare": {
     "metaTitle": "Compare fighters",
