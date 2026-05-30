@@ -23,6 +23,7 @@ from sklearn.metrics import (
 
 from .config import (
     ARTIFACTS_DIR,
+    FEATURE_CONTRI_OVERRIDES,
     LGB_EARLY_STOPPING_ROUNDS,
     LGB_NUM_ROUNDS,
     LGB_PARAMS,
@@ -70,10 +71,18 @@ def temporal_split(
 def train_lgb(
     X_train: pd.DataFrame, y_train: pd.Series, X_val: pd.DataFrame, y_val: pd.Series
 ) -> lgb.Booster:
+    # Per-feature gain multiplier: <1 makes a feature pay more "gain
+    # tax" before being split on, so its share of total SHAP shrinks
+    # without us hand-removing it. Defaults to 1.0 for anything not in
+    # the overrides map.
+    feature_contri = [
+        FEATURE_CONTRI_OVERRIDES.get(col, 1.0) for col in X_train.columns
+    ]
+    params = {**LGB_PARAMS, "feature_contri": feature_contri}
     dtrain = lgb.Dataset(X_train, label=y_train)
     dval = lgb.Dataset(X_val, label=y_val, reference=dtrain)
     booster = lgb.train(
-        LGB_PARAMS,
+        params,
         dtrain,
         num_boost_round=LGB_NUM_ROUNDS,
         valid_sets=[dtrain, dval],

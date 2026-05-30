@@ -10,6 +10,23 @@ export interface BoutSimulationFeature {
   absRank: number;
 }
 
+export interface BoutSimulationRounds {
+  nSimulations: number;
+  mcWinnerProbA: number;
+  mcWinnerProbB: number;
+  probKoA: number;
+  probKoB: number;
+  probSubA: number;
+  probSubB: number;
+  probDecisionA: number;
+  probDecisionB: number;
+  avgFinishSeconds: number | null;
+  /** Index 0 is round 1, etc. Length = scheduled_rounds. Each entry is
+   *  the probability the bout was finished IN that round (any method,
+   *  either fighter). NULL when scheduled_rounds < that index. */
+  finishByRound: Array<number | null>;
+}
+
 export interface BoutSimulationRow {
   modelVersion: string;
   probA: number;
@@ -23,6 +40,9 @@ export interface BoutSimulationRow {
    *  abs_rank ASC. Empty array when feature attribution hasn't been
    *  populated yet (e.g. predict ran on Phase 1 schema). */
   features: BoutSimulationFeature[];
+  /** Phase 3 Monte Carlo round distribution. NULL when MC hasn't been
+   *  run yet for this (bout, model_version). */
+  rounds: BoutSimulationRounds | null;
 }
 
 /**
@@ -87,6 +107,59 @@ export async function getBoutSimulation(
     absRank: f.abs_rank,
   }));
 
+  type RRow = {
+    n_simulations: number;
+    mc_winner_prob_a: number;
+    mc_winner_prob_b: number;
+    prob_ko_a: number;
+    prob_ko_b: number;
+    prob_sub_a: number;
+    prob_sub_b: number;
+    prob_decision_a: number;
+    prob_decision_b: number;
+    avg_finish_seconds: number | null;
+    prob_finish_round_1: number | null;
+    prob_finish_round_2: number | null;
+    prob_finish_round_3: number | null;
+    prob_finish_round_4: number | null;
+    prob_finish_round_5: number | null;
+  };
+  const roundsResult = await db.execute<RRow>(sql`
+    SELECT n_simulations, mc_winner_prob_a, mc_winner_prob_b,
+           prob_ko_a, prob_ko_b, prob_sub_a, prob_sub_b,
+           prob_decision_a, prob_decision_b,
+           avg_finish_seconds,
+           prob_finish_round_1, prob_finish_round_2, prob_finish_round_3,
+           prob_finish_round_4, prob_finish_round_5
+    FROM bout_simulation_rounds
+    WHERE bout_id = ${boutId}::uuid
+      AND model_version = ${r.model_version}
+    LIMIT 1
+  `);
+  const roundsRows = roundsResult as unknown as RRow[];
+  const rounds: BoutSimulationRounds | null =
+    roundsRows.length === 0
+      ? null
+      : {
+          nSimulations: roundsRows[0].n_simulations,
+          mcWinnerProbA: roundsRows[0].mc_winner_prob_a,
+          mcWinnerProbB: roundsRows[0].mc_winner_prob_b,
+          probKoA: roundsRows[0].prob_ko_a,
+          probKoB: roundsRows[0].prob_ko_b,
+          probSubA: roundsRows[0].prob_sub_a,
+          probSubB: roundsRows[0].prob_sub_b,
+          probDecisionA: roundsRows[0].prob_decision_a,
+          probDecisionB: roundsRows[0].prob_decision_b,
+          avgFinishSeconds: roundsRows[0].avg_finish_seconds,
+          finishByRound: [
+            roundsRows[0].prob_finish_round_1,
+            roundsRows[0].prob_finish_round_2,
+            roundsRows[0].prob_finish_round_3,
+            roundsRows[0].prob_finish_round_4,
+            roundsRows[0].prob_finish_round_5,
+          ],
+        };
+
   return {
     modelVersion: r.model_version,
     probA: r.prob_a,
@@ -97,6 +170,7 @@ export async function getBoutSimulation(
     edgeA: r.edge_a,
     generatedAt: r.generated_at,
     features,
+    rounds,
   };
 }
 

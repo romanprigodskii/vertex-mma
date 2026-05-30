@@ -1,9 +1,13 @@
-"""Inference runner — scores upcoming UFC bouts with the trained
-LightGBM + isotonic calibrator and writes one row per bout to the
-`bout_simulation` table.
+"""Inference runner — scores upcoming UFC bouts.
 
-Re-running for the same (bout_id, model_version) pair is an UPSERT so
-the cron can be invoked multiple times safely (idempotent)."""
+Three things get written per bout:
+
+  1. bout_simulation                  — calibrated LightGBM winner prob
+  2. bout_simulation_features         — top-N SHAP attributions (Phase 2)
+  3. bout_simulation_rounds           — Monte Carlo method × round (Phase 3)
+
+Re-running for the same (bout_id, model_version) is an UPSERT so the
+cron can be invoked multiple times safely (idempotent)."""
 
 from __future__ import annotations
 
@@ -14,12 +18,14 @@ import joblib
 import lightgbm as lgb
 import numpy as np
 import pandas as pd
+from psycopg.types.json import Jsonb
 from rich.console import Console
 
 from .config import ARTIFACTS_DIR, MODEL_VERSION, confidence_label
 from .db import get_connection
 from .export import build_dataset, fetch_raw
 from .features import build_feature_matrix, feature_names
+from .monte_carlo import FighterMC, simulate_bout
 
 console = Console()
 
@@ -133,6 +139,43 @@ def predict_upcoming(*, force_version: str | None = None) -> int:
                 (m.bout_id, version, feature_name, shap_value, feature_value, rank)
             )
 
+    # Phase 3 — Monte Carlo per-bout. We rebuild FighterMC from the
+    # upcoming DataFrame rows; the snapshot fields are all present there
+    # (see export.FighterHistory.snapshot keys). seed is bout-stable so
+    # re-running the same bout gets the same distribution (within
+    # rounding) — easier to debug.
+    mc_rows: list[tuple] = []
+    for i, m in enumerate(meta.itertuples(index=False)):
+        row = upcoming.iloc[i]
+        snap_a = {k[:-2]: row[k] for k in row.index if k.endswith("_a") and k != "fighter_a_id"}
+        snap_b = {k[:-2]: row[k] for k in row.index if k.endswith("_b") and k != "fighter_b_id"}
+        a = FighterMC.from_snapshot(snap_a)
+        b = FighterMC.from_snapshot(snap_b)
+        scheduled_rounds = int(row["scheduled_rounds"])
+        mc = simulate_bout(a, b, scheduled_rounds, seed=hash(m.bout_id) & 0xFFFFFFFF)
+        mc_rows.append(
+            (
+                m.bout_id,
+                version,
+                mc.n_simulations,
+                mc.winner_prob_a,
+                mc.winner_prob_b,
+                mc.prob_ko_a,
+                mc.prob_ko_b,
+                mc.prob_sub_a,
+                mc.prob_sub_b,
+                mc.prob_decision_a,
+                mc.prob_decision_b,
+                mc.avg_finish_seconds,
+                mc.prob_finish_per_round.get(1),
+                mc.prob_finish_per_round.get(2),
+                mc.prob_finish_per_round.get(3),
+                mc.prob_finish_per_round.get(4),
+                mc.prob_finish_per_round.get(5),
+                Jsonb(mc.distribution),
+            )
+        )
+
     upsert_sim_sql = """
         INSERT INTO bout_simulation
           (bout_id, model_version, prob_a, prob_b, predicted_winner_id,
@@ -157,6 +200,38 @@ def predict_upcoming(*, force_version: str | None = None) -> int:
           abs_rank = EXCLUDED.abs_rank,
           generated_at = now()
     """
+    upsert_rounds_sql = """
+        INSERT INTO bout_simulation_rounds
+          (bout_id, model_version, n_simulations,
+           mc_winner_prob_a, mc_winner_prob_b,
+           prob_ko_a, prob_ko_b, prob_sub_a, prob_sub_b,
+           prob_decision_a, prob_decision_b,
+           avg_finish_seconds,
+           prob_finish_round_1, prob_finish_round_2, prob_finish_round_3,
+           prob_finish_round_4, prob_finish_round_5,
+           distribution)
+        VALUES (%s::uuid, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (bout_id, model_version) DO UPDATE SET
+          n_simulations = EXCLUDED.n_simulations,
+          mc_winner_prob_a = EXCLUDED.mc_winner_prob_a,
+          mc_winner_prob_b = EXCLUDED.mc_winner_prob_b,
+          prob_ko_a = EXCLUDED.prob_ko_a,
+          prob_ko_b = EXCLUDED.prob_ko_b,
+          prob_sub_a = EXCLUDED.prob_sub_a,
+          prob_sub_b = EXCLUDED.prob_sub_b,
+          prob_decision_a = EXCLUDED.prob_decision_a,
+          prob_decision_b = EXCLUDED.prob_decision_b,
+          avg_finish_seconds = EXCLUDED.avg_finish_seconds,
+          prob_finish_round_1 = EXCLUDED.prob_finish_round_1,
+          prob_finish_round_2 = EXCLUDED.prob_finish_round_2,
+          prob_finish_round_3 = EXCLUDED.prob_finish_round_3,
+          prob_finish_round_4 = EXCLUDED.prob_finish_round_4,
+          prob_finish_round_5 = EXCLUDED.prob_finish_round_5,
+          distribution = EXCLUDED.distribution,
+          generated_at = now()
+    """
+
     # Re-running for the same (bout, version) under fewer top-N or
     # different rank could leave stale rows around. Wipe the prior set
     # in the same transaction before inserting the fresh top-N.
@@ -171,9 +246,10 @@ def predict_upcoming(*, force_version: str | None = None) -> int:
                     (version, bout_ids),
                 )
             cur.executemany(upsert_features_sql, feature_rows)
+            cur.executemany(upsert_rounds_sql, mc_rows)
         conn.commit()
     console.log(
-        f"wrote {len(rows):,} predictions · {len(feature_rows):,} SHAP rows "
-        f"(top {TOP_N_FEATURES} per bout)"
+        f"wrote {len(rows):,} predictions · {len(feature_rows):,} SHAP rows · "
+        f"{len(mc_rows):,} Monte Carlo distributions"
     )
     return len(rows)

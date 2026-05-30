@@ -214,9 +214,202 @@ export async function BoutSimulationPanel({ bout, sim }: Props) {
         </div>
       ) : null}
 
+      {sim.rounds ? (
+        <MonteCarloBlock bout={bout} rounds={sim.rounds} />
+      ) : null}
+
       <p className="mt-4 font-sans text-[11px] leading-relaxed text-foreground-subtle">
         {t("disclaimer")}
       </p>
     </section>
+  );
+}
+
+function formatFinishTime(seconds: number | null): string {
+  if (seconds == null) return "—";
+  const m = Math.floor(seconds / 60);
+  const s = Math.round(seconds % 60);
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+async function MonteCarloBlock({
+  bout,
+  rounds,
+}: {
+  bout: BoutDetail;
+  rounds: NonNullable<BoutSimulationRow["rounds"]>;
+}) {
+  const t = await getTranslations("boutSimulation");
+  // Find the most likely (method, round) cell — used for the headline
+  // sentence. Decision sits at "round = scheduled_rounds + 1" so it
+  // sorts after all round-finish cells.
+  const finishByRound = rounds.finishByRound.filter(
+    (v): v is number => v != null,
+  );
+  const scheduledRounds = finishByRound.length;
+  type Cell = { kind: "ko" | "sub" | "dec"; round: number; prob: number };
+  const cells: Cell[] = [];
+  // Per-round KO + Sub finishes (collapsed across sides for the
+  // headline cell — direction is shown in the method strip below).
+  for (let i = 0; i < scheduledRounds; i += 1) {
+    cells.push({ kind: "ko", round: i + 1, prob: finishByRound[i] });
+  }
+  // KO share within method-prob already includes side; this approximation
+  // is fine for "what's the modal outcome".
+  const decisionProb = rounds.probDecisionA + rounds.probDecisionB;
+  cells.push({ kind: "dec", round: scheduledRounds + 1, prob: decisionProb });
+  cells.sort((x, y) => y.prob - x.prob);
+  const top = cells[0];
+
+  // Method totals strip.
+  const totalKo = rounds.probKoA + rounds.probKoB;
+  const totalSub = rounds.probSubA + rounds.probSubB;
+  const totalDec = decisionProb;
+
+  // Per-round bars + decision bar.
+  const maxRoundProb = Math.max(
+    decisionProb,
+    ...finishByRound,
+    0.05,
+  );
+
+  const fighterAName = bout.fighter_a.name_en;
+  const fighterBName = bout.fighter_b.name_en;
+  const topMethodLabel =
+    top.kind === "ko"
+      ? t("mcMethodKo")
+      : top.kind === "sub"
+        ? t("mcMethodSub")
+        : t("mcMethodDec");
+
+  return (
+    <div className="mt-5 border-t border-foreground/10 pt-4">
+      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <h4 className="font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
+          {t("mcHeading", { n: rounds.nSimulations.toLocaleString() })}
+        </h4>
+        {rounds.avgFinishSeconds != null ? (
+          <span className="font-mono text-[10px] tabular text-foreground-subtle">
+            {t("mcAvgFinish", {
+              time: formatFinishTime(rounds.avgFinishSeconds),
+            })}
+          </span>
+        ) : null}
+      </div>
+
+      {/* Headline sentence */}
+      <p className="mb-3 font-sans text-sm text-foreground">
+        {top.kind === "dec"
+          ? t("mcMostLikely", {
+              method: topMethodLabel,
+              round: "—",
+              pct: `${(top.prob * 100).toFixed(0)}%`,
+            })
+          : t("mcMostLikely", {
+              method: topMethodLabel,
+              round: top.round,
+              pct: `${(top.prob * 100).toFixed(0)}%`,
+            })}
+      </p>
+
+      {/* Method totals — stacked bar */}
+      <div className="mb-3 space-y-1.5">
+        <div className="flex h-2 w-full overflow-hidden rounded-sm bg-foreground/[0.05]">
+          <div
+            aria-hidden
+            className="h-full bg-streak-loss/70"
+            style={{ width: `${totalKo * 100}%` }}
+            title={`${t("mcMethodKo")} ${(totalKo * 100).toFixed(0)}%`}
+          />
+          <div
+            aria-hidden
+            className="h-full bg-primary/70"
+            style={{ width: `${totalSub * 100}%` }}
+            title={`${t("mcMethodSub")} ${(totalSub * 100).toFixed(0)}%`}
+          />
+          <div
+            aria-hidden
+            className="h-full bg-foreground-muted/60"
+            style={{ width: `${totalDec * 100}%` }}
+            title={`${t("mcMethodDec")} ${(totalDec * 100).toFixed(0)}%`}
+          />
+        </div>
+        <div className="flex flex-wrap gap-x-3 gap-y-1 font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
+          <span className="flex items-center gap-1">
+            <span aria-hidden className="h-2 w-2 rounded-sm bg-streak-loss/70" />
+            <span>
+              {t("mcMethodKo")} · {(totalKo * 100).toFixed(0)}% ·{" "}
+              <span className="text-foreground-muted">
+                {(rounds.probKoA * 100).toFixed(0)}/{(rounds.probKoB * 100).toFixed(0)}
+              </span>
+            </span>
+          </span>
+          <span className="flex items-center gap-1">
+            <span aria-hidden className="h-2 w-2 rounded-sm bg-primary/70" />
+            <span>
+              {t("mcMethodSub")} · {(totalSub * 100).toFixed(0)}% ·{" "}
+              <span className="text-foreground-muted">
+                {(rounds.probSubA * 100).toFixed(0)}/{(rounds.probSubB * 100).toFixed(0)}
+              </span>
+            </span>
+          </span>
+          <span className="flex items-center gap-1">
+            <span aria-hidden className="h-2 w-2 rounded-sm bg-foreground-muted/60" />
+            <span>
+              {t("mcMethodDec")} · {(totalDec * 100).toFixed(0)}% ·{" "}
+              <span className="text-foreground-muted">
+                {(rounds.probDecisionA * 100).toFixed(0)}/
+                {(rounds.probDecisionB * 100).toFixed(0)}
+              </span>
+            </span>
+          </span>
+        </div>
+        <p className="font-mono text-[10px] uppercase tracking-widest text-foreground-subtle/70">
+          {fighterAName} / {fighterBName}
+        </p>
+      </div>
+
+      {/* Per-round finish probability strip */}
+      <ul className="grid grid-cols-1 gap-1.5">
+        {finishByRound.map((prob, idx) => {
+          const widthPct = Math.max(4, Math.round((prob / maxRoundProb) * 100));
+          return (
+            <li
+              key={`r${idx + 1}`}
+              className="flex items-baseline gap-2 font-mono text-[10px] uppercase tracking-widest text-foreground-subtle"
+            >
+              <span className="w-6 shrink-0 text-foreground-muted">
+                {t("mcRoundLabel", { n: idx + 1 })}
+              </span>
+              <div className="h-1 flex-1 overflow-hidden rounded-sm bg-foreground/[0.05]">
+                <div
+                  aria-hidden
+                  className="h-full bg-streak-loss/55"
+                  style={{ width: `${widthPct}%` }}
+                />
+              </div>
+              <span className="w-10 shrink-0 text-right text-foreground-muted">
+                {(prob * 100).toFixed(0)}%
+              </span>
+            </li>
+          );
+        })}
+        <li className="flex items-baseline gap-2 font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
+          <span className="w-6 shrink-0 text-foreground-muted">
+            {t("mcDecisionLabel")}
+          </span>
+          <div className="h-1 flex-1 overflow-hidden rounded-sm bg-foreground/[0.05]">
+            <div
+              aria-hidden
+              className="h-full bg-foreground-muted/50"
+              style={{ width: `${Math.max(4, Math.round((decisionProb / maxRoundProb) * 100))}%` }}
+            />
+          </div>
+          <span className="w-10 shrink-0 text-right text-foreground-muted">
+            {(decisionProb * 100).toFixed(0)}%
+          </span>
+        </li>
+      </ul>
+    </div>
   );
 }

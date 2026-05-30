@@ -1,5 +1,7 @@
 import {
   index,
+  integer,
+  jsonb,
   pgTable,
   real,
   smallint,
@@ -102,3 +104,45 @@ export const boutSimulationFeatures = pgTable(
 
 export type BoutSimulationFeatureRow = typeof boutSimulationFeatures.$inferSelect;
 export type NewBoutSimulationFeatureRow = typeof boutSimulationFeatures.$inferInsert;
+
+// Phase 3: Monte Carlo round-by-round distribution. One row per
+// (bout, model_version). Summary columns mirror the most-clicked
+// numbers in the UI; `distribution` JSONB carries the full payload
+// (e.g., per-round per-method per-fighter probabilities) for richer
+// drilldown.
+export const boutSimulationRounds = pgTable(
+  "bout_simulation_rounds",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    boutId: uuid("bout_id")
+      .notNull()
+      .references(() => bout.id, { onDelete: "cascade" }),
+    modelVersion: text("model_version").notNull(),
+    nSimulations: integer("n_simulations").notNull(),
+    mcWinnerProbA: real("mc_winner_prob_a").notNull(),
+    mcWinnerProbB: real("mc_winner_prob_b").notNull(),
+    probKoA: real("prob_ko_a").notNull(),
+    probKoB: real("prob_ko_b").notNull(),
+    probSubA: real("prob_sub_a").notNull(),
+    probSubB: real("prob_sub_b").notNull(),
+    probDecisionA: real("prob_decision_a").notNull(),
+    probDecisionB: real("prob_decision_b").notNull(),
+    avgFinishSeconds: real("avg_finish_seconds"),
+    probFinishRound1: real("prob_finish_round_1"),
+    probFinishRound2: real("prob_finish_round_2"),
+    probFinishRound3: real("prob_finish_round_3"),
+    probFinishRound4: real("prob_finish_round_4"),
+    probFinishRound5: real("prob_finish_round_5"),
+    distribution: jsonb("distribution").notNull(),
+    generatedAt: timestamp("generated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    unique("bout_simulation_rounds_unique").on(table.boutId, table.modelVersion),
+    index("bout_simulation_rounds_bout_idx").on(table.boutId),
+  ],
+);
+
+export type BoutSimulationRoundsRow = typeof boutSimulationRounds.$inferSelect;
+export type NewBoutSimulationRoundsRow = typeof boutSimulationRounds.$inferInsert;
