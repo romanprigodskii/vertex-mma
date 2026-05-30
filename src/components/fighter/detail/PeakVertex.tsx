@@ -93,14 +93,14 @@ export async function PeakVertex({ info }: PeakVertexProps) {
           ) : null}
         </div>
 
-        <div className="min-w-[200px] flex-1 space-y-2 font-sans text-sm">
+        <div className="min-w-0 w-full space-y-2 font-sans text-sm sm:min-w-[200px] sm:flex-1 sm:w-auto">
           <div>
             <span className="text-[11px] uppercase tracking-widest text-foreground-subtle">
               {heldAcrossBouts ? t("boutsAtPeak") : t("after")}
             </span>
             <ul className="mt-1 space-y-1.5">
               {peakBouts.map((b) => (
-                <li key={b.id} className="text-foreground-muted">
+                <li key={b.id} className="break-words text-foreground-muted">
                   <ResultPill result={b.result} />
                   <span className="ml-1.5">{t("vs")}</span>{" "}
                   <Link
@@ -124,7 +124,7 @@ export async function PeakVertex({ info }: PeakVertexProps) {
               <span className="text-[11px] uppercase tracking-widest text-foreground-subtle">
                 {t("ended")}
               </span>
-              <span className="ml-2 text-foreground-muted">
+              <span className="ml-2 break-words text-foreground-muted">
                 <ResultPill result={endingBout.result} />
                 <span className="ml-1.5">{t("vs")}</span>{" "}
                 <Link

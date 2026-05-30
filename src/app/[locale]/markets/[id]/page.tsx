@@ -175,13 +175,13 @@ export default async function MarketDetailPage({ params }: PageProps) {
               ))}
             </div>
           ) : (
-            <div className="mt-8 grid grid-cols-2 gap-3">
+            <div className="mt-8 grid grid-cols-2 gap-2 sm:gap-3">
               {market.outcomes.map((o) => (
                 <div
                   key={o.id}
-                  className="rounded-md border border-foreground/10 bg-background-elevated/30 p-4"
+                  className="rounded-md border border-foreground/10 bg-background-elevated/30 p-3 sm:p-4"
                 >
-                  <p className="font-sans text-[11px] uppercase tracking-widest text-foreground-muted">
+                  <p className="truncate font-sans text-[11px] uppercase tracking-widest text-foreground-muted">
                     {o.label}
                   </p>
                   <p className="mt-2 font-display text-3xl tabular text-foreground">

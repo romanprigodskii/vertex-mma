@@ -270,13 +270,13 @@ export default async function FighterDetailPage({ params }: PageProps) {
           <Link
             href={`/fighters/compare?a=${slug}`}
             prefetch={false}
-            className="group flex flex-wrap items-center justify-between gap-3 rounded-md border border-foreground/15 bg-foreground/[0.02] px-4 py-3 transition-colors hover:border-foreground/35 hover:bg-foreground/[0.05]"
+            className="group flex flex-wrap items-center justify-between gap-x-3 gap-y-2 rounded-md border border-foreground/15 bg-foreground/[0.02] px-4 py-3 transition-colors hover:border-foreground/35 hover:bg-foreground/[0.05]"
           >
-            <span className="flex items-center gap-2 font-sans text-[11px] uppercase tracking-[0.22em] text-foreground-muted">
-              <ArrowLeftRight className="h-3.5 w-3.5" aria-hidden />
+            <span className="flex min-w-0 items-center gap-2 font-sans text-[11px] uppercase tracking-[0.22em] text-foreground-muted">
+              <ArrowLeftRight className="h-3.5 w-3.5 shrink-0" aria-hidden />
               {t("compareWith")}
             </span>
-            <span className="flex items-center gap-1.5 font-sans text-xs text-foreground transition-transform group-hover:translate-x-0.5">
+            <span className="flex shrink-0 items-center gap-1.5 font-sans text-xs text-foreground transition-transform group-hover:translate-x-0.5">
               <span>{t("openCompare")}</span>
               <ChevronRight className="h-3.5 w-3.5" aria-hidden />
             </span>
