@@ -145,7 +145,7 @@ export default async function HomePage({
 
         <section className="border-b border-foreground/[0.06]">
           <Container size="xl" className="py-12 md:py-16">
-            <div className="mb-6 flex items-baseline justify-between">
+            <div className="mb-6 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
               <h2 className="font-display uppercase tracking-tight text-foreground text-h2">
                 {t("topFighters")}
               </h2>
@@ -212,7 +212,7 @@ export default async function HomePage({
 
         <section className="border-b border-foreground/[0.06]">
           <Container size="xl" className="py-12 md:py-16">
-            <div className="mb-6 flex items-baseline justify-between">
+            <div className="mb-6 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
               <h2 className="font-display uppercase tracking-tight text-foreground text-h2">
                 {t("marketsHeading")}
               </h2>
@@ -247,7 +247,7 @@ export default async function HomePage({
 
         <section className="border-b border-foreground/[0.06]">
           <Container size="xl" className="py-12 md:py-16">
-            <div className="mb-6 flex items-baseline justify-between">
+            <div className="mb-6 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
               <h2 className="font-display uppercase tracking-tight text-foreground text-h2">
                 {t("communityRankings")}
               </h2>

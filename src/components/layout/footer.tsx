@@ -61,9 +61,9 @@ export async function Footer() {
   return (
     <footer className="mt-16 border-t border-foreground/[0.06] bg-background-elevated/30">
       <Container size="xl" className="py-10 md:py-14">
-        <div className="grid grid-cols-2 gap-8 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:gap-x-8 md:grid-cols-4">
           {COLUMNS.map((col) => (
-            <div key={col.titleKey}>
+            <div key={col.titleKey} className="min-w-0">
               <h4 className="font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
                 {t(col.titleKey)}
               </h4>
@@ -72,7 +72,7 @@ export async function Footer() {
                   <li key={l.href}>
                     <Link
                       href={l.href}
-                      className="font-sans text-sm text-foreground-muted transition-colors hover:text-foreground"
+                      className="block break-words font-sans text-sm text-foreground-muted transition-colors hover:text-foreground"
                     >
                       {t(l.labelKey)}
                     </Link>
@@ -83,12 +83,12 @@ export async function Footer() {
           ))}
         </div>
 
-        <div className="mt-10 flex flex-wrap items-baseline justify-between gap-3 border-t border-foreground/[0.06] pt-6">
+        <div className="mt-10 flex flex-col gap-3 border-t border-foreground/[0.06] pt-6 sm:flex-row sm:flex-wrap sm:items-baseline sm:justify-between">
           <p className="font-display text-lg uppercase tracking-widest">
             <span className="text-primary">V</span>
             <span className="text-foreground">ERTEX MMA</span>
           </p>
-          <p className="max-w-xl text-right font-sans text-xs text-foreground-subtle">
+          <p className="max-w-xl text-left font-sans text-xs text-foreground-subtle sm:text-right">
             {t("tagline", { year: new Date().getFullYear() })}
           </p>
         </div>

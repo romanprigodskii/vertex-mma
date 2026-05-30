@@ -41,8 +41,8 @@ export default async function NotificationsPage({
       <Navbar />
       <main className="flex-1">
         <Container size="md" className="py-10 md:py-14">
-          <header className="mb-8 flex items-baseline justify-between gap-3">
-            <div>
+          <header className="mb-8 flex flex-wrap items-baseline justify-between gap-3">
+            <div className="min-w-0 flex-1">
               <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground-subtle">
                 {t("kicker")}
               </p>

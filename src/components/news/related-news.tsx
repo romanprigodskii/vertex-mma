@@ -18,7 +18,7 @@ export async function RelatedNews({
   return (
     <section className="mt-14 border-t border-foreground/10 pt-8">
       <div className="mb-5 flex items-baseline justify-between">
-        <h3 className="font-display text-2xl uppercase tracking-tight text-foreground">
+        <h3 className="font-display text-xl uppercase tracking-tight text-foreground break-words sm:text-2xl">
           {headingLabel}
         </h3>
         <Link

@@ -39,8 +39,8 @@ export default async function PredictionsListPage({
       <Navbar />
       <main className="flex-1">
         <Container size="xl" className="py-10 md:py-14">
-          <header className="mb-8 flex flex-wrap items-baseline justify-between gap-3">
-            <div>
+          <header className="mb-8 flex flex-col items-start gap-4 sm:flex-row sm:flex-wrap sm:items-baseline sm:justify-between sm:gap-3">
+            <div className="min-w-0 flex-1">
               <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground-subtle">
                 {t("kicker")}
               </p>
@@ -70,7 +70,7 @@ export default async function PredictionsListPage({
 
           {events.length === 0 ? (
             <div className="rounded-md border border-dashed border-foreground/15 bg-background-elevated/20 px-6 py-16 text-center">
-              <p className="font-display text-2xl uppercase tracking-tight text-foreground">
+              <p className="font-display text-xl uppercase tracking-tight text-foreground break-words sm:text-2xl">
                 {t("emptyTitle")}
               </p>
               <p className="mx-auto mt-3 max-w-md font-sans text-sm text-foreground-muted">

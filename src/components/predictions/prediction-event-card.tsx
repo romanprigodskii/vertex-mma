@@ -34,12 +34,12 @@ export function PredictionEventCard({
       <h3 className="mt-2 font-display text-lg uppercase tracking-tight text-foreground line-clamp-2">
         {event.event_name}
       </h3>
-      <div className="mt-3 flex flex-wrap items-baseline justify-between gap-2 font-mono text-[11px] tabular text-foreground-subtle">
+      <div className="mt-3 flex flex-wrap items-baseline gap-x-2 gap-y-1 font-mono text-[11px] tabular text-foreground-subtle">
         <span>{t("boutCount", { count: event.bout_count })}</span>
-        <span>
-          {t("predictingCount", { count: event.total_participants })} ·{" "}
-          {t("closesInHours", { h: hoursLeft })}
-        </span>
+        <span aria-hidden className="text-foreground-subtle/40">·</span>
+        <span>{t("predictingCount", { count: event.total_participants })}</span>
+        <span aria-hidden className="text-foreground-subtle/40">·</span>
+        <span>{t("closesInHours", { h: hoursLeft })}</span>
       </div>
     </Link>
   );

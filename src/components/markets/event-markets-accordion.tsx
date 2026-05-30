@@ -26,7 +26,7 @@ export async function EventMarketsAccordion({
   if (events.length === 0) {
     return (
       <div className="rounded-md border border-dashed border-foreground/15 bg-background-elevated/20 px-6 py-16 text-center">
-        <p className="font-display text-2xl uppercase tracking-tight text-foreground">
+        <p className="font-display text-xl uppercase tracking-tight text-foreground break-words sm:text-2xl">
           {t("noOpenMarkets")}
         </p>
         <p className="mx-auto mt-3 max-w-md font-sans text-sm text-foreground-muted">
@@ -52,8 +52,8 @@ export async function EventMarketsAccordion({
           open={idx === 0}
           className="group overflow-hidden rounded-md border border-foreground/10 bg-background-elevated/30"
         >
-          <summary className="flex cursor-pointer list-none flex-wrap items-baseline justify-between gap-x-3 gap-y-1 px-4 py-3 hover:bg-foreground/[0.04]">
-            <div className="flex min-w-0 flex-1 items-baseline gap-3">
+          <summary className="cursor-pointer list-none px-4 py-3 hover:bg-foreground/[0.04] sm:flex sm:items-baseline sm:justify-between sm:gap-3">
+            <div className="flex min-w-0 items-baseline gap-3 sm:flex-1">
               <ChevronRight
                 className="h-4 w-4 shrink-0 text-foreground-muted transition-transform group-open:rotate-90"
                 aria-hidden
@@ -62,7 +62,7 @@ export async function EventMarketsAccordion({
                 {event.event_short_name ?? event.event_name}
               </h3>
             </div>
-            <div className="ml-auto flex flex-wrap items-baseline justify-end gap-x-1.5 font-mono text-[11px] tabular text-foreground-subtle">
+            <div className="mt-1 flex flex-wrap items-baseline gap-x-1.5 pl-7 font-mono text-[11px] tabular text-foreground-subtle sm:mt-0 sm:shrink-0 sm:justify-end sm:pl-0">
               <span className="whitespace-nowrap">
                 {new Date(event.event_date).toLocaleDateString(dateFmt, {
                   month: "short",

@@ -62,7 +62,7 @@ export default async function MyPredictionsPage({
 
           {rows.length === 0 ? (
             <div className="mt-10 rounded-md border border-dashed border-foreground/15 bg-background-elevated/20 px-6 py-16 text-center">
-              <p className="font-display text-2xl uppercase tracking-tight text-foreground">
+              <p className="font-display text-xl uppercase tracking-tight text-foreground break-words sm:text-2xl">
                 {t("noPicks")}
               </p>
               <p className="mx-auto mt-3 max-w-md font-sans text-sm text-foreground-muted">

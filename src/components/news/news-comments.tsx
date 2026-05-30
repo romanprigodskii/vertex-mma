@@ -19,7 +19,7 @@ export async function NewsComments({ newsItemId }: { newsItemId: string }) {
   return (
     <section className="mt-14 border-t border-foreground/10 pt-8">
       <div className="mb-5 flex items-baseline justify-between gap-4">
-        <h3 className="font-display text-2xl uppercase tracking-tight text-foreground">
+        <h3 className="font-display text-xl uppercase tracking-tight text-foreground break-words sm:text-2xl">
           {t("comments")}{" "}
           <span className="ml-1 font-mono text-xs tracking-wider text-foreground-subtle">
             · {total}

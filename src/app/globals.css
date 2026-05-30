@@ -335,6 +335,12 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+    /* Mobile safety net: prevent any rogue child from creating horizontal
+       scroll on small viewports. `overflow-x: clip` keeps sticky positioning
+       (and any intentional inner horizontal-scroll containers like the
+       career timeline) working, but caps the body at viewport width so a
+       wide overlay or panel can't push the layout past the right edge. */
+    overflow-x: clip;
   }
 
   ::selection {
