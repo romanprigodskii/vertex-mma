@@ -91,7 +91,7 @@ export function RankingView({ ranking }: Props) {
                     />
                   )}
                   <div className="min-w-0 flex-1">
-                    <p className="font-display text-lg uppercase tracking-tight text-foreground">
+                    <p className="truncate font-display text-lg uppercase tracking-tight text-foreground">
                       {e.fighter_name}
                     </p>
                     <p className="mt-0.5 font-mono text-[11px] uppercase tracking-widest text-foreground-subtle">

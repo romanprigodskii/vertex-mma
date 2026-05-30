@@ -26,12 +26,27 @@ export function StatRow({
       !muted && !highlighted && "text-foreground-muted",
     );
   return (
-    <div className="grid grid-cols-[1fr_auto_1fr] items-baseline gap-3 border-b border-foreground/[0.05] py-2 last:border-b-0">
-      <div className={cn("text-right", cellClass(highlightA))}>{valueA}</div>
-      <div className="text-center font-sans text-[10px] uppercase tracking-widest text-foreground-subtle">
-        {label}
+    <div className="border-b border-foreground/[0.05] py-2 last:border-b-0">
+      {/* Mobile — label on top, values on a single row below. Stops the
+       *  long "X / Y (Z%)" cells from squeezing the center label off-screen
+       *  at 375px. */}
+      <div className="sm:hidden">
+        <div className="text-center font-sans text-[10px] uppercase tracking-widest text-foreground-subtle">
+          {label}
+        </div>
+        <div className="mt-1 grid grid-cols-2 gap-3">
+          <div className={cn("text-right", cellClass(highlightA))}>{valueA}</div>
+          <div className={cn("text-left", cellClass(highlightB))}>{valueB}</div>
+        </div>
       </div>
-      <div className={cn("text-left", cellClass(highlightB))}>{valueB}</div>
+      {/* Desktop — value · label · value. */}
+      <div className="hidden grid-cols-[1fr_auto_1fr] items-baseline gap-3 sm:grid">
+        <div className={cn("text-right", cellClass(highlightA))}>{valueA}</div>
+        <div className="text-center font-sans text-[10px] uppercase tracking-widest text-foreground-subtle">
+          {label}
+        </div>
+        <div className={cn("text-left", cellClass(highlightB))}>{valueB}</div>
+      </div>
     </div>
   );
 }

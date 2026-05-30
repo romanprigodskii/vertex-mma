@@ -57,7 +57,7 @@ export function HeadToHead({
               className="-mx-2 grid grid-cols-1 gap-x-4 gap-y-1 rounded-sm px-2 py-1 transition-colors hover:bg-foreground/[0.03] sm:grid-cols-[minmax(0,1fr)_auto]"
             >
               <div className="min-w-0">
-                <p className="truncate font-sans text-sm text-foreground">
+                <p className="font-sans text-sm text-foreground">
                   {winnerName ? (
                     <span>
                       <span className="text-streak-win">{winnerName}</span>{" "}

@@ -138,7 +138,8 @@ function BreakdownTable({
         {t("sourceLabel")}{" "}
         <span className="ml-1 text-foreground-muted">{sourceLabel}</span>
       </p>
-      <table className="w-full font-mono text-xs tabular">
+      <div className="overflow-x-auto -mx-2 sm:mx-0">
+      <table className="w-full min-w-[320px] font-mono text-xs tabular">
         <thead>
           <tr className="border-b border-foreground/10 text-foreground-subtle">
             <th className="py-1 text-left font-sans text-[10px] font-medium uppercase tracking-widest">
@@ -224,6 +225,7 @@ function BreakdownTable({
           </tr>
         </tfoot>
       </table>
+      </div>
     </div>
   );
 }

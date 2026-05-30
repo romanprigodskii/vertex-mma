@@ -50,8 +50,9 @@ function HeroPhoto({
   photoUrl: string | null;
 }) {
   const wrapper = cn(
-    "relative aspect-[3/4] w-full overflow-hidden rounded-md",
-    "lg:aspect-auto lg:h-[480px] lg:w-[360px]",
+    "relative mx-auto aspect-[3/4] w-full max-w-[280px] overflow-hidden rounded-md",
+    "sm:max-w-[320px]",
+    "lg:mx-0 lg:aspect-auto lg:h-[480px] lg:w-[360px] lg:max-w-none",
   );
   if (photoUrl) {
     return (

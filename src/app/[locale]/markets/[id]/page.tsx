@@ -225,8 +225,8 @@ export default async function MarketDetailPage({ params }: PageProps) {
             />
           ) : null}
 
-          <dl className="mt-10 grid grid-cols-3 gap-4">
-            <div className="rounded-md border border-foreground/10 bg-background-elevated/30 px-4 py-3">
+          <dl className="mt-10 grid grid-cols-3 gap-2 sm:gap-4">
+            <div className="rounded-md border border-foreground/10 bg-background-elevated/30 px-2.5 py-3 sm:px-4">
               <dt className="font-sans text-[10px] uppercase tracking-widest text-foreground-subtle">
                 Volume
               </dt>
@@ -234,7 +234,7 @@ export default async function MarketDetailPage({ params }: PageProps) {
                 {market.total_volume.toLocaleString()}
               </dd>
             </div>
-            <div className="rounded-md border border-foreground/10 bg-background-elevated/30 px-4 py-3">
+            <div className="rounded-md border border-foreground/10 bg-background-elevated/30 px-2.5 py-3 sm:px-4">
               <dt className="font-sans text-[10px] uppercase tracking-widest text-foreground-subtle">
                 Traders
               </dt>
@@ -242,7 +242,7 @@ export default async function MarketDetailPage({ params }: PageProps) {
                 {market.unique_traders}
               </dd>
             </div>
-            <div className="rounded-md border border-foreground/10 bg-background-elevated/30 px-4 py-3">
+            <div className="rounded-md border border-foreground/10 bg-background-elevated/30 px-2.5 py-3 sm:px-4">
               <dt className="font-sans text-[10px] uppercase tracking-widest text-foreground-subtle">
                 Closes
               </dt>

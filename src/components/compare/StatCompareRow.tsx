@@ -67,6 +67,28 @@ function decideLeader(
   return a < b ? "a" : "b";
 }
 
+function MobileIndicator({
+  leader,
+}: {
+  leader: "a" | "b" | "tie" | "none";
+}) {
+  if (leader === "a")
+    return <ArrowLeft className="h-5 w-5 text-streak-win" aria-hidden />;
+  if (leader === "b")
+    return <ArrowRight className="h-5 w-5 text-streak-win" aria-hidden />;
+  if (leader === "tie")
+    return (
+      <span aria-hidden className="text-foreground-subtle/60">
+        =
+      </span>
+    );
+  return (
+    <span aria-hidden className="text-foreground-subtle/30">
+      ·
+    </span>
+  );
+}
+
 export function StatCompareRow({
   label,
   valueA,
@@ -84,67 +106,100 @@ export function StatCompareRow({
   const tie = leader === "tie";
 
   return (
-    <div className="grid grid-cols-[1fr_auto_2fr_auto_1fr] items-baseline gap-3 border-b border-foreground/[0.06] py-4 last:border-b-0 sm:gap-4 sm:py-5">
-      <div
-        className={cn(
-          "text-right font-display tabular text-2xl tracking-tight sm:text-3xl",
-          aWon
-            ? "text-streak-win"
-            : tie
-              ? "text-foreground"
-              : "text-foreground",
-        )}
-      >
-        <span>{format(valueA, fmt, decimals, unit)}</span>
-        {noteA ? (
-          <p className="font-sans text-[11px] uppercase tracking-widest text-foreground-subtle">
-            {noteA}
-          </p>
-        ) : null}
+    <div className="border-b border-foreground/[0.06] py-4 last:border-b-0 sm:py-5">
+      {/* Mobile: label on top, then 3-col values with single indicator */}
+      <div className="sm:hidden">
+        <div className="mb-2 text-center font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
+          {label}
+        </div>
+        <div className="grid grid-cols-[1fr_auto_1fr] items-baseline gap-3">
+          <div
+            className={cn(
+              "text-right font-display tabular text-xl tracking-tight",
+              aWon ? "text-streak-win" : "text-foreground",
+            )}
+          >
+            <span>{format(valueA, fmt, decimals, unit)}</span>
+            {noteA ? (
+              <p className="font-sans text-[10px] uppercase tracking-widest text-foreground-subtle">
+                {noteA}
+              </p>
+            ) : null}
+          </div>
+          <div className="flex h-6 w-6 items-center justify-center text-foreground-subtle">
+            <MobileIndicator leader={leader} />
+          </div>
+          <div
+            className={cn(
+              "text-left font-display tabular text-xl tracking-tight",
+              bWon ? "text-streak-win" : "text-foreground",
+            )}
+          >
+            <span>{format(valueB, fmt, decimals, unit)}</span>
+            {noteB ? (
+              <p className="font-sans text-[10px] uppercase tracking-widest text-foreground-subtle">
+                {noteB}
+              </p>
+            ) : null}
+          </div>
+        </div>
       </div>
-      <div
-        className="flex h-6 w-6 items-center justify-center text-foreground-subtle"
-        aria-hidden
-      >
-        {aWon ? (
-          <ArrowLeft className="h-5 w-5 text-streak-win" />
-        ) : tie ? (
-          <span className="text-foreground-subtle/60">=</span>
-        ) : (
-          <span className="text-foreground-subtle/30">·</span>
-        )}
-      </div>
-      <div className="text-center font-sans text-[13px] font-medium uppercase tracking-widest text-foreground-muted">
-        {label}
-      </div>
-      <div
-        className="flex h-6 w-6 items-center justify-center text-foreground-subtle"
-        aria-hidden
-      >
-        {bWon ? (
-          <ArrowRight className="h-5 w-5 text-streak-win" />
-        ) : tie ? (
-          <span className="text-foreground-subtle/60">=</span>
-        ) : (
-          <span className="text-foreground-subtle/30">·</span>
-        )}
-      </div>
-      <div
-        className={cn(
-          "text-left font-display tabular text-2xl tracking-tight sm:text-3xl",
-          bWon
-            ? "text-streak-win"
-            : tie
-              ? "text-foreground"
-              : "text-foreground",
-        )}
-      >
-        <span>{format(valueB, fmt, decimals, unit)}</span>
-        {noteB ? (
-          <p className="font-sans text-[11px] uppercase tracking-widest text-foreground-subtle">
-            {noteB}
-          </p>
-        ) : null}
+
+      {/* Desktop: 5-col grid (value · arrow · label · arrow · value) */}
+      <div className="hidden grid-cols-[1fr_auto_2fr_auto_1fr] items-baseline gap-4 sm:grid">
+        <div
+          className={cn(
+            "text-right font-display tabular text-3xl tracking-tight",
+            aWon ? "text-streak-win" : "text-foreground",
+          )}
+        >
+          <span>{format(valueA, fmt, decimals, unit)}</span>
+          {noteA ? (
+            <p className="font-sans text-[11px] uppercase tracking-widest text-foreground-subtle">
+              {noteA}
+            </p>
+          ) : null}
+        </div>
+        <div
+          className="flex h-6 w-6 items-center justify-center text-foreground-subtle"
+          aria-hidden
+        >
+          {aWon ? (
+            <ArrowLeft className="h-5 w-5 text-streak-win" />
+          ) : tie ? (
+            <span className="text-foreground-subtle/60">=</span>
+          ) : (
+            <span className="text-foreground-subtle/30">·</span>
+          )}
+        </div>
+        <div className="text-center font-sans text-[13px] font-medium uppercase tracking-widest text-foreground-muted">
+          {label}
+        </div>
+        <div
+          className="flex h-6 w-6 items-center justify-center text-foreground-subtle"
+          aria-hidden
+        >
+          {bWon ? (
+            <ArrowRight className="h-5 w-5 text-streak-win" />
+          ) : tie ? (
+            <span className="text-foreground-subtle/60">=</span>
+          ) : (
+            <span className="text-foreground-subtle/30">·</span>
+          )}
+        </div>
+        <div
+          className={cn(
+            "text-left font-display tabular text-3xl tracking-tight",
+            bWon ? "text-streak-win" : "text-foreground",
+          )}
+        >
+          <span>{format(valueB, fmt, decimals, unit)}</span>
+          {noteB ? (
+            <p className="font-sans text-[11px] uppercase tracking-widest text-foreground-subtle">
+              {noteB}
+            </p>
+          ) : null}
+        </div>
       </div>
     </div>
   );
@@ -165,31 +220,62 @@ export function StatTextRow({
   noteB?: string | null;
 }) {
   return (
-    <div className="grid grid-cols-[1fr_auto_2fr_auto_1fr] items-baseline gap-3 border-b border-foreground/[0.06] py-4 last:border-b-0 sm:gap-4 sm:py-5">
-      <div className="text-right font-display text-2xl uppercase tracking-tight text-foreground sm:text-3xl">
-        {valueA ?? "—"}
-        {noteA ? (
-          <p className="font-sans text-[11px] uppercase tracking-widest text-foreground-subtle">
-            {noteA}
-          </p>
-        ) : null}
+    <div className="border-b border-foreground/[0.06] py-4 last:border-b-0 sm:py-5">
+      {/* Mobile */}
+      <div className="sm:hidden">
+        <div className="mb-2 text-center font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
+          {label}
+        </div>
+        <div className="grid grid-cols-[1fr_auto_1fr] items-baseline gap-3">
+          <div className="text-right font-display text-lg uppercase tracking-tight text-foreground">
+            {valueA ?? "—"}
+            {noteA ? (
+              <p className="font-sans text-[10px] uppercase tracking-widest text-foreground-subtle">
+                {noteA}
+              </p>
+            ) : null}
+          </div>
+          <span aria-hidden className="text-foreground-subtle/30">
+            ·
+          </span>
+          <div className="text-left font-display text-lg uppercase tracking-tight text-foreground">
+            {valueB ?? "—"}
+            {noteB ? (
+              <p className="font-sans text-[10px] uppercase tracking-widest text-foreground-subtle">
+                {noteB}
+              </p>
+            ) : null}
+          </div>
+        </div>
       </div>
-      <span aria-hidden className="text-foreground-subtle/30">
-        ·
-      </span>
-      <div className="text-center font-sans text-[13px] font-medium uppercase tracking-widest text-foreground-muted">
-        {label}
-      </div>
-      <span aria-hidden className="text-foreground-subtle/30">
-        ·
-      </span>
-      <div className="text-left font-display text-2xl uppercase tracking-tight text-foreground sm:text-3xl">
-        {valueB ?? "—"}
-        {noteB ? (
-          <p className="font-sans text-[11px] uppercase tracking-widest text-foreground-subtle">
-            {noteB}
-          </p>
-        ) : null}
+
+      {/* Desktop */}
+      <div className="hidden grid-cols-[1fr_auto_2fr_auto_1fr] items-baseline gap-4 sm:grid">
+        <div className="text-right font-display text-3xl uppercase tracking-tight text-foreground">
+          {valueA ?? "—"}
+          {noteA ? (
+            <p className="font-sans text-[11px] uppercase tracking-widest text-foreground-subtle">
+              {noteA}
+            </p>
+          ) : null}
+        </div>
+        <span aria-hidden className="text-foreground-subtle/30">
+          ·
+        </span>
+        <div className="text-center font-sans text-[13px] font-medium uppercase tracking-widest text-foreground-muted">
+          {label}
+        </div>
+        <span aria-hidden className="text-foreground-subtle/30">
+          ·
+        </span>
+        <div className="text-left font-display text-3xl uppercase tracking-tight text-foreground">
+          {valueB ?? "—"}
+          {noteB ? (
+            <p className="font-sans text-[11px] uppercase tracking-widest text-foreground-subtle">
+              {noteB}
+            </p>
+          ) : null}
+        </div>
       </div>
     </div>
   );

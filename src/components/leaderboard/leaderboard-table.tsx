@@ -16,7 +16,7 @@ export async function LeaderboardTable({ rows, activeSort }: Props) {
   return (
     <div>
       <nav
-        className="mb-6 flex gap-1 border-b border-foreground/10"
+        className="mb-6 flex gap-1 overflow-x-auto border-b border-foreground/10"
         role="tablist"
       >
         {SORT_KEYS.map((key) => (
@@ -58,7 +58,7 @@ export async function LeaderboardTable({ rows, activeSort }: Props) {
               <Link
                 href={`/profile/${r.username}`}
                 prefetch={false}
-                className="grid grid-cols-[2.5rem_2.5rem_1fr_auto] items-center gap-3 rounded-md border border-foreground/10 bg-background-elevated/30 px-3 py-2.5 transition-colors hover:bg-foreground/[0.04]"
+                className="grid grid-cols-[2rem_2.25rem_minmax(0,1fr)_auto] items-center gap-2 rounded-md border border-foreground/10 bg-background-elevated/30 px-2.5 py-2.5 transition-colors hover:bg-foreground/[0.04] sm:grid-cols-[2.5rem_2.5rem_minmax(0,1fr)_auto] sm:gap-3 sm:px-3"
               >
                 <span className="font-display text-xl tabular text-foreground-subtle">
                   #{r.rank}
@@ -79,7 +79,7 @@ export async function LeaderboardTable({ rows, activeSort }: Props) {
                   <p className="truncate font-sans text-sm text-foreground">
                     {r.display_name || r.username}
                   </p>
-                  <p className="font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
+                  <p className="truncate font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
                     @{r.username} · {r.tier.toUpperCase()} ·{" "}
                     {r.achievement_count} {t("achShort")}
                   </p>

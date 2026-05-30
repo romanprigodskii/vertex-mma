@@ -54,36 +54,51 @@ function BoutLine({
     ? `${tCompare("roundShort", { n: bout.round_finished })}${timeStr ? ` · ${timeStr}` : ""}`
     : null;
   return (
-    <div className="grid grid-cols-[64px_auto_1fr] items-baseline gap-2 font-sans text-sm text-foreground-muted sm:grid-cols-[88px_auto_1fr] sm:gap-3">
+    <div className="grid grid-cols-[56px_auto_minmax(0,1fr)] items-baseline gap-2 font-sans text-sm text-foreground-muted sm:grid-cols-[88px_auto_minmax(0,1fr)] sm:gap-3">
       <span className="font-mono text-[11px] uppercase tracking-widest text-foreground-subtle">
         {label}
       </span>
-      <span className={cn("font-display tabular text-base tracking-wider", resultClass(bout.result))}>
+      <span
+        className={cn(
+          "font-display tabular text-base tracking-wider",
+          resultClass(bout.result),
+        )}
+      >
         {bout.result}
       </span>
-      <span className="flex min-w-0 flex-wrap items-baseline gap-x-1.5">
-        {method ? <span>{method}</span> : null}
-        {finishDetail ? (
-          <>
-            <span aria-hidden className="text-foreground-subtle/40">·</span>
-            <span className="font-mono tabular text-foreground-subtle">
-              {finishDetail}
-            </span>
-          </>
-        ) : null}
-        <span aria-hidden className="text-foreground-subtle/40">·</span>
-        <Link
-          href={`/events/${bout.event_slug}`}
-          prefetch={false}
-          className="truncate text-foreground hover:text-primary transition-colors"
-        >
-          {bout.event_name}
-        </Link>
-        <span aria-hidden className="text-foreground-subtle/40">·</span>
-        <span className="font-mono tabular text-foreground-subtle">
-          {bout.event_date.slice(0, 10)}
+      <div className="flex min-w-0 flex-col gap-0.5 sm:flex-row sm:flex-wrap sm:items-baseline sm:gap-x-1.5">
+        <span className="flex flex-wrap items-baseline gap-x-1.5">
+          {method ? <span>{method}</span> : null}
+          {finishDetail ? (
+            <>
+              <span aria-hidden className="text-foreground-subtle/40">
+                ·
+              </span>
+              <span className="font-mono tabular text-foreground-subtle">
+                {finishDetail}
+              </span>
+            </>
+          ) : null}
         </span>
-      </span>
+        <span className="flex min-w-0 items-baseline gap-x-1.5">
+          <span aria-hidden className="hidden text-foreground-subtle/40 sm:inline">
+            ·
+          </span>
+          <Link
+            href={`/events/${bout.event_slug}`}
+            prefetch={false}
+            className="min-w-0 truncate text-foreground transition-colors hover:text-primary"
+          >
+            {bout.event_name}
+          </Link>
+          <span aria-hidden className="text-foreground-subtle/40">
+            ·
+          </span>
+          <span className="font-mono tabular text-foreground-subtle">
+            {bout.event_date.slice(0, 10)}
+          </span>
+        </span>
+      </div>
     </div>
   );
 }
@@ -115,18 +130,18 @@ export function CommonOpponents({
       {entries.map((e) => (
         <li
           key={e.opponent_slug}
-          className="rounded-md border border-foreground/10 bg-background-elevated/30 px-5 py-4"
+          className="rounded-md border border-foreground/10 bg-background-elevated/30 px-4 py-4 sm:px-5"
         >
-          <div className="mb-3 flex items-baseline justify-between gap-3">
+          <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
             <Link
               href={`/fighters/${e.opponent_slug}`}
               prefetch={false}
-              className="font-display text-2xl uppercase tracking-tight text-foreground hover:text-primary transition-colors sm:text-3xl"
+              className="min-w-0 font-display text-2xl uppercase tracking-tight text-foreground transition-colors hover:text-primary sm:text-3xl"
             >
               {e.opponent_name}
             </Link>
             {e.opponent_nickname ? (
-              <span className="truncate font-sans text-sm italic text-foreground-subtle">
+              <span className="min-w-0 truncate font-sans text-sm italic text-foreground-subtle">
                 &ldquo;{e.opponent_nickname}&rdquo;
               </span>
             ) : null}

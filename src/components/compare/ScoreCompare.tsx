@@ -68,8 +68,8 @@ export function ScoreCompare({
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-md border border-foreground/10 bg-background-elevated/30">
-        <table className="w-full font-mono text-xs tabular">
+      <div className="overflow-x-auto rounded-md border border-foreground/10 bg-background-elevated/30">
+        <table className="w-full min-w-[320px] font-mono text-xs tabular">
           <thead>
             <tr className="border-b border-foreground/10 text-foreground-subtle">
               <th className="w-[30%] px-2 py-1.5 text-right font-sans text-[10px] font-medium uppercase tracking-widest">
