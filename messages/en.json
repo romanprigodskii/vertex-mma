@@ -363,6 +363,7 @@
     "notEnoughCoins": "Not enough coins.",
     "placeBet": "Place bet",
     "placing": "Placing…",
+    "chooseOutcome": "Choose an outcome",
     "coinsToSpend": "Coins to spend",
     "noOpenMarkets": "No open markets",
     "noOpenMarketsHint": "New markets get generated automatically when the UFC schedules upcoming bouts. Check back when the next card is announced.",

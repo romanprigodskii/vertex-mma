@@ -25,6 +25,7 @@ export function DailyBonusButton({ lastDailyBonusAt, tier }: Props) {
   const t = useTranslations("profile");
   const [pending, setPending] = React.useState(false);
   const [feedback, setFeedback] = React.useState<string | null>(null);
+  const [isError, setIsError] = React.useState(false);
   // Track the "applied at" value locally so a fresh claim immediately
   // disables the button without needing a full server refresh.
   const [lastIso, setLastIso] = React.useState<string | null>(lastDailyBonusAt);
@@ -35,9 +36,11 @@ export function DailyBonusButton({ lastDailyBonusAt, tier }: Props) {
   async function onClick() {
     setPending(true);
     setFeedback(null);
+    setIsError(false);
     const res = await claimDailyBonusAction();
     setPending(false);
     if (res.error) {
+      setIsError(true);
       setFeedback(res.error);
       return;
     }
@@ -73,7 +76,13 @@ export function DailyBonusButton({ lastDailyBonusAt, tier }: Props) {
           : t("claimDaily", { amount: amount.toLocaleString() })}
       </button>
       {feedback ? (
-        <p className="mt-2 font-sans text-sm text-streak-win">{feedback}</p>
+        <p
+          role={isError ? "alert" : undefined}
+          aria-live={isError ? undefined : "polite"}
+          className={`mt-2 font-sans text-sm ${isError ? "text-streak-loss" : "text-streak-win"}`}
+        >
+          {feedback}
+        </p>
       ) : null}
     </div>
   );

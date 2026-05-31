@@ -94,6 +94,7 @@ export function BetForm({ market, userBalance }: Props) {
         <select
           value={outcomeId}
           onChange={(e) => setOutcomeId(e.target.value)}
+          aria-label={t("chooseOutcome")}
           className={`${INPUT_CLASS} sm:min-w-[220px]`}
         >
           {market.outcomes.map((o) => (
@@ -112,6 +113,7 @@ export function BetForm({ market, userBalance }: Props) {
           value={coins}
           onChange={(e) => setCoins(e.target.value)}
           placeholder={t("coinsToSpend")}
+          aria-label={t("coinsToSpend")}
           className={`${INPUT_CLASS} flex-1`}
         />
 

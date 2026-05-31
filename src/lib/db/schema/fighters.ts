@@ -51,6 +51,12 @@ export const fighter = pgTable(
     gender: text("gender").default("male").notNull(),
 
     weightClassPrimary: weightClassEnum("weight_class_primary"),
+    // Wave 7A: derived from the fighter's last bout's division (migration
+    // 0041). Read heavily in fighter-search.ts and the fighter_with_stats
+    // view; declared here as TEXT (not the enum, matching the DB) so
+    // `drizzle-kit push` doesn't drop the column. See the
+    // project_current_division_schema_drift memory.
+    currentDivision: text("current_division"),
     status: fighterStatusEnum("status").default("active"),
     careerStart: date("career_start"),
     careerEnd: date("career_end"),
@@ -253,6 +259,9 @@ export const fighter = pgTable(
     index("fighter_status_idx").on(table.status),
     index("fighter_roster_status_idx").on(table.rosterStatus),
     index("fighter_has_upcoming_bout_idx").on(table.hasUpcomingBout),
+    index("fighter_current_division_idx")
+      .on(table.currentDivision)
+      .where(sql`${table.currentDivision} IS NOT NULL`),
     index("fighter_name_en_trgm_idx").using(
       "gin",
       sql`${table.nameEn} gin_trgm_ops`,

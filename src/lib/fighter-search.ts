@@ -37,56 +37,63 @@ export async function searchFighters(
   if (!trimmed) return [];
 
   const isRu = await isRuLocale();
+  // DISTINCT ON requires f.id to be the leftmost ORDER BY key, so the LIMIT
+  // can't be applied to the inner query without truncating by random UUID
+  // (dropping the actual top-ranked matches). Dedupe per fighter in the
+  // subquery, then order by rank_score and LIMIT on the outer query.
   const result = await db.execute<FighterSearchResult>(sql`
-    SELECT DISTINCT ON (f.id)
-      f.id::text AS id,
-      f.slug,
-      ${localizedNameSql("f", isRu)} AS name_en,
-      f.name_ru,
-      f.nickname,
-      f.photo_url,
-      f.photo_silhouette_url,
-      f.photo_thumbnail_url,
-      f.weight_class_primary::text,
-      f.country_code,
-      fsa.wins_total,
-      fsa.losses_total,
-      fsa.draws_total,
-      GREATEST(
-        similarity(f.name_en, ${trimmed}),
-        similarity(COALESCE(f.nickname, ''), ${trimmed}),
-        COALESCE((
-          SELECT MAX(similarity(fa.alias, ${trimmed}))
-          FROM fighter_alias fa
-          WHERE fa.fighter_id = f.id
-        ), 0)
-      )::float AS similarity,
-      (
-        (CASE
-          WHEN lower(f.name_en) = lower(${trimmed}) THEN 4
-          WHEN f.name_en ILIKE ${trimmed + "%"}
-            OR f.name_en ILIKE ${"% " + trimmed + "%"} THEN 3
-          WHEN COALESCE(f.nickname, '') ILIKE ${trimmed + "%"}
-            OR COALESCE(f.nickname, '') ILIKE ${"% " + trimmed + "%"} THEN 2
-          WHEN f.name_en ILIKE ${"%" + trimmed + "%"}
-            OR COALESCE(f.nickname, '') ILIKE ${"%" + trimmed + "%"} THEN 1
-          ELSE 0
-        END) * 1000
-        + GREATEST(COALESCE(f.vertex_score, 0), COALESCE(f.vertex_score_all_time, 0))
-      )::float AS rank_score
-    FROM fighter f
-    LEFT JOIN fighter_stats_aggregate fsa ON fsa.fighter_id = f.id
-    WHERE
-      f.name_en ILIKE ${"%" + trimmed + "%"}
-      OR f.nickname ILIKE ${"%" + trimmed + "%"}
-      OR similarity(f.name_en, ${trimmed}) > 0.3
-      OR similarity(COALESCE(f.nickname, ''), ${trimmed}) > 0.3
-      OR EXISTS (
-        SELECT 1 FROM fighter_alias fa2
-        WHERE fa2.fighter_id = f.id
-          AND similarity(fa2.alias, ${trimmed}) > 0.3
-      )
-    ORDER BY f.id, rank_score DESC
+    SELECT * FROM (
+      SELECT DISTINCT ON (f.id)
+        f.id::text AS id,
+        f.slug,
+        ${localizedNameSql("f", isRu)} AS name_en,
+        f.name_ru,
+        f.nickname,
+        f.photo_url,
+        f.photo_silhouette_url,
+        f.photo_thumbnail_url,
+        f.weight_class_primary::text,
+        f.country_code,
+        fsa.wins_total,
+        fsa.losses_total,
+        fsa.draws_total,
+        GREATEST(
+          similarity(f.name_en, ${trimmed}),
+          similarity(COALESCE(f.nickname, ''), ${trimmed}),
+          COALESCE((
+            SELECT MAX(similarity(fa.alias, ${trimmed}))
+            FROM fighter_alias fa
+            WHERE fa.fighter_id = f.id
+          ), 0)
+        )::float AS similarity,
+        (
+          (CASE
+            WHEN lower(f.name_en) = lower(${trimmed}) THEN 4
+            WHEN f.name_en ILIKE ${trimmed + "%"}
+              OR f.name_en ILIKE ${"% " + trimmed + "%"} THEN 3
+            WHEN COALESCE(f.nickname, '') ILIKE ${trimmed + "%"}
+              OR COALESCE(f.nickname, '') ILIKE ${"% " + trimmed + "%"} THEN 2
+            WHEN f.name_en ILIKE ${"%" + trimmed + "%"}
+              OR COALESCE(f.nickname, '') ILIKE ${"%" + trimmed + "%"} THEN 1
+            ELSE 0
+          END) * 1000
+          + GREATEST(COALESCE(f.vertex_score, 0), COALESCE(f.vertex_score_all_time, 0))
+        )::float AS rank_score
+      FROM fighter f
+      LEFT JOIN fighter_stats_aggregate fsa ON fsa.fighter_id = f.id
+      WHERE
+        f.name_en ILIKE ${"%" + trimmed + "%"}
+        OR f.nickname ILIKE ${"%" + trimmed + "%"}
+        OR similarity(f.name_en, ${trimmed}) > 0.3
+        OR similarity(COALESCE(f.nickname, ''), ${trimmed}) > 0.3
+        OR EXISTS (
+          SELECT 1 FROM fighter_alias fa2
+          WHERE fa2.fighter_id = f.id
+            AND similarity(fa2.alias, ${trimmed}) > 0.3
+        )
+      ORDER BY f.id, rank_score DESC
+    ) d
+    ORDER BY d.rank_score DESC, d.similarity DESC
     LIMIT ${limit}
   `);
 

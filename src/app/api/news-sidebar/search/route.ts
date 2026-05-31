@@ -6,7 +6,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
-  const q = request.nextUrl.searchParams.get("q")?.trim() ?? "";
+  const q = request.nextUrl.searchParams.get("q")?.trim().slice(0, 64) ?? "";
   if (q.length < 2) {
     return NextResponse.json({ results: [] }, { headers: { "Cache-Control": "no-store" } });
   }

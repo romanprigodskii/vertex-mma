@@ -41,6 +41,11 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
+  // Without this, every relative og:image (/api/og/...) resolves against
+  // localhost:3000 in production, so social crawlers can't fetch the cards.
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL ?? "https://vertexmma.com",
+  ),
   title: {
     default: "Vertex MMA — AI-powered Fight Simulator",
     template: "%s | Vertex MMA",

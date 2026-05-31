@@ -200,6 +200,7 @@ function FighterPickButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
+      aria-pressed={isPicked}
       className={cn(
         "flex items-center gap-3 rounded-sm border px-3 py-2.5 text-left transition-colors",
         isPicked

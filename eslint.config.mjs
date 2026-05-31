@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Python virtualenvs vendor minified JS (yt_dlp, shap, sklearn) that
+    // ESLint should never lint — they produced 30+ bogus errors.
+    "**/venv/**",
+    "**/__pycache__/**",
   ]),
 ]);
 

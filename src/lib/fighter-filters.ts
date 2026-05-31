@@ -44,6 +44,13 @@ const VALID_GENDERS: ReadonlySet<CatalogGenderFilter> = new Set([
   "female",
 ]);
 
+// Bounds on untrusted catalog params: cap the search string length (it feeds
+// pg_trgm + triple ILIKE), and clamp limit/offset so deep-pagination can't be
+// abused as an unauthenticated full-table scan.
+const MAX_Q_LEN = 64;
+const MAX_LIMIT = 200;
+const MAX_OFFSET = 10_000;
+
 const VALID_WEIGHTS = new Set(WEIGHT_CLASSES.map((w) => w.id as string));
 const VALID_STANCES = new Set(["orthodox", "southpaw", "switch", "unknown"]);
 // roster.watch emits active / retired / released. The UI collapses
@@ -136,11 +143,12 @@ export function parseCatalogFilters(
     if (champion === "all") champion = "any";
   }
 
+  const rawQ = get("q")?.trim().slice(0, MAX_Q_LEN);
   const rawLimit = Number.parseInt(get("limit") ?? "", 10);
   const rawOffset = Number.parseInt(get("offset") ?? "", 10);
 
   return {
-    q: get("q") ?? undefined,
+    q: rawQ || undefined,
     weight,
     country,
     stance,
@@ -151,7 +159,11 @@ export function parseCatalogFilters(
     champion,
     gender,
     sort,
-    limit: Number.isFinite(rawLimit) ? rawLimit : undefined,
-    offset: Number.isFinite(rawOffset) ? rawOffset : undefined,
+    limit: Number.isFinite(rawLimit)
+      ? Math.min(MAX_LIMIT, Math.max(1, rawLimit))
+      : undefined,
+    offset: Number.isFinite(rawOffset)
+      ? Math.min(MAX_OFFSET, Math.max(0, rawOffset))
+      : undefined,
   };
 }

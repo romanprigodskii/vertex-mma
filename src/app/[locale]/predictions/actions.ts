@@ -92,57 +92,84 @@ export async function submitPicksAction(
     (priorPickRows as unknown as Array<{ has_prior: boolean }>)[0]
       ?.has_prior === true;
 
-  let saved = 0;
-  for (const p of picks) {
-    // Anti-tamper: the picked fighter must be one of the two on this bout,
-    // and the bout must belong to this prediction event.
-    const validRows = await db.execute<{ ok: boolean }>(sql`
-      SELECT (b.fighter_a_id::text = ${p.picked_fighter_id}
-              OR b.fighter_b_id::text = ${p.picked_fighter_id}) AS ok
-      FROM bout b
-      WHERE b.id = ${p.bout_id}::uuid
-        AND b.event_id = ${pe.event_id}::uuid
-    `);
-    const ok =
-      (validRows as unknown as Array<{ ok: boolean }>)[0]?.ok === true;
-    if (!ok) continue;
+  // Anti-tamper validation in ONE query (was an N+1 loop): fetch the bout/
+  // fighter pairs that legitimately belong to this event, then check each
+  // pick in memory. The picked fighter must be one of the two on the bout,
+  // and the bout must belong to this prediction event.
+  const boutRows = await db.execute<{ bout_id: string; a: string; b: string }>(sql`
+    SELECT b.id::text AS bout_id,
+           b.fighter_a_id::text AS a,
+           b.fighter_b_id::text AS b
+    FROM bout b
+    WHERE b.event_id = ${pe.event_id}::uuid
+      AND b.id IN (${sql.join(
+        picks.map((p) => sql`${p.bout_id}::uuid`),
+        sql`, `,
+      )})
+  `);
+  const boutMap = new Map(
+    (
+      boutRows as unknown as Array<{ bout_id: string; a: string; b: string }>
+    ).map((r) => [r.bout_id, r]),
+  );
 
-    await db.execute(sql`
+  // Dedupe by bout (last pick wins) so the batch upsert below can't try to
+  // affect the same (user, bout) row twice in one statement.
+  const byBout = new Map<string, PickInput>();
+  for (const p of picks) {
+    const bt = boutMap.get(p.bout_id);
+    if (bt && (bt.a === p.picked_fighter_id || bt.b === p.picked_fighter_id)) {
+      byBout.set(p.bout_id, p);
+    }
+  }
+  const validPicks = [...byBout.values()];
+  if (validPicks.length === 0) return { error: "No valid picks." };
+
+  // Atomic: the batch upsert and the first-time participant/count bumps must
+  // commit together (or not at all), so a mid-write failure can't leave a
+  // half-saved submission or a desynced participant count.
+  await db.transaction(async (tx) => {
+    await tx.execute(sql`
       INSERT INTO prediction_pick (
         user_id, prediction_event_id, bout_id, picked_fighter_id, locked_at
       )
-      VALUES (
-        ${myId}::uuid,
-        ${predictionEventId}::uuid,
-        ${p.bout_id}::uuid,
-        ${p.picked_fighter_id}::uuid,
-        NOW()
-      )
+      VALUES ${sql.join(
+        validPicks.map(
+          (p) => sql`(
+            ${myId}::uuid,
+            ${predictionEventId}::uuid,
+            ${p.bout_id}::uuid,
+            ${p.picked_fighter_id}::uuid,
+            NOW()
+          )`,
+        ),
+        sql`, `,
+      )}
       ON CONFLICT (user_id, bout_id) DO UPDATE
         SET picked_fighter_id = EXCLUDED.picked_fighter_id,
             locked_at = NOW()
     `);
-    saved++;
-  }
 
-  // If this is the user's first pick on this event, bump participant
-  // count and the user's lifetime prediction_count.
-  if (!hadPriorPicks && saved > 0) {
-    await db.execute(sql`
-      UPDATE prediction_event
-      SET total_participants = (
-        SELECT COUNT(DISTINCT user_id)
-        FROM prediction_pick
-        WHERE prediction_event_id = ${predictionEventId}::uuid
-      )
-      WHERE id = ${predictionEventId}::uuid
-    `);
-    await db.execute(sql`
-      UPDATE user_profile
-      SET prediction_count = prediction_count + 1
-      WHERE id = ${myId}::uuid
-    `);
-  }
+    // If this is the user's first pick on this event, bump participant count
+    // and the user's lifetime prediction_count.
+    if (!hadPriorPicks) {
+      await tx.execute(sql`
+        UPDATE prediction_event
+        SET total_participants = (
+          SELECT COUNT(DISTINCT user_id)
+          FROM prediction_pick
+          WHERE prediction_event_id = ${predictionEventId}::uuid
+        )
+        WHERE id = ${predictionEventId}::uuid
+      `);
+      await tx.execute(sql`
+        UPDATE user_profile
+        SET prediction_count = prediction_count + 1
+        WHERE id = ${myId}::uuid
+      `);
+    }
+  });
+  const saved = validPicks.length;
 
   revalidatePath(`/predictions/${predictionEventId}`);
   revalidatePath("/predictions");
