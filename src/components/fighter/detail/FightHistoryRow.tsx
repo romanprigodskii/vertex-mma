@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl";
 
 import { Link } from "@/i18n/navigation";
 import type { FightHistoryEntry } from "@/lib/fighter-detail";
-import { abbreviateMethod } from "@/lib/method";
+import { abbreviateMethod, methodAbbrevKey } from "@/lib/method";
 import { isCuratedTitleFight } from "@/lib/title-fights";
 import { cn } from "@/lib/utils";
 
@@ -32,8 +32,11 @@ interface FightHistoryRowProps {
 
 export function FightHistoryRow({ entry }: FightHistoryRowProps) {
   const t = useTranslations("fighter");
+  const tMethod = useTranslations("method");
   const date = entry.event_date.slice(0, 10);
-  const methodLabel = abbreviateMethod(entry.method_resolved ?? entry.method);
+  const rawMethod = entry.method_resolved ?? entry.method;
+  const mKey = methodAbbrevKey(rawMethod);
+  const methodLabel = mKey ? tMethod(mKey) : abbreviateMethod(rawMethod);
   const methodInferred =
     entry.method == null && entry.method_resolved != null;
   const time = formatRoundTime(entry.time_finished_seconds);

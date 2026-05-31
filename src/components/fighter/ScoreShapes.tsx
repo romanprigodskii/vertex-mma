@@ -1,3 +1,4 @@
+import { useTranslations } from "next-intl";
 import { Crown } from "lucide-react";
 
 import { classifyAndStyle } from "@/lib/vertex-tier";
@@ -24,11 +25,6 @@ const PAD = 8;
 const RADIUS = VIEWBOX / 2 - PAD;
 const CENTER = VIEWBOX / 2;
 const UNRANKED_STROKE = "oklch(0.5 0.02 240)";
-const SUBLABEL: Record<"current" | "all_time", string> = {
-  current: "CURRENT",
-  all_time: "ALL-TIME",
-};
-
 function octagonPoints(): string {
   // 8 vertices on inscribed circle, rotated so flat sides are top/bottom
   // (points to left/right). offset = -π/2 + π/8 = -3π/8.
@@ -57,6 +53,7 @@ function ScoreShape({
   fighter,
   label,
 }: ScoreShapeProps & { shape: "octagon" | "circle" }) {
+  const t = useTranslations("fighter");
   const { tierStyle, championStyle, classification } = classifyAndStyle({
     slug: fighter.slug,
     vertexScore: fighter.vertexScore,
@@ -130,7 +127,10 @@ function ScoreShape({
           fontFamily="var(--font-mono)"
           letterSpacing="0.18em"
         >
-          {SUBLABEL[scoreMode]}
+          {(scoreMode === "all_time"
+            ? t("tabAllTime")
+            : t("tabCurrent")
+          ).toUpperCase()}
         </text>
       </svg>
       {showCrown && championStyle.crownColor ? (

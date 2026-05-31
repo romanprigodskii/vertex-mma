@@ -2,7 +2,7 @@ import { useTranslations } from "next-intl";
 
 import { Link } from "@/i18n/navigation";
 import type { HeadToHeadBout } from "@/lib/compare-fighters";
-import { abbreviateMethod } from "@/lib/method";
+import { abbreviateMethod, methodAbbrevKey } from "@/lib/method";
 
 interface HeadToHeadProps {
   bouts: HeadToHeadBout[];
@@ -23,6 +23,7 @@ export function HeadToHead({
   fighterBName,
 }: HeadToHeadProps) {
   const t = useTranslations("compare");
+  const tMethod = useTranslations("method");
   if (bouts.length === 0) {
     return (
       <p className="py-6 text-center font-sans text-sm text-foreground-muted">
@@ -35,7 +36,8 @@ export function HeadToHead({
     <ul className="mt-4 flex flex-col">
       {bouts.map((bout) => {
         const date = bout.event_date.slice(0, 10);
-        const methodLabel = abbreviateMethod(bout.method);
+        const mKey = methodAbbrevKey(bout.method);
+        const methodLabel = mKey ? tMethod(mKey) : abbreviateMethod(bout.method);
         const time = formatRoundTime(bout.time_finished_seconds);
         const finishDetail = bout.round_finished
           ? `${t("roundShort", { n: bout.round_finished })}${time ? ` · ${time}` : ""}`

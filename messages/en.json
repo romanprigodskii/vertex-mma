@@ -1341,6 +1341,18 @@
     "trigger": "Find",
     "triggerAria": "Find a fighter"
   },
+  "method": {
+    "ko": "KO",
+    "tko": "TKO",
+    "sub": "Sub",
+    "udec": "U-Dec",
+    "sdec": "S-Dec",
+    "mdec": "M-Dec",
+    "dec": "Dec",
+    "dq": "DQ",
+    "draw": "Draw",
+    "nc": "NC"
+  },
   "weight": {
     "strawweight": "Strawweight",
     "flyweight": "Flyweight",

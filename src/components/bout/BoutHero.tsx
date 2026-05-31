@@ -4,7 +4,7 @@ import { FighterAvatar } from "@/components/fighter/FighterAvatar";
 import { Link } from "@/i18n/navigation";
 import type { BoutDetail, BoutDetailFighter } from "@/lib/bout-detail";
 import { getCountryFlag } from "@/lib/fighter-helpers";
-import { abbreviateMethod } from "@/lib/method";
+import { abbreviateMethod, methodAbbrevKey } from "@/lib/method";
 import { isCuratedTitleFight } from "@/lib/title-fights";
 import { cn } from "@/lib/utils";
 
@@ -27,6 +27,7 @@ function formatEventDate(iso: string, locale: string): string {
 
 export async function BoutHero({ bout, weightLabel }: BoutHeroProps) {
   const t = await getTranslations("bout");
+  const tMethod = await getTranslations("method");
   const locale = await getLocale();
   const winnerId = bout.winner_id;
   const aWon = winnerId === bout.fighter_a.id;
@@ -35,7 +36,8 @@ export async function BoutHero({ bout, weightLabel }: BoutHeroProps) {
   const isDraw = isCompleted && !winnerId && bout.method !== "no_contest";
   const isNc = bout.method === "no_contest";
 
-  const methodLabel = abbreviateMethod(bout.method);
+  const mKey = methodAbbrevKey(bout.method);
+  const methodLabel = mKey ? tMethod(mKey) : abbreviateMethod(bout.method);
   const finishDetail =
     isCompleted && bout.round_finished
       ? `R${bout.round_finished}${
