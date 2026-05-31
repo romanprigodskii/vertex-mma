@@ -3,6 +3,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { ChevronLeft } from "lucide-react";
 
 import { CommonOpponents } from "@/components/compare/CommonOpponents";
+import { CompareForecast } from "@/components/compare/CompareForecast";
 import { CompareHero } from "@/components/compare/CompareHero";
 import { CompareSection } from "@/components/compare/CompareSection";
 import {
@@ -27,6 +28,7 @@ import {
   getHeadToHeadBouts,
   getRecentForm,
 } from "@/lib/compare-fighters";
+import { estimateWinProbability } from "@/lib/compare-prediction";
 import { computeAttributes } from "@/lib/fighter-attributes";
 import {
   buildScoreBreakdown,
@@ -146,6 +148,14 @@ export default async function ComparePage({ params, searchParams }: PageProps) {
   const attributesA = computeAttributes(fighterA);
   const attributesB = computeAttributes(fighterB);
 
+  // Free, lightweight win-probability teaser from the Vertex Score gap. The
+  // full AI simulation (method / rounds / Monte-Carlo / "why") stays the paid
+  // Simulation feature — this only answers "who's favoured, by how much".
+  const forecast = estimateWinProbability(
+    { allTime: fighterA.vertex_score_all_time, current: fighterA.vertex_score },
+    { allTime: fighterB.vertex_score_all_time, current: fighterB.vertex_score },
+  );
+
   const [common, headToHead, recentA, recentB, globalA, globalB] =
     await Promise.all([
       getCommonOpponents(fighterA.id, fighterB.id),
@@ -192,6 +202,23 @@ export default async function ComparePage({ params, searchParams }: PageProps) {
             championB={championB}
           />
         </section>
+
+        {forecast ? (
+          <CompareSection
+            label={t("forecast")}
+            explainer={t("forecastExplainer")}
+          >
+            <CompareForecast
+              fighterAName={fighterA.name_en}
+              fighterBName={fighterB.name_en}
+              probA={forecast.probA}
+              probB={forecast.probB}
+              scoreA={forecast.scoreA}
+              scoreB={forecast.scoreB}
+              basis={forecast.basis}
+            />
+          </CompareSection>
+        ) : null}
 
         <CompareSection
           label={t("taleOfTheTape")}
