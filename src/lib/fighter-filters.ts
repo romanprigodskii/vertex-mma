@@ -92,6 +92,8 @@ export function parseCatalogFilters(
     .map((c) => c.toUpperCase())
     .filter((c) => c.length === 2);
 
+  const rawQ = get("q")?.trim().slice(0, MAX_Q_LEN);
+
   const rawSort = get("sort");
   // Default sort is Vertex Score (current) as of Wave 3.5 step 4A. Old URLs
   // with `sort=winrate` etc. continue to work via VALID_SORTS lookup.
@@ -111,7 +113,11 @@ export function parseCatalogFilters(
   let status: FighterCatalogFilters["status"];
   if (rawStatus && VALID_STATUSES.has(rawStatus)) {
     status = rawStatus as FighterCatalogFilters["status"];
-  } else if (sort === "vertex_all_time" || sort === "all_time") {
+  } else if (rawQ || sort === "vertex_all_time" || sort === "all_time") {
+    // A name search (or an all-time sort) must reach retired legends — Jon
+    // Jones and Khabib live in 'released'/'retired', so the active-roster
+    // default would hide them from search results. Broaden to 'all' unless
+    // the user explicitly picked a status.
     status = "all";
   } else {
     status = "active";
@@ -143,7 +149,6 @@ export function parseCatalogFilters(
     if (champion === "all") champion = "any";
   }
 
-  const rawQ = get("q")?.trim().slice(0, MAX_Q_LEN);
   const rawLimit = Number.parseInt(get("limit") ?? "", 10);
   const rawOffset = Number.parseInt(get("offset") ?? "", 10);
 
