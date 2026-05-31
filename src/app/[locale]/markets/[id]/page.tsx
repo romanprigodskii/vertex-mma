@@ -11,6 +11,7 @@ import { ShareButton } from "@/components/share/share-button";
 import { Link } from "@/i18n/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { priceToDecimalOdds } from "@/lib/lmsr";
+import { marketHasOdds } from "@/lib/market-odds";
 import { getBoutExternalOdds, getMarketById } from "@/lib/markets";
 
 export const dynamic = "force-dynamic";
@@ -70,6 +71,9 @@ export default async function MarketDetailPage({ params }: PageProps) {
   const closed =
     market.status !== "open" ||
     new Date(market.closes_at).getTime() <= Date.now();
+  // Cold-start markets sit at the uniform LMSR default; flag so we frame the
+  // shown price as an untraded "opening line" rather than a real consensus.
+  const hasOdds = marketHasOdds(market.outcomes, market.total_volume);
 
   return (
     <>
@@ -139,6 +143,12 @@ export default async function MarketDetailPage({ params }: PageProps) {
                 ? `${market.fighter_a_name} vs ${market.fighter_b_name}`
                 : `${market.fighter_a_name} vs ${market.fighter_b_name} · ${market.question}`}
           </p>
+
+          {!hasOdds && !closed ? (
+            <p className="mt-6 rounded-md border border-foreground/15 bg-foreground/[0.03] px-4 py-3 text-center font-sans text-xs text-foreground-muted">
+              {t("openingLineBanner")}
+            </p>
+          ) : null}
 
           {market.type === "method" ? (
             <div className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-2">

@@ -11,6 +11,7 @@ import { Link } from "@/i18n/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { isRuLocale, localizedNameSql } from "@/lib/i18n-name";
+import { marketHasOdds } from "@/lib/market-odds";
 import { listOpenMarkets } from "@/lib/markets";
 import { listRecentRankings } from "@/lib/rankings";
 
@@ -86,12 +87,19 @@ export default async function HomePage({
     const key = division.replace(/-/g, "_");
     return tWeight.has(key) ? tWeight(key as "lightweight") : division.replace(/_/g, " ");
   };
-  const [user, topFighters, topMarkets, recentRankings] = await Promise.all([
+  const [user, topFighters, openMarketsRaw, recentRankings] = await Promise.all([
     getCurrentUser(),
     getTopFighters(5),
-    listOpenMarkets(6),
+    listOpenMarkets(40),
     listRecentRankings(3),
   ]);
+
+  // Only surface markets with a real line (synced odds or a trade) — the LMSR
+  // cold-start default would otherwise fill the homepage with fake 50/50s.
+  const topMarkets = openMarketsRaw
+    .filter((m) => marketHasOdds(m.outcomes, m.total_volume))
+    .slice(0, 6);
+  const hasAnyMarkets = openMarketsRaw.length > 0;
 
   // The hero title is two lines in both locales — store with a literal
   // \n in the message file and split here. Avoids an i18n-specific
@@ -224,15 +232,21 @@ export default async function HomePage({
               </Link>
             </div>
             {topMarkets.length === 0 ? (
-              <p className="font-sans text-sm text-foreground-muted">
-                {t.rich("noMarketsHint", {
-                  cmd: () => (
-                    <code className="rounded-sm bg-foreground/[0.05] px-1 py-0.5 font-mono text-xs">
-                      pnpm markets:generate
-                    </code>
-                  ),
-                })}
-              </p>
+              hasAnyMarkets ? (
+                <p className="font-sans text-sm text-foreground-muted">
+                  {t("noLiveMarketsYet")}
+                </p>
+              ) : (
+                <p className="font-sans text-sm text-foreground-muted">
+                  {t.rich("noMarketsHint", {
+                    cmd: () => (
+                      <code className="rounded-sm bg-foreground/[0.05] px-1 py-0.5 font-mono text-xs">
+                        pnpm markets:generate
+                      </code>
+                    ),
+                  })}
+                </p>
+              )
             ) : (
               <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {topMarkets.map((m) => (

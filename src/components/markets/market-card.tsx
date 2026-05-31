@@ -2,6 +2,7 @@ import { getTranslations } from "next-intl/server";
 
 import { Link } from "@/i18n/navigation";
 import { priceToDecimalOdds } from "@/lib/lmsr";
+import { marketHasOdds } from "@/lib/market-odds";
 import type { MarketCardOutcome, MarketListItem } from "@/lib/markets";
 
 function lastName(full: string): string {
@@ -40,14 +41,25 @@ export async function MarketCard({ market }: { market: MarketListItem }) {
         {market.fighter_b_name}
       </h3>
 
-      <MarketBody market={market} favoriteLabel={t("favorite")} plusMore={(n) => t("plusMore", { n })} />
-
-      <p className="mt-3 font-mono text-[10px] tabular text-foreground-subtle">
-        {t("volTraders", {
-          vol: market.total_volume.toLocaleString(),
-          count: market.unique_traders,
-        })}
-      </p>
+      {marketHasOdds(market.outcomes, market.total_volume) ? (
+        <>
+          <MarketBody
+            market={market}
+            favoriteLabel={t("favorite")}
+            plusMore={(n) => t("plusMore", { n })}
+          />
+          <p className="mt-3 font-mono text-[10px] tabular text-foreground-subtle">
+            {t("volTraders", {
+              vol: market.total_volume.toLocaleString(),
+              count: market.unique_traders,
+            })}
+          </p>
+        </>
+      ) : (
+        <p className="mt-4 rounded-sm bg-foreground/[0.04] px-2 py-3 text-center font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
+          {t("oddsComingSoon")}
+        </p>
+      )}
     </Link>
   );
 }

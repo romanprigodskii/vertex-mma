@@ -3,6 +3,7 @@ import { ChevronRight } from "lucide-react";
 
 import { Link } from "@/i18n/navigation";
 import { priceToDecimalOdds } from "@/lib/lmsr";
+import { marketHasOdds } from "@/lib/market-odds";
 import type { EventMarketsGroup } from "@/lib/markets";
 
 const TYPE_ORDER: Record<string, number> = {
@@ -98,6 +99,7 @@ export async function EventMarketsAccordion({
                     t.has(`type_${type}`) ? t(`type_${type}`) : type
                   }
                   noOutcomesLabel={t("noOutcomes")}
+                  oddsComingSoonLabel={t("oddsComingSoon")}
                 />
               );
             })}
@@ -115,6 +117,7 @@ function BoutMarketsBlock({
   titleLabel,
   typeLabel,
   noOutcomesLabel,
+  oddsComingSoonLabel,
 }: {
   bout: EventMarketsGroup["bouts"][number];
   tag: string | null;
@@ -122,6 +125,7 @@ function BoutMarketsBlock({
   titleLabel: string;
   typeLabel: (type: string) => string;
   noOutcomesLabel: string;
+  oddsComingSoonLabel: string;
 }) {
   const ordered = [...bout.markets].sort(
     (a, b) =>
@@ -155,7 +159,9 @@ function BoutMarketsBlock({
                 </p>
                 <TopOutcomePreview
                   outcomes={m.outcomes}
+                  totalVolume={m.total_volume}
                   noOutcomesLabel={noOutcomesLabel}
+                  oddsComingSoonLabel={oddsComingSoonLabel}
                 />
               </div>
             </Link>
@@ -168,19 +174,31 @@ function BoutMarketsBlock({
 
 function TopOutcomePreview({
   outcomes,
+  totalVolume,
   noOutcomesLabel,
+  oddsComingSoonLabel,
 }: {
   outcomes: Array<{
     label: string;
     order_index: number;
     current_price: number;
   }>;
+  totalVolume: number;
   noOutcomesLabel: string;
+  oddsComingSoonLabel: string;
 }) {
   if (!outcomes || outcomes.length === 0) {
     return (
       <p className="mt-1 font-sans text-xs text-foreground-subtle">
         {noOutcomesLabel}
+      </p>
+    );
+  }
+  // Don't render the LMSR cold-start template as if it were a real line.
+  if (!marketHasOdds(outcomes, totalVolume)) {
+    return (
+      <p className="mt-1 font-sans text-xs text-foreground-subtle">
+        {oddsComingSoonLabel}
       </p>
     );
   }
