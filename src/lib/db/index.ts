@@ -2,6 +2,7 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 
 import { install as installDnsFallback } from "@/lib/dns-fallback";
+import { serverEnv } from "@/lib/env";
 
 import * as schema from "./schema";
 
@@ -10,11 +11,9 @@ import * as schema from "./schema";
 // Patch dns.lookup BEFORE postgres-js opens a socket. No-op on healthy hosts.
 installDnsFallback();
 
-const connectionString = process.env.DATABASE_URL;
-
-if (!connectionString) {
-  throw new Error("DATABASE_URL is not set");
-}
+// Validated at boot — throws a clear "Missing required environment variable"
+// instead of a cryptic connection error at request time.
+const connectionString = serverEnv().DATABASE_URL;
 
 // prepare: false для совместимости с Supabase pooler. max + idle_timeout
 // keep us under the session-pooler 15-slot cap when Turbopack HMR

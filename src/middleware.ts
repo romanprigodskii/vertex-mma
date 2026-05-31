@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import createIntlMiddleware from "next-intl/middleware";
 import { type NextRequest } from "next/server";
 
+import { publicEnv } from "@/lib/env";
 import { routing } from "@/i18n/routing";
 
 const intlMiddleware = createIntlMiddleware(routing);
@@ -21,8 +22,8 @@ export async function middleware(request: NextRequest) {
   // those writes at intlResponse.cookies, preserving the rewrite headers
   // it set.
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL ?? "",
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "",
+    publicEnv.NEXT_PUBLIC_SUPABASE_URL,
+    publicEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     {
       cookies: {
         getAll() {

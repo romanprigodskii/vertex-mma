@@ -1,6 +1,8 @@
+import { sql } from "drizzle-orm";
 import {
   boolean,
   char,
+  check,
   index,
   integer,
   pgTable,
@@ -52,6 +54,10 @@ export const userProfile = pgTable(
     index("user_profile_auth_idx").on(table.authUserId),
     index("user_profile_username_idx").on(table.username),
     index("user_profile_balance_idx").on(table.balanceCoins),
+    // Backstop against any residual debit race: the coin balance can never go
+    // negative. placeBetAction already locks this row FOR UPDATE and debits
+    // relatively, but the constraint makes overspend impossible at the DB level.
+    check("user_profile_balance_non_negative", sql`${table.balanceCoins} >= 0`),
   ],
 );
 

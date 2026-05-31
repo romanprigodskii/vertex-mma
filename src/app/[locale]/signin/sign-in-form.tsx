@@ -8,16 +8,10 @@ import { signInAction } from "@/app/[locale]/signin/actions";
 import { GoogleAuthButton } from "@/components/auth/GoogleAuthButton";
 import { PasswordInput } from "@/components/auth/PasswordInput";
 import { Link } from "@/i18n/navigation";
+import { safeNext } from "@/lib/safe-redirect";
 
 const INPUT_CLASS =
   "rounded-sm border border-foreground/15 bg-background-elevated/30 px-3 py-2 font-sans text-sm text-foreground focus:border-primary focus:outline-none";
-
-function safeNext(raw: string | null): string {
-  // Only honour relative paths to avoid open-redirect via ?next=https://evil
-  if (!raw) return "/";
-  if (!raw.startsWith("/") || raw.startsWith("//")) return "/";
-  return raw;
-}
 
 export function SignInForm() {
   const router = useRouter();

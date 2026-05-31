@@ -32,6 +32,30 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  // Baseline security headers for the public Coolify deploy. A full
+  // Content-Security-Policy is deliberately left for a dedicated pass (it
+  // needs nonce wiring for Next's inline scripts); these are the safe,
+  // high-value headers that don't risk breaking resource loading.
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          {
+            key: "Strict-Transport-Security",
+            value: "max-age=63072000; includeSubDomains; preload",
+          },
+          {
+            key: "Permissions-Policy",
+            value: "camera=(), microphone=(), geolocation=()",
+          },
+        ],
+      },
+    ];
+  },
 };
 
 export default withNextIntl(nextConfig);

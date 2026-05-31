@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { safeNext } from "@/lib/safe-redirect";
 import { createClient } from "@/lib/supabase/server";
 
 function siteOrigin(request: NextRequest): string {
@@ -17,7 +18,11 @@ export async function GET(request: NextRequest) {
   const code = searchParams.get("code");
   const errorDescription =
     searchParams.get("error_description") ?? searchParams.get("error");
-  const next = searchParams.get("next") ?? "/";
+  // Validate server-side: `next` is attacker-controlled (recovery / magic-link
+  // / OAuth links carry it), and concatenating it raw allowed an open redirect
+  // (e.g. next=@evil.com -> https://host@evil.com). safeNext rejects anything
+  // that isn't a same-origin relative path.
+  const next = safeNext(searchParams.get("next"));
   const origin = siteOrigin(request);
 
   // Supabase signals errors via query params when redirect target isn't

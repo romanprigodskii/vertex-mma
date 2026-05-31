@@ -104,7 +104,25 @@ export async function placeBetAction(
       const sharesBought = lmsrSharesForCoins(shares, b, targetIdx, coinsInt);
       if (!(sharesBought > 0)) throw new Error("Could not compute shares.");
       const actualCost = Math.ceil(lmsrBuyCost(shares, b, targetIdx, sharesBought));
-      if (actualCost > profile.balance) throw new Error("Not enough coins.");
+
+      // Lock the profile row and re-read the AUTHORITATIVE balance inside the
+      // tx. The outer read (above) is only a cheap early-reject; trusting it
+      // for the debit was a lost-update race — two concurrent bets by the same
+      // user on DIFFERENT markets lock different market rows, so they never
+      // serialised, and each wrote `startingBalance - ownCost` (absolute),
+      // letting the user overspend / mint coins. Locking user_profile here
+      // also serialises the same user's concurrent bets across all markets.
+      const balanceRows = await tx.execute<{ balance_coins: number }>(sql`
+        SELECT balance_coins
+        FROM user_profile
+        WHERE id = ${profile.id}::uuid
+        FOR UPDATE
+      `);
+      const lockedBalance = (
+        balanceRows as unknown as Array<{ balance_coins: number }>
+      )[0]?.balance_coins;
+      if (typeof lockedBalance !== "number") throw new Error("Profile not found.");
+      if (actualCost > lockedBalance) throw new Error("Not enough coins.");
 
       const newShares = shares.slice();
       newShares[targetIdx] += sharesBought;
@@ -148,10 +166,13 @@ export async function placeBetAction(
         )
       `);
 
-      const newBalance = profile.balance - actualCost;
+      // Relative debit (not an absolute overwrite) so it composes safely with
+      // any concurrent balance mutation; the FOR UPDATE lock above plus the
+      // balance_coins >= 0 CHECK constraint guarantee it can never go negative.
+      const newBalance = lockedBalance - actualCost;
       await tx.execute(sql`
         UPDATE user_profile
-        SET balance_coins = ${newBalance},
+        SET balance_coins = balance_coins - ${actualCost},
             total_coins_lost = total_coins_lost + ${actualCost},
             bet_count = bet_count + 1
         WHERE id = ${profile.id}::uuid

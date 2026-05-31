@@ -1,5 +1,7 @@
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 
+import { publicEnv, serverEnv } from "@/lib/env";
+
 /**
  * Service-role Supabase client.
  *
@@ -9,12 +11,11 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js";
  * client components or route handlers that echo the client back.
  */
 export function createAdminClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !serviceKey) {
-    throw new Error("Missing Supabase admin credentials.");
-  }
-  return createSupabaseClient(url, serviceKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
+  return createSupabaseClient(
+    publicEnv.NEXT_PUBLIC_SUPABASE_URL,
+    serverEnv().SUPABASE_SERVICE_ROLE_KEY,
+    {
+      auth: { autoRefreshToken: false, persistSession: false },
+    },
+  );
 }
