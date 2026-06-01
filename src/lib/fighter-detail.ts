@@ -22,6 +22,9 @@ export type FighterDetail = {
   fighting_out_of: string | null;
   weight_class_primary: string | null;
   status: string | null;
+  /** roster.watch membership (active | retired | released | inactive |
+   *  unknown). Drives the canonical headline rule — see headlineScore(). */
+  roster_status: string | null;
   career_start: string | null;
   career_end: string | null;
   hall_of_fame_year: number | null;
@@ -525,6 +528,7 @@ export async function getFighterBySlug(
       f.fighting_out_of,
       f.weight_class_primary::text AS weight_class_primary,
       f.status::text AS status,
+      f.roster_status::text AS roster_status,
       f.career_start::text AS career_start,
       f.career_end::text AS career_end,
       f.hall_of_fame_year,

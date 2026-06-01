@@ -8,7 +8,7 @@ import { WEIGHT_CLASSES } from "@/lib/constants";
 import { getCountryFlag } from "@/lib/fighter-helpers";
 import type { FighterCatalogRow } from "@/lib/fighter-search";
 import { cn } from "@/lib/utils";
-import { classifyAndStyle } from "@/lib/vertex-tier";
+import { classifyAndStyle, clampHeadline, headlineScore } from "@/lib/vertex-tier";
 
 const WEIGHT_LABELS: Record<string, string> = Object.fromEntries(
   WEIGHT_CLASSES.map((w) => [w.id, w.label]),
@@ -74,33 +74,40 @@ export function FighterCard({
 }: FighterCardProps) {
   const t = useTranslations("catalog");
   const tWeight = useTranslations("weight");
-  // Wave 14B.2: when the catalog query joined a divisional row (single-
-  // weight filter), prefer the per-division score for "current"
-  // classification. all_time always stays global. divisional_score is
-  // NULL outside the single-weight-filter path, so this is a no-op for
-  // multi-/no-weight catalogs and for callers like the champion strip.
-  const effectiveCurrent =
-    fighter.divisional_score ?? fighter.vertex_score;
+  // Canonical headline (active → current divisional/global, retired →
+  // all-time) so the card number matches the profile hero + search palette.
+  // The catalog's explicit all-time SORT is a deliberate all-time VIEW —
+  // honour it; every other context follows the single headlineScore rule.
+  const headline = headlineScore({
+    rosterStatus: fighter.roster_status,
+    divisionalScore: fighter.divisional_score,
+    vertexScore: fighter.vertex_score,
+    vertexScoreAllTime: fighter.vertex_score_all_time,
+  });
+  const viewAllTime = scoreMode === "all_time";
+  const shownMode = viewAllTime ? "all_time" : headline.scoreMode;
+  const shownValue = viewAllTime
+    ? fighter.vertex_score_all_time
+    : headline.value;
   const { classification, tierStyle, championStyle } = classifyAndStyle({
     slug: fighter.slug,
-    vertexScore: effectiveCurrent,
+    vertexScore: shownValue,
     vertexScoreAllTime: fighter.vertex_score_all_time,
     ufcBouts: fighter.ufc_bouts,
-    scoreMode,
+    scoreMode: shownMode,
   });
   const isChampion = championStyle.status !== "none";
   const showTierBadge = tierStyle.tier !== "unranked";
-  const rawScore =
-    scoreMode === "all_time"
-      ? fighter.vertex_score_all_time
-      : effectiveCurrent ?? fighter.vertex_score_all_time;
+  // Provisional qualifier only when the divisional score is actually what's
+  // headlined (active fighter, current view, <5 bouts in the division).
   const isProvisional =
-    scoreMode === "current" && fighter.divisional_status === "provisional";
+    !viewAllTime &&
+    headline.basis === "divisional" &&
+    fighter.divisional_status === "provisional";
   // Cap visible score at 100 — raw all-time values can exceed 100 for sort
-  // ordering after we lifted the LEAST(100, ...) cap in step 5E, but the UI
-  // tier breaks (Apex 75+, Elite 55-74 etc.) are calibrated against [0, 100].
-  const displayScore =
-    rawScore == null ? null : Math.min(100, Math.max(0, rawScore));
+  // ordering, but the UI tier breaks (Apex 75+, Elite 55-74 etc.) are
+  // calibrated against [0, 100].
+  const displayScore = clampHeadline(shownValue);
   const weightLabel = (() => {
     if (!fighter.weight_class_primary) return null;
     const key = fighter.weight_class_primary.replace(/-/g, "_");

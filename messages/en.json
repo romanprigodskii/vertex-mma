@@ -1307,6 +1307,7 @@
     "headingAllTime": "All-time score, fight by fight",
     "leadCurrent": "Replay of the current-Vertex formula at each completed UFC bout. Hover the chart for the bout that locked in each value.",
     "leadAllTime": "Replay of the all-time legacy formula at each bout — quality wins, championship pedigree, era dominance, performance, finishing, career peak, minus weighted losses.",
+    "currentFormNote": "Current is a live-form rating, so it drifts between fights: recent results age out of the rolling windows and the age curve steps on a birthday — a quiet stretch can nudge it slightly up or down with no bout. The all-time score only moves when a fighter actually competes.",
     "noReplay": "No replay data — this fighter has fewer than three completed UFC bouts, so the formula has nothing to anchor on yet.",
     "boutsHeading": "Bouts",
     "vsLabel": "vs",

@@ -8,10 +8,16 @@ interface ScoreCompareProps {
   fighterBName: string;
   breakdownA: ScoreBreakdownData | null;
   breakdownB: ScoreBreakdownData | null;
-  vertexA: number | null;
-  vertexB: number | null;
-  vertexAllTimeA: number | null;
-  vertexAllTimeB: number | null;
+  /** Canonical headline values + modes (from headlineScore) so the number
+   *  here matches the profile hero / search / cards exactly. */
+  scoreA: number | null;
+  scoreModeA: "current" | "all_time";
+  scoreB: number | null;
+  scoreModeB: "current" | "all_time";
+}
+
+function clampScore(value: number | null): number | string {
+  return value == null ? "—" : Math.min(100, Math.max(0, Math.round(value)));
 }
 
 function lastName(name: string): string {
@@ -24,10 +30,10 @@ export function ScoreCompare({
   fighterBName,
   breakdownA,
   breakdownB,
-  vertexA,
-  vertexB,
-  vertexAllTimeA,
-  vertexAllTimeB,
+  scoreA,
+  scoreModeA,
+  scoreB,
+  scoreModeB,
 }: ScoreCompareProps) {
   const t = useTranslations("compare");
   if (!breakdownA && !breakdownB) {
@@ -49,10 +55,12 @@ export function ScoreCompare({
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 text-center">
         <div>
           <p className="font-display text-3xl tabular text-foreground sm:text-4xl">
-            {vertexA != null ? vertexA : vertexAllTimeA ?? "—"}
+            {clampScore(scoreA)}
           </p>
           <p className="mt-0.5 font-sans text-[10px] uppercase tracking-widest text-foreground-subtle">
-            {vertexA != null ? t("scoreModeCurrent") : t("scoreModeAllTime")}
+            {scoreModeA === "current"
+              ? t("scoreModeCurrent")
+              : t("scoreModeAllTime")}
           </p>
         </div>
         <p className="font-mono text-[11px] uppercase tracking-widest text-foreground-subtle">
@@ -60,10 +68,12 @@ export function ScoreCompare({
         </p>
         <div>
           <p className="font-display text-3xl tabular text-foreground sm:text-4xl">
-            {vertexB != null ? vertexB : vertexAllTimeB ?? "—"}
+            {clampScore(scoreB)}
           </p>
           <p className="mt-0.5 font-sans text-[10px] uppercase tracking-widest text-foreground-subtle">
-            {vertexB != null ? t("scoreModeCurrent") : t("scoreModeAllTime")}
+            {scoreModeB === "current"
+              ? t("scoreModeCurrent")
+              : t("scoreModeAllTime")}
           </p>
         </div>
       </div>

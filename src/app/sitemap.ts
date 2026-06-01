@@ -53,7 +53,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         COALESCE(updated_at, created_at)::text AS date
       FROM fighter
       WHERE roster_status = 'active'
-      ORDER BY vertex_score DESC NULLS LAST
+      -- Rank by the headline score (current, falling back to all-time) so
+      -- active fighters who only carry an all-time rating aren't demoted
+      -- below the 500-row cap by a NULL current score.
+      ORDER BY COALESCE(vertex_score, vertex_score_all_time) DESC NULLS LAST
       LIMIT 500
     `);
     fighterUrls = (

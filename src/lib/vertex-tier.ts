@@ -85,6 +85,101 @@ export function classifyFighter(args: ClassifyArgs): FighterClassification {
 }
 
 // =====================================================================
+// Canonical headline-score rule — the single source of truth for
+// "which number do we broadcast for this fighter, everywhere".
+// =====================================================================
+
+/** roster.watch membership (fighter.roster_status). 'active' = currently
+ *  rostered; the headline rule treats retired/released/inactive alike. */
+export type RosterStatus =
+  | "active"
+  | "retired"
+  | "released"
+  | "inactive"
+  | "unknown";
+
+const RETIRED_ROSTER_STATUSES: ReadonlySet<RosterStatus> = new Set([
+  "retired",
+  "released",
+  "inactive",
+]);
+
+export interface HeadlineScoreInput {
+  /** fighter.roster_status (string for ergonomics; unknown values → active). */
+  rosterStatus: string | null;
+  /** Per-division CURRENT score for the fighter's active division
+   *  (fighter_divisional_score where division = current_division AND
+   *  in_active_ranking). Null when the fighter has no such row. */
+  divisionalScore: number | null;
+  /** Global CURRENT score (fighter.vertex_score — NULL for many inactive
+   *  fighters and <5-bout careers). */
+  vertexScore: number | null;
+  /** Global ALL-TIME score (fighter.vertex_score_all_time). */
+  vertexScoreAllTime: number | null;
+}
+
+export interface HeadlineScore {
+  /** The single number every surface should render (pre-clamp). Null → "—". */
+  value: number | null;
+  /** Tier-classification mode that matches `value` — feed this straight into
+   *  classifyAndStyle so the colour always agrees with the number. */
+  scoreMode: "current" | "all_time";
+  /** Where `value` came from. Callers that change layout by source (e.g. the
+   *  profile hero drops its Current octagon when basis === "all_time") read
+   *  this; pure number surfaces can ignore it. */
+  basis: "divisional" | "global" | "all_time";
+}
+
+/**
+ * The canonical Vertex headline — one number, identical on every surface
+ * (search palette, catalog cards, profile hero, compare, …):
+ *
+ *   • RETIRED / released / inactive → ALL-TIME. Any stale `vertex_score`
+ *     these fighters still carry (108 of them as of the Wave-rating audit)
+ *     is intentionally ignored — a retired legend headlines their legacy
+ *     rating, never a decayed near-zero current value.
+ *   • ACTIVE / unknown → CURRENT: divisional score for their active division
+ *     when present, else the global current score, else an all-time fallback
+ *     (102 active fighters carry only an all-time score).
+ *
+ * Tier classification MUST consume the returned `{ value, scoreMode }` so the
+ * ring/tier colour matches the displayed number. Keep this the ONLY place the
+ * rule lives — surfaces calling their own ad-hoc coalesce is exactly what
+ * produced the search-≠-profile divergence.
+ */
+export function headlineScore(input: HeadlineScoreInput): HeadlineScore {
+  const status = (input.rosterStatus ?? "unknown") as RosterStatus;
+  if (RETIRED_ROSTER_STATUSES.has(status)) {
+    return {
+      value: input.vertexScoreAllTime,
+      scoreMode: "all_time",
+      basis: "all_time",
+    };
+  }
+  if (input.divisionalScore != null) {
+    return {
+      value: input.divisionalScore,
+      scoreMode: "current",
+      basis: "divisional",
+    };
+  }
+  if (input.vertexScore != null) {
+    return { value: input.vertexScore, scoreMode: "current", basis: "global" };
+  }
+  return {
+    value: input.vertexScoreAllTime,
+    scoreMode: "all_time",
+    basis: "all_time",
+  };
+}
+
+/** Clamp a raw score to the 0–100 integer the UI renders. Raw all-time values
+ *  can exceed 100 for sort ordering; the tier breaks are calibrated on [0,100]. */
+export function clampHeadline(value: number | null): number | null {
+  return value == null ? null : Math.min(100, Math.max(0, Math.round(value)));
+}
+
+// =====================================================================
 // Tier visual config
 // =====================================================================
 

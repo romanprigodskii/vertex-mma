@@ -118,6 +118,11 @@ export default async function FighterScoreHistoryPage({
           <p className="mt-2 max-w-xl font-sans text-sm text-foreground-muted">
             {mode === "current" ? t("leadCurrent") : t("leadAllTime")}
           </p>
+          {mode === "current" ? (
+            <p className="mt-3 max-w-xl font-sans text-xs leading-relaxed text-foreground-subtle">
+              {t("currentFormNote")}
+            </p>
+          ) : null}
 
           <div className="mt-6 inline-flex rounded-md border border-foreground/15 bg-background-elevated/30 p-0.5">
             <ModeTab

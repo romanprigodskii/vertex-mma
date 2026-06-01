@@ -39,6 +39,7 @@ import {
 import { listNewsForFighter } from "@/lib/news";
 import { getPeakVertex } from "@/lib/score-history";
 import { getSimilarFighters } from "@/lib/similar-fighters";
+import { headlineScore } from "@/lib/vertex-tier";
 
 export const dynamic = "force-dynamic";
 
@@ -152,8 +153,20 @@ export default async function FighterDetailPage({ params }: PageProps) {
           d.division === fighter.current_division && d.in_active_ranking,
       ) ?? null
     : null;
+  // Canonical headline (see headlineScore): active fighters headline their
+  // current score (divisional for the active division, else global); retired/
+  // released/inactive headline all-time, so a stale `vertex_score` never
+  // surfaces a Current octagon for a retired fighter. basis === "all_time"
+  // (retired, or an active fighter with no current score) → no octagon, the
+  // all-time circle stands alone (the Wave 29 layout below).
+  const heroHeadline = headlineScore({
+    rosterStatus: fighter.roster_status,
+    divisionalScore: activeDivisionalRow?.vertex_score ?? null,
+    vertexScore: fighter.vertex_score,
+    vertexScoreAllTime: fighter.vertex_score_all_time,
+  });
   const heroCurrentScore =
-    activeDivisionalRow?.vertex_score ?? fighter.vertex_score;
+    heroHeadline.basis === "all_time" ? null : heroHeadline.value;
   // Sidebar list — every divisional row OTHER than the one driving the
   // hero. When activeDivisionalRow is null (fallback case) we include
   // all divisional rows.

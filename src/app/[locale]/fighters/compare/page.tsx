@@ -32,9 +32,12 @@ import { estimateWinProbability } from "@/lib/compare-prediction";
 import { computeAttributes } from "@/lib/fighter-attributes";
 import {
   buildScoreBreakdown,
+  getDivisionalScores,
   getFighterBySlug,
   getGlobalScoreComponents,
+  type FighterDivisionalScoreRow,
 } from "@/lib/fighter-detail";
+import { headlineScore } from "@/lib/vertex-tier";
 
 export const dynamic = "force-dynamic";
 
@@ -156,18 +159,61 @@ export default async function ComparePage({ params, searchParams }: PageProps) {
     { allTime: fighterB.vertex_score_all_time, current: fighterB.vertex_score },
   );
 
-  const [common, headToHead, recentA, recentB, globalA, globalB] =
-    await Promise.all([
-      getCommonOpponents(fighterA.id, fighterB.id),
-      getHeadToHeadBouts(fighterA.id, fighterB.id),
-      getRecentForm(fighterA.id, 5),
-      getRecentForm(fighterB.id, 5),
-      getGlobalScoreComponents(fighterA.id),
-      getGlobalScoreComponents(fighterB.id),
-    ]);
+  const [
+    common,
+    headToHead,
+    recentA,
+    recentB,
+    globalA,
+    globalB,
+    divScoresA,
+    divScoresB,
+  ] = await Promise.all([
+    getCommonOpponents(fighterA.id, fighterB.id),
+    getHeadToHeadBouts(fighterA.id, fighterB.id),
+    getRecentForm(fighterA.id, 5),
+    getRecentForm(fighterB.id, 5),
+    getGlobalScoreComponents(fighterA.id),
+    getGlobalScoreComponents(fighterB.id),
+    getDivisionalScores(fighterA.id),
+    getDivisionalScores(fighterB.id),
+  ]);
 
-  const breakdownA = buildScoreBreakdown(null, globalA);
-  const breakdownB = buildScoreBreakdown(null, globalB);
+  // Mirror the profile hero: the active-division divisional row (if any)
+  // drives the headline + breakdown so compare shows the SAME number the
+  // profile does. headlineScore then applies the active/retired rule.
+  const findActiveDiv = (
+    currentDivision: string | null,
+    rows: FighterDivisionalScoreRow[],
+  ): FighterDivisionalScoreRow | null =>
+    currentDivision
+      ? rows.find(
+          (d) => d.division === currentDivision && d.in_active_ranking,
+        ) ?? null
+      : null;
+  const activeDivA = findActiveDiv(fighterA.current_division, divScoresA);
+  const activeDivB = findActiveDiv(fighterB.current_division, divScoresB);
+  const headlineA = headlineScore({
+    rosterStatus: fighterA.roster_status,
+    divisionalScore: activeDivA?.vertex_score ?? null,
+    vertexScore: fighterA.vertex_score,
+    vertexScoreAllTime: fighterA.vertex_score_all_time,
+  });
+  const headlineB = headlineScore({
+    rosterStatus: fighterB.roster_status,
+    divisionalScore: activeDivB?.vertex_score ?? null,
+    vertexScore: fighterB.vertex_score,
+    vertexScoreAllTime: fighterB.vertex_score_all_time,
+  });
+
+  const breakdownA = buildScoreBreakdown(
+    headlineA.basis === "divisional" ? activeDivA : null,
+    globalA,
+  );
+  const breakdownB = buildScoreBreakdown(
+    headlineB.basis === "divisional" ? activeDivB : null,
+    globalB,
+  );
 
   return (
     <>
@@ -252,10 +298,10 @@ export default async function ComparePage({ params, searchParams }: PageProps) {
             fighterBName={fighterB.name_en}
             breakdownA={breakdownA}
             breakdownB={breakdownB}
-            vertexA={fighterA.vertex_score}
-            vertexB={fighterB.vertex_score}
-            vertexAllTimeA={fighterA.vertex_score_all_time}
-            vertexAllTimeB={fighterB.vertex_score_all_time}
+            scoreA={headlineA.value}
+            scoreModeA={headlineA.scoreMode}
+            scoreB={headlineB.value}
+            scoreModeB={headlineB.scoreMode}
           />
         </CompareSection>
 
