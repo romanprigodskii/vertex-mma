@@ -146,16 +146,37 @@ function LatestNewsWidget({
               : "border-t border-foreground/10 py-3 last:pb-0"
           }
         >
-          <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-foreground-subtle">
-            {item.source_name} · {formatRelative(item.published_at, labels, locale)}
-          </span>
-          <Link
-            href={`/news/${item.id}`}
-            prefetch={false}
-            className="mt-1 block text-[13px] leading-snug text-foreground hover:text-primary"
-          >
-            {item.title}
-          </Link>
+          <div className="flex gap-3">
+            {item.image_url ? (
+              <Link
+                href={`/news/${item.id}`}
+                prefetch={false}
+                aria-hidden
+                tabIndex={-1}
+                className="shrink-0"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={item.image_url}
+                  alt=""
+                  loading="lazy"
+                  className="h-12 w-16 rounded-sm border border-foreground/10 object-cover"
+                />
+              </Link>
+            ) : null}
+            <div className="min-w-0 flex-1">
+              <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-foreground-subtle">
+                {item.source_name} · {formatRelative(item.published_at, labels, locale)}
+              </span>
+              <Link
+                href={`/news/${item.id}`}
+                prefetch={false}
+                className="mt-1 block text-[13px] leading-snug text-foreground hover:text-primary"
+              >
+                {item.title}
+              </Link>
+            </div>
+          </div>
         </li>
       ))}
     </ul>
