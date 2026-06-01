@@ -135,7 +135,19 @@ export async function checkAndUnlockAchievements(
 
   // Aggregate stats in parallel — each is a cheap COUNT against indexed
   // foreign keys.
-  const [winRows, rankingRows, bigWinRows, dailyStreakRows] = await Promise.all([
+  // Win-based achievements count ALL bet products: the LMSR prediction
+  // market (`bet`), the fixed-odds sportsbook (`fixed_odds_bet`), and parlays
+  // (`parlay`). Counting only `bet` would have shut sportsbook-only bettors
+  // out of bet_10_wins / big_win.
+  type SbAgg = { won: number; big: number; underdog: number };
+  const [
+    winRows,
+    rankingRows,
+    bigWinRows,
+    dailyStreakRows,
+    sbWinRows,
+    parlayWinRows,
+  ] = await Promise.all([
     db.execute<{ c: number }>(sql`
       SELECT COUNT(*)::int AS c FROM bet
       WHERE user_id = ${userProfileId}::uuid
@@ -158,16 +170,43 @@ export async function checkAndUnlockAchievements(
         AND type = 'daily_bonus'
         AND created_at > NOW() - INTERVAL '8 days'
     `),
+    db.execute<SbAgg>(sql`
+      SELECT
+        COUNT(*) FILTER (WHERE status = 'won')::int AS won,
+        COUNT(*) FILTER (WHERE payout >= 5000)::int AS big,
+        COUNT(*) FILTER (WHERE status = 'won' AND decimal_odds >= 3.0)::int AS underdog
+      FROM fixed_odds_bet WHERE user_id = ${userProfileId}::uuid
+    `),
+    db.execute<SbAgg>(sql`
+      SELECT
+        COUNT(*) FILTER (WHERE status = 'won')::int AS won,
+        COUNT(*) FILTER (WHERE payout >= 5000)::int AS big,
+        COUNT(*) FILTER (WHERE status = 'won' AND combined_odds >= 3.0)::int AS underdog
+      FROM parlay WHERE user_id = ${userProfileId}::uuid
+    `),
   ]);
 
-  const winCount =
-    (winRows as unknown as Array<{ c: number }>)[0]?.c ?? 0;
+  const lmsrWins = (winRows as unknown as Array<{ c: number }>)[0]?.c ?? 0;
   const rankingCount =
     (rankingRows as unknown as Array<{ c: number }>)[0]?.c ?? 0;
-  const bigWinCount =
-    (bigWinRows as unknown as Array<{ c: number }>)[0]?.c ?? 0;
+  const lmsrBig = (bigWinRows as unknown as Array<{ c: number }>)[0]?.c ?? 0;
   const dailyStreakDays =
     (dailyStreakRows as unknown as Array<{ days: number }>)[0]?.days ?? 0;
+  const sb = (sbWinRows as unknown as SbAgg[])[0] ?? {
+    won: 0,
+    big: 0,
+    underdog: 0,
+  };
+  const pl = (parlayWinRows as unknown as SbAgg[])[0] ?? {
+    won: 0,
+    big: 0,
+    underdog: 0,
+  };
+
+  const winCount = lmsrWins + sb.won + pl.won;
+  const bigWinCount = lmsrBig + sb.big + pl.big;
+  const parlayWinCount = pl.won;
+  const underdogWinCount = sb.underdog + pl.underdog;
 
   const candidates: Array<{ slug: string; condition: boolean }> = [
     { slug: "first_bet", condition: profile.bet_count >= 1 },
@@ -186,6 +225,8 @@ export async function checkAndUnlockAchievements(
     { slug: "balance_50k", condition: profile.balance >= 50_000 },
     { slug: "balance_100k", condition: profile.balance >= 100_000 },
     { slug: "big_win", condition: bigWinCount >= 1 },
+    { slug: "parlay_win", condition: parlayWinCount >= 1 },
+    { slug: "underdog_win", condition: underdogWinCount >= 1 },
   ];
 
   const newly: string[] = [];

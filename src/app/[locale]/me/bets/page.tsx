@@ -7,6 +7,7 @@ import { Container } from "@/components/layout/container";
 import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
 import { Link } from "@/i18n/navigation";
+import { checkAndUnlockAchievements } from "@/lib/achievements";
 import { getCurrentUser } from "@/lib/auth";
 import { listMyBets } from "@/lib/markets";
 import {
@@ -45,10 +46,15 @@ export default async function MyBetsPage({
   const tSb = await getTranslations("sportsbook");
   const user = await getCurrentUser();
   if (!user) redirect("/signin?next=/me/bets");
+  // Settlement runs DB-side (trigger), which can't call the TS achievement
+  // evaluator — so re-evaluate here when the user views their bets, catching
+  // win-based achievements (bet_10_wins, big_win, parlay_win, …) shortly after
+  // a bout settles. Idempotent + cheap; newly-unlocked surface on /achievements.
   const [bets, sbBets, parlays] = await Promise.all([
     listMyBets(user.userProfileId),
     listMyFixedOddsBets(user.userProfileId),
     listMyParlays(user.userProfileId),
+    checkAndUnlockAchievements(user.userProfileId),
   ]);
 
   // Localised label for a sportsbook selection (mirrors SportsbookPanel).
