@@ -34,7 +34,8 @@ SLEEP_SECS = 0.4
 MIN_GAIN_CHARS = 200
 
 SELECT_CANDIDATES = """
-    SELECT id::text, url, title, COALESCE(length(body), 0) AS current_len
+    SELECT id::text, url, title, COALESCE(length(body), 0) AS current_len,
+           (image_url IS NULL) AS needs_image
     FROM news_item
     WHERE status IN ('approved', 'auto_approved', 'pending')
       AND (
@@ -49,6 +50,9 @@ SELECT_CANDIDATES = """
           )
           AND published_at > now() - interval '48 hours'
         )
+        -- RSS feeds carry no images, so fetch recent imageless items once to
+        -- pull their og:image (bounded by the 30-day window + LIMIT).
+        OR (image_url IS NULL AND published_at > now() - interval '30 days')
       )
     ORDER BY published_at DESC
     LIMIT %s
@@ -66,9 +70,20 @@ UPDATE_BODY = """
     WHERE id = %s::uuid
 """
 
+UPDATE_IMAGE = """
+    UPDATE news_item SET image_url = %s
+    WHERE id = %s::uuid AND image_url IS NULL
+"""
+
 
 def run() -> dict[str, int]:
-    totals = {"checked": 0, "updated": 0, "skipped_no_gain": 0, "failed": 0}
+    totals = {
+        "checked": 0,
+        "updated": 0,
+        "images_added": 0,
+        "skipped_no_gain": 0,
+        "failed": 0,
+    }
 
     with get_connection() as conn:
         with conn.cursor() as cur:
@@ -78,36 +93,43 @@ def run() -> dict[str, int]:
         if not items:
             return totals
 
-        for item_id, url, title, current_len in items:
+        for item_id, url, title, current_len, needs_image in items:
             totals["checked"] += 1
             try:
                 result = extract_article_full(url)
             except Exception as exc:
                 log.warning(f"  fetch failed for {url}: {exc!r}")
                 totals["failed"] += 1
+                time.sleep(SLEEP_SECS)
                 continue
 
             if not result:
                 log.info(f"  no body extracted from {url}")
                 totals["failed"] += 1
+                time.sleep(SLEEP_SECS)
                 continue
 
-            if len(result.body) < current_len + MIN_GAIN_CHARS:
-                totals["skipped_no_gain"] += 1
-                continue
-
-            with conn.cursor() as cur:
-                cur.execute(
-                    UPDATE_BODY,
-                    (result.body, json.dumps(result.refs), result.image_url, item_id),
+            if len(result.body) >= current_len + MIN_GAIN_CHARS:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        UPDATE_BODY,
+                        (result.body, json.dumps(result.refs), result.image_url, item_id),
+                    )
+                conn.commit()
+                totals["updated"] += 1
+                log.info(
+                    f"  updated [{title[:60]}]: "
+                    f"{current_len} → {len(result.body)} chars, "
+                    f"{len(result.refs)} refs"
                 )
-            conn.commit()
-            totals["updated"] += 1
-            log.info(
-                f"  updated [{title[:60]}]: "
-                f"{current_len} → {len(result.body)} chars, "
-                f"{len(result.refs)} refs"
-            )
+            elif needs_image and result.image_url:
+                # Body didn't gain, but we found an image and the item lacked one.
+                with conn.cursor() as cur:
+                    cur.execute(UPDATE_IMAGE, (result.image_url, item_id))
+                conn.commit()
+                totals["images_added"] += 1
+            else:
+                totals["skipped_no_gain"] += 1
 
             time.sleep(SLEEP_SECS)
 
@@ -115,6 +137,7 @@ def run() -> dict[str, int]:
         "article extract done: "
         f"checked={totals['checked']} "
         f"updated={totals['updated']} "
+        f"images_added={totals['images_added']} "
         f"skipped_no_gain={totals['skipped_no_gain']} "
         f"failed={totals['failed']}"
     )
