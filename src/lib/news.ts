@@ -349,6 +349,7 @@ export type NewsItemDetail = {
   classification: string;
   source_name: string;
   source_url: string | null;
+  image_url: string | null;
   fighters: NewsFighter[];
   external_refs: NewsExternalRef[];
 };
@@ -364,6 +365,7 @@ type DetailRow = {
   related_fighter_ids: string[] | null;
   source_name: string;
   source_url: string | null;
+  image_url: string | null;
   external_refs: NewsExternalRef[] | null;
 };
 
@@ -391,6 +393,7 @@ export async function getNewsItemById(
         ni.related_fighter_ids,
         ns.name AS source_name,
         ns.url AS source_url,
+        ni.image_url,
         ni.external_refs
       FROM news_item ni
       JOIN news_source ns ON ns.id = ni.source_id
@@ -410,7 +413,8 @@ export async function getNewsItemById(
         ni.classification::text AS classification,
         ni.related_fighter_ids,
         ns.name AS source_name,
-        ns.url AS source_url
+        ns.url AS source_url,
+        ni.image_url
       FROM news_item ni
       JOIN news_source ns ON ns.id = ni.source_id
       WHERE ni.id = ${id}::uuid
@@ -438,6 +442,7 @@ export async function getNewsItemById(
     classification: r.classification ?? "general_news",
     source_name: r.source_name,
     source_url: r.source_url,
+    image_url: r.image_url ?? null,
     fighters,
     external_refs: Array.isArray(r.external_refs) ? r.external_refs : [],
   };

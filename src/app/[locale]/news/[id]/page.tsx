@@ -61,6 +61,12 @@ export async function generateMetadata({ params }: PageProps) {
   return {
     title: item.title,
     description: t("metaDescriptionArticle", { source: item.source_name }),
+    ...(item.image_url
+      ? {
+          openGraph: { images: [item.image_url] },
+          twitter: { card: "summary_large_image", images: [item.image_url] },
+        }
+      : {}),
   };
 }
 
@@ -162,6 +168,18 @@ export default async function NewsArticlePage({ params }: PageProps) {
                   {item.title}
                 </h1>
               </header>
+
+              {item.image_url ? (
+                <figure className="mt-6 overflow-hidden rounded-md border border-foreground/10 bg-background-elevated/30">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={item.image_url}
+                    alt=""
+                    loading="lazy"
+                    className="max-h-[440px] w-full object-cover"
+                  />
+                </figure>
+              ) : null}
 
               {paragraphs.length > 0 ? (
                 <div className="mt-6 flex flex-col gap-5 font-sans text-base leading-relaxed text-foreground">
