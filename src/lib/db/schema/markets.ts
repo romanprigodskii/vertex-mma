@@ -9,8 +9,14 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
-import { marketStatusEnum, marketTypeEnum } from "./enums";
+import {
+  fixedOddsBetStatusEnum,
+  fixedOddsMarketEnum,
+  marketStatusEnum,
+  marketTypeEnum,
+} from "./enums";
 import { bout } from "./events";
+import { fighter } from "./fighters";
 import { userProfile } from "./users";
 
 export const market = pgTable(
@@ -104,7 +110,61 @@ export const bet = pgTable(
   ],
 );
 
+// Vertex Sportsbook — fixed-odds bet. Unlike the LMSR `bet` (shares at a
+// moving price), this stakes coins at a FIXED decimal odds locked from our
+// model at placement time; payout = floor(stake × decimal_odds) on a win.
+// Settlement (src/lib/sportsbook-data.ts) grades selection_code against the
+// resolved bout. selected_fighter_id is denormalised for winner/method bets
+// so grading needs no extra join.
+export const fixedOddsBet = pgTable(
+  "fixed_odds_bet",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => userProfile.id, { onDelete: "cascade" }),
+    boutId: uuid("bout_id")
+      .notNull()
+      .references(() => bout.id, { onDelete: "cascade" }),
+
+    marketKind: fixedOddsMarketEnum("market_kind").notNull(),
+    /** Selection code from src/lib/sportsbook.ts (win_a, a_ko, o2_5, …). */
+    selectionCode: text("selection_code").notNull(),
+    /** Fighter the selection is about (winner/method); null for totals/distance. */
+    selectedFighterId: uuid("selected_fighter_id").references(() => fighter.id, {
+      onDelete: "set null",
+    }),
+
+    stakeCoins: integer("stake_coins").notNull(),
+    /** Decimal odds locked at placement — payout basis, never recomputed. */
+    decimalOdds: real("decimal_odds").notNull(),
+    /** floor(stake × decimal_odds) — credited on a win. */
+    potentialPayout: integer("potential_payout").notNull(),
+
+    /** Model version + fair prob the odds were derived from (transparency). */
+    modelVersion: text("model_version").notNull(),
+    modelProb: real("model_prob").notNull(),
+
+    status: fixedOddsBetStatusEnum("status").default("open").notNull(),
+    /** Coins actually credited on settlement: payout on win, stake on void,
+     *  0 on loss. Null while open. */
+    payout: integer("payout"),
+    settledAt: timestamp("settled_at", { withTimezone: true }),
+
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("fixed_odds_bet_user_idx").on(table.userId),
+    index("fixed_odds_bet_bout_idx").on(table.boutId),
+    index("fixed_odds_bet_status_idx").on(table.status),
+  ],
+);
+
 export type Market = typeof market.$inferSelect;
 export type NewMarket = typeof market.$inferInsert;
 export type MarketOutcome = typeof marketOutcome.$inferSelect;
 export type NewMarketOutcome = typeof marketOutcome.$inferInsert;
+export type FixedOddsBet = typeof fixedOddsBet.$inferSelect;
+export type NewFixedOddsBet = typeof fixedOddsBet.$inferInsert;

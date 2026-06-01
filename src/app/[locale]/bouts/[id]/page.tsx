@@ -17,12 +17,16 @@ import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
 import { ShareButton } from "@/components/share/share-button";
 import { Link } from "@/i18n/navigation";
+import { SportsbookPanel } from "@/components/markets/sportsbook-panel";
+import { getCurrentUser } from "@/lib/auth";
 import {
   computeFighterPositionMap,
   computeFighterStrikeMap,
   getBoutById,
 } from "@/lib/bout-detail";
 import { getBoutSimulation } from "@/lib/bout-simulation";
+import { getBoutExternalOdds } from "@/lib/markets";
+import { computeSportsbookOutcomes, isBoutBettable } from "@/lib/sportsbook";
 export const dynamic = "force-dynamic";
 
 interface PageProps {
@@ -98,6 +102,32 @@ export default async function BoutDetailPage({ params }: PageProps) {
   const isUpcoming = bout.status !== "completed";
   const simulation = await getBoutSimulation(bout.id);
 
+  // Vertex Sportsbook — fixed-odds betting at our model's odds, open while
+  // the bout is scheduled and the event hasn't started.
+  const bettable = isBoutBettable(bout.status, bout.event.date);
+  const [betUser, externalOdds] = await Promise.all([
+    bettable ? getCurrentUser() : Promise.resolve(null),
+    bettable ? getBoutExternalOdds(bout.id) : Promise.resolve(null),
+  ]);
+  const sportsbookOutcomes =
+    bettable && simulation
+      ? computeSportsbookOutcomes({
+          probA: simulation.probA,
+          probB: simulation.probB,
+          rounds: simulation.rounds
+            ? {
+                probKoA: simulation.rounds.probKoA,
+                probKoB: simulation.rounds.probKoB,
+                probSubA: simulation.rounds.probSubA,
+                probSubB: simulation.rounds.probSubB,
+                probDecisionA: simulation.rounds.probDecisionA,
+                probDecisionB: simulation.rounds.probDecisionB,
+                finishByRound: simulation.rounds.finishByRound,
+              }
+            : null,
+        })
+      : [];
+
   return (
     <>
       <Navbar />
@@ -129,6 +159,27 @@ export default async function BoutDetailPage({ params }: PageProps) {
         {simulation && isUpcoming ? (
           <Container size="xl" className="pt-4">
             <BoutSimulationPanel bout={bout} sim={simulation} />
+          </Container>
+        ) : null}
+
+        {bettable && sportsbookOutcomes.length > 0 ? (
+          <Container size="xl" className="pt-4">
+            <SportsbookPanel
+              boutId={bout.id}
+              fighterAName={bout.fighter_a.name_en}
+              fighterBName={bout.fighter_b.name_en}
+              outcomes={sportsbookOutcomes}
+              userBalance={betUser ? betUser.balanceCoins : null}
+              signInHref={`/signin?next=/bouts/${bout.id}`}
+              consensus={
+                externalOdds
+                  ? {
+                      aDecimal: externalOdds.winner_a_decimal,
+                      bDecimal: externalOdds.winner_b_decimal,
+                    }
+                  : null
+              }
+            />
           </Container>
         ) : null}
 

@@ -110,6 +110,22 @@ export const marketStatusEnum = pgEnum("market_status", [
   "cancelled",
 ]);
 
+// Vertex Sportsbook (fixed-odds betting at model-derived odds). A bet
+// targets one market kind + one selection code (see src/lib/sportsbook.ts).
+export const fixedOddsMarketEnum = pgEnum("fixed_odds_market", [
+  "winner",
+  "method",
+  "total_rounds",
+  "distance",
+]);
+
+export const fixedOddsBetStatusEnum = pgEnum("fixed_odds_bet_status", [
+  "open",
+  "won",
+  "lost",
+  "void",
+]);
+
 export const newsClassificationEnum = pgEnum("news_classification", [
   "bout_announced",
   "bout_cancelled",

@@ -59,6 +59,7 @@ export default async function MarketDetailPage({ params }: PageProps) {
   const { id, locale } = await params;
   setRequestLocale(locale);
   const t = await getTranslations("markets");
+  const tSb = await getTranslations("sportsbook");
   const dateLocale = locale === "ru" ? "ru-RU" : "en-US";
   const market = await getMarketById(id);
   if (!market) notFound();
@@ -148,6 +149,16 @@ export default async function MarketDetailPage({ params }: PageProps) {
             <p className="mt-6 rounded-md border border-foreground/15 bg-foreground/[0.03] px-4 py-3 text-center font-sans text-xs text-foreground-muted">
               {t("openingLineBanner")}
             </p>
+          ) : null}
+
+          {!closed ? (
+            <Link
+              href={`/bouts/${market.bout_id}`}
+              prefetch={false}
+              className="mt-6 block rounded-md border border-primary/30 bg-primary/[0.06] px-4 py-3 text-center font-sans text-xs font-medium text-primary transition-colors hover:bg-primary/[0.12]"
+            >
+              {tSb("fromMarketCta")}
+            </Link>
           ) : null}
 
           {market.type === "method" ? (

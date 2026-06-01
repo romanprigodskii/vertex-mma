@@ -4,9 +4,18 @@ import { eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 import { checkAndUnlockAchievements } from "@/lib/achievements";
+import { getBoutSimulation } from "@/lib/bout-simulation";
 import { db } from "@/lib/db";
 import { userProfile } from "@/lib/db/schema/users";
 import { lmsrBuyCost, lmsrPrices, lmsrSharesForCoins } from "@/lib/lmsr";
+import {
+  type SportsbookSelectionCode,
+  computeSportsbookOutcomes,
+  isBoutBettable,
+  isSelectionCode,
+  potentialPayout,
+  selectionSide,
+} from "@/lib/sportsbook";
 import { createClient } from "@/lib/supabase/server";
 
 const MIN_COINS_PER_BET = 1;
@@ -260,4 +269,158 @@ export async function previewBetCost(
   newSharesArr[idx] += shares;
   const newPrice = lmsrPrices(newSharesArr, b)[idx];
   return { shares, cost, newPrice };
+}
+
+/* -------------------------------------------------------------------------- */
+/*                  Vertex Sportsbook — fixed-odds bet placement              */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Place a FIXED-ODDS bet on a bout outcome at our model-derived "Vertex
+ * odds". Unlike the LMSR market, odds don't move with volume: the decimal
+ * odds are recomputed from the latest simulation server-side (never trust
+ * the client) and LOCKED onto the bet row. Payout = floor(stake × odds),
+ * paid at settlement (src/lib/sportsbook-data.ts).
+ */
+export async function placeFixedOddsBetAction(
+  boutId: string,
+  selectionCode: string,
+  stake: number,
+): Promise<{
+  error?: string;
+  decimalOdds?: number;
+  potentialPayout?: number;
+  newlyUnlocked?: string[];
+}> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Not signed in." };
+
+  if (!isSelectionCode(selectionCode)) return { error: "Unknown selection." };
+  const code = selectionCode as SportsbookSelectionCode;
+
+  if (
+    !Number.isFinite(stake) ||
+    stake < MIN_COINS_PER_BET ||
+    stake > MAX_COINS_PER_BET
+  ) {
+    return {
+      error: `Stake must be between ${MIN_COINS_PER_BET} and ${MAX_COINS_PER_BET} coins.`,
+    };
+  }
+  const stakeInt = Math.floor(stake);
+
+  const profileRows = await db
+    .select({ id: userProfile.id, balance: userProfile.balanceCoins })
+    .from(userProfile)
+    .where(eq(userProfile.authUserId, user.id))
+    .limit(1);
+  const profile = profileRows[0];
+  if (!profile) return { error: "Profile not found." };
+  if (profile.balance < stakeInt) return { error: "Not enough coins." };
+
+  // Bout context + bettability gate (status scheduled + event in the future).
+  const boutRows = (await db.execute<{
+    status: string;
+    fighter_a_id: string;
+    fighter_b_id: string;
+    event_date: string;
+  }>(sql`
+    SELECT b.status::text AS status,
+           b.fighter_a_id::text AS fighter_a_id,
+           b.fighter_b_id::text AS fighter_b_id,
+           e.date::text AS event_date
+    FROM bout b JOIN event e ON e.id = b.event_id
+    WHERE b.id = ${boutId}::uuid
+    LIMIT 1
+  `)) as unknown as Array<{
+    status: string;
+    fighter_a_id: string;
+    fighter_b_id: string;
+    event_date: string;
+  }>;
+  const boutRow = boutRows[0];
+  if (!boutRow) return { error: "Bout not found." };
+  if (!isBoutBettable(boutRow.status, boutRow.event_date)) {
+    return { error: "Betting is closed for this bout." };
+  }
+
+  // Recompute the odds from the latest model — the authoritative price.
+  const sim = await getBoutSimulation(boutId);
+  if (!sim) return { error: "No model odds available for this bout yet." };
+  const outcomes = computeSportsbookOutcomes({
+    probA: sim.probA,
+    probB: sim.probB,
+    rounds: sim.rounds
+      ? {
+          probKoA: sim.rounds.probKoA,
+          probKoB: sim.rounds.probKoB,
+          probSubA: sim.rounds.probSubA,
+          probSubB: sim.rounds.probSubB,
+          probDecisionA: sim.rounds.probDecisionA,
+          probDecisionB: sim.rounds.probDecisionB,
+          finishByRound: sim.rounds.finishByRound,
+        }
+      : null,
+  });
+  const offered = outcomes.find((o) => o.code === code);
+  if (!offered) return { error: "That market isn't offered for this bout." };
+
+  const decimalOdds = offered.decimalOdds;
+  const payout = potentialPayout(stakeInt, decimalOdds);
+  const side = selectionSide(code);
+  const selectedFighterId =
+    side === "a"
+      ? boutRow.fighter_a_id
+      : side === "b"
+        ? boutRow.fighter_b_id
+        : null;
+
+  try {
+    await db.transaction(async (tx) => {
+      // Authoritative balance under lock (mirrors placeBetAction — guards the
+      // lost-update race for the same user betting concurrently).
+      const balanceRows = (await tx.execute<{ balance_coins: number }>(sql`
+        SELECT balance_coins FROM user_profile WHERE id = ${profile.id}::uuid FOR UPDATE
+      `)) as unknown as Array<{ balance_coins: number }>;
+      const locked = balanceRows[0]?.balance_coins;
+      if (typeof locked !== "number") throw new Error("Profile not found.");
+      if (stakeInt > locked) throw new Error("Not enough coins.");
+
+      await tx.execute(sql`
+        INSERT INTO fixed_odds_bet
+          (user_id, bout_id, market_kind, selection_code, selected_fighter_id,
+           stake_coins, decimal_odds, potential_payout, model_version, model_prob)
+        VALUES (
+          ${profile.id}::uuid, ${boutId}::uuid, ${offered.marketKind}, ${code},
+          ${selectedFighterId ? sql`${selectedFighterId}::uuid` : sql`NULL`},
+          ${stakeInt}, ${decimalOdds}, ${payout}, ${sim.modelVersion}, ${offered.prob}
+        )
+      `);
+
+      const newBalance = locked - stakeInt;
+      await tx.execute(sql`
+        UPDATE user_profile
+        SET balance_coins = balance_coins - ${stakeInt},
+            total_coins_lost = total_coins_lost + ${stakeInt},
+            bet_count = bet_count + 1
+        WHERE id = ${profile.id}::uuid
+      `);
+
+      await tx.execute(sql`
+        INSERT INTO transaction (user_id, type, amount, balance_after, description)
+        VALUES (${profile.id}::uuid, 'bet_placed', ${-stakeInt}, ${newBalance},
+                ${`Sportsbook bet on bout ${boutId}`})
+      `);
+    });
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Bet failed." };
+  }
+
+  const newlyUnlocked = await checkAndUnlockAchievements(profile.id);
+  revalidatePath(`/bouts/${boutId}`);
+  revalidatePath("/me/bets");
+  return { decimalOdds, potentialPayout: payout, newlyUnlocked };
 }
