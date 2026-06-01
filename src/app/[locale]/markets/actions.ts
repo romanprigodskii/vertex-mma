@@ -10,7 +10,10 @@ import { lmsrBuyCost, lmsrPrices, lmsrSharesForCoins } from "@/lib/lmsr";
 import { createClient } from "@/lib/supabase/server";
 
 const MIN_COINS_PER_BET = 1;
-const MAX_COINS_PER_BET = 100_000_000;
+// 1M is already 100× the 10k signup grant — generous, but far below the point
+// where cumulative total_volume / lifetime tallies (int4) could overflow. The
+// CHECK(balance_coins >= 0) constraint + FOR UPDATE lock cap the rest.
+const MAX_COINS_PER_BET = 1_000_000;
 
 export async function placeBetAction(
   marketId: string,
