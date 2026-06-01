@@ -68,7 +68,7 @@ export function NewsRow({ item }: { item: NewsFeedItem }) {
           // Many outlets (e.g. Sherdog) 403 hotlinked images when a Referer is
           // sent but serve them fine with none — so suppress the referrer.
           referrerPolicy="no-referrer"
-          className="h-16 w-24 shrink-0 rounded-sm border border-foreground/10 object-cover sm:h-20 sm:w-32"
+          className="h-16 w-24 shrink-0 self-center rounded-sm border border-foreground/10 object-cover sm:h-20 sm:w-32"
         />
       ) : null}
     </div>

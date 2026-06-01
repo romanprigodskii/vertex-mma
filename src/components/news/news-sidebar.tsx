@@ -161,7 +161,7 @@ function LatestNewsWidget({
                   alt=""
                   loading="lazy"
                   referrerPolicy="no-referrer"
-                  className="h-12 w-16 rounded-sm border border-foreground/10 object-cover"
+                  className="h-12 w-16 self-center rounded-sm border border-foreground/10 object-cover"
                 />
               </Link>
             ) : null}
