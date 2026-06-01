@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 
 import { placeFixedOddsBetAction } from "@/app/[locale]/markets/actions";
+import { useBetSlip } from "@/components/markets/bet-slip-context";
 import { Link } from "@/i18n/navigation";
 import {
   type SportsbookMarketKind,
@@ -46,6 +47,8 @@ export function SportsbookPanel({
 }: Props) {
   const t = useTranslations("sportsbook");
   const router = useRouter();
+  const { toggleLeg, codeForBout } = useBetSlip();
+  const slipCode = codeForBout(boutId);
   const [selected, setSelected] = React.useState<SportsbookOutcome | null>(null);
   const [stake, setStake] = React.useState("100");
   const [pending, setPending] = React.useState(false);
@@ -217,6 +220,38 @@ export function SportsbookPanel({
           );
         })}
       </div>
+
+      {/* Add to parlay slip — available whether or not signed in (the slip is
+          client-side; placement auth is enforced server-side). */}
+      {selected ? (
+        <div className="mt-4 flex items-center justify-between gap-3 rounded-md border border-dashed border-foreground/15 bg-foreground/[0.02] px-3 py-2">
+          <span className="min-w-0 truncate font-sans text-[11px] text-foreground-muted">
+            {slipCode === selected.code
+              ? t("inSlip", { pick: fullLabel(selected) })
+              : t("addToSlipHint", { pick: fullLabel(selected) })}
+          </span>
+          <button
+            type="button"
+            onClick={() =>
+              toggleLeg({
+                boutId,
+                code: selected.code,
+                odds: selected.decimalOdds,
+                boutLabel: `${fighterAName} vs ${fighterBName}`,
+                pickLabel: fullLabel(selected),
+              })
+            }
+            className={cn(
+              "shrink-0 rounded-sm border px-3 py-1.5 font-sans text-[11px] uppercase tracking-widest transition-colors",
+              slipCode === selected.code
+                ? "border-primary/40 bg-primary/10 text-primary"
+                : "border-foreground/20 text-foreground-muted hover:border-foreground/40 hover:text-foreground",
+            )}
+          >
+            {slipCode === selected.code ? t("inSlipRemove") : t("addToSlip")}
+          </button>
+        </div>
+      ) : null}
 
       {/* Bet slip */}
       <div className="mt-6 border-t border-foreground/10 pt-5">

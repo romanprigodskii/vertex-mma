@@ -9,8 +9,17 @@ import { Navbar } from "@/components/layout/navbar";
 import { Link } from "@/i18n/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { listMyBets } from "@/lib/markets";
-import { describeSelection, formatOdds, isSelectionCode } from "@/lib/sportsbook";
-import { listMyFixedOddsBets, type MyFixedOddsBetRow } from "@/lib/sportsbook-data";
+import {
+  type SportsbookSelectionCode,
+  describeSelection,
+  formatOdds,
+  isSelectionCode,
+} from "@/lib/sportsbook";
+import {
+  listMyFixedOddsBets,
+  listMyParlays,
+  type MyFixedOddsBetRow,
+} from "@/lib/sportsbook-data";
 
 export const dynamic = "force-dynamic";
 
@@ -36,16 +45,17 @@ export default async function MyBetsPage({
   const tSb = await getTranslations("sportsbook");
   const user = await getCurrentUser();
   if (!user) redirect("/signin?next=/me/bets");
-  const [bets, sbBets] = await Promise.all([
+  const [bets, sbBets, parlays] = await Promise.all([
     listMyBets(user.userProfileId),
     listMyFixedOddsBets(user.userProfileId),
+    listMyParlays(user.userProfileId),
   ]);
 
   // Localised label for a sportsbook selection (mirrors SportsbookPanel).
-  function sbLabel(b: MyFixedOddsBetRow): string {
-    if (!isSelectionCode(b.selection_code)) return b.selection_code;
-    const d = describeSelection(b.selection_code);
-    const name = d.side === "a" ? b.fighter_a_name : b.fighter_b_name;
+  function selectionLabel(code: string, aName: string, bName: string): string {
+    if (!isSelectionCode(code)) return code;
+    const d = describeSelection(code as SportsbookSelectionCode);
+    const name = d.side === "a" ? aName : bName;
     switch (d.marketKind) {
       case "winner":
         return name;
@@ -60,6 +70,15 @@ export default async function MyBetsPage({
           d.distanceKey === "yes" ? tSb("distanceYes") : tSb("distanceNo")
         }`;
     }
+  }
+  const sbLabel = (b: MyFixedOddsBetRow): string =>
+    selectionLabel(b.selection_code, b.fighter_a_name, b.fighter_b_name);
+
+  function statusClass(status: string): string {
+    if (status === "won") return "text-streak-win";
+    if (status === "lost") return "text-streak-loss";
+    if (status === "void") return "text-foreground-muted";
+    return "text-foreground-subtle";
   }
 
   return (
@@ -88,7 +107,7 @@ export default async function MyBetsPage({
             </span>
           </p>
 
-          {bets.length === 0 && sbBets.length === 0 ? (
+          {bets.length === 0 && sbBets.length === 0 && parlays.length === 0 ? (
             <div className="mt-10 rounded-md border border-dashed border-foreground/15 bg-background-elevated/20 px-6 py-16 text-center">
               <p className="font-display text-xl uppercase tracking-tight text-foreground break-words sm:text-2xl">
                 {t("noBets")}
@@ -157,6 +176,83 @@ export default async function MyBetsPage({
                             )}
                           </div>
                         </div>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ) : null}
+              {parlays.length > 0 ? (
+                <section>
+                  <h2 className="mb-3 font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-subtle">
+                    {t("parlaySection")}
+                  </h2>
+                  <ul className="flex flex-col gap-2">
+                    {parlays.map((p) => (
+                      <li
+                        key={p.parlay_id}
+                        className="rounded-md border border-foreground/10 bg-background-elevated/30 p-3"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="font-sans text-sm text-foreground">
+                            {t("parlayHeader", {
+                              n: p.num_legs,
+                              odds: formatOdds(p.combined_odds),
+                            })}
+                          </p>
+                          <div className="shrink-0 text-right">
+                            {p.status === "won" ? (
+                              <p className="font-mono text-xs tabular text-streak-win">
+                                {t("wonSuffix", {
+                                  coins: (p.payout ?? 0).toLocaleString(),
+                                })}
+                              </p>
+                            ) : p.status === "void" ? (
+                              <p className="font-mono text-xs tabular text-foreground-muted">
+                                {t("refundedSuffix", {
+                                  coins: (p.payout ?? 0).toLocaleString(),
+                                })}
+                              </p>
+                            ) : p.status === "lost" ? (
+                              <p className="font-mono text-xs tabular text-streak-loss">
+                                {t("lost")}
+                              </p>
+                            ) : (
+                              <p className="font-mono text-xs tabular text-foreground-subtle">
+                                {t("pending")} → {p.potential_payout.toLocaleString()}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <ul className="mt-2 space-y-1 border-t border-foreground/[0.06] pt-2">
+                          {p.legs.map((leg, i) => (
+                            <li
+                              key={`${p.parlay_id}-${i}`}
+                              className="flex items-center justify-between gap-2 font-mono text-[11px] tabular"
+                            >
+                              <span className="min-w-0 truncate text-foreground-muted">
+                                <span className={statusClass(leg.status)}>●</span>{" "}
+                                {selectionLabel(
+                                  leg.selection_code,
+                                  leg.fighter_a_name,
+                                  leg.fighter_b_name,
+                                )}
+                                <span className="text-foreground-subtle/60">
+                                  {" · "}
+                                  {leg.fighter_a_name} vs {leg.fighter_b_name}
+                                </span>
+                              </span>
+                              <span className="shrink-0 text-foreground-subtle">
+                                {formatOdds(leg.decimal_odds)}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                        <p className="mt-2 font-mono text-[10px] tabular text-foreground-subtle">
+                          {t("sbStaked", {
+                            coins: p.stake_coins.toLocaleString(),
+                            odds: formatOdds(p.combined_odds),
+                          })}
+                        </p>
                       </li>
                     ))}
                   </ul>

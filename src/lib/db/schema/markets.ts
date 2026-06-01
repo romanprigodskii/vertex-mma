@@ -6,6 +6,7 @@ import {
   real,
   text,
   timestamp,
+  unique,
   uuid,
 } from "drizzle-orm/pg-core";
 
@@ -162,9 +163,86 @@ export const fixedOddsBet = pgTable(
   ],
 );
 
+// Vertex Sportsbook — PARLAY (accumulator). One stake across N legs; combined
+// odds = product of leg odds; wins only if every leg wins. A VOID leg (push:
+// draw/NC/cancel) drops out and the combined odds recompute over the surviving
+// legs. Settles when the LAST leg's bout resolves (or early-lost the moment any
+// leg loses). Legs reuse the same selection codes + grading as single bets.
+export const parlay = pgTable(
+  "parlay",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => userProfile.id, { onDelete: "cascade" }),
+
+    stakeCoins: integer("stake_coins").notNull(),
+    /** Product of the leg odds at placement (display + max payout basis). */
+    combinedOdds: real("combined_odds").notNull(),
+    /** floor(stake × combinedOdds) — the all-legs-win payout. Recomputed
+     *  lower at settlement if any leg voids out. */
+    potentialPayout: integer("potential_payout").notNull(),
+    numLegs: integer("num_legs").notNull(),
+
+    status: fixedOddsBetStatusEnum("status").default("open").notNull(),
+    /** Coins credited on settlement (won: stake×Πsurviving odds; void: stake;
+     *  lost: 0). Null while open. */
+    payout: integer("payout"),
+    settledAt: timestamp("settled_at", { withTimezone: true }),
+
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("parlay_user_idx").on(table.userId),
+    index("parlay_status_idx").on(table.status),
+  ],
+);
+
+export const parlayLeg = pgTable(
+  "parlay_leg",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    parlayId: uuid("parlay_id")
+      .notNull()
+      .references(() => parlay.id, { onDelete: "cascade" }),
+    boutId: uuid("bout_id")
+      .notNull()
+      .references(() => bout.id, { onDelete: "cascade" }),
+
+    marketKind: fixedOddsMarketEnum("market_kind").notNull(),
+    selectionCode: text("selection_code").notNull(),
+    selectedFighterId: uuid("selected_fighter_id").references(() => fighter.id, {
+      onDelete: "set null",
+    }),
+    /** Leg odds locked at placement. */
+    decimalOdds: real("decimal_odds").notNull(),
+    modelProb: real("model_prob").notNull(),
+
+    status: fixedOddsBetStatusEnum("status").default("open").notNull(),
+    settledAt: timestamp("settled_at", { withTimezone: true }),
+
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("parlay_leg_parlay_idx").on(table.parlayId),
+    index("parlay_leg_bout_idx").on(table.boutId),
+    index("parlay_leg_status_idx").on(table.status),
+    // One leg per bout per parlay — no correlated same-bout legs.
+    unique("parlay_leg_unique_bout").on(table.parlayId, table.boutId),
+  ],
+);
+
 export type Market = typeof market.$inferSelect;
 export type NewMarket = typeof market.$inferInsert;
 export type MarketOutcome = typeof marketOutcome.$inferSelect;
 export type NewMarketOutcome = typeof marketOutcome.$inferInsert;
 export type FixedOddsBet = typeof fixedOddsBet.$inferSelect;
 export type NewFixedOddsBet = typeof fixedOddsBet.$inferInsert;
+export type Parlay = typeof parlay.$inferSelect;
+export type NewParlay = typeof parlay.$inferInsert;
+export type ParlayLeg = typeof parlayLeg.$inferSelect;
+export type NewParlayLeg = typeof parlayLeg.$inferInsert;

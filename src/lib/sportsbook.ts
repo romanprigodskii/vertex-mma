@@ -438,6 +438,56 @@ export function potentialPayout(stakeCoins: number, decimalOdds: number): number
   return Math.floor(stakeCoins * decimalOdds);
 }
 
+// =====================================================================
+// Parlays (accumulators)
+// =====================================================================
+
+export const MIN_PARLAY_LEGS = 2;
+export const MAX_PARLAY_LEGS = 12;
+/** Cap on combined odds so stake×odds can't overflow int4 (1M stake ×
+ *  1000 = 1e9 < 2.1e9) and one lottery ticket can't drain the economy. */
+export const MAX_PARLAY_ODDS = 1000;
+
+/** Combined parlay odds = product of leg odds, rounded to 2dp and capped. */
+export function combineParlayOdds(legOdds: number[]): number {
+  if (legOdds.length === 0) return 1;
+  const product = legOdds.reduce((acc, o) => acc * o, 1);
+  if (!Number.isFinite(product)) return MAX_PARLAY_ODDS;
+  return Math.min(MAX_PARLAY_ODDS, Math.round(product * 100) / 100);
+}
+
+export interface ParlayLegResult {
+  status: SettleStatus;
+  /** The leg's locked decimal odds (only used when it won). */
+  odds: number;
+}
+
+export interface ParlayResolution {
+  status: SettleStatus;
+  payout: number;
+}
+
+/**
+ * Resolve a parlay from its (fully-graded) legs:
+ *   • any leg lost            → parlay lost, payout 0
+ *   • all legs void (push)    → parlay void, refund the stake
+ *   • else (≥1 won, rest void) → won; payout = floor(stake × Π won-leg odds)
+ *     — void legs drop out and the combined odds recompute over survivors,
+ *     standard sportsbook behaviour.
+ *
+ * Caller MUST ensure every leg is resolved (no 'open') before calling.
+ */
+export function resolveParlay(
+  legs: ParlayLegResult[],
+  stake: number,
+): ParlayResolution {
+  if (legs.some((l) => l.status === "lost")) return { status: "lost", payout: 0 };
+  const won = legs.filter((l) => l.status === "won");
+  if (won.length === 0) return { status: "void", payout: stake };
+  const combined = combineParlayOdds(won.map((l) => l.odds));
+  return { status: "won", payout: Math.floor(stake * combined) };
+}
+
 export interface SelectionDescriptor {
   marketKind: SportsbookMarketKind;
   /** Fighter the pick is about (winner/method); null otherwise. */

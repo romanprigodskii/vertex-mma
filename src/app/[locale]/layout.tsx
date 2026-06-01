@@ -8,6 +8,8 @@ import "../globals.css";
 
 import { ScrollToTopOnNav } from "@/components/layout/scroll-to-top-on-nav";
 import { ThemeProvider } from "@/components/layout/theme-provider";
+import { BetSlipProvider } from "@/components/markets/bet-slip-context";
+import { BetSlipWidget } from "@/components/markets/bet-slip-widget";
 import { FighterSearchPalette } from "@/components/search/fighter-search-palette";
 import { routing } from "@/i18n/routing";
 
@@ -95,7 +97,10 @@ export default async function RootLayout({
           <ThemeProvider>
             <ScrollToTopOnNav />
             <FighterSearchPalette />
-            {children}
+            <BetSlipProvider>
+              {children}
+              <BetSlipWidget />
+            </BetSlipProvider>
           </ThemeProvider>
         </NextIntlClientProvider>
       </body>

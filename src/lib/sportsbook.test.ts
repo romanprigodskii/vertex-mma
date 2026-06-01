@@ -17,9 +17,11 @@ import {
   MAX_MARKET_EDGE,
   MAX_ODDS,
   MIN_ODDS,
+  MAX_PARLAY_ODDS,
   type BoutResult,
   type SportsbookSimInput,
   applyEdgeGuard,
+  combineParlayOdds,
   computeSportsbookOutcomes,
   isBoutBettable,
   marketProbFromOdds,
@@ -27,6 +29,7 @@ import {
   oddsForMarket,
   potentialPayout,
   reconcileMethodProbs,
+  resolveParlay,
   settleSelection,
 } from "./sportsbook";
 
@@ -364,6 +367,79 @@ describe("computeSportsbookOutcomes — edge-guard wiring", () => {
     const aSum = aMethods.reduce((s, o) => s + o.prob, 0);
     // A's three method cells should sum to the GUARDED prob (0.39), not 0.28
     assert.ok(Math.abs(aSum - 0.39) < 0.02, `aSum=${aSum}`);
+  });
+});
+
+describe("combineParlayOdds", () => {
+  it("multiplies leg odds, rounded to 2dp", () => {
+    assert.equal(combineParlayOdds([1.85, 2.0]), 3.7);
+    assert.equal(combineParlayOdds([1.5, 1.5, 1.5]), 3.38); // 3.375 → 3.38
+  });
+  it("empty → 1", () => {
+    assert.equal(combineParlayOdds([]), 1);
+  });
+  it("caps at MAX_PARLAY_ODDS", () => {
+    assert.equal(combineParlayOdds(Array(10).fill(5)), MAX_PARLAY_ODDS);
+  });
+});
+
+describe("resolveParlay", () => {
+  it("all legs win → stake × product", () => {
+    const r = resolveParlay(
+      [
+        { status: "won", odds: 1.85 },
+        { status: "won", odds: 2.0 },
+      ],
+      100,
+    );
+    assert.equal(r.status, "won");
+    assert.equal(r.payout, 370); // 100 × 3.70
+  });
+  it("any leg lost → parlay lost, payout 0", () => {
+    const r = resolveParlay(
+      [
+        { status: "won", odds: 1.85 },
+        { status: "lost", odds: 2.0 },
+        { status: "won", odds: 1.5 },
+      ],
+      100,
+    );
+    assert.equal(r.status, "lost");
+    assert.equal(r.payout, 0);
+  });
+  it("a void leg drops out and combined odds recompute over survivors", () => {
+    const r = resolveParlay(
+      [
+        { status: "won", odds: 1.85 },
+        { status: "void", odds: 2.0 }, // pushed → excluded
+        { status: "won", odds: 2.0 },
+      ],
+      100,
+    );
+    assert.equal(r.status, "won");
+    assert.equal(r.payout, 370); // 100 × (1.85 × 2.0), void leg ignored
+  });
+  it("all legs void → refund the stake", () => {
+    const r = resolveParlay(
+      [
+        { status: "void", odds: 1.85 },
+        { status: "void", odds: 2.0 },
+      ],
+      100,
+    );
+    assert.equal(r.status, "void");
+    assert.equal(r.payout, 100);
+  });
+  it("single surviving won leg pays like a straight bet", () => {
+    const r = resolveParlay(
+      [
+        { status: "void", odds: 2.0 },
+        { status: "won", odds: 1.5 },
+      ],
+      100,
+    );
+    assert.equal(r.status, "won");
+    assert.equal(r.payout, 150);
   });
 });
 
