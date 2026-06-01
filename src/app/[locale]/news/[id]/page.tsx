@@ -49,6 +49,13 @@ function toEmbedData(ref: NewsExternalRef): SocialEmbedData {
 
 export const dynamic = "force-dynamic";
 
+// A line inside a multi-line block that reads like a bout — an upcoming matchup
+// ("A vs. B") or a result ("A def. B via …"). Fight cards and results lists are
+// written one bout per line (single \n); rendered as a plain paragraph those
+// newlines collapse into an unreadable run-on, so such blocks get their own
+// one-line-per-bout list instead.
+const BOUT_LINE = /\s(?:def\.|defeats|vs\.?)\s/i;
+
 interface PageProps {
   params: Promise<{ id: string; locale: string }>;
 }
@@ -185,21 +192,62 @@ export default async function NewsArticlePage({ params }: PageProps) {
               {paragraphs.length > 0 ? (
                 <div className="mt-6 flex flex-col gap-5 font-sans text-base leading-relaxed text-foreground">
                   {paragraphs.map((p, i) => {
-                    const nodes = autolinkParagraph(
-                      p,
-                      allFighters,
-                      mentionedEvents,
-                      inlineRefs,
-                    );
                     const after = featuredByParagraph.get(i) ?? [];
+                    const lines = p
+                      .split("\n")
+                      .map((l) => l.trim())
+                      .filter(Boolean);
+                    // A fight card / results list: multiple lines, at least one
+                    // a bout. Render each bout on its own line in a distinct
+                    // block so the matchups/results stand out instead of
+                    // collapsing into a paragraph.
+                    const isBoutList =
+                      lines.length > 1 && lines.some((l) => BOUT_LINE.test(l));
                     return (
                       <React.Fragment key={i}>
-                        {i === 0 ? (
-                          <p className="text-lg leading-[1.65] text-foreground first-letter:float-left first-letter:mr-3 first-letter:font-display first-letter:text-[3.8em] first-letter:leading-[0.85] first-letter:text-primary">
-                            {nodes}
+                        {isBoutList ? (
+                          <div className="overflow-hidden rounded-md border border-foreground/10 bg-foreground/[0.02] px-4 py-1.5">
+                            {lines.map((line, li) =>
+                              BOUT_LINE.test(line) ? (
+                                <p
+                                  key={li}
+                                  className="border-b border-foreground/[0.06] py-2.5 font-sans text-[15px] leading-snug text-foreground last:border-0 sm:text-base"
+                                >
+                                  {autolinkParagraph(
+                                    line,
+                                    allFighters,
+                                    mentionedEvents,
+                                    inlineRefs,
+                                  )}
+                                </p>
+                              ) : (
+                                <p
+                                  key={li}
+                                  className="mb-1 mt-4 font-mono text-[11px] uppercase tracking-widest text-foreground-subtle first:mt-2"
+                                >
+                                  {line}
+                                </p>
+                              ),
+                            )}
+                          </div>
+                        ) : i === 0 ? (
+                          <p className="whitespace-pre-line text-lg leading-[1.65] text-foreground first-letter:float-left first-letter:mr-3 first-letter:font-display first-letter:text-[3.8em] first-letter:leading-[0.85] first-letter:text-primary">
+                            {autolinkParagraph(
+                              p,
+                              allFighters,
+                              mentionedEvents,
+                              inlineRefs,
+                            )}
                           </p>
                         ) : (
-                          <p>{nodes}</p>
+                          <p className="whitespace-pre-line">
+                            {autolinkParagraph(
+                              p,
+                              allFighters,
+                              mentionedEvents,
+                              inlineRefs,
+                            )}
+                          </p>
                         )}
                         {after.map((ref) => (
                           <SocialEmbed key={ref.url} embed={toEmbedData(ref)} />
