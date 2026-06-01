@@ -9,9 +9,14 @@
  *   • lost → no balance change (stake was debited at placement)
  *
  * Idempotent (only status='open' rows are touched) and transactional per
- * bout, so a re-run after a crash can't double-pay. Run from cron AFTER the
- * results scrape writes winner_id/method to bout — the LMSR markets settle
- * instantly via the on_bout_auto_settle DB trigger; fixed-odds settle here.
+ * bout, so a re-run after a crash can't double-pay.
+ *
+ * As of the instant-settlement pass, fixed-odds bets settle the moment the
+ * scraper UPDATEs a bout's result, via the on_bout_settle_fixed_odds DB
+ * trigger (scripts/apply_fixed_odds_settlement.ts) — same grading rules as
+ * here. This script is now a BACKSTOP: the trigger is AFTER UPDATE, so a bout
+ * INSERTed already completed (no UPDATE) won't fire it; a periodic cron run of
+ * this catches those. Safe to run alongside the trigger (idempotent).
  *
  *   Usage: npx tsx scripts/settle_fixed_odds.ts [--dry]
  */
