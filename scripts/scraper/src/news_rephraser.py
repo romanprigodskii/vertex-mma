@@ -13,8 +13,11 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).resolve().parents[3] / ".env.local")
 
 MODEL = "claude-haiku-4-5"
-_MAX_BODY_CHARS = 800
-_MAX_OUT_TOKENS = 4096
+# Large enough that a full fight-card listing (which sits AFTER the intro
+# paragraphs) reaches the model — at 800 the card was being cut off, so
+# "full card" articles lost their entire point.
+_MAX_BODY_CHARS = 6000
+_MAX_OUT_TOKENS = 8192
 
 SYSTEM_PROMPT = """You write expanded MMA news articles for Vertex MMA, a UFC stats \
 site. For each item you receive the source's title and a short summary; rewrite it \
@@ -25,6 +28,14 @@ Length: aim for 250-400 words across 3-5 paragraphs when the input has real cont
 (only a title, a one-line summary, or template scaffolding) write ONE SHORT \
 paragraph of 40-100 words that honestly summarises what is known — a short honest \
 summary beats a padded one.
+
+FIGHT CARDS / LINEUPS: if the source lists a fight card or bout lineup — multiple \
+matchups written as "A vs. B", often grouped under headings like "Main card", \
+"Prelims", "Early prelims" — you MUST reproduce the COMPLETE card, one bout per \
+line, under its section headings when given. Never summarise the card into prose \
+and never drop bouts: for a "full card" / lineup / results article the card IS the \
+point. Write a short lead paragraph first, then output every bout. This overrides \
+the 250-400 word guidance — list the whole card however long it is.
 
 Style: third-person news voice, factual and informative. Open with the lead (what \
 happened). Then add relevant context — what the event or promotion is, who the \

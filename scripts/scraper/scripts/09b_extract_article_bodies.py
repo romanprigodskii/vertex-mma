@@ -33,7 +33,21 @@ SLEEP_SECS = 0.4
 # a full article down to a one-line caption.
 MIN_GAIN_CHARS = 200
 
-SELECT_CANDIDATES = """
+# Title patterns marking an article whose body keeps changing or matters in
+# full, so it's worth re-fetching for a few days after publish:
+#   - live results / recaps: the body fills in as the event runs, so the
+#     pre-event snapshot must be replaced by the final version.
+#   - full card / fight card / lineup: the complete bout list is the whole
+#     point, and often lands in the article after the RSS teaser.
+REFETCH_PATTERNS = (
+    "%result%", "%live blog%", "%play-by-play%", "%recap%",
+    "%full card%", "%fight card%", "%lineup%",
+)
+_TITLE_OR = " OR ".join(["title ILIKE %s"] * len(REFETCH_PATTERNS))
+
+# 72h so a card/results article published a day or two before the event keeps
+# getting re-checked until the final version (results filled in) is live.
+SELECT_CANDIDATES = f"""
     SELECT id::text, url, title, COALESCE(length(body), 0) AS current_len,
            (image_url IS NULL) AS needs_image
     FROM news_item
@@ -41,15 +55,7 @@ SELECT_CANDIDATES = """
       AND (
         body IS NULL
         OR length(body) < 400
-        OR (
-          (
-            title ILIKE %s
-            OR title ILIKE %s
-            OR title ILIKE %s
-            OR title ILIKE %s
-          )
-          AND published_at > now() - interval '48 hours'
-        )
+        OR (({_TITLE_OR}) AND published_at > now() - interval '72 hours')
         -- RSS feeds carry no images, so fetch recent imageless items once to
         -- pull their og:image (bounded by the 30-day window + LIMIT).
         OR (image_url IS NULL AND published_at > now() - interval '30 days')
@@ -58,15 +64,17 @@ SELECT_CANDIDATES = """
     LIMIT %s
 """
 
-LIVE_PATTERNS = ("%result%", "%live blog%", "%play-by-play%", "%recap%")
-
 UPDATE_BODY = """
     UPDATE news_item
-    SET body            = %s,
-        body_rephrased  = NULL,
-        processed_at    = NULL,
-        external_refs   = %s::jsonb,
-        image_url       = COALESCE(image_url, %s)
+    SET body              = %s,
+        -- clear EN + RU derived text so a refreshed body re-classifies,
+        -- re-rephrases AND re-translates (RU was previously left stale).
+        body_rephrased    = NULL,
+        body_rephrased_ru = NULL,
+        title_ru          = NULL,
+        processed_at      = NULL,
+        external_refs     = %s::jsonb,
+        image_url         = COALESCE(image_url, %s)
     WHERE id = %s::uuid
 """
 
@@ -87,7 +95,7 @@ def run() -> dict[str, int]:
 
     with get_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute(SELECT_CANDIDATES, (*LIVE_PATTERNS, LIMIT))
+            cur.execute(SELECT_CANDIDATES, (*REFETCH_PATTERNS, LIMIT))
             items = cur.fetchall()
         log.info(f"article extract: {len(items)} candidate(s)")
         if not items:
