@@ -2,7 +2,14 @@
 
 import * as React from "react";
 
-import { MAX_PARLAY_LEGS, type SportsbookSelectionCode } from "@/lib/sportsbook";
+import {
+  MAX_PARLAY_LEGS,
+  type SportsbookSelectionCode,
+  isSelectionCode,
+} from "@/lib/sportsbook";
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** One pick in the parlay slip. Self-contained (carries display labels +
  *  an odds snapshot) so the floating slip renders without re-fetching. The
@@ -32,24 +39,87 @@ interface BetSlipContextValue {
 const Ctx = React.createContext<BetSlipContextValue | null>(null);
 const STORAGE_KEY = "vertex.betslip.v1";
 
+/** Serialise the slip for a shareable "tail my parlay" link (compact keys).
+ *  The recipient's slip is populated from this; odds re-price server-side at
+ *  placement, so the shared odds are just a display snapshot. */
+export function encodeSlip(legs: SlipLeg[]): string {
+  return JSON.stringify(
+    legs.map((l) => ({
+      b: l.boutId,
+      c: l.code,
+      o: l.odds,
+      bl: l.boutLabel,
+      pl: l.pickLabel,
+    })),
+  );
+}
+
+/** Parse + sanitise a shared slip param. Returns null on anything malformed. */
+export function decodeSlip(raw: string): SlipLeg[] | null {
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return null;
+    const seen = new Set<string>();
+    const legs: SlipLeg[] = [];
+    for (const item of parsed) {
+      if (!item || typeof item !== "object") continue;
+      const boutId = String(item.b ?? "");
+      const code = String(item.c ?? "");
+      if (!UUID_RE.test(boutId) || !isSelectionCode(code)) continue;
+      if (seen.has(boutId)) continue; // one leg per bout
+      const odds = Number(item.o);
+      if (!Number.isFinite(odds) || odds <= 1) continue;
+      seen.add(boutId);
+      legs.push({
+        boutId,
+        code: code as SportsbookSelectionCode,
+        odds,
+        boutLabel: String(item.bl ?? "").slice(0, 120),
+        pickLabel: String(item.pl ?? "").slice(0, 120),
+      });
+      if (legs.length >= MAX_PARLAY_LEGS) break;
+    }
+    return legs.length > 0 ? legs : null;
+  } catch {
+    return null;
+  }
+}
+
 export function BetSlipProvider({ children }: { children: React.ReactNode }) {
   const [legs, setLegs] = React.useState<SlipLeg[]>([]);
   const [hydrated, setHydrated] = React.useState(false);
 
-  // Load once on mount. localStorage isn't available during SSR, so hydrating
-  // from it is the canonical effect-setState exception (can't be done in
-  // render or a lazy initializer without a server/client mismatch).
+  // Load once on mount. A shared "?slip=" link (tail-my-parlay) takes
+  // precedence over the stored slip; otherwise hydrate from localStorage.
+  // Both are client-only (no SSR), the canonical effect-setState exception.
   React.useEffect(() => {
+    let loaded: SlipLeg[] | null = null;
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage hydration
-        if (Array.isArray(parsed)) setLegs(parsed);
+      const params = new URLSearchParams(window.location.search);
+      const shared = params.get("slip");
+      if (shared) {
+        loaded = decodeSlip(shared);
+        // Strip the param so a refresh doesn't re-import the shared slip.
+        params.delete("slip");
+        const qs = params.toString();
+        window.history.replaceState(
+          {},
+          "",
+          window.location.pathname + (qs ? `?${qs}` : "") + window.location.hash,
+        );
+      }
+      if (!loaded) {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) loaded = parsed as SlipLeg[];
+        }
       }
     } catch {
-      // ignore malformed storage
+      // ignore malformed storage / url
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- client-only hydration
+    if (loaded) setLegs(loaded);
     setHydrated(true);
   }, []);
 

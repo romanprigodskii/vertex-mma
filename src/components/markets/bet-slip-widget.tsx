@@ -2,11 +2,11 @@
 
 import * as React from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { useTranslations } from "next-intl";
-import { Ticket, X } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
+import { Share2, Ticket, X } from "lucide-react";
 
 import { placeParlayAction } from "@/app/[locale]/markets/actions";
-import { useBetSlip } from "@/components/markets/bet-slip-context";
+import { encodeSlip, useBetSlip } from "@/components/markets/bet-slip-context";
 import { Link } from "@/i18n/navigation";
 import {
   MIN_PARLAY_LEGS,
@@ -20,8 +20,10 @@ export function BetSlipWidget() {
   const t = useTranslations("sportsbook");
   const router = useRouter();
   const pathname = usePathname();
+  const locale = useLocale();
   const { legs, removeBout, clear, hydrated } = useBetSlip();
   const [open, setOpen] = React.useState(false);
+  const [shareMsg, setShareMsg] = React.useState<string | null>(null);
   const [stake, setStake] = React.useState("100");
   const [pending, setPending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -38,6 +40,23 @@ export function BetSlipWidget() {
   })();
   const payout = potentialPayout(parsedStake, combined);
   const enoughLegs = legs.length >= MIN_PARLAY_LEGS;
+
+  async function onShare() {
+    const url = `${window.location.origin}/${locale}/markets?slip=${encodeURIComponent(
+      encodeSlip(legs),
+    )}`;
+    try {
+      if (typeof navigator !== "undefined" && navigator.share) {
+        await navigator.share({ title: t("slipTitle"), url });
+      } else if (typeof navigator !== "undefined" && navigator.clipboard) {
+        await navigator.clipboard.writeText(url);
+        setShareMsg(t("shareCopied"));
+        setTimeout(() => setShareMsg(null), 2000);
+      }
+    } catch {
+      // user cancelled the share sheet / clipboard blocked — no-op
+    }
+  }
 
   async function onPlace() {
     setError(null);
@@ -85,13 +104,23 @@ export function BetSlipWidget() {
               <h2 className="font-display text-sm uppercase tracking-widest text-foreground">
                 {t("slipTitle")}
               </h2>
-              <button
-                type="button"
-                onClick={() => clear()}
-                className="font-sans text-[11px] uppercase tracking-widest text-foreground-subtle hover:text-streak-loss"
-              >
-                {t("clearSlip")}
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={onShare}
+                  className="inline-flex items-center gap-1 font-sans text-[11px] uppercase tracking-widest text-foreground-subtle hover:text-primary"
+                >
+                  <Share2 className="h-3 w-3" aria-hidden />
+                  {shareMsg ?? t("share")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => clear()}
+                  className="font-sans text-[11px] uppercase tracking-widest text-foreground-subtle hover:text-streak-loss"
+                >
+                  {t("clearSlip")}
+                </button>
+              </div>
             </div>
 
             <ul className="max-h-[40vh] divide-y divide-foreground/[0.06] overflow-y-auto">
