@@ -39,8 +39,6 @@ export interface AccuracySummary {
     "low" | "medium" | "high",
     { hits: number; total: number }
   >;
-  /** Same shape but for picks that flagged a market edge ≥5pp. */
-  edgeHitRate: { hits: number; total: number };
   /** Latest model version that has graded data (NULL if no graded data). */
   modelVersion: string | null;
 }
@@ -103,7 +101,10 @@ export async function getGradedSimulations(
     JOIN event e ON e.id = b.event_id
     JOIN bout_simulation bs ON bs.bout_id = b.id
     JOIN fighter wf ON wf.id = b.winner_id
-    LEFT JOIN fighter pf ON pf.id = bs.predicted_winner_id
+    -- INNER join: only grade picks where the model actually named a winner we
+    -- can resolve. A NULL/orphaned predicted_winner_id (e.g. a fighter
+    -- re-import) isn't an honest "miss" — it's ungradeable, so drop it.
+    JOIN fighter pf ON pf.id = bs.predicted_winner_id
     WHERE e.promotion = 'ufc'
       AND b.status = 'completed'
       AND b.winner_id IS NOT NULL
@@ -166,7 +167,6 @@ export function summarizeAccuracy(picks: GradedSimulationPick[]): AccuracySummar
     total,
     hitRate: total > 0 ? hits / total : Number.NaN,
     perConfidence,
-    edgeHitRate: { hits: 0, total: 0 },
     modelVersion,
   };
 }

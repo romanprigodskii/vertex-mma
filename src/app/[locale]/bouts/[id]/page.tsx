@@ -7,6 +7,7 @@ import { BoutDecisionBanner } from "@/components/bout/BoutDecisionBanner";
 import { BoutHero } from "@/components/bout/BoutHero";
 import { BoutRoundBreakdown } from "@/components/bout/BoutRoundBreakdown";
 import { BoutScorecards } from "@/components/bout/BoutScorecards";
+import { BoutModelVerdict } from "@/components/bout/BoutModelVerdict";
 import { BoutSimulationPanel } from "@/components/bout/BoutSimulationPanel";
 import { BoutStrikeAnalysis } from "@/components/bout/BoutStrikeAnalysis";
 import { BoutTotals } from "@/components/bout/BoutTotals";
@@ -90,11 +91,12 @@ export default async function BoutDetailPage({ params }: PageProps) {
   const positionA = computeFighterPositionMap(bout.rounds, bout.fighter_a.id);
   const positionB = computeFighterPositionMap(bout.rounds, bout.fighter_b.id);
 
-  // Phase 1 ML simulation: only render for upcoming/scheduled bouts.
-  // Once the bout completes the actual result is the truth, so we hide
-  // the predicted-winner panel (avoids second-guessing past results).
+  // Phase 1 ML simulation. Upcoming bouts get the full predicted-winner panel.
+  // Completed bouts instead get a compact "how the model called it" verdict
+  // (predicted winner + hit/miss) so the prediction loop visibly closes —
+  // accountability, not second-guessing.
   const isUpcoming = bout.status !== "completed";
-  const simulation = isUpcoming ? await getBoutSimulation(bout.id) : null;
+  const simulation = await getBoutSimulation(bout.id);
 
   return (
     <>
@@ -124,9 +126,15 @@ export default async function BoutDetailPage({ params }: PageProps) {
           <BoutHero bout={bout} weightLabel={weightLabel} />
         </Container>
 
-        {simulation ? (
+        {simulation && isUpcoming ? (
           <Container size="xl" className="pt-4">
             <BoutSimulationPanel bout={bout} sim={simulation} />
+          </Container>
+        ) : null}
+
+        {simulation && !isUpcoming && bout.winner_id ? (
+          <Container size="xl" className="pt-4">
+            <BoutModelVerdict bout={bout} sim={simulation} />
           </Container>
         ) : null}
 

@@ -1119,6 +1119,11 @@
     "mcRoundFinish": "{pct} финиш",
     "mcDecisionLabel": "Решение",
     "mcAvgFinish": "Сред. время финиша: {time}",
+    "verdictHeading": "Как модель оценила бой",
+    "verdictPredicted": "Модель ставила на {name} · {pct}%",
+    "verdictHit": "Угадала",
+    "verdictMiss": "Не угадала",
+    "verdictMeta": "{version} · прогноз от {date}",
     "disclaimer": "Модель LightGBM на исторических боях UFC с изотонической калибровкой. Только статистический baseline — не торговая рекомендация.",
     "features": {
       "diff_age": "Разница в возрасте",

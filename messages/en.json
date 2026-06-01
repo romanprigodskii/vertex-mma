@@ -1119,6 +1119,11 @@
     "mcRoundFinish": "{pct} finish",
     "mcDecisionLabel": "Decision",
     "mcAvgFinish": "Avg finish: {time}",
+    "verdictHeading": "How the model called it",
+    "verdictPredicted": "Model picked {name} · {pct}%",
+    "verdictHit": "Correct call",
+    "verdictMiss": "Missed",
+    "verdictMeta": "{version} · predicted {date}",
     "disclaimer": "LightGBM model trained on historical UFC bouts with isotonic calibration. Reflects statistical baseline only — not a betting recommendation.",
     "features": {
       "diff_age": "Age gap",
