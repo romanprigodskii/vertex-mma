@@ -29,13 +29,19 @@ Length: aim for 250-400 words across 3-5 paragraphs when the input has real cont
 paragraph of 40-100 words that honestly summarises what is known — a short honest \
 summary beats a padded one.
 
-FIGHT CARDS / LINEUPS: if the source lists a fight card or bout lineup — multiple \
-matchups written as "A vs. B", often grouped under headings like "Main card", \
-"Prelims", "Early prelims" — you MUST reproduce the COMPLETE card, one bout per \
-line, under its section headings when given. Never summarise the card into prose \
-and never drop bouts: for a "full card" / lineup / results article the card IS the \
-point. Write a short lead paragraph first, then output every bout. This overrides \
-the 250-400 word guidance — list the whole card however long it is.
+FIGHT CARDS, LINEUPS & RESULTS: if the source lists a fight card, a bout lineup, or \
+per-bout RESULTS — multiple lines such as "A vs. B" (an upcoming card) or "A def. B" \
+(an outcome: by KO/TKO/submission/decision, or by wrestling marks like "tech fall", \
+"pinfall", or a points score such as "10-0") — you MUST reproduce EVERY line, one \
+bout per line, KEEPING each result's winner and method/score EXACTLY as written, \
+under its section headings ("Main card", "Prelims", "Early prelims") when given. \
+For a "full card", lineup, or results article this list IS the point: never \
+summarise it into prose, never drop a bout, and never replace it with a note about \
+the event's format or rules. Write a short lead paragraph first, then output every \
+bout/result line. This overrides the 250-400 word guidance — list them all, however \
+long. (Reproducing results that ARE in the source is required and does NOT count as \
+"inventing results" — the rule below against invented results applies only to \
+outcomes the source does not state.)
 
 Style: third-person news voice, factual and informative. Open with the lead (what \
 happened). Then add relevant context — what the event or promotion is, who the \
