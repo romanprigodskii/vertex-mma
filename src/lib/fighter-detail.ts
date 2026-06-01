@@ -738,6 +738,65 @@ export async function getFighterBoutRounds(
   return [...(result as unknown as FighterBoutRound[])];
 }
 
+export type FighterUpcomingBout = {
+  bout_id: string;
+  event_name: string;
+  event_slug: string;
+  event_date: string; // ISO timestamp from event.date
+  opponent_id: string;
+  opponent_slug: string;
+  opponent_name: string;
+  opponent_nickname: string | null;
+  weight_class: string | null;
+  is_title_fight: boolean;
+  is_main_event: boolean;
+  /** True when the bout is still news-created (ufc_stats_id IS NULL) — i.e.
+   *  announced but not yet on the official UFCStats card. Drives the
+   *  "Announced" chip so a provisional booking reads as preliminary. */
+  is_provisional: boolean;
+};
+
+/**
+ * Forward-chronological list of a fighter's SCHEDULED (upcoming) bouts —
+ * including news-announced provisional ones (ufc_stats_id IS NULL). The fight
+ * history query is completed-only, so without this an announced fight never
+ * surfaced on the profile. Filtered to genuinely future events so a scheduled
+ * row the scrape hasn't marked completed yet doesn't linger as "upcoming".
+ */
+export async function getUpcomingBouts(
+  fighterId: string,
+): Promise<FighterUpcomingBout[]> {
+  const isRu = await isRuLocale();
+  const result = await db.execute<FighterUpcomingBout>(sql`
+    SELECT
+      b.id::text AS bout_id,
+      ${localizedEventNameSql("e", isRu)} AS event_name,
+      e.slug AS event_slug,
+      e.date::text AS event_date,
+      opp.id::text AS opponent_id,
+      opp.slug AS opponent_slug,
+      ${localizedNameSql("opp", isRu)} AS opponent_name,
+      opp.nickname AS opponent_nickname,
+      b.weight_class::text AS weight_class,
+      b.is_title_fight,
+      b.is_main_event,
+      (b.ufc_stats_id IS NULL) AS is_provisional
+    FROM bout b
+    JOIN event e ON e.id = b.event_id
+    JOIN fighter opp
+      ON opp.id = CASE
+        WHEN b.fighter_a_id = ${fighterId}::uuid THEN b.fighter_b_id
+        ELSE b.fighter_a_id
+      END
+    WHERE (b.fighter_a_id = ${fighterId}::uuid OR b.fighter_b_id = ${fighterId}::uuid)
+      AND b.status = 'scheduled'
+      AND e.status <> 'cancelled'
+      AND e.date >= NOW() - INTERVAL '1 day'
+    ORDER BY e.date ASC, b.bout_order ASC NULLS LAST
+  `);
+  return [...(result as unknown as FighterUpcomingBout[])];
+}
+
 /**
  * Reverse-chronological list of completed bouts with opponent + event info.
  *

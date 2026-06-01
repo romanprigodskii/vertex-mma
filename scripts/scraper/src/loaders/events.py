@@ -57,23 +57,41 @@ def upsert_event_listing(
             # the news pipeline created for this card before UFCStats listed it,
             # so the upsert below updates it IN PLACE — preserving its id and any
             # attached bouts / markets / predictions — instead of inserting a
-            # duplicate. The provisional name is the news hint ("UFC 330"); the
-            # official name is the full card ("UFC 330: Pereira vs Ankalaev"),
-            # so we match on:
+            # duplicate. The provisional name is the news hint ("UFC 330" or, for
+            # a Fight Night, the city — "UFC Belgrade"); the official name is the
+            # full card ("UFC 330: Pereira vs Ankalaev", "UFC Fight Night: Medic
+            # vs. Rodriguez"), so we match on:
             #   - exact name, OR
             #   - the official name STARTING WITH the hint (numbered cards —
             #     robust even if the LLM's date was wrong), OR
             #   - same UTC calendar day + a weak name-similarity signal (Fight
-            #     Nights, once the published-date-anchored year is reliable).
-            # The date branch requires a name signal so two different cards on
-            # the same Saturday can't merge. Day comparison is pinned to UTC so
-            # a non-UTC session timezone can't shift the calendar day.
+            #     Nights, once the published-date-anchored year is reliable), OR
+            #   - same UTC calendar day + the host CITY: a Fight Night the news
+            #     filed under "UFC <City>" carries no name overlap with the
+            #     official "Medic vs. Rodriguez" headline, but the city is the
+            #     shared signal — match when the official city appears in the
+            #     provisional name or its location_city. UFC runs at most one
+            #     card per day, so day + city is safe.
+            # The day-only branches always require a second signal (name OR city)
+            # so two different cards on the same Saturday can't merge. Day
+            # comparison is pinned to UTC so a non-UTC session timezone can't
+            # shift the calendar day.
             cur.execute(
                 """
                 UPDATE event SET ufc_stats_id = %(uid)s
                 WHERE id = (
                     SELECT e.id FROM event e
                     WHERE e.ufc_stats_id IS NULL AND e.promotion = 'ufc'
+                      -- Never stamp an id that already lives on another row:
+                      -- when the official event already exists (a dupe that an
+                      -- earlier scrape failed to adopt), claiming a provisional
+                      -- twin here would hit the ufc_stats_id unique index and
+                      -- abort the whole scrape. Those leftovers are merged by
+                      -- reconcile_duplicate_events instead; adoption only fires
+                      -- on the FIRST scrape, before any official row exists.
+                      AND NOT EXISTS (
+                        SELECT 1 FROM event x WHERE x.ufc_stats_id = %(uid)s
+                      )
                       AND (
                         lower(e.name) = lower(%(name)s)
                         OR lower(%(name)s) LIKE lower(e.name) || '%%'
@@ -82,6 +100,16 @@ def upsert_event_listing(
                           AND (e.date AT TIME ZONE 'UTC')::date
                               = (%(date)s AT TIME ZONE 'UTC')::date
                           AND similarity(e.name, %(name)s) > 0.3
+                        )
+                        OR (
+                          %(date)s IS NOT NULL
+                          AND %(city)s IS NOT NULL AND length(trim(%(city)s)) > 0
+                          AND (e.date AT TIME ZONE 'UTC')::date
+                              = (%(date)s AT TIME ZONE 'UTC')::date
+                          AND (
+                            e.name ILIKE '%%' || %(city)s || '%%'
+                            OR lower(e.location_city) = lower(%(city)s)
+                          )
                         )
                       )
                     ORDER BY
@@ -95,6 +123,7 @@ def upsert_event_listing(
                     "uid": item.ufc_stats_id,
                     "name": item.name,
                     "date": item.date,
+                    "city": city,
                 },
             )
 
@@ -123,6 +152,145 @@ def upsert_event_listing(
                 counts.updated += 1
 
     return counts
+
+
+def reconcile_duplicate_events(conn: psycopg.Connection) -> int:
+    """Merge a news-created provisional event (ufc_stats_id IS NULL) into its
+    official same-day twin when an earlier scrape failed to adopt it in place —
+    e.g. the news filed a Fight Night under "UFC <City>" but UFCStats listed it
+    as "UFC Fight Night: <A> vs. <B>", so the name-based adopt in
+    upsert_event_listing never matched and a second (official) row was inserted.
+
+    The match key mirrors that adopt branch's city signal: same UTC calendar day
+    + the host city (the official city appears in the provisional name, or their
+    location_city values match). UFC runs at most one card per day, so day + city
+    is safe; a same-day card from another city or promotion (e.g. a PFL event)
+    won't match.
+
+    Merge is deliberately CONSERVATIVE — it never destroys user data. Each
+    provisional bout is MOVED onto the official event (UPDATE event_id), which
+    keeps its id and every referrer (markets, bets, predictions, news links)
+    intact. Two cases make a twin UNSAFE to auto-merge, and it is then SKIPPED
+    (logged for manual handling) rather than risk data loss:
+      - the official card already lists one of the provisional pairs AND that
+        provisional bout carries a market (deleting it would CASCADE-wipe bets);
+      - the provisional event has its own prediction pool (prediction_event),
+        whose merge into the official pool (UNIQUE(event_id), UNIQUE(user,bout),
+        leaderboards) is not something to automate blindly.
+    A dup provisional bout with NO market is safe to drop (after repointing any
+    news link to the official bout); no prediction_pick can reference it because
+    the no-prediction-pool gate already held. Each twin runs inside its own
+    SAVEPOINT so one problem pair can't roll back the others. Idempotent — a
+    second run finds nothing. Returns the number of events merged.
+    """
+    merged = 0
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT p.id::text, o.id::text, p.name, o.name
+            FROM event p
+            JOIN event o
+              ON o.ufc_stats_id IS NOT NULL AND o.promotion = 'ufc' AND o.id <> p.id
+             AND (o.date AT TIME ZONE 'UTC')::date = (p.date AT TIME ZONE 'UTC')::date
+             AND o.location_city IS NOT NULL AND length(trim(o.location_city)) > 0
+             AND (
+               p.name ILIKE '%' || o.location_city || '%'
+               OR lower(p.location_city) = lower(o.location_city)
+             )
+            WHERE p.ufc_stats_id IS NULL AND p.promotion = 'ufc'
+            """
+        )
+        twins = cur.fetchall()
+
+        for provisional_id, official_id, p_name, o_name in twins:
+            # A prediction pool on the provisional event would need a real
+            # pool-merge (out of scope for an automated scrape) — leave it.
+            cur.execute(
+                "SELECT 1 FROM prediction_event WHERE event_id = %s::uuid",
+                (provisional_id,),
+            )
+            if cur.fetchone():
+                log.warning(
+                    f"  skip event merge {p_name!r} -> {o_name!r}: "
+                    f"provisional event has a prediction pool — needs manual merge"
+                )
+                continue
+
+            # Classify each provisional bout: MOVE (no twin on the official
+            # card) vs DROP (official already has the pair, and the provisional
+            # twin carries no market so it can be removed safely).
+            cur.execute(
+                "SELECT id::text, fighter_a_id::text, fighter_b_id::text "
+                "FROM bout WHERE event_id = %s::uuid",
+                (provisional_id,),
+            )
+            bouts = cur.fetchall()
+            moves: list[str] = []
+            drops: list[tuple[str, str]] = []  # (provisional_bout, official_bout)
+            unsafe = False
+            for bout_id, fa, fb in bouts:
+                cur.execute(
+                    """
+                    SELECT id::text FROM bout
+                    WHERE event_id = %s::uuid
+                      AND ((fighter_a_id = %s::uuid AND fighter_b_id = %s::uuid)
+                        OR (fighter_a_id = %s::uuid AND fighter_b_id = %s::uuid))
+                    LIMIT 1
+                    """,
+                    (official_id, fa, fb, fb, fa),
+                )
+                official_bout = cur.fetchone()
+                if official_bout is None:
+                    moves.append(bout_id)
+                    continue
+                cur.execute(
+                    "SELECT 1 FROM market WHERE bout_id = %s::uuid LIMIT 1",
+                    (bout_id,),
+                )
+                if cur.fetchone():
+                    unsafe = True
+                    break
+                drops.append((bout_id, official_bout[0]))
+
+            if unsafe:
+                log.warning(
+                    f"  skip event merge {p_name!r} -> {o_name!r}: a duplicate "
+                    f"provisional bout has an open market — needs manual merge"
+                )
+                continue
+
+            cur.execute("SAVEPOINT merge_twin")
+            try:
+                for prov_bout, off_bout in drops:
+                    cur.execute(
+                        "UPDATE news_item SET related_bout_id = %s::uuid "
+                        "WHERE related_bout_id = %s::uuid",
+                        (off_bout, prov_bout),
+                    )
+                    cur.execute(
+                        "DELETE FROM bout WHERE id = %s::uuid", (prov_bout,)
+                    )
+                for prov_bout in moves:
+                    cur.execute(
+                        "UPDATE bout SET event_id = %s::uuid, updated_at = now() "
+                        "WHERE id = %s::uuid",
+                        (official_id, prov_bout),
+                    )
+                # Provisional event now has no bouts and no prediction pool.
+                cur.execute(
+                    "DELETE FROM event WHERE id = %s::uuid", (provisional_id,)
+                )
+            except Exception as exc:  # noqa: BLE001 — isolate one bad twin
+                cur.execute("ROLLBACK TO SAVEPOINT merge_twin")
+                cur.execute("RELEASE SAVEPOINT merge_twin")
+                log.error(
+                    f"  event merge {p_name!r} -> {o_name!r} failed, skipped — {exc!r}"
+                )
+                continue
+            cur.execute("RELEASE SAVEPOINT merge_twin")
+            merged += 1
+            log.info(f"  merged provisional event {p_name!r} -> {o_name!r}")
+    return merged
 
 
 def upsert_event_details(

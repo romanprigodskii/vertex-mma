@@ -109,50 +109,108 @@ def run() -> dict[str, int]:
                 fighter_ids = resolve_fighter_ids(
                     conn, res.fighters, fighter_cache
                 )
+
+                # Build the concrete matchups to act on. The classifier's
+                # structured `bouts` carries one pairing per announced/changed
+                # fight, so a multi-bout article ("A vs B and C vs D are
+                # official") creates BOTH — the old code only fired when the
+                # flat fighter list held exactly two names, so any article that
+                # named a third fighter (a co-main, a mentioned champ) silently
+                # created nothing. Fall back to the legacy "exactly two
+                # fighters = one matchup" heuristic when the model gave no
+                # structured pairing (e.g. a cancellation, which we don't ask
+                # to pair). Each entry: (name_a, name_b, fighter_a_id,
+                # fighter_b_id, weight_class).
+                matchups: list[tuple[str, str, str, str, str | None]] = []
+                for ab in res.bouts:
+                    pair_ids = resolve_fighter_ids(
+                        conn, [ab.fighter_a, ab.fighter_b], fighter_cache
+                    )
+                    if len(pair_ids) == 2:
+                        matchups.append(
+                            (
+                                ab.fighter_a,
+                                ab.fighter_b,
+                                pair_ids[0],
+                                pair_ids[1],
+                                ab.weight_class or res.weight_class,
+                            )
+                        )
+                # Legacy fallback: ONLY when the model gave no structured
+                # pairing AND named exactly two fighters that both resolved.
+                # resolve_fighter_ids drops unresolved names and de-dupes, so a
+                # 3+-name article where only two resolve would leave the flat
+                # list positionally misaligned with res.fighters — pairing two
+                # fighters the article never matched. Requiring len 2 on BOTH
+                # keeps fighter_ids[i] aligned with res.fighters[i].
+                if (
+                    not matchups
+                    and len(res.fighters) == 2
+                    and len(fighter_ids) == 2
+                ):
+                    matchups.append(
+                        (
+                            res.fighters[0],
+                            res.fighters[1],
+                            fighter_ids[0],
+                            fighter_ids[1],
+                            res.weight_class,
+                        )
+                    )
+
+                # related_bout_id links the news item to a bout for display
+                # (e.g. a result/weigh-in/announcement card linking to the
+                # fight). Default to an existing bout for the primary matchup;
+                # bout_announced may create one below and claim the slot.
+                primary = matchups[0] if matchups else None
                 bout_id = (
-                    find_bout(conn, fighter_ids[0], fighter_ids[1])
-                    if len(fighter_ids) == 2
+                    find_bout(conn, primary[2], primary[3])
+                    if primary is not None
                     else None
                 )
 
-                # If Haiku tagged this as a freshly-announced bout AND we have
-                # everything needed (two known fighters, a stated weight class,
-                # a trusted source, high confidence) AND no existing bout links
-                # the pair — spin up a scheduled bout so the matchup surfaces on
-                # the event page without a manual touch. The event is resolved
-                # OR created: a brand-new card (announced before UFCStats lists
-                # it — the common case) gets a provisional event, which the
-                # later official scrape adopts rather than duplicates.
+                # If Haiku tagged this as a freshly-announced booking AND we have
+                # everything needed (two known fighters, a weight class, a
+                # trusted source, high confidence) AND no existing bout links the
+                # pair — spin up a scheduled bout so the matchup surfaces on the
+                # event page without a manual touch. The event is resolved OR
+                # created: a brand-new card (announced before UFCStats lists it
+                # — the common case) gets a provisional event, which the later
+                # official scrape adopts rather than duplicates. Every announced
+                # matchup is handled, not just the first.
                 if (
                     res.classification == "bout_announced"
-                    and bout_id is None
-                    and len(fighter_ids) == 2
                     and res.confidence >= AUTO_CREATE_BOUT_MIN_CONFIDENCE
                     and item.source_is_trusted
                     and res.event_hint
-                    and res.weight_class
                 ):
-                    event_id = resolve_or_create_event(
-                        conn,
-                        res.event_hint,
-                        event_date=res.event_date,
-                        cache=event_cache,
-                    )
-                    if event_id:
+                    for name_a, name_b, fa_id, fb_id, wc in matchups:
+                        if not wc:
+                            continue
+                        if find_bout(conn, fa_id, fb_id) is not None:
+                            continue
+                        event_id = resolve_or_create_event(
+                            conn,
+                            res.event_hint,
+                            event_date=res.event_date,
+                            cache=event_cache,
+                        )
+                        if not event_id:
+                            continue
                         new_bout_id, created = auto_create_bout(
                             conn,
-                            fighter_a_id=fighter_ids[0],
-                            fighter_b_id=fighter_ids[1],
+                            fighter_a_id=fa_id,
+                            fighter_b_id=fb_id,
                             event_id=event_id,
-                            weight_class=res.weight_class,
+                            weight_class=wc,
                         )
-                        bout_id = new_bout_id
+                        if bout_id is None:
+                            bout_id = new_bout_id
                         if created:
                             totals["bouts_auto_created"] += 1
                             log.info(
-                                f"  auto-bout: {res.fighters[0]} vs "
-                                f"{res.fighters[1]} @ {res.event_hint} "
-                                f"({res.weight_class}) — {new_bout_id}"
+                                f"  auto-bout: {name_a} vs {name_b} @ "
+                                f"{res.event_hint} ({wc}) — {new_bout_id}"
                             )
 
                 # A trusted cancellation report retires a provisional (news-
@@ -182,7 +240,7 @@ def run() -> dict[str, int]:
                     if update_provisional_bout(
                         conn,
                         bout_id,
-                        weight_class=res.weight_class,
+                        weight_class=(primary[4] if primary else None),
                         event_date=res.event_date,
                     ):
                         totals["bouts_updated"] += 1

@@ -19,6 +19,7 @@ import { ScoreBreakdown } from "@/components/fighter/detail/ScoreBreakdown";
 import { SectionHeader } from "@/components/fighter/detail/SectionHeader";
 import { SimilarFighters } from "@/components/fighter/detail/SimilarFighters";
 import { StrikingHeatmap } from "@/components/fighter/detail/StrikingHeatmap";
+import { UpcomingBouts } from "@/components/fighter/detail/UpcomingBouts";
 import { Container } from "@/components/layout/container";
 import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
@@ -33,6 +34,7 @@ import {
   getFighterBoutRounds,
   getFighterBySlug,
   getGlobalScoreComponents,
+  getUpcomingBouts,
 } from "@/lib/fighter-detail";
 import { listNewsForFighter } from "@/lib/news";
 import { getPeakVertex } from "@/lib/score-history";
@@ -118,6 +120,7 @@ export default async function FighterDetailPage({ params }: PageProps) {
   const [
     boutRounds,
     history,
+    upcomingBouts,
     similar,
     divisionalScores,
     globalComponents,
@@ -126,6 +129,7 @@ export default async function FighterDetailPage({ params }: PageProps) {
   ] = await Promise.all([
     getFighterBoutRounds(fighter.id),
     getFightHistory(fighter.id),
+    getUpcomingBouts(fighter.id),
     getSimilarFighters(fighter),
     getDivisionalScores(fighter.id),
     getGlobalScoreComponents(fighter.id),
@@ -282,6 +286,18 @@ export default async function FighterDetailPage({ params }: PageProps) {
             </span>
           </Link>
         </Container>
+
+        {upcomingBouts.length > 0 ? (
+          <Section
+            label={t("upcomingBouts")}
+            explainer={t("upcomingBoutsExplainer")}
+            className="mt-16 sm:mt-20"
+          >
+            <div className="mx-auto max-w-3xl">
+              <UpcomingBouts bouts={upcomingBouts} />
+            </div>
+          </Section>
+        ) : null}
 
         <Section
           label={t("careerTimeline")}

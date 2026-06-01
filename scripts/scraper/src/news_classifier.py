@@ -67,6 +67,17 @@ fighters mentioned only in passing. For an analyst-prediction piece, do NOT \
 list the analyst — list the fighters the prediction is about. Empty list when \
 there are none. At most four.
 
+Bouts: for `bout_announced` and `bout_changed` items, list EACH announced (or \
+newly-changed) matchup as an object {fighter_a, fighter_b, weight_class}, \
+pairing the two fighters who ACTUALLY face each other. A single article often \
+announces several bouts at once — a main event plus a co-main, or a batch of \
+card additions ("X vs Y and A vs B are official for…"); return one object per \
+matchup, never mixing fighters from different fights into the same pair. \
+weight_class uses the same vocabulary and underscore form as below (or null if \
+the matchup's weight isn't stated). Use the same full names as in `fighters`. \
+Return an empty list for every other category (results, weigh-ins, rumors, \
+general news, cancellations).
+
 Event hint: ONLY for `bout_announced` items, give the event name the booking \
 is FOR, exactly as written (e.g. "UFC 330", "UFC Fight Night: Whittaker vs \
 Costa", "UFC on ESPN 60"). Use null if you can't find a specific event name \
@@ -124,6 +135,27 @@ OUTPUT_SCHEMA = {
                         "type": "array",
                         "items": {"type": "string"},
                     },
+                    # Per-matchup pairing for bout_announced/bout_changed so a
+                    # multi-bout article ("A vs B and C vs D are official") maps
+                    # to the right pairs — the flat `fighters` list above can't.
+                    # Per-bout weight_class is enum-validated in code.
+                    "bouts": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "fighter_a": {"type": "string"},
+                                "fighter_b": {"type": "string"},
+                                "weight_class": {"type": ["string", "null"]},
+                            },
+                            "required": [
+                                "fighter_a",
+                                "fighter_b",
+                                "weight_class",
+                            ],
+                            "additionalProperties": False,
+                        },
+                    },
                     "event_hint": {"type": ["string", "null"]},
                     # Weight class is enum-validated in code (_VALID_WEIGHT)
                     # rather than via JSON Schema — Anthropic's structured
@@ -137,6 +169,7 @@ OUTPUT_SCHEMA = {
                     "classification",
                     "confidence",
                     "fighters",
+                    "bouts",
                     "event_hint",
                     "weight_class",
                     "event_date",
@@ -159,10 +192,23 @@ class ItemInput:
 
 
 @dataclass
+class AnnouncedBout:
+    """A single announced/changed matchup the classifier pulled out of an
+    item — the pairing the flat `fighters` list can't express on its own."""
+
+    fighter_a: str
+    fighter_b: str
+    weight_class: str | None
+
+
+@dataclass
 class ItemClassification:
     classification: str
     confidence: float
     fighters: list[str]
+    # One entry per announced/changed matchup (bout_announced / bout_changed);
+    # empty for every other category.
+    bouts: list[AnnouncedBout]
     event_hint: str | None
     weight_class: str | None
     event_date: str | None  # ISO 'YYYY-MM-DD' or None
@@ -205,7 +251,10 @@ def classify_batch(items: list[ItemInput]) -> dict[int, ItemClassification]:
     # error). Structured outputs guarantee schema-valid JSON.
     response = _get_client().messages.create(
         model=MODEL,
-        max_tokens=2048,
+        # Bumped from 2048: the per-matchup `bouts` array adds output per item,
+        # and a batch (BATCH_SIZE=10) of card-addition articles can each carry
+        # several pairings — 2048 risked truncating the JSON on a busy batch.
+        max_tokens=4096,
         system=[
             {
                 "type": "text",
@@ -239,6 +288,25 @@ def classify_batch(items: list[ItemInput]) -> dict[int, ItemClassification]:
             for f in row.get("fighters", [])
             if isinstance(f, str) and f.strip()
         ][:4]
+        bouts: list[AnnouncedBout] = []
+        for raw_bout in row.get("bouts", []) or []:
+            if not isinstance(raw_bout, dict):
+                continue
+            a = raw_bout.get("fighter_a")
+            b = raw_bout.get("fighter_b")
+            if not (isinstance(a, str) and a.strip()):
+                continue
+            if not (isinstance(b, str) and b.strip()):
+                continue
+            wc_raw = raw_bout.get("weight_class")
+            wc = wc_raw if isinstance(wc_raw, str) and wc_raw in _VALID_WEIGHT else None
+            bouts.append(
+                AnnouncedBout(
+                    fighter_a=a.strip(), fighter_b=b.strip(), weight_class=wc
+                )
+            )
+            if len(bouts) >= 6:
+                break
         event_hint_raw = row.get("event_hint")
         event_hint = (
             event_hint_raw.strip()
@@ -262,6 +330,7 @@ def classify_batch(items: list[ItemInput]) -> dict[int, ItemClassification]:
             classification=classification,
             confidence=confidence,
             fighters=fighters,
+            bouts=bouts,
             event_hint=event_hint,
             weight_class=weight_class,
             event_date=event_date,
