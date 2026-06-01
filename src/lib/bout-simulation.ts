@@ -240,6 +240,56 @@ export async function getBoutSimulation(
   };
 }
 
+export interface BoutSimulationPick {
+  predictedWinnerId: string | null;
+  probA: number;
+  probB: number;
+}
+
+/**
+ * Batch: the latest prediction (predicted winner + win probs) for a set of
+ * bouts, keyed by bout_id. Lets the event card list surface the model's pick
+ * inline without an N+1. Bouts with no prediction are simply absent from the
+ * map. DISTINCT ON keeps the freshest model_version per bout.
+ */
+export async function getBoutSimulationPicks(
+  boutIds: string[],
+): Promise<Map<string, BoutSimulationPick>> {
+  const ids = [...new Set(boutIds)].filter((id) =>
+    /^[0-9a-f-]{36}$/i.test(id),
+  );
+  if (ids.length === 0) return new Map();
+  const values = sql.join(
+    ids.map((id) => sql`${id}::uuid`),
+    sql`, `,
+  );
+  type PickRow = {
+    bout_id: string;
+    prob_a: number;
+    prob_b: number;
+    predicted_winner_id: string | null;
+  };
+  const rows = (await db.execute<PickRow>(sql`
+    SELECT DISTINCT ON (bs.bout_id)
+      bs.bout_id::text AS bout_id,
+      bs.prob_a,
+      bs.prob_b,
+      bs.predicted_winner_id::text AS predicted_winner_id
+    FROM bout_simulation bs
+    WHERE bs.bout_id IN (${values})
+    ORDER BY bs.bout_id, bs.generated_at DESC
+  `)) as unknown as PickRow[];
+  const map = new Map<string, BoutSimulationPick>();
+  for (const r of rows) {
+    map.set(r.bout_id, {
+      predictedWinnerId: r.predicted_winner_id,
+      probA: r.prob_a,
+      probB: r.prob_b,
+    });
+  }
+  return map;
+}
+
 /**
  * Maps raw model feature names → translation keys + a hint about how to
  * format the feature value alongside the label. Anything not in this

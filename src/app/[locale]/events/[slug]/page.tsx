@@ -13,6 +13,10 @@ import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
 import { Link } from "@/i18n/navigation";
 import {
+  type BoutSimulationPick,
+  getBoutSimulationPicks,
+} from "@/lib/bout-simulation";
+import {
   type EventBout,
   type EventDetail,
   getEventBouts,
@@ -86,6 +90,11 @@ export async function generateMetadata({
   };
 }
 
+function lastName(full: string): string {
+  const parts = full.trim().split(/\s+/);
+  return parts[parts.length - 1] || full;
+}
+
 interface BoutCardTranslations {
   weight: (id: string) => string;
   rounds: (n: number) => string;
@@ -100,15 +109,29 @@ interface BoutCardTranslations {
   viewDetails: string;
   decision: string;
   finish: string;
+  modelPick: (name: string, pct: number) => string;
 }
 
 function BoutCard({
   bout,
   tr,
+  pick,
 }: {
   bout: EventBout;
   tr: BoutCardTranslations;
+  pick: BoutSimulationPick | null;
 }) {
+  // Model's pick to surface inline on upcoming bouts (the AI prediction was
+  // otherwise invisible until you opened /bouts).
+  const predA = !!pick && pick.predictedWinnerId === bout.fighter_a.id;
+  const predB = !!pick && pick.predictedWinnerId === bout.fighter_b.id;
+  const modelPick =
+    bout.status !== "completed" && pick && (predA || predB)
+      ? {
+          name: lastName(predA ? bout.fighter_a.name_en : bout.fighter_b.name_en),
+          pct: Math.round((predA ? pick.probA : pick.probB) * 100),
+        }
+      : null;
   const weightLabel = tr.weight(bout.weight_class);
   const time = formatRoundTime(bout.time_finished_seconds);
   // Method may be NULL for many completed bouts (scraper gap, Wave 3.5 will
@@ -201,6 +224,10 @@ function BoutCard({
                 : isDraw
                   ? `${tr.draw}${methodLabel ? ` · ${methodLabel}` : ""}`
                   : methodLabel ?? tr.resultPending}
+            </p>
+          ) : modelPick ? (
+            <p className="mt-0.5 font-mono text-[11px] uppercase tracking-widest text-primary">
+              {tr.modelPick(modelPick.name, modelPick.pct)}
             </p>
           ) : (
             <p className="mt-0.5 font-sans text-[11px] uppercase tracking-widest text-foreground-subtle">
@@ -305,6 +332,10 @@ export default async function EventDetailPage({ params }: PageProps) {
   if (!event) notFound();
 
   const bouts = await getEventBouts(event.id);
+  // Model picks for the not-yet-fought bouts, surfaced inline on each card.
+  const simPicks = await getBoutSimulationPicks(
+    bouts.filter((b) => b.status !== "completed").map((b) => b.id),
+  );
   const activeLocale = await getLocale();
   const dateStr = formatEventDate(event.date, activeLocale);
   const location = locationString(event);
@@ -323,6 +354,7 @@ export default async function EventDetailPage({ params }: PageProps) {
     viewDetails: t("viewDetails"),
     decision: t("decision"),
     finish: t("finish"),
+    modelPick: (name: string, pct: number) => t("modelPick", { name, pct }),
   };
 
   return (
@@ -381,7 +413,11 @@ export default async function EventDetailPage({ params }: PageProps) {
                 <ul className="flex flex-col gap-3">
                   {bouts.map((b) => (
                     <li key={b.id}>
-                      <BoutCard bout={b} tr={boutCardTranslations} />
+                      <BoutCard
+                        bout={b}
+                        tr={boutCardTranslations}
+                        pick={simPicks.get(b.id) ?? null}
+                      />
                     </li>
                   ))}
                 </ul>

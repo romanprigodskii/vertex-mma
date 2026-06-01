@@ -324,6 +324,7 @@
     "draw": "Draw",
     "resultPending": "Result —",
     "viewDetails": "View details",
+    "modelPick": "Model: {name} {pct}%",
     "decision": "Decision",
     "finish": "Finish",
     "card": "Card",

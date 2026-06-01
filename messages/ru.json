@@ -324,6 +324,7 @@
     "draw": "Ничья",
     "resultPending": "Результат —",
     "viewDetails": "Подробнее",
+    "modelPick": "Модель: {name} {pct}%",
     "decision": "Решение",
     "finish": "Финиш",
     "card": "Кард",
