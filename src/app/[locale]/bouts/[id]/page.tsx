@@ -26,7 +26,11 @@ import {
 } from "@/lib/bout-detail";
 import { getBoutSimulation } from "@/lib/bout-simulation";
 import { getBoutExternalOdds } from "@/lib/markets";
-import { computeSportsbookOutcomes, isBoutBettable } from "@/lib/sportsbook";
+import {
+  computeSportsbookOutcomes,
+  isBoutBettable,
+  marketProbFromOdds,
+} from "@/lib/sportsbook";
 export const dynamic = "force-dynamic";
 
 interface PageProps {
@@ -114,6 +118,11 @@ export default async function BoutDetailPage({ params }: PageProps) {
       ? computeSportsbookOutcomes({
           probA: simulation.probA,
           probB: simulation.probB,
+          // Edge-guard the winner prob against the bookmaker consensus.
+          marketProbA: marketProbFromOdds(
+            externalOdds?.winner_a_decimal ?? null,
+            externalOdds?.winner_b_decimal ?? null,
+          ),
           rounds: simulation.rounds
             ? {
                 probKoA: simulation.rounds.probKoA,

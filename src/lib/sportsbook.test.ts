@@ -14,12 +14,15 @@ import { describe, it } from "node:test";
 
 import {
   HOUSE_MARGIN,
+  MAX_MARKET_EDGE,
   MAX_ODDS,
   MIN_ODDS,
   type BoutResult,
   type SportsbookSimInput,
+  applyEdgeGuard,
   computeSportsbookOutcomes,
   isBoutBettable,
+  marketProbFromOdds,
   methodBucket,
   oddsForMarket,
   potentialPayout,
@@ -290,6 +293,77 @@ describe("settleSelection — goes the distance", () => {
   it("DQ finish → dist_no won", () => {
     const r = baseResult({ winnerId: A, method: "dq", roundFinished: 2 });
     assert.equal(settleSelection("dist_no", r), "won");
+  });
+});
+
+describe("marketProbFromOdds (devig)", () => {
+  it("devigs a 2-way moneyline", () => {
+    const p = marketProbFromOdds(1.85, 2.15)!;
+    // 1/1.85=.5405, 1/2.15=.4651 → .5405/(.5405+.4651)=.5375
+    assert.ok(Math.abs(p - 0.5375) < 0.002, `p=${p}`);
+  });
+  it("heavy favourite devigs above 0.5", () => {
+    assert.ok(marketProbFromOdds(1.12, 6.0)! > 0.8);
+  });
+  it("null on missing/invalid sides", () => {
+    assert.equal(marketProbFromOdds(null, 2.0), null);
+    assert.equal(marketProbFromOdds(1.0, 2.0), null);
+    assert.equal(marketProbFromOdds(1.85, null), null);
+  });
+});
+
+describe("applyEdgeGuard", () => {
+  it("no market line → model prob unchanged (pure model)", () => {
+    assert.equal(applyEdgeGuard(0.28, null), 0.28);
+  });
+  it("within the band → unchanged", () => {
+    // model 0.50 vs market 0.54, gap 0.04 < 0.15
+    assert.equal(applyEdgeGuard(0.5, 0.54), 0.5);
+  });
+  it("clamps a wild underdog call up to market − maxEdge (the Belal case)", () => {
+    // model 0.28 vs market 0.54 → clamp to 0.54 − 0.15 = 0.39
+    assert.ok(Math.abs(applyEdgeGuard(0.28, 0.54) - 0.39) < 1e-9);
+  });
+  it("clamps an over-confident call down to market + maxEdge", () => {
+    assert.ok(Math.abs(applyEdgeGuard(0.95, 0.6) - (0.6 + MAX_MARKET_EDGE)) < 1e-9);
+  });
+  it("respects a custom maxEdge", () => {
+    assert.ok(Math.abs(applyEdgeGuard(0.28, 0.54, 0.1) - 0.44) < 1e-9);
+  });
+});
+
+describe("computeSportsbookOutcomes — edge-guard wiring", () => {
+  const base: SportsbookSimInput = { probA: 0.28, probB: 0.72, rounds: null };
+  it("with no marketProbA, win_a reflects the raw model prob", () => {
+    const wa = computeSportsbookOutcomes(base).find((o) => o.code === "win_a")!;
+    assert.ok(Math.abs(wa.prob - 0.28) < 1e-6);
+  });
+  it("with a market line, win_a is pulled into the ±band (Belal)", () => {
+    const wa = computeSportsbookOutcomes({ ...base, marketProbA: 0.54 }).find(
+      (o) => o.code === "win_a",
+    )!;
+    assert.ok(Math.abs(wa.prob - 0.39) < 1e-6, `prob=${wa.prob}`);
+    // win_b is the complement of the guarded prob
+    const wb = computeSportsbookOutcomes({ ...base, marketProbA: 0.54 }).find(
+      (o) => o.code === "win_b",
+    )!;
+    assert.ok(Math.abs(wb.prob - 0.61) < 1e-6, `prob=${wb.prob}`);
+  });
+  it("guarded prob also rescales the method level", () => {
+    const sim: SportsbookSimInput = {
+      probA: 0.28,
+      probB: 0.72,
+      marketProbA: 0.54,
+      rounds: {
+        probKoA: 0.2, probKoB: 0.4, probSubA: 0.04, probSubB: 0.12,
+        probDecisionA: 0.04, probDecisionB: 0.2, finishByRound: [0.3, 0.2, 0.1],
+      },
+    };
+    const out = computeSportsbookOutcomes(sim);
+    const aMethods = out.filter((o) => o.marketKind === "method" && o.side === "a");
+    const aSum = aMethods.reduce((s, o) => s + o.prob, 0);
+    // A's three method cells should sum to the GUARDED prob (0.39), not 0.28
+    assert.ok(Math.abs(aSum - 0.39) < 0.02, `aSum=${aSum}`);
   });
 });
 

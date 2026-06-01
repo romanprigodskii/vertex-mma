@@ -32,6 +32,17 @@ export const HOUSE_MARGIN = 0.06;
 export const MIN_ODDS = 1.04;
 export const MAX_ODDS = 25;
 
+/** Edge-guard: max distance (in probability) the model's winner prob may sit
+ *  from the bookmaker consensus when one exists. Pure-model odds are the
+ *  product (no blending), but a model that's wildly off the market — e.g. it
+ *  put Belal Muhammad at 28% vs a 54% market — would otherwise hand bettors a
+ *  huge +EV line. Where odds exist we clamp the model to ±this band around the
+ *  devigged market prob; where they don't, the model is used unguarded. The
+ *  model is only market-LEVEL out-of-sample (not proven better), so this is
+ *  damage-control, not a profit cap — it bounds the worst case without
+ *  neutralising genuine smaller edges. */
+export const MAX_MARKET_EDGE = 0.15;
+
 // =====================================================================
 // Types
 // =====================================================================
@@ -89,6 +100,10 @@ export interface SportsbookSimInput {
   probB: number;
   /** Monte-Carlo method/round split. null → only the winner market is offered. */
   rounds: SportsbookRoundsInput | null;
+  /** Devigged bookmaker consensus prob that A wins, if available. When set,
+   *  the edge-guard clamps the model's winner prob to ±MAX_MARKET_EDGE of it.
+   *  null → pure model (no market line for this bout). */
+  marketProbA?: number | null;
 }
 
 // =====================================================================
@@ -155,6 +170,37 @@ export function reconcileMethodProbs(
   return { a_ko, a_sub, a_dec, b_ko, b_sub, b_dec };
 }
 
+/** Devigged 2-way market prob that A wins, from decimal moneyline odds.
+ *  Returns null when either side is missing / invalid. */
+export function marketProbFromOdds(
+  aDecimal: number | null,
+  bDecimal: number | null,
+): number | null {
+  if (!(typeof aDecimal === "number" && aDecimal > 1)) return null;
+  if (!(typeof bDecimal === "number" && bDecimal > 1)) return null;
+  const pa = 1 / aDecimal;
+  const pb = 1 / bDecimal;
+  const sum = pa + pb;
+  if (!(sum > 0)) return null;
+  return pa / sum;
+}
+
+/** Edge-guard: clamp the model's winner prob to ±maxEdge of the market when a
+ *  market prob is available; otherwise return the model prob unchanged
+ *  (pure model). See MAX_MARKET_EDGE. */
+export function applyEdgeGuard(
+  modelProbA: number,
+  marketProbA: number | null,
+  maxEdge = MAX_MARKET_EDGE,
+): number {
+  if (marketProbA == null || !Number.isFinite(marketProbA)) {
+    return clampProb(modelProbA);
+  }
+  const lo = marketProbA - maxEdge;
+  const hi = marketProbA + maxEdge;
+  return clampProb(Math.min(hi, Math.max(lo, modelProbA)));
+}
+
 /** P(fight goes the distance) = 1 − P(any finish). Driven by the round
  *  finish distribution so it stays consistent with the totals market. */
 function distanceProb(rounds: SportsbookRoundsInput): number {
@@ -207,9 +253,15 @@ export function computeSportsbookOutcomes(
 ): SportsbookOutcome[] {
   const out: SportsbookOutcome[] = [];
 
+  // Edge-guard the winner prob against the market (no-op when no market line).
+  // The guarded prob drives both the winner market AND the method level (via
+  // reconciliation), so a market-blind model error can't escape through props.
+  const guardedA = applyEdgeGuard(sim.probA, sim.marketProbA ?? null);
+  const guardedB = clampProb(1 - guardedA);
+
   // ── Winner (moneyline) ───────────────────────────────────────────
   {
-    const probs = [clampProb(sim.probA), clampProb(sim.probB)];
+    const probs = [guardedA, guardedB];
     const odds = oddsForMarket(probs);
     out.push({ marketKind: "winner", code: "win_a", side: "a", prob: probs[0], decimalOdds: odds[0] });
     out.push({ marketKind: "winner", code: "win_b", side: "b", prob: probs[1], decimalOdds: odds[1] });
@@ -220,7 +272,7 @@ export function computeSportsbookOutcomes(
 
   // ── Method of victory (6-way: A/B × KO·Sub·Dec) ─────────────────
   {
-    const m = reconcileMethodProbs(r, sim.probA, sim.probB);
+    const m = reconcileMethodProbs(r, guardedA, guardedB);
     const probs = [m.a_ko, m.a_sub, m.a_dec, m.b_ko, m.b_sub, m.b_dec].map(clampProb);
     const odds = oddsForMarket(probs);
     const codes: { code: SportsbookSelectionCode; side: "a" | "b" }[] = [

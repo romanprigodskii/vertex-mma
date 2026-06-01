@@ -8,11 +8,13 @@ import { getBoutSimulation } from "@/lib/bout-simulation";
 import { db } from "@/lib/db";
 import { userProfile } from "@/lib/db/schema/users";
 import { lmsrBuyCost, lmsrPrices, lmsrSharesForCoins } from "@/lib/lmsr";
+import { getBoutExternalOdds } from "@/lib/markets";
 import {
   type SportsbookSelectionCode,
   computeSportsbookOutcomes,
   isBoutBettable,
   isSelectionCode,
+  marketProbFromOdds,
   potentialPayout,
   selectionSide,
 } from "@/lib/sportsbook";
@@ -348,11 +350,20 @@ export async function placeFixedOddsBetAction(
   }
 
   // Recompute the odds from the latest model — the authoritative price.
-  const sim = await getBoutSimulation(boutId);
+  // Fetch the consensus odds too so the edge-guard here matches the bout
+  // page exactly (the locked odds must equal what the user was shown).
+  const [sim, externalOdds] = await Promise.all([
+    getBoutSimulation(boutId),
+    getBoutExternalOdds(boutId),
+  ]);
   if (!sim) return { error: "No model odds available for this bout yet." };
   const outcomes = computeSportsbookOutcomes({
     probA: sim.probA,
     probB: sim.probB,
+    marketProbA: marketProbFromOdds(
+      externalOdds?.winner_a_decimal ?? null,
+      externalOdds?.winner_b_decimal ?? null,
+    ),
     rounds: sim.rounds
       ? {
           probKoA: sim.rounds.probKoA,
