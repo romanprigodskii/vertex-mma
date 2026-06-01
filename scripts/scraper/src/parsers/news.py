@@ -24,6 +24,7 @@ class NewsEntry:
     author: str | None
     published_at: datetime
     refs: list[dict] = field(default_factory=list)
+    image_url: str | None = None
 
 
 def _clean_text(html: str | None) -> str | None:
@@ -35,6 +36,27 @@ def _clean_text(html: str | None) -> str | None:
     if not text:
         return None
     return text[:_MAX_BODY_CHARS]
+
+
+def _entry_image(entry) -> str | None:
+    """A lead image straight off the RSS entry when the feed supplies one
+    (media:content / media:thumbnail / an image enclosure). Cheap, broad — no
+    extra fetch. The article-body pass backfills og:image when this is empty."""
+    for m in entry.get("media_content") or []:
+        u = (m.get("url") or "").strip()
+        medium = m.get("medium") or ""
+        mtype = m.get("type") or ""
+        if u.startswith("http") and (medium == "image" or mtype.startswith("image/") or not mtype):
+            return u
+    for th in entry.get("media_thumbnail") or []:
+        u = (th.get("url") or "").strip()
+        if u.startswith("http"):
+            return u
+    for enc in entry.get("enclosures") or []:
+        u = (enc.get("href") or "").strip()
+        if u.startswith("http") and (enc.get("type") or "").startswith("image/"):
+            return u
+    return None
 
 
 def _entry_published(entry) -> datetime:
@@ -68,6 +90,7 @@ def parse_feed(xml: str) -> list[NewsEntry]:
                 author=(unescape(author).strip() or None) if author else None,
                 published_at=_entry_published(raw),
                 refs=extract_refs(summary_html),
+                image_url=_entry_image(raw),
             )
         )
     return entries

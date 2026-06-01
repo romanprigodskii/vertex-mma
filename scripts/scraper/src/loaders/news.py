@@ -140,9 +140,9 @@ def upsert_news_items(
                 """
                 INSERT INTO news_item (
                     source_id, external_id, url, title, body, author,
-                    published_at, external_refs
+                    image_url, published_at, external_refs
                 )
-                VALUES (%s::uuid, %s, %s, %s, %s, %s, %s, %s::jsonb)
+                VALUES (%s::uuid, %s, %s, %s, %s, %s, %s, %s, %s::jsonb)
                 ON CONFLICT (url) DO NOTHING
                 RETURNING id
                 """,
@@ -153,6 +153,7 @@ def upsert_news_items(
                     e.title,
                     e.body,
                     e.author,
+                    e.image_url,
                     e.published_at,
                     json.dumps(e.refs or []),
                 ),

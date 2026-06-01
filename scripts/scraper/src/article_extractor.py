@@ -25,8 +25,28 @@ import re
 from dataclasses import dataclass
 
 import trafilatura
+from selectolax.parser import HTMLParser
 
 from .ref_extractor import extract_refs
+
+
+def _extract_og_image(html: str | None) -> str | None:
+    """Lead image from the raw article HTML — og:image, then twitter:image."""
+    if not html:
+        return None
+    tree = HTMLParser(html)
+    for sel in (
+        'meta[property="og:image"]',
+        'meta[property="og:image:url"]',
+        'meta[name="twitter:image"]',
+        'meta[name="twitter:image:src"]',
+    ):
+        node = tree.css_first(sel)
+        if node:
+            url = (node.attributes.get("content") or "").strip()
+            if url.startswith("http"):
+                return url
+    return None
 
 # Trafilatura defaults are good for major news outlets. `favor_precision`
 # trims marketing rails / comment threads; `include_comments=False`
@@ -84,6 +104,7 @@ def is_low_quality_body(text: str | None) -> bool:
 class ExtractedArticle:
     body: str
     refs: list[dict]
+    image_url: str | None = None
 
 
 def extract_article(url: str) -> str | None:
@@ -115,4 +136,6 @@ def extract_article_full(url: str) -> ExtractedArticle | None:
         downloaded, output_format="html", **_EXTRACT_KWARGS
     )
     refs = extract_refs(html_body) if html_body else []
-    return ExtractedArticle(body=text, refs=refs)
+    # og:image comes off the RAW page (trafilatura's cleaned body strips meta).
+    image_url = _extract_og_image(downloaded)
+    return ExtractedArticle(body=text, refs=refs, image_url=image_url)

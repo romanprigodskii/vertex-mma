@@ -86,6 +86,7 @@ export type NewsFeedItem = {
   published_at: string;
   classification: string;
   source_name: string;
+  image_url: string | null;
   fighters: NewsFighter[];
 };
 
@@ -103,6 +104,7 @@ type FeedRow = {
   classification: string | null;
   related_fighter_ids: string[] | null;
   source_name: string;
+  image_url: string | null;
 };
 
 async function resolveNewsFighters(
@@ -140,6 +142,7 @@ function toFeedItem(row: FeedRow, fighters: NewsFighter[]): NewsFeedItem {
     published_at: row.published_at,
     classification: row.classification ?? "general_news",
     source_name: row.source_name,
+    image_url: row.image_url ?? null,
     fighters,
   };
 }
@@ -154,6 +157,7 @@ function feedSelect(isRu: boolean) {
     ni.published_at::text AS published_at,
     ni.classification::text AS classification,
     ni.related_fighter_ids,
+    ni.image_url,
     ns.name AS source_name
   FROM news_item ni
   JOIN news_source ns ON ns.id = ni.source_id
@@ -269,6 +273,7 @@ export async function listRelatedNews(opts: {
       ni.published_at::text AS published_at,
       ni.classification::text AS classification,
       ni.related_fighter_ids,
+      ni.image_url,
       ns.name AS source_name,
       ${rankExpr} AS rank
     FROM news_item ni

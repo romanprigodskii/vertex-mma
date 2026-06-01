@@ -61,7 +61,8 @@ UPDATE_BODY = """
     SET body            = %s,
         body_rephrased  = NULL,
         processed_at    = NULL,
-        external_refs   = %s::jsonb
+        external_refs   = %s::jsonb,
+        image_url       = COALESCE(image_url, %s)
     WHERE id = %s::uuid
 """
 
@@ -98,7 +99,7 @@ def run() -> dict[str, int]:
             with conn.cursor() as cur:
                 cur.execute(
                     UPDATE_BODY,
-                    (result.body, json.dumps(result.refs), item_id),
+                    (result.body, json.dumps(result.refs), result.image_url, item_id),
                 )
             conn.commit()
             totals["updated"] += 1

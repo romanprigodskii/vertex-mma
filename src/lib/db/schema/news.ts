@@ -76,6 +76,10 @@ export const newsItem = pgTable(
     titleRu: text("title_ru"),
     bodyRephrasedRu: text("body_rephrased_ru"),
     author: text("author"),
+    // Lead image for the feed/cards — og:image from the article (or a
+    // media:thumbnail / enclosure straight off the RSS entry). Nullable; the
+    // UI omits the thumbnail when absent.
+    imageUrl: text("image_url"),
 
     publishedAt: timestamp("published_at", { withTimezone: true }).notNull(),
     fetchedAt: timestamp("fetched_at", { withTimezone: true })
