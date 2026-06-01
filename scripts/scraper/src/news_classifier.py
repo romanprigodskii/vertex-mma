@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -76,6 +77,14 @@ flyweight, bantamweight, featherweight, lightweight, welterweight, \
 middleweight, light_heavyweight, heavyweight, catchweight. Use the underscore \
 form `light_heavyweight`. Use null when not stated.
 
+Event date: ONLY for `bout_announced` items, the calendar date the event takes \
+place, as an ISO date `YYYY-MM-DD`, when a specific date is stated or clearly \
+implied (e.g. "on March 14", "Dec. 6 card", "UFC 330 on Jan 17"). For the year: \
+fights are announced BEFORE they happen, so pick the first occurrence of that \
+month/day ON OR AFTER the item's PUBLISHED date (shown per item); if no \
+PUBLISHED date is given, use the nearest future occurrence. Use null if no date \
+is stated. For every other category, null.
+
 Confidence: 0.0-1.0 — how sure you are of the category. Use lower values for \
 ambiguous or thinly-sourced items.
 
@@ -118,6 +127,8 @@ OUTPUT_SCHEMA = {
                     # rather than via JSON Schema — Anthropic's structured
                     # output rejects `enum` mixed with a nullable type.
                     "weight_class": {"type": ["string", "null"]},
+                    # ISO YYYY-MM-DD; format-validated in code (see below).
+                    "event_date": {"type": ["string", "null"]},
                 },
                 "required": [
                     "index",
@@ -126,6 +137,7 @@ OUTPUT_SCHEMA = {
                     "fighters",
                     "event_hint",
                     "weight_class",
+                    "event_date",
                 ],
                 "additionalProperties": False,
             },
@@ -141,6 +153,7 @@ class ItemInput:
     index: int
     title: str
     body: str | None
+    published_at: str | None = None  # ISO date; anchors event-year inference
 
 
 @dataclass
@@ -150,6 +163,7 @@ class ItemClassification:
     fighters: list[str]
     event_hint: str | None
     weight_class: str | None
+    event_date: str | None  # ISO 'YYYY-MM-DD' or None
 
 
 _client: Anthropic | None = None
@@ -168,8 +182,9 @@ def _build_user_message(items: list[ItemInput]) -> str:
         body = (it.body or "").strip()
         if len(body) > _MAX_BODY_CHARS:
             body = body[:_MAX_BODY_CHARS] + "…"
+        pub = f"\nPUBLISHED: {it.published_at}" if it.published_at else ""
         blocks.append(
-            f"[{it.index}]\nTITLE: {it.title}\nSUMMARY: {body or '(none)'}"
+            f"[{it.index}]{pub}\nTITLE: {it.title}\nSUMMARY: {body or '(none)'}"
         )
     return "Classify these MMA news items:\n\n" + "\n\n".join(blocks)
 
@@ -234,11 +249,19 @@ def classify_batch(items: list[ItemInput]) -> dict[int, ItemClassification]:
             if isinstance(weight_raw, str) and weight_raw in _VALID_WEIGHT
             else None
         )
+        date_raw = row.get("event_date")
+        event_date = (
+            date_raw
+            if isinstance(date_raw, str)
+            and re.fullmatch(r"\d{4}-\d{2}-\d{2}", date_raw)
+            else None
+        )
         out[idx] = ItemClassification(
             classification=classification,
             confidence=confidence,
             fighters=fighters,
             event_hint=event_hint,
             weight_class=weight_class,
+            event_date=event_date,
         )
     return out

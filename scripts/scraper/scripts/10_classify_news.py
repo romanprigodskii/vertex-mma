@@ -6,10 +6,11 @@ from src.db import get_connection
 from src.loaders.news import (
     apply_classification,
     auto_create_bout,
+    cancel_bout_if_provisional,
     fetch_unprocessed,
     find_bout,
-    resolve_event_id,
     resolve_fighter_ids,
+    resolve_or_create_event,
 )
 from src.news_classifier import ItemInput, classify_batch
 from src.utils.logger import log
@@ -17,12 +18,14 @@ from src.utils.logger import log
 BATCH_SIZE = 10
 APPROVE_THRESHOLD = 0.70
 
-# Auto-creating a bout from a news announcement is irreversible-ish (we'd
-# pollute the bout table with bad rows). Gate it aggressively:
+# Auto-creating a bout (and, when needed, a provisional event) from a news
+# announcement is irreversible-ish (we'd pollute the event/bout tables with bad
+# rows). Gate it aggressively:
 #   - Haiku must be at least 85% sure of the classification.
 #   - The source has to be trusted (MMA Junkie / Fighting / Mania / etc.),
 #     so a random tabloid blog can't seed a phantom bout.
-#   - We need both fighters AND an event resolved AND a weight class.
+#   - We need both fighters, a weight class, and an event hint; the event is
+#     resolved or (with a parseable date) created provisionally.
 AUTO_CREATE_BOUT_MIN_CONFIDENCE = 0.85
 
 
@@ -61,6 +64,7 @@ def run() -> dict[str, int]:
         "rejected": 0,
         "failed_batches": 0,
         "bouts_auto_created": 0,
+        "bouts_cancelled": 0,
     }
 
     with get_connection() as conn:
@@ -76,7 +80,12 @@ def run() -> dict[str, int]:
         for bi in range(batch_count):
             batch = items[bi * BATCH_SIZE : (bi + 1) * BATCH_SIZE]
             inputs = [
-                ItemInput(index=i, title=it.title, body=it.body)
+                ItemInput(
+                    index=i,
+                    title=it.title,
+                    body=it.body,
+                    published_at=it.published_at,
+                )
                 for i, it in enumerate(batch)
             ]
             try:
@@ -104,12 +113,14 @@ def run() -> dict[str, int]:
                     else None
                 )
 
-                # If Haiku tagged this as a freshly-announced bout AND we
-                # have everything needed (two known fighters, an event we
-                # already track, a stated weight class, a trusted source,
-                # high confidence) AND no existing bout links the pair —
-                # spin up a scheduled bout row right here so the matchup
-                # surfaces on the event page without a manual touch.
+                # If Haiku tagged this as a freshly-announced bout AND we have
+                # everything needed (two known fighters, a stated weight class,
+                # a trusted source, high confidence) AND no existing bout links
+                # the pair — spin up a scheduled bout so the matchup surfaces on
+                # the event page without a manual touch. The event is resolved
+                # OR created: a brand-new card (announced before UFCStats lists
+                # it — the common case) gets a provisional event, which the
+                # later official scrape adopts rather than duplicates.
                 if (
                     res.classification == "bout_announced"
                     and bout_id is None
@@ -119,8 +130,11 @@ def run() -> dict[str, int]:
                     and res.event_hint
                     and res.weight_class
                 ):
-                    event_id = resolve_event_id(
-                        conn, res.event_hint, cache=event_cache
+                    event_id = resolve_or_create_event(
+                        conn,
+                        res.event_hint,
+                        event_date=res.event_date,
+                        cache=event_cache,
                     )
                     if event_id:
                         new_bout_id, created = auto_create_bout(
@@ -138,6 +152,20 @@ def run() -> dict[str, int]:
                                 f"{res.fighters[1]} @ {res.event_hint} "
                                 f"({res.weight_class}) — {new_bout_id}"
                             )
+
+                # A trusted cancellation report retires a provisional (news-
+                # created) bout so the phantom card doesn't linger. Only ever
+                # touches ufc_stats_id-NULL scheduled rows — official bouts are
+                # left to the scrape.
+                elif (
+                    res.classification == "bout_cancelled"
+                    and bout_id is not None
+                    and item.source_is_trusted
+                    and res.confidence >= AUTO_CREATE_BOUT_MIN_CONFIDENCE
+                ):
+                    if cancel_bout_if_provisional(conn, bout_id):
+                        totals["bouts_cancelled"] += 1
+                        log.info(f"  provisional bout cancelled: {bout_id}")
 
                 status = decide_status(
                     res.classification,
@@ -166,7 +194,8 @@ def run() -> dict[str, int]:
         f"news classify done: classified={totals['classified']} "
         f"auto_approved={totals['auto_approved']} pending={totals['pending']} "
         f"rejected={totals['rejected']} failed_batches={totals['failed_batches']} "
-        f"bouts_auto_created={totals['bouts_auto_created']}"
+        f"bouts_auto_created={totals['bouts_auto_created']} "
+        f"bouts_cancelled={totals['bouts_cancelled']}"
     )
     return totals
 

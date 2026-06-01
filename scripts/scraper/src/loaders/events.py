@@ -53,6 +53,51 @@ def upsert_event_listing(
                 counts.inserted += 1
                 continue
 
+            # Reconcile: claim a provisional event (ufc_stats_id IS NULL) that
+            # the news pipeline created for this card before UFCStats listed it,
+            # so the upsert below updates it IN PLACE — preserving its id and any
+            # attached bouts / markets / predictions — instead of inserting a
+            # duplicate. The provisional name is the news hint ("UFC 330"); the
+            # official name is the full card ("UFC 330: Pereira vs Ankalaev"),
+            # so we match on:
+            #   - exact name, OR
+            #   - the official name STARTING WITH the hint (numbered cards —
+            #     robust even if the LLM's date was wrong), OR
+            #   - same UTC calendar day + a weak name-similarity signal (Fight
+            #     Nights, once the published-date-anchored year is reliable).
+            # The date branch requires a name signal so two different cards on
+            # the same Saturday can't merge. Day comparison is pinned to UTC so
+            # a non-UTC session timezone can't shift the calendar day.
+            cur.execute(
+                """
+                UPDATE event SET ufc_stats_id = %(uid)s
+                WHERE id = (
+                    SELECT e.id FROM event e
+                    WHERE e.ufc_stats_id IS NULL AND e.promotion = 'ufc'
+                      AND (
+                        lower(e.name) = lower(%(name)s)
+                        OR lower(%(name)s) LIKE lower(e.name) || '%%'
+                        OR (
+                          %(date)s IS NOT NULL
+                          AND (e.date AT TIME ZONE 'UTC')::date
+                              = (%(date)s AT TIME ZONE 'UTC')::date
+                          AND similarity(e.name, %(name)s) > 0.3
+                        )
+                      )
+                    ORDER BY
+                      (lower(%(name)s) LIKE lower(e.name) || '%%') DESC,
+                      (lower(e.name) = lower(%(name)s)) DESC,
+                      similarity(e.name, %(name)s) DESC
+                    LIMIT 1
+                )
+                """,
+                {
+                    "uid": item.ufc_stats_id,
+                    "name": item.name,
+                    "date": item.date,
+                },
+            )
+
             cur.execute(
                 """
                 INSERT INTO event (
@@ -188,6 +233,23 @@ def upsert_bouts(
                 counts.inserted += 1
                 continue
 
+            # Reconcile a news-created provisional bout (ufc_stats_id IS NULL)
+            # for the same pair at this event: claim it so the upsert updates it
+            # in place (keeping its id and any linked markets/predictions)
+            # instead of inserting a twin. Exact event + fighter-pair match —
+            # always safe (a pair fights at most once per card).
+            cur.execute(
+                """
+                UPDATE bout SET ufc_stats_id = %s
+                WHERE ufc_stats_id IS NULL AND event_id = %s::uuid
+                  AND (
+                    (fighter_a_id = %s::uuid AND fighter_b_id = %s::uuid)
+                    OR (fighter_a_id = %s::uuid AND fighter_b_id = %s::uuid)
+                  )
+                """,
+                (b.ufc_stats_id, event_id, f_a, f_b, f_b, f_a),
+            )
+
             cur.execute(
                 """
                 INSERT INTO bout (
@@ -209,6 +271,10 @@ def upsert_bouts(
                     is_main_event = EXCLUDED.is_main_event,
                     is_co_main_event = EXCLUDED.is_co_main_event,
                     bout_order = EXCLUDED.bout_order,
+                    -- Refresh scheduled_rounds so a provisional bout the news
+                    -- pipeline created at the default 3 is corrected to the
+                    -- real 5 (title/main event) on official adoption.
+                    scheduled_rounds = EXCLUDED.scheduled_rounds,
                     status = EXCLUDED.status,
                     winner_id = COALESCE(EXCLUDED.winner_id, bout.winner_id),
                     method = COALESCE(EXCLUDED.method, bout.method),

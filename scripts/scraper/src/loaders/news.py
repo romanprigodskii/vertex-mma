@@ -2,11 +2,15 @@
 from __future__ import annotations
 
 import json
+import uuid
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 
 import psycopg
 
 from ..parsers.news import NewsEntry
+from ..utils.logger import log
+from ..utils.slugify import slugify
 
 
 @dataclass
@@ -157,6 +161,9 @@ class UnprocessedItem:
     body: str | None
     source_base_confidence: float
     source_is_trusted: bool
+    # Article publish date (ISO 'YYYY-MM-DD'), used to anchor the classifier's
+    # event-year inference so a backlog item doesn't get a wrong-year date.
+    published_at: str | None
 
 
 def fetch_unprocessed(
@@ -167,7 +174,8 @@ def fetch_unprocessed(
         cur.execute(
             """
             SELECT ni.id::text, ni.title, ni.body,
-                   ns.base_confidence, ns.is_trusted
+                   ns.base_confidence, ns.is_trusted,
+                   to_char(ni.published_at, 'YYYY-MM-DD')
             FROM news_item ni
             JOIN news_source ns ON ns.id = ni.source_id
             WHERE ni.processed_at IS NULL
@@ -183,6 +191,7 @@ def fetch_unprocessed(
                 body=r[2],
                 source_base_confidence=float(r[3]),
                 source_is_trusted=bool(r[4]),
+                published_at=r[5],
             )
             for r in cur.fetchall()
         ]
@@ -294,6 +303,76 @@ def resolve_event_id(
     return eid
 
 
+# A provisional event created from a news booking can land at most this far
+# out; anything beyond is almost certainly a hallucinated/garbled LLM date.
+_MAX_EVENT_HORIZON_DAYS = 540
+
+
+def resolve_or_create_event(
+    conn: psycopg.Connection,
+    event_hint: str | None,
+    *,
+    event_date: str | None,
+    cache: dict[str, str | None] | None = None,
+) -> str | None:
+    """Resolve an event hint to an event_id, CREATING a provisional event when
+    the hint names a card we don't track yet — the common case for a freshly
+    announced bout that UFCStats hasn't listed (this is exactly why most
+    auto-bout attempts used to fail silently).
+
+    A provisional event is a normal `event` row with `ufc_stats_id = NULL`; the
+    UFCStats scrape later ADOPTS it (loaders/events.upsert_event_listing claims
+    the row by setting its ufc_stats_id) instead of inserting a duplicate, so
+    the card — and any bouts/markets/predictions attached to it — survive the
+    transition to official data with their IDs intact.
+
+    Creation needs a parseable `event_date` because `event.date` is NOT NULL; we
+    never invent a date, so when the LLM didn't extract one this degrades to the
+    old resolve-only behaviour (returns None → no bout created). Returns the
+    event_id, or None when nothing resolves and we can't create.
+    """
+    if not event_hint:
+        return None
+    existing = resolve_event_id(conn, event_hint, cache=cache)
+    if existing:
+        return existing
+    if not event_date:
+        return None
+    try:
+        when = datetime.strptime(event_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+    now = datetime.now(timezone.utc)
+    # Guard against bad LLM dates: not meaningfully in the past, not absurdly far out.
+    if when < now - timedelta(days=2) or when > now + timedelta(days=_MAX_EVENT_HORIZON_DAYS):
+        log.warning(
+            f"  provisional event skipped — date {event_date} outside "
+            f"[-2d, +{_MAX_EVENT_HORIZON_DAYS}d] for {event_hint!r}"
+        )
+        return None
+
+    name = event_hint.strip()
+    slug = f"{slugify(name) or 'ufc-event'}-{uuid.uuid4().hex[:6]}"
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO event (
+                slug, name, short_name, promotion, date, status, ufc_stats_id
+            )
+            VALUES (%s, %s, %s, 'ufc', %s, 'upcoming'::event_status, NULL)
+            RETURNING id::text
+            """,
+            (slug, name, name, when),
+        )
+        eid = cur.fetchone()[0]
+    if cache is not None:
+        cache[event_hint.strip().lower()] = eid
+    log.info(
+        f"  provisional event created: {name!r} @ {event_date} — {eid}"
+    )
+    return eid
+
+
 def auto_create_bout(
     conn: psycopg.Connection,
     *,
@@ -337,6 +416,24 @@ def auto_create_bout(
             (event_id, fighter_a_id, fighter_b_id, weight_class),
         )
         return cur.fetchone()[0], True
+
+
+def cancel_bout_if_provisional(conn: psycopg.Connection, bout_id: str) -> bool:
+    """Mark a bout 'cancelled' ONLY if it's a still-scheduled provisional row
+    (ufc_stats_id IS NULL) — i.e. one we auto-created from a news announcement.
+    Never touches an official UFCStats-scraped bout (those are owned by the
+    scrape). Returns True if a row was cancelled. Closes the loop so a
+    'bout_cancelled' news item retires the phantom card it would otherwise
+    leave behind."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE bout SET status = 'cancelled'::bout_status, updated_at = now()
+            WHERE id = %s::uuid AND ufc_stats_id IS NULL AND status = 'scheduled'
+            """,
+            (bout_id,),
+        )
+        return cur.rowcount > 0
 
 
 def apply_classification(
