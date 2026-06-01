@@ -21,6 +21,7 @@
     "db:seed": "tsx src/lib/db/seed.ts",
     "scrape:setup": "cd scripts/scraper && python3 -m venv venv && ./venv/bin/pip install -r requirements.txt",
     "scrape:quick": "cd scripts/scraper && ./venv/bin/python scripts/run_all.py --phase quick",
+    "scrape:refresh": "cd scripts/scraper && SCRAPE_BOUTS_SINCE_DAYS=21 ./venv/bin/python scripts/run_all.py --phase refresh",
     "scrape:enrich": "cd scripts/scraper && ./venv/bin/python scripts/run_all.py --phase enrich",
     "scrape:all": "cd scripts/scraper && ./venv/bin/python scripts/run_all.py --phase all",
     "scrape:country": "cd scripts/scraper && ./venv/bin/python scripts/06_backfill_country.py",

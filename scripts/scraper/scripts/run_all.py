@@ -20,6 +20,10 @@ PHASES = {
 
 PHASE_GROUPS = {
     "quick": ["events", "fighters", "bouts"],
+    # Cheap scheduled refresh: re-list events (2 pages) and re-scrape bouts for
+    # upcoming + recent cards only (set SCRAPE_BOUTS_SINCE_DAYS, e.g. 21). Pull
+    # odds separately via 08 (it has its own entrypoint, no run_all hook).
+    "refresh": ["events", "bouts"],
     "enrich": ["enrich-fighters", "enrich-bouts"],
     "all": [
         "events",

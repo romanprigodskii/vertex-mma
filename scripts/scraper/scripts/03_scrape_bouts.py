@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 import _path  # noqa: F401
 
 from rich.progress import BarColumn, Progress, TextColumn, TimeElapsedColumn
@@ -12,26 +14,46 @@ from src.parsers.event_details import parse_event_details
 from src.utils.logger import log
 
 
-def _all_event_ufc_ids(conn, limit: int | None = None) -> list[str]:
+def _all_event_ufc_ids(
+    conn, limit: int | None = None, since_days: int | None = None
+) -> list[str]:
+    clauses = ["ufc_stats_id IS NOT NULL"]
+    params: list = []
+    if since_days is not None:
+        # Upcoming events (future date) always pass; completed events only when
+        # within the window. Lets a frequent refresh re-scrape upcoming cards
+        # and recent results without re-walking years of finished events.
+        clauses.append("date >= now() - make_interval(days => %s)")
+        params.append(since_days)
+    sql = (
+        "SELECT ufc_stats_id FROM event WHERE "
+        + " AND ".join(clauses)
+        + " ORDER BY date DESC"
+    )
+    if limit is not None:
+        sql += " LIMIT %s"
+        params.append(limit)
     with conn.cursor() as cur:
-        if limit is None:
-            cur.execute(
-                "SELECT ufc_stats_id FROM event WHERE ufc_stats_id IS NOT NULL ORDER BY date DESC"
-            )
-        else:
-            cur.execute(
-                "SELECT ufc_stats_id FROM event WHERE ufc_stats_id IS NOT NULL ORDER BY date DESC LIMIT %s",
-                (limit,),
-            )
+        cur.execute(sql, params)
         return [row[0] for row in cur.fetchall()]
 
 
 def run(*, limit: int | None = None, dry_run: bool = False) -> dict[str, int]:
     totals = {"events_processed": 0, "bouts_inserted": 0, "bouts_updated": 0, "bouts_skipped": 0}
 
+    # SCRAPE_BOUTS_SINCE_DAYS=N restricts to upcoming + events within N days —
+    # the cheap path for the scheduled `refresh` phase. Unset = full backfill.
+    since_env = os.environ.get("SCRAPE_BOUTS_SINCE_DAYS")
+    since_days = (
+        int(since_env) if since_env and since_env.lstrip("-").isdigit() else None
+    )
+
     with Client() as http, get_connection() as conn:
-        event_ids = _all_event_ufc_ids(conn, limit=limit)
-        log.info(f"phase 3: scraping {len(event_ids)} events for bouts")
+        event_ids = _all_event_ufc_ids(conn, limit=limit, since_days=since_days)
+        log.info(
+            f"phase 3: scraping {len(event_ids)} events for bouts "
+            f"(since_days={since_days})"
+        )
 
         with Progress(
             TextColumn("[progress.description]{task.description}"),
