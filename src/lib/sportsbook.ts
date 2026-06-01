@@ -201,6 +201,34 @@ export function applyEdgeGuard(
   return clampProb(Math.min(hi, Math.max(lo, modelProbA)));
 }
 
+/** Threshold (probability points) at which the model's disagreement with the
+ *  market is surfaced as a "value edge" badge on the winner market. The model
+ *  is only market-LEVEL out-of-sample (calibration audit), so this flags
+ *  "our model leans harder than the bookmakers here", NOT a guaranteed +EV. */
+export const VALUE_EDGE_THRESHOLD = 0.07;
+
+/** Signed model-vs-market edge for one winner side, in probability (0–1).
+ *  Positive = the model rates this side higher than the bookmaker consensus.
+ *  `edgeA` is bout_simulation.edge_a = model_prob_a − market_prob_a; null when
+ *  the bout has no market line. */
+export function modelEdgeForSide(
+  edgeA: number | null,
+  side: "a" | "b",
+): number | null {
+  if (edgeA == null || !Number.isFinite(edgeA)) return null;
+  return side === "a" ? edgeA : -edgeA;
+}
+
+/** Whether a winner side clears the value-edge threshold (badge-worthy). */
+export function hasValueEdge(
+  edgeA: number | null,
+  side: "a" | "b",
+  threshold = VALUE_EDGE_THRESHOLD,
+): boolean {
+  const e = modelEdgeForSide(edgeA, side);
+  return e != null && e >= threshold;
+}
+
 /** P(fight goes the distance) = 1 − P(any finish). Driven by the round
  *  finish distribution so it stays consistent with the totals market. */
 function distanceProb(rounds: SportsbookRoundsInput): number {

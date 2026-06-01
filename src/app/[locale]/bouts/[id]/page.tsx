@@ -113,16 +113,22 @@ export default async function BoutDetailPage({ params }: PageProps) {
     bettable ? getCurrentUser() : Promise.resolve(null),
     bettable ? getBoutExternalOdds(bout.id) : Promise.resolve(null),
   ]);
+  // Live devigged market prob (same reference the edge-guard AND the value
+  // badge use, so they never tell inconsistent stories — bout_simulation.edge_a
+  // is computed at predict time and can be stale).
+  const marketProbA = marketProbFromOdds(
+    externalOdds?.winner_a_decimal ?? null,
+    externalOdds?.winner_b_decimal ?? null,
+  );
+  const liveEdgeA =
+    simulation && marketProbA != null ? simulation.probA - marketProbA : null;
   const sportsbookOutcomes =
     bettable && simulation
       ? computeSportsbookOutcomes({
           probA: simulation.probA,
           probB: simulation.probB,
           // Edge-guard the winner prob against the bookmaker consensus.
-          marketProbA: marketProbFromOdds(
-            externalOdds?.winner_a_decimal ?? null,
-            externalOdds?.winner_b_decimal ?? null,
-          ),
+          marketProbA,
           rounds: simulation.rounds
             ? {
                 probKoA: simulation.rounds.probKoA,
@@ -188,6 +194,7 @@ export default async function BoutDetailPage({ params }: PageProps) {
                     }
                   : null
               }
+              edgeA={liveEdgeA}
             />
           </Container>
         ) : null}

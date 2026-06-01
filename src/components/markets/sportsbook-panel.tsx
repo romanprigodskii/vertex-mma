@@ -12,6 +12,8 @@ import {
   type SportsbookOutcome,
   describeSelection,
   formatOdds,
+  hasValueEdge,
+  modelEdgeForSide,
   potentialPayout,
 } from "@/lib/sportsbook";
 import { cn } from "@/lib/utils";
@@ -27,6 +29,9 @@ interface Props {
   signInHref: string;
   /** Bookmaker consensus moneyline (decimal), shown as a reference only. */
   consensus?: { aDecimal: number | null; bDecimal: number | null } | null;
+  /** Model−market winner edge (bout_simulation.edge_a). Drives the "value"
+   *  badge on the winner market; null when the bout has no market line. */
+  edgeA?: number | null;
 }
 
 const MARKET_ORDER: SportsbookMarketKind[] = [
@@ -44,6 +49,7 @@ export function SportsbookPanel({
   userBalance,
   signInHref,
   consensus,
+  edgeA,
 }: Props) {
   const t = useTranslations("sportsbook");
   const router = useRouter();
@@ -212,6 +218,20 @@ export function SportsbookPanel({
                       <span className="mt-1 font-mono text-[10px] tabular text-foreground-subtle">
                         {t("modelPct", { pct: (o.prob * 100).toFixed(0) })}
                       </span>
+                      {o.marketKind === "winner" &&
+                      o.side &&
+                      hasValueEdge(edgeA ?? null, o.side) ? (
+                        <span
+                          title={t("valueTooltip")}
+                          className="mt-1 inline-flex items-center rounded-sm bg-primary/15 px-1.5 py-0.5 font-sans text-[9px] font-semibold uppercase tracking-wide text-primary"
+                        >
+                          {t("valueBadge", {
+                            pp: Math.round(
+                              (modelEdgeForSide(edgeA ?? null, o.side) ?? 0) * 100,
+                            ),
+                          })}
+                        </span>
+                      ) : null}
                     </button>
                   );
                 })}

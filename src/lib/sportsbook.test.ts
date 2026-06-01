@@ -18,14 +18,17 @@ import {
   MAX_ODDS,
   MIN_ODDS,
   MAX_PARLAY_ODDS,
+  VALUE_EDGE_THRESHOLD,
   type BoutResult,
   type SportsbookSimInput,
   applyEdgeGuard,
   combineParlayOdds,
   computeSportsbookOutcomes,
+  hasValueEdge,
   isBoutBettable,
   marketProbFromOdds,
   methodBucket,
+  modelEdgeForSide,
   oddsForMarket,
   potentialPayout,
   reconcileMethodProbs,
@@ -367,6 +370,27 @@ describe("computeSportsbookOutcomes — edge-guard wiring", () => {
     const aSum = aMethods.reduce((s, o) => s + o.prob, 0);
     // A's three method cells should sum to the GUARDED prob (0.39), not 0.28
     assert.ok(Math.abs(aSum - 0.39) < 0.02, `aSum=${aSum}`);
+  });
+});
+
+describe("modelEdgeForSide + hasValueEdge", () => {
+  it("edge for A is edgeA; for B it flips sign", () => {
+    assert.equal(modelEdgeForSide(0.1, "a"), 0.1);
+    assert.ok(Math.abs(modelEdgeForSide(0.1, "b")! + 0.1) < 1e-9);
+    assert.equal(modelEdgeForSide(null, "a"), null);
+  });
+  it("flags the side the model rates above the market past the threshold", () => {
+    // model rates A +10pp over market → value on A, not B
+    assert.equal(hasValueEdge(0.1, "a"), true);
+    assert.equal(hasValueEdge(0.1, "b"), false);
+    // model rates B higher (edgeA negative) → value on B
+    assert.equal(hasValueEdge(-0.1, "b"), true);
+    assert.equal(hasValueEdge(-0.1, "a"), false);
+  });
+  it("below threshold → no badge; null edge → no badge", () => {
+    assert.equal(hasValueEdge(VALUE_EDGE_THRESHOLD - 0.01, "a"), false);
+    assert.equal(hasValueEdge(VALUE_EDGE_THRESHOLD, "a"), true);
+    assert.equal(hasValueEdge(null, "a"), false);
   });
 });
 

@@ -1338,7 +1338,9 @@
     "placeParlay": "Place parlay",
     "needMorePicks": "Add at least 2 picks",
     "parlayPlaced": "Parlay placed — {payout} to win at {odds}",
-    "slipAria": "Parlay slip, {n} picks"
+    "slipAria": "Parlay slip, {n} picks",
+    "valueBadge": "Value +{pp}",
+    "valueTooltip": "Our model rates this side higher than the betting market by this many points. A model lean vs the market — not a guaranteed win."
   },
   "scoreHistory": {
     "metaTitle": "{fighter} · {label} Vertex history",
