@@ -176,6 +176,7 @@ export default async function NewsArticlePage({ params }: PageProps) {
                     src={item.image_url}
                     alt=""
                     loading="lazy"
+                    referrerPolicy="no-referrer"
                     className="max-h-[440px] w-full object-cover"
                   />
                 </figure>

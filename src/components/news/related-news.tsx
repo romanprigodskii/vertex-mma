@@ -43,6 +43,7 @@ export async function RelatedNews({
                   src={item.image_url}
                   alt=""
                   loading="lazy"
+                  referrerPolicy="no-referrer"
                   className="aspect-[16/9] w-full object-cover"
                 />
               ) : null}

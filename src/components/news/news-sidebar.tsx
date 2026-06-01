@@ -160,6 +160,7 @@ function LatestNewsWidget({
                   src={item.image_url}
                   alt=""
                   loading="lazy"
+                  referrerPolicy="no-referrer"
                   className="h-12 w-16 rounded-sm border border-foreground/10 object-cover"
                 />
               </Link>
