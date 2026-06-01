@@ -1342,7 +1342,24 @@
     "valueBadge": "Value +{pp}",
     "valueTooltip": "Our model rates this side higher than the betting market by this many points. A model lean vs the market — not a guaranteed win.",
     "share": "Share",
-    "shareCopied": "Copied!"
+    "shareCopied": "Copied!",
+    "viewShare": "View & share",
+    "done": "Done"
+  },
+  "parlay": {
+    "metaTitle": "{n}-leg parlay · Vertex MMA",
+    "metaDescription": "A {n}-leg parlay at {odds}× on Vertex MMA — every leg has to land.",
+    "kicker": "Vertex Sportsbook · Parlay",
+    "placedBy": "by {name}",
+    "stakeToWin": "{stake} coins to win {payout}",
+    "legsHeading": "Legs",
+    "buildYourOwn": "Build your own parlay →",
+    "statusWon": "Won",
+    "statusLost": "Lost",
+    "statusVoid": "Void",
+    "statusOpen": "Pending",
+    "shareLabel": "Share parlay",
+    "notFound": "Parlay not found"
   },
   "scoreHistory": {
     "metaTitle": "{fighter} · {label} Vertex history",

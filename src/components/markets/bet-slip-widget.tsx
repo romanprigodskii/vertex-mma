@@ -27,11 +27,19 @@ export function BetSlipWidget() {
   const [stake, setStake] = React.useState("100");
   const [pending, setPending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
-  const [success, setSuccess] = React.useState<string | null>(null);
   const [needAuth, setNeedAuth] = React.useState(false);
+  // Set on a successful place so the widget stays mounted to confirm + offer a
+  // share link even though the slip itself is cleared.
+  const [placed, setPlaced] = React.useState<{
+    id?: string;
+    odds: number;
+    payout: number;
+  } | null>(null);
 
   // Avoid SSR/first-paint mismatch — render nothing until the slip hydrates.
-  if (!hydrated || legs.length === 0) return null;
+  if (!hydrated) return null;
+  // Nothing to show: empty slip and no just-placed confirmation.
+  if (legs.length === 0 && !placed) return null;
 
   const combined = combineParlayOdds(legs.map((l) => l.odds));
   const parsedStake = (() => {
@@ -60,7 +68,6 @@ export function BetSlipWidget() {
 
   async function onPlace() {
     setError(null);
-    setSuccess(null);
     setNeedAuth(false);
     if (!enoughLegs || parsedStake < 1) return;
     setPending(true);
@@ -74,14 +81,45 @@ export function BetSlipWidget() {
       setError(res.error);
       return;
     }
-    setSuccess(
-      t("parlayPlaced", {
-        payout: res.potentialPayout ?? payout,
-        odds: formatOdds(res.combinedOdds ?? combined),
-      }),
-    );
+    setPlaced({
+      id: res.parlayId,
+      odds: res.combinedOdds ?? combined,
+      payout: res.potentialPayout ?? payout,
+    });
     clear();
     router.refresh();
+  }
+
+  // Just placed: the slip is cleared, so confirm here + offer a share link.
+  if (legs.length === 0 && placed) {
+    return (
+      <div className="fixed bottom-4 right-4 z-50 w-[min(92vw,360px)] rounded-lg border border-foreground/15 bg-background-elevated/95 p-4 shadow-elevation-2 backdrop-blur">
+        <p className="font-sans text-sm text-streak-win">
+          {t("parlayPlaced", {
+            payout: placed.payout.toLocaleString(),
+            odds: formatOdds(placed.odds),
+          })}
+        </p>
+        <div className="mt-3 flex items-center gap-2">
+          {placed.id ? (
+            <Link
+              href={`/parlay/${placed.id}`}
+              prefetch={false}
+              className="rounded-sm bg-primary px-3 py-1.5 font-display text-xs uppercase tracking-widest text-background-base hover:opacity-90"
+            >
+              {t("viewShare")}
+            </Link>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => setPlaced(null)}
+            className="rounded-sm border border-foreground/15 px-3 py-1.5 font-sans text-xs uppercase tracking-widest text-foreground-muted hover:text-foreground"
+          >
+            {t("done")}
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -201,9 +239,6 @@ export function BetSlipWidget() {
                 <p className="mt-2 font-sans text-xs text-streak-loss" role="alert">
                   {error}
                 </p>
-              ) : null}
-              {success ? (
-                <p className="mt-2 font-sans text-xs text-streak-win">{success}</p>
               ) : null}
             </div>
           </div>

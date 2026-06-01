@@ -6,7 +6,8 @@ import { ChevronLeft } from "lucide-react";
 import { Container } from "@/components/layout/container";
 import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
-import { Link } from "@/i18n/navigation";
+import { ShareButton } from "@/components/share/share-button";
+import { Link, getPathname } from "@/i18n/navigation";
 import { checkAndUnlockAchievements } from "@/lib/achievements";
 import { getCurrentUser } from "@/lib/auth";
 import { listMyBets } from "@/lib/markets";
@@ -44,6 +45,7 @@ export default async function MyBetsPage({
   const t = await getTranslations("me");
   const tMarkets = await getTranslations("markets");
   const tSb = await getTranslations("sportsbook");
+  const tParlay = await getTranslations("parlay");
   const user = await getCurrentUser();
   if (!user) redirect("/signin?next=/me/bets");
   // Settlement runs DB-side (trigger), which can't call the TS achievement
@@ -205,7 +207,16 @@ export default async function MyBetsPage({
                               odds: formatOdds(p.combined_odds),
                             })}
                           </p>
-                          <div className="shrink-0 text-right">
+                          <div className="flex shrink-0 items-center gap-2">
+                            <ShareButton
+                              url={getPathname({ href: `/parlay/${p.parlay_id}`, locale })}
+                              ogImageUrl={`/api/og/parlay/${p.parlay_id}`}
+                              title={tParlay("metaTitle", { n: p.legs.length })}
+                              filename={`vertexmma-parlay-${p.parlay_id.slice(0, 8)}`}
+                              label={tParlay("shareLabel")}
+                              variant="icon"
+                            />
+                            <div className="text-right">
                             {p.status === "won" ? (
                               <p className="font-mono text-xs tabular text-streak-win">
                                 {t("wonSuffix", {
@@ -227,6 +238,7 @@ export default async function MyBetsPage({
                                 {t("pending")} → {p.potential_payout.toLocaleString()}
                               </p>
                             )}
+                            </div>
                           </div>
                         </div>
                         <ul className="mt-2 space-y-1 border-t border-foreground/[0.06] pt-2">

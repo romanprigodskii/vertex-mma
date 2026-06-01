@@ -1342,7 +1342,24 @@
     "valueBadge": "Value +{pp}",
     "valueTooltip": "Наша модель оценивает этот исход выше рынка на столько процентных пунктов. Перевес модели относительно рынка — не гарантия выигрыша.",
     "share": "Поделиться",
-    "shareCopied": "Скопировано!"
+    "shareCopied": "Скопировано!",
+    "viewShare": "Открыть и поделиться",
+    "done": "Готово"
+  },
+  "parlay": {
+    "metaTitle": "Экспресс из {n} · Vertex MMA",
+    "metaDescription": "Экспресс из {n} при кэфе {odds}× на Vertex MMA — должны зайти все ноги.",
+    "kicker": "Vertex Букмекер · Экспресс",
+    "placedBy": "от {name}",
+    "stakeToWin": "{stake} монет к выплате {payout}",
+    "legsHeading": "Ноги",
+    "buildYourOwn": "Собрать свой экспресс →",
+    "statusWon": "Выигрыш",
+    "statusLost": "Проигрыш",
+    "statusVoid": "Возврат",
+    "statusOpen": "В игре",
+    "shareLabel": "Поделиться экспрессом",
+    "notFound": "Экспресс не найден"
   },
   "scoreHistory": {
     "metaTitle": "{fighter} · {label} Vertex-история",

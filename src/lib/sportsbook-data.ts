@@ -41,6 +41,103 @@ export type MyFixedOddsBetRow = {
   event_date: string;
 };
 
+export type PublicParlayLeg = {
+  selection_code: string;
+  decimal_odds: number;
+  status: string;
+  fighter_a_name: string;
+  fighter_a_slug: string;
+  fighter_b_name: string;
+  fighter_b_slug: string;
+  event_name: string;
+  event_slug: string;
+  event_date: string;
+};
+
+export type PublicParlay = {
+  id: string;
+  stake_coins: number;
+  combined_odds: number;
+  potential_payout: number;
+  num_legs: number;
+  status: string;
+  payout: number | null;
+  created_at: string;
+  settled_at: string | null;
+  /** Bettor's PUBLIC profile only — never balance / private fields. */
+  bettor_username: string;
+  bettor_display_name: string | null;
+  bettor_avatar_url: string | null;
+  legs: PublicParlayLeg[];
+};
+
+/**
+ * Public, by-id view of a parlay for the shareable /parlay/[id] page + OG
+ * image. Exposes only the picks, odds, stake/payout, status, and the bettor's
+ * public profile — no balance or other private data. Null when not found.
+ */
+export async function getParlayById(id: string): Promise<PublicParlay | null> {
+  if (!UUID_RE.test(id)) return null;
+  const isRu = await isRuLocale();
+  const headRows = (await db.execute<{
+    id: string;
+    stake_coins: number;
+    combined_odds: number;
+    potential_payout: number;
+    num_legs: number;
+    status: string;
+    payout: number | null;
+    created_at: string;
+    settled_at: string | null;
+    bettor_username: string;
+    bettor_display_name: string | null;
+    bettor_avatar_url: string | null;
+  }>(sql`
+    SELECT
+      p.id::text AS id,
+      p.stake_coins,
+      p.combined_odds::float AS combined_odds,
+      p.potential_payout,
+      p.num_legs,
+      p.status::text AS status,
+      p.payout,
+      p.created_at::text AS created_at,
+      p.settled_at::text AS settled_at,
+      up.username AS bettor_username,
+      up.display_name AS bettor_display_name,
+      up.avatar_url AS bettor_avatar_url
+    FROM parlay p
+    JOIN user_profile up ON up.id = p.user_id
+    WHERE p.id = ${id}::uuid
+    LIMIT 1
+  `)) as unknown as Array<PublicParlay>;
+  const head = headRows[0];
+  if (!head) return null;
+
+  const legRows = (await db.execute<PublicParlayLeg>(sql`
+    SELECT
+      pl.selection_code AS selection_code,
+      pl.decimal_odds::float AS decimal_odds,
+      pl.status::text AS status,
+      ${localizedNameSql("fa", isRu)} AS fighter_a_name,
+      fa.slug AS fighter_a_slug,
+      ${localizedNameSql("fb", isRu)} AS fighter_b_name,
+      fb.slug AS fighter_b_slug,
+      ${localizedEventNameSql("e", isRu)} AS event_name,
+      e.slug AS event_slug,
+      e.date::text AS event_date
+    FROM parlay_leg pl
+    JOIN bout bo ON bo.id = pl.bout_id
+    JOIN event e ON e.id = bo.event_id
+    JOIN fighter fa ON fa.id = bo.fighter_a_id
+    JOIN fighter fb ON fb.id = bo.fighter_b_id
+    WHERE pl.parlay_id = ${id}::uuid
+    ORDER BY pl.created_at ASC
+  `)) as unknown as PublicParlayLeg[];
+
+  return { ...head, legs: legRows };
+}
+
 export type MyParlayLeg = {
   bout_id: string;
   selection_code: string;

@@ -542,6 +542,7 @@ export async function placeParlayAction(
   stake: number,
 ): Promise<{
   error?: string;
+  parlayId?: string;
   combinedOdds?: number;
   potentialPayout?: number;
   newlyUnlocked?: string[];
@@ -596,6 +597,7 @@ export async function placeParlayAction(
   const combinedOdds = combineParlayOdds(pricedLegs.map((p) => p.decimalOdds));
   const payout = potentialPayout(stakeInt, combinedOdds);
 
+  let createdParlayId: string | null = null;
   try {
     await db.transaction(async (tx) => {
       const balanceRows = (await tx.execute<{ balance_coins: number }>(sql`
@@ -612,6 +614,7 @@ export async function placeParlayAction(
       `)) as unknown as Array<{ id: string }>;
       const parlayId = parlayRows[0]?.id;
       if (!parlayId) throw new Error("Could not create parlay.");
+      createdParlayId = parlayId;
 
       for (const leg of pricedLegs) {
         await tx.execute(sql`
@@ -645,5 +648,10 @@ export async function placeParlayAction(
 
   const newlyUnlocked = await checkAndUnlockAchievements(profile.id);
   revalidatePath("/me/bets");
-  return { combinedOdds, potentialPayout: payout, newlyUnlocked };
+  return {
+    parlayId: createdParlayId ?? undefined,
+    combinedOdds,
+    potentialPayout: payout,
+    newlyUnlocked,
+  };
 }

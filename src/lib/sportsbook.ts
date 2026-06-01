@@ -561,6 +561,35 @@ export function describeSelection(
   }
 }
 
+/** Plain-English label for a selection (for the OG image / non-localised
+ *  contexts). The localised UI builds its own from `describeSelection` + the
+ *  `sportsbook` i18n namespace. */
+export function selectionLabelEn(
+  code: SportsbookSelectionCode,
+  fighterAName: string,
+  fighterBName: string,
+): string {
+  const d = describeSelection(code);
+  const name = d.side === "a" ? fighterAName : fighterBName;
+  switch (d.marketKind) {
+    case "winner":
+      return name;
+    case "method": {
+      const m =
+        d.methodKey === "ko"
+          ? "by KO/TKO"
+          : d.methodKey === "sub"
+            ? "by submission"
+            : "by decision";
+      return `${name} ${m}`;
+    }
+    case "total_rounds":
+      return d.totalKey === "over" ? "Over 2.5 rounds" : "Under 2.5 rounds";
+    case "distance":
+      return d.distanceKey === "yes" ? "Goes the distance" : "Doesn't go the distance";
+  }
+}
+
 const ALL_SELECTION_CODES: SportsbookSelectionCode[] = [
   "win_a", "win_b",
   "a_ko", "a_sub", "a_dec", "b_ko", "b_sub", "b_dec",
