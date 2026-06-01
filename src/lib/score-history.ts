@@ -3,6 +3,9 @@ import { sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { isRuLocale, localizedColSql, localizedNameSql } from "@/lib/i18n-name";
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /**
  * Wave 31.7 — peak vertex history for a fighter.
  *
@@ -179,31 +182,39 @@ export async function getPeakVertex(
   const isRu = await isRuLocale();
   const idsToFetch = [...combined.peak_bout_ids];
   if (combined.end_bout_id) idsToFetch.push(combined.end_bout_id);
-  const idList = sql.join(
-    idsToFetch.map((id) => sql`${id}::uuid`),
-    sql`, `,
-  );
-  const boutDetailRowsResult = await db.execute<BoutDetailRow>(sql`
-    SELECT
-      b.id::text,
-      e.date::text AS event_date,
-      ${localizedColSql("e.name", "e.name_ru", isRu)} AS event_name,
-      e.slug AS event_slug,
-      b.method::text AS method,
-      b.winner_id::text AS winner_id,
-      b.fighter_a_id::text AS fighter_a_id,
-      b.fighter_b_id::text AS fighter_b_id,
-      ${localizedNameSql("fa", isRu)} AS fighter_a_name,
-      fa.slug AS fighter_a_slug,
-      ${localizedNameSql("fb", isRu)} AS fighter_b_name,
-      fb.slug AS fighter_b_slug
-    FROM bout b
-    JOIN event e ON e.id = b.event_id
-    JOIN fighter fa ON fa.id = b.fighter_a_id
-    JOIN fighter fb ON fb.id = b.fighter_b_id
-    WHERE b.id IN (${idList})
-  `);
-  const boutDetailRows = boutDetailRowsResult as unknown as BoutDetailRow[];
+  // as_of_bout_id is NULL for 'monthly' snapshots, so array_agg can surface
+  // "NULL" string elements — filter to real UUIDs before the ::uuid cast.
+  // A bare 'NULL'::uuid throws 22P02 and 500s the score-history page; an
+  // empty list would also produce invalid `IN ()`, so guard that too.
+  const validIds = [...new Set(idsToFetch.filter((id) => UUID_RE.test(id)))];
+  let boutDetailRows: BoutDetailRow[] = [];
+  if (validIds.length > 0) {
+    const idList = sql.join(
+      validIds.map((id) => sql`${id}::uuid`),
+      sql`, `,
+    );
+    const boutDetailRowsResult = await db.execute<BoutDetailRow>(sql`
+      SELECT
+        b.id::text,
+        e.date::text AS event_date,
+        ${localizedColSql("e.name", "e.name_ru", isRu)} AS event_name,
+        e.slug AS event_slug,
+        b.method::text AS method,
+        b.winner_id::text AS winner_id,
+        b.fighter_a_id::text AS fighter_a_id,
+        b.fighter_b_id::text AS fighter_b_id,
+        ${localizedNameSql("fa", isRu)} AS fighter_a_name,
+        fa.slug AS fighter_a_slug,
+        ${localizedNameSql("fb", isRu)} AS fighter_b_name,
+        fb.slug AS fighter_b_slug
+      FROM bout b
+      JOIN event e ON e.id = b.event_id
+      JOIN fighter fa ON fa.id = b.fighter_a_id
+      JOIN fighter fb ON fb.id = b.fighter_b_id
+      WHERE b.id IN (${idList})
+    `);
+    boutDetailRows = boutDetailRowsResult as unknown as BoutDetailRow[];
+  }
   const boutMap = new Map<string, BoutDetailRow>();
   for (const b of boutDetailRows) boutMap.set(b.id, b);
 
