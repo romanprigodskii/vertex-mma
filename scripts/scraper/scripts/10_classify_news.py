@@ -11,6 +11,7 @@ from src.loaders.news import (
     find_bout,
     resolve_fighter_ids,
     resolve_or_create_event,
+    update_provisional_bout,
 )
 from src.news_classifier import ItemInput, classify_batch
 from src.utils.logger import log
@@ -65,6 +66,7 @@ def run() -> dict[str, int]:
         "failed_batches": 0,
         "bouts_auto_created": 0,
         "bouts_cancelled": 0,
+        "bouts_updated": 0,
     }
 
     with get_connection() as conn:
@@ -167,6 +169,25 @@ def run() -> dict[str, int]:
                         totals["bouts_cancelled"] += 1
                         log.info(f"  provisional bout cancelled: {bout_id}")
 
+                # A trusted "details changed" report (opponent stays, date or
+                # weight moved) updates the provisional bout/card in place.
+                # Opponent SWAPS surface separately as a fresh bout_announced
+                # for the new pair, so we don't guess them here.
+                elif (
+                    res.classification == "bout_changed"
+                    and bout_id is not None
+                    and item.source_is_trusted
+                    and res.confidence >= AUTO_CREATE_BOUT_MIN_CONFIDENCE
+                ):
+                    if update_provisional_bout(
+                        conn,
+                        bout_id,
+                        weight_class=res.weight_class,
+                        event_date=res.event_date,
+                    ):
+                        totals["bouts_updated"] += 1
+                        log.info(f"  provisional bout updated (changed): {bout_id}")
+
                 status = decide_status(
                     res.classification,
                     res.confidence,
@@ -195,7 +216,8 @@ def run() -> dict[str, int]:
         f"auto_approved={totals['auto_approved']} pending={totals['pending']} "
         f"rejected={totals['rejected']} failed_batches={totals['failed_batches']} "
         f"bouts_auto_created={totals['bouts_auto_created']} "
-        f"bouts_cancelled={totals['bouts_cancelled']}"
+        f"bouts_cancelled={totals['bouts_cancelled']} "
+        f"bouts_updated={totals['bouts_updated']}"
     )
     return totals
 

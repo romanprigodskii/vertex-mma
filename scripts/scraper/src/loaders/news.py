@@ -118,6 +118,24 @@ def upsert_news_items(
     counts = UpsertCounts()
     with conn.cursor() as cur:
         for e in entries:
+            # Skip near-duplicate stories (the same booking re-reported across
+            # outlets, or a re-post) via pg_trgm title similarity within a
+            # recent window — otherwise the feed fills with the same headline.
+            # Exact-URL dupes are still caught by ON CONFLICT below. Same-batch
+            # dupes are caught too: an earlier insert is visible to this SELECT
+            # within the open transaction.
+            cur.execute(
+                """
+                SELECT 1 FROM news_item
+                WHERE similarity(title, %s) > 0.85
+                  AND published_at > now() - interval '7 days'
+                LIMIT 1
+                """,
+                (e.title,),
+            )
+            if cur.fetchone() is not None:
+                counts.skipped += 1
+                continue
             cur.execute(
                 """
                 INSERT INTO news_item (
@@ -434,6 +452,56 @@ def cancel_bout_if_provisional(conn: psycopg.Connection, bout_id: str) -> bool:
             (bout_id,),
         )
         return cur.rowcount > 0
+
+
+def update_provisional_bout(
+    conn: psycopg.Connection,
+    bout_id: str,
+    *,
+    weight_class: str | None = None,
+    event_date: str | None = None,
+) -> bool:
+    """Apply a `bout_changed` announcement to a still-provisional bout
+    (ufc_stats_id NULL, scheduled): a weight-class change, and/or a card date
+    change on its provisional event. Never touches official scraped rows (those
+    are owned by the UFCStats scrape). Returns True if anything changed."""
+    changed = False
+    with conn.cursor() as cur:
+        if weight_class:
+            cur.execute(
+                """
+                UPDATE bout SET weight_class = %s::weight_class, updated_at = now()
+                WHERE id = %s::uuid AND ufc_stats_id IS NULL AND status = 'scheduled'
+                  AND weight_class <> %s::weight_class
+                """,
+                (weight_class, bout_id, weight_class),
+            )
+            changed = changed or cur.rowcount > 0
+        if event_date:
+            try:
+                when = datetime.strptime(event_date, "%Y-%m-%d").replace(
+                    tzinfo=timezone.utc
+                )
+            except ValueError:
+                when = None
+            if when is not None:
+                # Move the (provisional) event's date — shifts the whole card,
+                # which is correct for a date change. Only if the event itself
+                # is still provisional.
+                cur.execute(
+                    """
+                    UPDATE event SET date = %s, updated_at = now()
+                    WHERE ufc_stats_id IS NULL
+                      AND id = (
+                        SELECT event_id FROM bout
+                        WHERE id = %s::uuid AND ufc_stats_id IS NULL
+                      )
+                      AND date::date <> %s::date
+                    """,
+                    (when, bout_id, when),
+                )
+                changed = changed or cur.rowcount > 0
+    return changed
 
 
 def apply_classification(

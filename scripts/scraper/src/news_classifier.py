@@ -72,14 +72,16 @@ is FOR, exactly as written (e.g. "UFC 330", "UFC Fight Night: Whittaker vs \
 Costa", "UFC on ESPN 60"). Use null if you can't find a specific event name \
 in the text, or for any other category.
 
-Weight class: ONLY for `bout_announced` items, return one of: strawweight, \
-flyweight, bantamweight, featherweight, lightweight, welterweight, \
-middleweight, light_heavyweight, heavyweight, catchweight. Use the underscore \
-form `light_heavyweight`. Use null when not stated.
+Weight class: for `bout_announced` and `bout_changed` items, return one of: \
+strawweight, flyweight, bantamweight, featherweight, lightweight, welterweight, \
+middleweight, light_heavyweight, heavyweight, catchweight (for a change, the NEW \
+weight class). Use the underscore form `light_heavyweight`. Use null when not \
+stated and for other categories.
 
-Event date: ONLY for `bout_announced` items, the calendar date the event takes \
-place, as an ISO date `YYYY-MM-DD`, when a specific date is stated or clearly \
-implied (e.g. "on March 14", "Dec. 6 card", "UFC 330 on Jan 17"). For the year: \
+Event date: for `bout_announced` and `bout_changed` items, the calendar date the \
+event takes place (for a change, the NEW date), as an ISO date `YYYY-MM-DD`, when \
+a specific date is stated or clearly implied (e.g. "on March 14", "Dec. 6 card", \
+"UFC 330 on Jan 17"). For the year: \
 fights are announced BEFORE they happen, so pick the first occurrence of that \
 month/day ON OR AFTER the item's PUBLISHED date (shown per item); if no \
 PUBLISHED date is given, use the nearest future occurrence. Use null if no date \
