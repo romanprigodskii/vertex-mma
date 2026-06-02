@@ -181,3 +181,27 @@ export const newsCommentFlag = pgTable(
     index("news_comment_flag_comment_idx").on(table.commentId),
   ],
 );
+
+/** One up/down vote per user per comment. `dir` is +1 (up) or -1 (down). The
+ *  denormalized upvotes/downvotes counts on news_comment are recomputed from
+ *  this table on each vote. */
+export const newsCommentVote = pgTable(
+  "news_comment_vote",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    commentId: uuid("comment_id")
+      .notNull()
+      .references(() => newsComment.id, { onDelete: "cascade" }),
+    userProfileId: uuid("user_profile_id")
+      .notNull()
+      .references(() => userProfile.id, { onDelete: "cascade" }),
+    dir: integer("dir").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    unique("news_comment_vote_unique").on(table.commentId, table.userProfileId),
+    index("news_comment_vote_comment_idx").on(table.commentId),
+  ],
+);

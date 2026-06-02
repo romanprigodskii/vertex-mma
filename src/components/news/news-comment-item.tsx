@@ -7,6 +7,7 @@ import { ArrowBigUp, ArrowBigDown, Flag, MoreHorizontal } from "lucide-react";
 import {
   deleteCommentAction,
   reportCommentAction,
+  voteCommentAction,
 } from "@/app/[locale]/news/[id]/actions";
 import {
   CommenterAvatar,
@@ -59,8 +60,25 @@ export function CommentItem({
   const [replying, setReplying] = React.useState(false);
   const [deleted, setDeleted] = React.useState(false);
   const [reported, setReported] = React.useState(false);
+  const [up, setUp] = React.useState(comment.upvotes);
+  const [down, setDown] = React.useState(comment.downvotes);
+  const [userVote, setUserVote] = React.useState(comment.userVote);
+  const [voting, setVoting] = React.useState(false);
   const isOwner = currentAuthor?.userProfileId === comment.author.userProfileId;
   const canReply = Boolean(currentAuthor);
+  const canVote = Boolean(currentAuthor);
+
+  async function onVote(dir: 1 | -1) {
+    if (!canVote || voting) return;
+    setVoting(true);
+    const res = await voteCommentAction({ commentId: comment.id, dir });
+    setVoting(false);
+    if (res.ok) {
+      setUp(res.upvotes);
+      setDown(res.downvotes);
+      setUserVote(res.userVote);
+    }
+  }
   const canModerate = Boolean(currentAuthor?.isStaff);
   const canDelete = isOwner || canModerate;
   const canReport = Boolean(currentAuthor) && !isOwner;
@@ -93,17 +111,35 @@ export function CommentItem({
         <div className="mt-1.5 flex items-center gap-3 font-mono text-[11px] tracking-wide text-foreground-subtle">
           <button
             type="button"
-            className="inline-flex items-center gap-1 transition-colors hover:text-foreground"
+            onClick={() => onVote(1)}
+            disabled={!canVote || voting}
+            aria-pressed={userVote === 1}
+            className={cn(
+              "inline-flex items-center gap-1 transition-colors hover:text-foreground disabled:hover:text-foreground-subtle",
+              userVote === 1 && "text-primary",
+            )}
             aria-label={t("upvote")}
           >
-            <ArrowBigUp className="h-3.5 w-3.5" /> {comment.upvotes}
+            <ArrowBigUp
+              className={cn("h-3.5 w-3.5", userVote === 1 && "fill-current")}
+            />{" "}
+            {up}
           </button>
           <button
             type="button"
-            className="inline-flex items-center gap-1 transition-colors hover:text-foreground"
+            onClick={() => onVote(-1)}
+            disabled={!canVote || voting}
+            aria-pressed={userVote === -1}
+            className={cn(
+              "inline-flex items-center gap-1 transition-colors hover:text-foreground disabled:hover:text-foreground-subtle",
+              userVote === -1 && "text-streak-loss",
+            )}
             aria-label={t("downvote")}
           >
-            <ArrowBigDown className="h-3.5 w-3.5" /> {comment.downvotes}
+            <ArrowBigDown
+              className={cn("h-3.5 w-3.5", userVote === -1 && "fill-current")}
+            />{" "}
+            {down}
           </button>
           {canReply && !isReply ? (
             <button

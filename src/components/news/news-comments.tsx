@@ -11,10 +11,11 @@ import {
 export async function NewsComments({ newsItemId }: { newsItemId: string }) {
   const t = await getTranslations("news");
   const tNav = await getTranslations("nav");
-  const [{ comments, total }, currentUser] = await Promise.all([
-    listCommentsForNews(newsItemId),
-    getCommentAuthor(),
-  ]);
+  const currentUser = await getCommentAuthor();
+  const { comments, total } = await listCommentsForNews(
+    newsItemId,
+    currentUser?.userProfileId ?? null,
+  );
 
   return (
     <section className="mt-14 border-t border-foreground/10 pt-8">

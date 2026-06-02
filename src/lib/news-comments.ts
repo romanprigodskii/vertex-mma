@@ -1,11 +1,15 @@
 import "server-only";
 
 import { revalidatePath } from "next/cache";
-import { and, asc, desc, eq, isNull, gt } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, gt, sql } from "drizzle-orm";
 
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { newsComment, newsCommentFlag } from "@/lib/db/schema/news";
+import {
+  newsComment,
+  newsCommentFlag,
+  newsCommentVote,
+} from "@/lib/db/schema/news";
 import { userProfile } from "@/lib/db/schema/users";
 
 const UUID_RE =
@@ -24,6 +28,8 @@ export type CommentNode = {
   body: string;
   upvotes: number;
   downvotes: number;
+  /** Current viewer's vote on this comment: 1, -1, or 0 (none / signed out). */
+  userVote: number;
   createdAt: string;
   author: CommentAuthor;
   replies: CommentNode[];
@@ -31,6 +37,7 @@ export type CommentNode = {
 
 export async function listCommentsForNews(
   newsItemId: string,
+  currentUserProfileId?: string | null,
 ): Promise<{ comments: CommentNode[]; total: number }> {
   if (!UUID_RE.test(newsItemId)) return { comments: [], total: 0 };
 
@@ -79,6 +86,20 @@ export async function listCommentsForNews(
     return { comments: [], total: 0 };
   }
 
+  // The viewer's own votes, so the UI can highlight the active arrow.
+  const voteMap = new Map<string, number>();
+  if (currentUserProfileId && UUID_RE.test(currentUserProfileId) && rows.length) {
+    try {
+      const votes = await db
+        .select({ commentId: newsCommentVote.commentId, dir: newsCommentVote.dir })
+        .from(newsCommentVote)
+        .where(eq(newsCommentVote.userProfileId, currentUserProfileId));
+      for (const v of votes) voteMap.set(v.commentId, v.dir);
+    } catch {
+      // Votes table not pushed yet → treat as no votes.
+    }
+  }
+
   const byId = new Map<string, CommentNode>();
   const tops: CommentNode[] = [];
   const replyBuckets = new Map<string, CommentNode[]>();
@@ -89,6 +110,7 @@ export async function listCommentsForNews(
       body: r.body,
       upvotes: r.upvotes,
       downvotes: r.downvotes,
+      userVote: voteMap.get(r.id) ?? 0,
       createdAt: r.createdAt.toISOString(),
       author: {
         userProfileId: r.userProfileId,
@@ -261,6 +283,80 @@ export async function flagComment(
     return { ok: true };
   }
   return { ok: true };
+}
+
+export type VoteCommentResult =
+  | { ok: true; upvotes: number; downvotes: number; userVote: number }
+  | { ok: false; error: string };
+
+/**
+ * Cast / toggle a vote on a comment. Same direction twice clears it; the
+ * opposite flips it. Recomputes the denormalized counts on news_comment from
+ * the votes table. Idempotent per (comment, user) via the unique index.
+ */
+export async function voteComment(
+  commentId: string,
+  dir: 1 | -1,
+): Promise<VoteCommentResult> {
+  if (!UUID_RE.test(commentId)) return { ok: false, error: "Bad id" };
+  if (dir !== 1 && dir !== -1) return { ok: false, error: "Bad direction" };
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, error: "Sign in" };
+
+  const rows = await db
+    .select({
+      newsItemId: newsComment.newsItemId,
+      deletedAt: newsComment.deletedAt,
+    })
+    .from(newsComment)
+    .where(eq(newsComment.id, commentId))
+    .limit(1);
+  if (rows.length === 0 || rows[0].deletedAt) {
+    return { ok: false, error: "Not found" };
+  }
+
+  const where = and(
+    eq(newsCommentVote.commentId, commentId),
+    eq(newsCommentVote.userProfileId, user.userProfileId),
+  );
+  try {
+    const existing = await db
+      .select({ dir: newsCommentVote.dir })
+      .from(newsCommentVote)
+      .where(where)
+      .limit(1);
+
+    let userVote: number;
+    if (existing.length === 0) {
+      await db
+        .insert(newsCommentVote)
+        .values({ commentId, userProfileId: user.userProfileId, dir });
+      userVote = dir;
+    } else if (existing[0].dir === dir) {
+      await db.delete(newsCommentVote).where(where);
+      userVote = 0;
+    } else {
+      await db.update(newsCommentVote).set({ dir }).where(where);
+      userVote = dir;
+    }
+
+    const agg = (await db.execute<{ up: number; down: number }>(sql`
+      SELECT
+        COUNT(*) FILTER (WHERE dir = 1)::int AS up,
+        COUNT(*) FILTER (WHERE dir = -1)::int AS down
+      FROM news_comment_vote WHERE comment_id = ${commentId}::uuid
+    `)) as unknown as Array<{ up: number; down: number }>;
+    const counts = agg[0] ?? { up: 0, down: 0 };
+    await db
+      .update(newsComment)
+      .set({ upvotes: counts.up, downvotes: counts.down })
+      .where(eq(newsComment.id, commentId));
+
+    revalidatePath(`/news/${rows[0].newsItemId}`);
+    return { ok: true, upvotes: counts.up, downvotes: counts.down, userVote };
+  } catch {
+    return { ok: false, error: "Vote failed" };
+  }
 }
 
 export async function softDeleteComment(commentId: string): Promise<{
