@@ -47,10 +47,10 @@ export const config = {
     /*
      * Match all paths except:
      *   - _next/static, _next/image  (build assets)
-     *   - favicon.ico, sitemap.xml, robots.txt  (metadata files)
+     *   - favicon.ico, sitemap.xml, robots.txt, manifest.webmanifest  (metadata files)
      *   - api/* and auth/*  (locale prefix doesn't make sense here)
      *   - common image extensions
      */
-    "/((?!api|auth|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!api|auth|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|manifest.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
