@@ -35,6 +35,7 @@ export async function generateMetadata({ params }: PageProps) {
         count: card.bouts.length,
         username: card.author_username,
       });
+  const ogImage = `/api/og/cards/${card.slug}`;
   return {
     title: `${card.title} · ${t("byUser")} @${card.author_username}`,
     description: desc,
@@ -43,7 +44,9 @@ export async function generateMetadata({ params }: PageProps) {
       description: desc,
       siteName: "Vertex MMA",
       type: "article",
+      images: [{ url: ogImage, width: 1200, height: 630, alt: card.title }],
     },
+    twitter: { card: "summary_large_image", images: [ogImage] },
   };
 }
 
@@ -169,6 +172,7 @@ export default async function CardViewPage({ params }: PageProps) {
             <FightCardActions
               cardId={card.id}
               slug={card.slug}
+              title={card.title}
               initialLiked={liked}
               initialLikeCount={card.like_count}
               isSignedIn={Boolean(currentUser)}

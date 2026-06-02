@@ -2,15 +2,17 @@
 
 import * as React from "react";
 import { useTranslations } from "next-intl";
-import { Check, Heart, Link2 } from "lucide-react";
+import { Heart } from "lucide-react";
 
 import { toggleLikeAction } from "@/app/[locale]/cards/actions";
+import { ShareButton } from "@/components/share/share-button";
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 
 interface Props {
   cardId: string;
   slug: string;
+  title: string;
   initialLiked: boolean;
   initialLikeCount: number;
   isSignedIn: boolean;
@@ -22,6 +24,7 @@ const BTN =
 export function FightCardActions({
   cardId,
   slug,
+  title,
   initialLiked,
   initialLikeCount,
   isSignedIn,
@@ -30,7 +33,6 @@ export function FightCardActions({
   const [liked, setLiked] = React.useState(initialLiked);
   const [count, setCount] = React.useState(initialLikeCount);
   const [pending, setPending] = React.useState(false);
-  const [copied, setCopied] = React.useState(false);
 
   async function onLike() {
     if (pending) return;
@@ -50,20 +52,6 @@ export function FightCardActions({
     }
     if (typeof res.liked === "boolean") setLiked(res.liked);
     if (typeof res.likeCount === "number") setCount(res.likeCount);
-  }
-
-  async function onCopy() {
-    const url =
-      typeof window !== "undefined"
-        ? `${window.location.origin}/cards/${slug}`
-        : `/cards/${slug}`;
-    try {
-      await navigator.clipboard.writeText(url);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      // Locked-down browsers — no-op rather than throw.
-    }
   }
 
   return (
@@ -102,21 +90,13 @@ export function FightCardActions({
         </Link>
       )}
 
-      <button
-        type="button"
-        onClick={onCopy}
-        className={cn(
-          BTN,
-          "border-foreground/15 text-foreground-muted hover:bg-foreground/[0.05] hover:text-foreground",
-        )}
-      >
-        {copied ? (
-          <Check className="h-4 w-4 text-streak-win" aria-hidden />
-        ) : (
-          <Link2 className="h-4 w-4" aria-hidden />
-        )}
-        <span>{copied ? t("linkCopied") : t("copyLink")}</span>
-      </button>
+      <ShareButton
+        url={`/cards/${slug}`}
+        ogImageUrl={`/api/og/cards/${slug}`}
+        title={title}
+        filename={`vertexmma-card-${slug}`}
+        label={t("share")}
+      />
     </div>
   );
 }
