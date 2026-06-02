@@ -35,6 +35,8 @@
     "markets:generate": "tsx scripts/generate_markets.ts",
     "markets:generate:dry": "tsx scripts/generate_markets.ts --limit=5",
     "markets:settle": "tsx scripts/settle_market.ts",
+    "markets:settle:fixed": "tsx scripts/settle_fixed_odds.ts",
+    "apply:comment-flags": "tsx scripts/apply_comment_flags.ts",
     "markets:refund": "tsx scripts/refund_market.ts",
     "markets:reseed": "tsx scripts/reseed_market_prices.ts",
     "odds:scrape": "cd scripts/scraper && ./venv/bin/python scripts/08_scrape_bestfightodds.py",

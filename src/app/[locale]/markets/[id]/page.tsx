@@ -61,6 +61,9 @@ export default async function MarketDetailPage({ params }: PageProps) {
   const t = await getTranslations("markets");
   const tSb = await getTranslations("sportsbook");
   const dateLocale = locale === "ru" ? "ru-RU" : "en-US";
+  // Method panel sub-labels (KO/Sub/Dec), localized; order matches the
+  // outcome order_index layout (0/1/2 per fighter).
+  const methodSubLabels = [t("byKoTko"), t("bySubmission"), t("byDecision")];
   const market = await getMarketById(id);
   if (!market) notFound();
 
@@ -166,10 +169,14 @@ export default async function MarketDetailPage({ params }: PageProps) {
               <FighterOutcomesPanel
                 fighterName={market.fighter_a_name}
                 outcomes={market.outcomes.filter((o) => o.order_index < 3)}
+                methodLabels={methodSubLabels}
+                sharesAbbrev={t("sharesAbbrev")}
               />
               <FighterOutcomesPanel
                 fighterName={market.fighter_b_name}
                 outcomes={market.outcomes.filter((o) => o.order_index >= 3)}
+                methodLabels={methodSubLabels}
+                sharesAbbrev={t("sharesAbbrev")}
               />
             </div>
           ) : market.type === "round" ? (
@@ -190,7 +197,7 @@ export default async function MarketDetailPage({ params }: PageProps) {
                     {priceToDecimalOdds(o.current_price)}x
                   </p>
                   <p className="mt-1 font-mono text-[10px] tabular text-foreground-subtle">
-                    {o.current_shares.toFixed(1)} sh
+                    {o.current_shares.toFixed(1)} {t("sharesAbbrev")}
                   </p>
                 </div>
               ))}
@@ -213,7 +220,7 @@ export default async function MarketDetailPage({ params }: PageProps) {
                     {priceToDecimalOdds(o.current_price)}x
                   </p>
                   <p className="mt-1 font-mono text-[10px] tabular text-foreground-subtle">
-                    {o.current_shares.toFixed(1)} shares outstanding
+                    {t("sharesOutstanding", { shares: o.current_shares.toFixed(1) })}
                   </p>
                 </div>
               ))}
@@ -223,7 +230,7 @@ export default async function MarketDetailPage({ params }: PageProps) {
           <div className="mt-8">
             {closed ? (
               <p className="rounded-md border border-foreground/10 bg-background-elevated/30 px-4 py-6 text-center font-sans text-sm text-foreground-muted">
-                Market is closed.
+                {t("marketClosed")}
               </p>
             ) : user ? (
               <BetForm market={market} userBalance={user.balanceCoins} />
@@ -232,7 +239,7 @@ export default async function MarketDetailPage({ params }: PageProps) {
                 href={`/signin?next=/markets/${market.id}`}
                 className="inline-block rounded-sm bg-primary px-4 py-2.5 font-display text-sm uppercase tracking-widest text-background-base hover:opacity-90"
               >
-                Sign in to bet
+                {t("signInToBet")}
               </Link>
             )}
           </div>
@@ -249,15 +256,15 @@ export default async function MarketDetailPage({ params }: PageProps) {
           <dl className="mt-10 grid grid-cols-3 gap-2 sm:gap-4">
             <div className="rounded-md border border-foreground/10 bg-background-elevated/30 px-2.5 py-3 sm:px-4">
               <dt className="font-sans text-[10px] uppercase tracking-widest text-foreground-subtle">
-                Volume
+                {t("statVolume")}
               </dt>
               <dd className="mt-1 font-display text-xl tabular text-foreground">
-                {market.total_volume.toLocaleString()}
+                {market.total_volume.toLocaleString(dateLocale)}
               </dd>
             </div>
             <div className="rounded-md border border-foreground/10 bg-background-elevated/30 px-2.5 py-3 sm:px-4">
               <dt className="font-sans text-[10px] uppercase tracking-widest text-foreground-subtle">
-                Traders
+                {t("statTraders")}
               </dt>
               <dd className="mt-1 font-display text-xl tabular text-foreground">
                 {market.unique_traders}
@@ -265,10 +272,10 @@ export default async function MarketDetailPage({ params }: PageProps) {
             </div>
             <div className="rounded-md border border-foreground/10 bg-background-elevated/30 px-2.5 py-3 sm:px-4">
               <dt className="font-sans text-[10px] uppercase tracking-widest text-foreground-subtle">
-                Closes
+                {t("statCloses")}
               </dt>
               <dd className="mt-1 font-mono text-xs tabular text-foreground">
-                {new Date(market.closes_at).toLocaleString("en-US", {
+                {new Date(market.closes_at).toLocaleString(dateLocale, {
                   month: "short",
                   day: "numeric",
                   hour: "numeric",
@@ -284,11 +291,11 @@ export default async function MarketDetailPage({ params }: PageProps) {
   );
 }
 
-const METHOD_SUB_LABELS = ["by KO/TKO", "by Submission", "by Decision"];
-
 function FighterOutcomesPanel({
   fighterName,
   outcomes,
+  methodLabels,
+  sharesAbbrev,
 }: {
   fighterName: string;
   outcomes: Array<{
@@ -298,6 +305,8 @@ function FighterOutcomesPanel({
     current_price: number;
     current_shares: number;
   }>;
+  methodLabels: string[];
+  sharesAbbrev: string;
 }) {
   return (
     <div className="rounded-md border border-foreground/10 bg-background-elevated/30 p-4">
@@ -311,7 +320,7 @@ function FighterOutcomesPanel({
             className="rounded-sm border border-foreground/10 bg-foreground/[0.04] px-3 py-2"
           >
             <p className="font-sans text-[10px] uppercase tracking-widest text-foreground-subtle">
-              {METHOD_SUB_LABELS[i] ?? o.label}
+              {methodLabels[i] ?? o.label}
             </p>
             <div className="mt-1 flex items-baseline justify-between gap-2">
               <p className="font-display text-2xl tabular text-foreground">
@@ -322,7 +331,7 @@ function FighterOutcomesPanel({
                 </span>
               </p>
               <p className="font-mono text-[10px] tabular text-foreground-subtle">
-                {o.current_shares.toFixed(1)} sh
+                {o.current_shares.toFixed(1)} {sharesAbbrev}
               </p>
             </div>
           </div>

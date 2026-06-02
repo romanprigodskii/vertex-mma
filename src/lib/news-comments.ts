@@ -5,7 +5,7 @@ import { and, asc, desc, eq, isNull, gt } from "drizzle-orm";
 
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { newsComment } from "@/lib/db/schema/news";
+import { newsComment, newsCommentFlag } from "@/lib/db/schema/news";
 import { userProfile } from "@/lib/db/schema/users";
 
 const UUID_RE =
@@ -198,6 +198,8 @@ export type CommentAuthorSnapshot = {
   displayName: string | null;
   avatarUrl: string | null;
   tier: string;
+  /** Staff can moderate (delete) any comment, not just their own. */
+  isStaff: boolean;
 };
 
 /** Wrapper around getCurrentUser that returns only the bits the composer
@@ -211,7 +213,54 @@ export async function getCommentAuthor(): Promise<CommentAuthorSnapshot | null> 
     displayName: user.displayName,
     avatarUrl: user.avatarUrl,
     tier: user.tier,
+    isStaff: user.isStaff,
   };
+}
+
+export type FlagCommentResult = { ok: boolean; error?: string };
+
+/**
+ * Reader report on a comment. Idempotent per reporter (the unique index makes
+ * a repeat report a no-op success). Requires sign-in. Degrades gracefully if
+ * the flag table hasn't been pushed yet.
+ */
+export async function flagComment(
+  commentId: string,
+  reason?: string | null,
+): Promise<FlagCommentResult> {
+  if (!UUID_RE.test(commentId)) return { ok: false, error: "Bad id" };
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, error: "Sign in" };
+
+  // Can't report your own comment.
+  const rows = await db
+    .select({ userProfileId: newsComment.userProfileId })
+    .from(newsComment)
+    .where(eq(newsComment.id, commentId))
+    .limit(1);
+  if (rows.length === 0) return { ok: false, error: "Not found" };
+  if (rows[0].userProfileId === user.userProfileId) {
+    return { ok: false, error: "Can't report your own comment" };
+  }
+
+  const trimmed = reason?.trim().slice(0, 200) || null;
+  try {
+    await db
+      .insert(newsCommentFlag)
+      .values({
+        commentId,
+        userProfileId: user.userProfileId,
+        reason: trimmed,
+      })
+      .onConflictDoNothing({
+        target: [newsCommentFlag.commentId, newsCommentFlag.userProfileId],
+      });
+  } catch {
+    // Table not pushed yet, or transient — treat as a soft success so the UI
+    // still acknowledges the report rather than erroring at the reader.
+    return { ok: true };
+  }
+  return { ok: true };
 }
 
 export async function softDeleteComment(commentId: string): Promise<{
@@ -228,7 +277,9 @@ export async function softDeleteComment(commentId: string): Promise<{
     .where(eq(newsComment.id, commentId))
     .limit(1);
   if (rows.length === 0) return { ok: false, error: "Not found" };
-  if (rows[0].userProfileId !== user.userProfileId) {
+  // Owners delete their own comment; staff (ADMIN_EMAILS) can remove any
+  // comment for trust-and-safety.
+  if (rows[0].userProfileId !== user.userProfileId && !user.isStaff) {
     return { ok: false, error: "Not your comment" };
   }
 

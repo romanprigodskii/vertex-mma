@@ -2,9 +2,12 @@
 
 import * as React from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { ArrowBigUp, ArrowBigDown, MoreHorizontal } from "lucide-react";
+import { ArrowBigUp, ArrowBigDown, Flag, MoreHorizontal } from "lucide-react";
 
-import { deleteCommentAction } from "@/app/[locale]/news/[id]/actions";
+import {
+  deleteCommentAction,
+  reportCommentAction,
+} from "@/app/[locale]/news/[id]/actions";
 import {
   CommenterAvatar,
   CommentComposer,
@@ -55,8 +58,12 @@ export function CommentItem({
   const relativeTime = useRelativeTime();
   const [replying, setReplying] = React.useState(false);
   const [deleted, setDeleted] = React.useState(false);
+  const [reported, setReported] = React.useState(false);
   const isOwner = currentAuthor?.userProfileId === comment.author.userProfileId;
   const canReply = Boolean(currentAuthor);
+  const canModerate = Boolean(currentAuthor?.isStaff);
+  const canDelete = isOwner || canModerate;
+  const canReport = Boolean(currentAuthor) && !isOwner;
 
   if (deleted) return null;
 
@@ -107,7 +114,31 @@ export function CommentItem({
               {replying ? t("cancel") : t("replyAction")}
             </button>
           ) : null}
-          {isOwner ? (
+          {canReport ? (
+            reported ? (
+              <span className="ml-auto inline-flex items-center gap-1 text-foreground-subtle">
+                <Flag className="h-3.5 w-3.5" />
+                {t("reported")}
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!confirm(t("reportConfirm"))) return;
+                  const result = await reportCommentAction({
+                    commentId: comment.id,
+                  });
+                  if (result.ok) setReported(true);
+                }}
+                className="ml-auto inline-flex items-center gap-1 transition-colors hover:text-foreground"
+                aria-label={t("reportAction")}
+              >
+                <Flag className="h-3.5 w-3.5" />
+                <span>{t("reportAction")}</span>
+              </button>
+            )
+          ) : null}
+          {canDelete ? (
             <button
               type="button"
               onClick={async () => {
@@ -117,11 +148,16 @@ export function CommentItem({
                 });
                 if (result.ok) setDeleted(true);
               }}
-              className="ml-auto inline-flex items-center transition-colors hover:text-foreground"
-              aria-label={t("deleteAction")}
+              className={cn(
+                "inline-flex items-center transition-colors hover:text-foreground",
+                canReport ? "" : "ml-auto",
+              )}
+              aria-label={!isOwner && canModerate ? t("removeAction") : t("deleteAction")}
             >
               <MoreHorizontal className="h-3.5 w-3.5" />
-              <span className="ml-1">{t("deleteAction")}</span>
+              <span className="ml-1">
+                {!isOwner && canModerate ? t("removeAction") : t("deleteAction")}
+              </span>
             </button>
           ) : null}
         </div>

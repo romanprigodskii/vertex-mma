@@ -7,7 +7,6 @@ import { Trophy } from "lucide-react";
 import type { ChampionEntry } from "@/lib/champions";
 import {
   ATTRIBUTE_KEYS,
-  ATTRIBUTE_LABELS,
   type FighterAttributes,
 } from "@/lib/fighter-attributes";
 import type { FighterDetail } from "@/lib/fighter-detail";
@@ -15,11 +14,32 @@ import type { FightHistoryEntry } from "@/lib/fighter-detail";
 import { getCountryFlag } from "@/lib/fighter-helpers";
 import { cn } from "@/lib/utils";
 
+/** All card-face strings, resolved server-side (the client component can't
+ *  call useTranslations for these). Reuses the shared attribute + weight
+ *  namespaces; see the card page that builds it. */
+export interface CardLabels {
+  tierChampion: string;
+  tierElite: string;
+  tierRoster: string;
+  tierInterim: string;
+  attributes: Record<string, string>;
+  weightLabel: string | null;
+  attributesHeading: string;
+  ufcCareer: string;
+  record: string;
+  lastLabel: string;
+  ko: string;
+  sub: string;
+  dec: string;
+  ariaFlip: string;
+}
+
 interface HolographicCardProps {
   fighter: FighterDetail;
   championEntry: ChampionEntry | null;
   attributes: FighterAttributes;
   recentHistory: FightHistoryEntry[];
+  labels: CardLabels;
 }
 
 type Tier = "champion" | "elite" | "roster";
@@ -35,30 +55,21 @@ function tierOf(
   return "roster";
 }
 
-const TIER_LABEL: Record<Tier, string> = {
-  champion: "Champion",
-  elite: "Elite",
-  roster: "Roster",
-};
+function tierLabelOf(
+  tier: Tier,
+  championEntry: ChampionEntry | null,
+  labels: CardLabels,
+): string {
+  if (championEntry?.isInterim) return labels.tierInterim;
+  if (tier === "champion") return labels.tierChampion;
+  if (tier === "elite") return labels.tierElite;
+  return labels.tierRoster;
+}
 
 const TIER_BORDER: Record<Tier, string> = {
   champion: "border-primary/55 shadow-glow-primary",
   elite: "border-foreground/30",
   roster: "border-foreground/15",
-};
-
-const WEIGHT_LABEL: Record<string, string> = {
-  strawweight: "Strawweight",
-  flyweight: "Flyweight",
-  bantamweight: "Bantamweight",
-  featherweight: "Featherweight",
-  lightweight: "Lightweight",
-  welterweight: "Welterweight",
-  middleweight: "Middleweight",
-  light_heavyweight: "Light Heavyweight",
-  heavyweight: "Heavyweight",
-  catchweight: "Catchweight",
-  openweight: "Openweight",
 };
 
 const PALETTE: readonly string[] = [
@@ -106,6 +117,7 @@ export function HolographicCard({
   championEntry,
   attributes,
   recentHistory,
+  labels,
 }: HolographicCardProps) {
   const tilt = React.useRef<HTMLDivElement>(null);
   const raf = React.useRef<number | null>(null);
@@ -159,7 +171,7 @@ export function HolographicCard({
             setFlipped((v) => !v);
           }
         }}
-        aria-label={`Holographic card for ${fighter.name_en}. Click to flip.`}
+        aria-label={labels.ariaFlip}
         className={cn(
           "group relative aspect-[3/4] w-[300px] cursor-pointer sm:w-[360px]",
           "outline-none focus-visible:ring-2 focus-visible:ring-primary",
@@ -188,12 +200,14 @@ export function HolographicCard({
             fighter={fighter}
             championEntry={championEntry}
             tier={tier}
+            labels={labels}
           />
           <CardBack
             fighter={fighter}
             attributes={attributes}
             tier={tier}
             recentHistory={recentHistory}
+            labels={labels}
           />
         </div>
       </div>
@@ -256,16 +270,15 @@ function CardFront({
   fighter,
   championEntry,
   tier,
+  labels,
 }: {
   fighter: FighterDetail;
   championEntry: ChampionEntry | null;
   tier: Tier;
+  labels: CardLabels;
 }) {
   const flag = getCountryFlag(fighter.country_code);
-  const weightLabel = fighter.weight_class_primary
-    ? WEIGHT_LABEL[fighter.weight_class_primary] ??
-      fighter.weight_class_primary
-    : null;
+  const weightLabel = labels.weightLabel;
   const record =
     fighter.draws_total > 0
       ? `${fighter.wins_total}-${fighter.losses_total}-${fighter.draws_total}`
@@ -288,7 +301,7 @@ function CardFront({
                 : "text-foreground-muted",
           )}
         >
-          {championEntry?.isInterim ? "Interim Champ" : TIER_LABEL[tier]}
+          {tierLabelOf(tier, championEntry, labels)}
         </span>
       </div>
 
@@ -373,11 +386,13 @@ function CardBack({
   attributes,
   tier,
   recentHistory,
+  labels,
 }: {
   fighter: FighterDetail;
   attributes: FighterAttributes;
   tier: Tier;
   recentHistory: FightHistoryEntry[];
+  labels: CardLabels;
 }) {
   const ufcTotalWins = fighter.ufc_wins;
   const koPct = ufcTotalWins
@@ -396,7 +411,7 @@ function CardBack({
     <CardFace tier={tier} isBack>
       <div className="relative z-10 flex flex-1 flex-col px-5 py-5">
         <p className="font-mono text-[9px] uppercase tracking-[0.3em] text-foreground-subtle">
-          Attributes
+          {labels.attributesHeading}
         </p>
 
         <ul className="mt-2 flex flex-col gap-1.5">
@@ -408,7 +423,7 @@ function CardBack({
                 className="flex items-center gap-2 font-sans text-[11px] text-foreground"
               >
                 <span className="w-[72px] shrink-0 uppercase tracking-widest text-foreground-muted">
-                  {ATTRIBUTE_LABELS[key]}
+                  {labels.attributes[key] ?? key}
                 </span>
                 <span className="relative h-1 flex-1 overflow-hidden rounded-sm bg-foreground/[0.08]">
                   <span
@@ -426,32 +441,32 @@ function CardBack({
 
         <div className="mt-4 border-t border-foreground/10 pt-3">
           <p className="font-mono text-[9px] uppercase tracking-[0.3em] text-foreground-subtle">
-            UFC career
+            {labels.ufcCareer}
           </p>
           <p className="mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-1 font-sans text-[11px] text-foreground-muted">
             <span>
               <span className="font-mono tabular text-foreground">
                 {fighter.ufc_wins}-{fighter.ufc_losses}
               </span>{" "}
-              record
+              {labels.record}
             </span>
             <span aria-hidden className="text-foreground-subtle/40">·</span>
             <span>
-              KO{" "}
+              {labels.ko}{" "}
               <span className="font-mono tabular text-foreground">
                 {koPct}%
               </span>
             </span>
             <span aria-hidden className="text-foreground-subtle/40">·</span>
             <span>
-              Sub{" "}
+              {labels.sub}{" "}
               <span className="font-mono tabular text-foreground">
                 {subPct}%
               </span>
             </span>
             <span aria-hidden className="text-foreground-subtle/40">·</span>
             <span>
-              Dec{" "}
+              {labels.dec}{" "}
               <span className="font-mono tabular text-foreground">
                 {decPct}%
               </span>
@@ -462,7 +477,7 @@ function CardBack({
         {lastFive.length > 0 ? (
           <div className="mt-4 border-t border-foreground/10 pt-3">
             <p className="font-mono text-[9px] uppercase tracking-[0.3em] text-foreground-subtle">
-              Last {lastFive.length}
+              {labels.lastLabel}
             </p>
             <div className="mt-2 flex items-center gap-1.5">
               {lastFive.map((h) => (

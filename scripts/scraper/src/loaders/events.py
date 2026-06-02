@@ -173,13 +173,14 @@ def reconcile_duplicate_events(conn: psycopg.Connection) -> int:
     intact. Two cases make a twin UNSAFE to auto-merge, and it is then SKIPPED
     (logged for manual handling) rather than risk data loss:
       - the official card already lists one of the provisional pairs AND that
-        provisional bout carries a market (deleting it would CASCADE-wipe bets);
+        provisional bout carries a market OR a fixed-odds bet OR a parlay leg
+        (deleting it would CASCADE-wipe staked coins with no refund);
       - the provisional event has its own prediction pool (prediction_event),
         whose merge into the official pool (UNIQUE(event_id), UNIQUE(user,bout),
         leaderboards) is not something to automate blindly.
-    A dup provisional bout with NO market is safe to drop (after repointing any
-    news link to the official bout); no prediction_pick can reference it because
-    the no-prediction-pool gate already held. Each twin runs inside its own
+    A dup provisional bout with NO bet of any kind is safe to drop (after
+    repointing any news link to the official bout); no prediction_pick can
+    reference it because the no-prediction-pool gate already held. Each twin runs inside its own
     SAVEPOINT so one problem pair can't roll back the others. Idempotent — a
     second run finds nothing. Returns the number of events merged.
     """
@@ -243,9 +244,20 @@ def reconcile_duplicate_events(conn: psycopg.Connection) -> int:
                 if official_bout is None:
                     moves.append(bout_id)
                     continue
+                # A provisional twin we'd DROP must carry no user money. The
+                # DROP is a hard DELETE and bout has ON DELETE CASCADE from
+                # market.bet, fixed_odds_bet and parlay_leg — so deleting it
+                # would silently wipe staked coins with no refund. Guard on all
+                # three bet products (not just the LMSR market): if any exists,
+                # the twin is unsafe to auto-merge → skip to manual handling.
                 cur.execute(
-                    "SELECT 1 FROM market WHERE bout_id = %s::uuid LIMIT 1",
-                    (bout_id,),
+                    "SELECT 1 FROM market WHERE bout_id = %s::uuid "
+                    "UNION ALL "
+                    "SELECT 1 FROM fixed_odds_bet WHERE bout_id = %s::uuid "
+                    "UNION ALL "
+                    "SELECT 1 FROM parlay_leg WHERE bout_id = %s::uuid "
+                    "LIMIT 1",
+                    (bout_id, bout_id, bout_id),
                 )
                 if cur.fetchone():
                     unsafe = True
@@ -255,7 +267,8 @@ def reconcile_duplicate_events(conn: psycopg.Connection) -> int:
             if unsafe:
                 log.warning(
                     f"  skip event merge {p_name!r} -> {o_name!r}: a duplicate "
-                    f"provisional bout has an open market — needs manual merge"
+                    f"provisional bout carries a market or sportsbook bet "
+                    f"(deleting it would wipe staked coins) — needs manual merge"
                 )
                 continue
 

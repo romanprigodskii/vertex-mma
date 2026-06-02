@@ -52,7 +52,20 @@ BEGIN
     INTO v_status, v_winner
   FROM bout WHERE id = p_bout_id;
 
-  IF v_status IS NULL OR v_status <> 'completed' THEN
+  IF v_status IS NULL
+     OR v_status NOT IN ('completed', 'cancelled', 'no_contest') THEN
+    RETURN;
+  END IF;
+
+  -- A cancelled / no-contest bout produced no result: void its picks (mark
+  -- them scored with zero points) so they don't sit at is_correct = NULL
+  -- forever while the rest of the event resolves.
+  IF v_status IN ('cancelled', 'no_contest') THEN
+    UPDATE prediction_pick
+    SET points_winner = 0,
+        is_correct    = FALSE,
+        total_points  = 0
+    WHERE bout_id = p_bout_id AND is_correct IS NULL;
     RETURN;
   END IF;
 
@@ -134,7 +147,7 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
-  IF NEW.status = 'completed'
+  IF NEW.status IN ('completed', 'cancelled', 'no_contest')
      AND OLD.status IS DISTINCT FROM NEW.status
   THEN
     PERFORM public.score_predictions_for_bout(NEW.id);

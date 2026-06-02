@@ -1,3 +1,5 @@
+import { getLocale } from "next-intl/server";
+
 import { Link } from "@/i18n/navigation";
 
 import type { RankingListItem } from "@/lib/rankings";
@@ -6,9 +8,10 @@ interface Props {
   ranking: RankingListItem;
 }
 
-export function RankingCard({ ranking }: Props) {
+export async function RankingCard({ ranking }: Props) {
+  const locale = await getLocale();
   const date = new Date(ranking.created_at);
-  const dateLabel = date.toLocaleDateString("en-US", {
+  const dateLabel = date.toLocaleDateString(locale === "ru" ? "ru-RU" : "en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",

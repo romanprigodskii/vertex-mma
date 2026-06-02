@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Bell } from "lucide-react";
 
 import { Link } from "@/i18n/navigation";
@@ -16,6 +17,7 @@ export function NavbarNotifications({
   initialUnreadCount,
   initialRecent,
 }: Props) {
+  const t = useTranslations("notifications");
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
   const ref = React.useRef<HTMLDivElement>(null);
@@ -51,8 +53,8 @@ export function NavbarNotifications({
         onClick={() => setOpen((v) => !v)}
         aria-label={
           initialUnreadCount > 0
-            ? `Notifications · ${initialUnreadCount} unread`
-            : "Notifications"
+            ? t("unreadAria", { count: initialUnreadCount })
+            : t("heading")
         }
         aria-haspopup="menu"
         aria-expanded={open}
@@ -73,19 +75,19 @@ export function NavbarNotifications({
         >
           <div className="flex items-baseline justify-between border-b border-foreground/10 px-3 py-2">
             <p className="font-display text-xs uppercase tracking-widest text-foreground-muted">
-              Notifications
+              {t("heading")}
             </p>
             <Link
               href="/notifications"
               onClick={() => setOpen(false)}
               className="font-sans text-xs text-primary hover:underline"
             >
-              See all
+              {t("seeAll")}
             </Link>
           </div>
           {initialRecent.length === 0 ? (
             <p className="px-3 py-6 text-center font-sans text-xs text-foreground-muted">
-              All caught up.
+              {t("allCaughtUp")}
             </p>
           ) : (
             <ul className="max-h-80 overflow-y-auto">

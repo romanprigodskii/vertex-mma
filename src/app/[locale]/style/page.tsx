@@ -1,3 +1,4 @@
+import { notFound } from "next/navigation";
 import { ArrowRight, Search, Swords, Trophy } from "lucide-react";
 
 import { Navbar } from "@/components/layout/navbar";
@@ -127,7 +128,17 @@ function Section({
   );
 }
 
+// Wave-1 design-system showcase. Internal reference only — it has inert demo
+// CTAs and must never be a public, crawlable page. 404 it in production and
+// keep it out of the index regardless.
+export const metadata = {
+  robots: { index: false, follow: false },
+};
+
 export default function Home() {
+  if (process.env.NODE_ENV === "production") {
+    notFound();
+  }
   return (
     <>
       <Navbar />

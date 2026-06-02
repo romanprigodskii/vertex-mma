@@ -1,3 +1,5 @@
+import { getLocale } from "next-intl/server";
+
 import { Link } from "@/i18n/navigation";
 
 import { Container } from "@/components/layout/container";
@@ -7,13 +9,17 @@ interface Props {
   ranking: RankingDetail;
 }
 
-export function RankingView({ ranking }: Props) {
+export async function RankingView({ ranking }: Props) {
+  const locale = await getLocale();
   const date = new Date(ranking.created_at);
-  const dateLabel = date.toLocaleDateString("en-US", {
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  });
+  const dateLabel = date.toLocaleDateString(
+    locale === "ru" ? "ru-RU" : "en-US",
+    {
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+    },
+  );
 
   return (
     <>

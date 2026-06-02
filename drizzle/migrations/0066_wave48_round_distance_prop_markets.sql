@@ -114,6 +114,79 @@ END;
 $$;
 
 -- ---------------------------------------------------------------------------
+-- settle_knockdown_props_for_bout — grade "any knockdown?" props ONLY once the
+-- round-stats data they depend on is present.
+--
+-- bout.status flips to 'completed' in an EARLY scraper pass; bout_round_stats
+-- (which carries `knockdowns`) is written by a SEPARATE, LATER pass. The
+-- original prop handler summed knockdowns at status-flip time, read 0 (no rows
+-- yet) and wrongly settled "No". This helper gates on the full set of rounds
+-- being present, so it is a no-op until the data lands — then settles correctly.
+-- It is called from on_bout_auto_settle (defers), from the round-stats loader
+-- (settles inline once all rounds for the bout are inserted), and from the
+-- settlement cron backstop. Idempotent: settle_market_outcome no-ops on an
+-- already-resolved market.
+--
+-- Refund cases (no_contest / draw / unknown winner / cancelled) are handled by
+-- on_bout_auto_settle's own refund paths and never reach a Yes/No here.
+-- ---------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION public.settle_knockdown_props_for_bout(p_bout_id uuid)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_bout record;
+  v_expected_rounds int;
+  v_rounds_present int;
+  v_kd_total int;
+  v_market record;
+BEGIN
+  SELECT status::text AS status, method::text AS method, winner_id,
+         round_finished, scheduled_rounds
+    INTO v_bout
+  FROM bout WHERE id = p_bout_id;
+  IF NOT FOUND THEN RETURN; END IF;
+
+  -- Only grade a clean, decided result.
+  IF v_bout.status <> 'completed' THEN RETURN; END IF;
+  IF v_bout.winner_id IS NULL THEN RETURN; END IF;            -- draw → refunded elsewhere
+  IF v_bout.method IS NULL OR v_bout.method = 'no_contest' THEN RETURN; END IF;
+
+  -- How many rounds the fight actually had: the finishing round for a stoppage,
+  -- the scheduled length for a decision.
+  v_expected_rounds := CASE
+    WHEN v_bout.method LIKE 'decision%' THEN COALESCE(v_bout.scheduled_rounds, 3)
+    WHEN v_bout.round_finished IS NOT NULL AND v_bout.round_finished >= 1
+      THEN v_bout.round_finished
+    ELSE COALESCE(v_bout.scheduled_rounds, 3)
+  END;
+
+  -- Defer until every round's stats are loaded (callers may fire before the
+  -- enrich pass; this keeps the prop OPEN rather than grading on partial data).
+  SELECT COUNT(DISTINCT round) INTO v_rounds_present
+  FROM bout_round_stats WHERE bout_id = p_bout_id;
+  IF v_rounds_present < v_expected_rounds THEN RETURN; END IF;
+
+  SELECT COALESCE(SUM(knockdowns), 0)::int INTO v_kd_total
+  FROM bout_round_stats WHERE bout_id = p_bout_id;
+
+  FOR v_market IN
+    SELECT id FROM market
+    WHERE bout_id = p_bout_id AND type = 'prop'
+      AND question ILIKE '%knockdown%' AND status = 'open'
+  LOOP
+    -- idx 0 = Yes (>=1 knockdown), idx 1 = No.
+    PERFORM public.settle_market_outcome(
+      v_market.id, CASE WHEN v_kd_total > 0 THEN 0 ELSE 1 END
+    );
+  END LOOP;
+END;
+$$;
+
+-- ---------------------------------------------------------------------------
 -- on_bout_auto_settle — Wave 42/46 body extended with round / distance /
 -- prop handlers. Same universal refund guards (no_contest / draw /
 -- unknown winner / cancelled bout) up front.
@@ -135,7 +208,6 @@ DECLARE
   v_outcome_count int;
   v_round_idx int;
   v_distance_idx int;
-  v_kd_total int;
 BEGIN
   IF NEW.status = 'completed'
      AND (
@@ -235,11 +307,11 @@ BEGIN
 
       ELSIF v_market.type = 'prop' THEN
         IF v_market.question ILIKE '%knockdown%' THEN
-          SELECT COALESCE(SUM(knockdowns), 0)::int INTO v_kd_total
-          FROM bout_round_stats WHERE bout_id = NEW.id;
-          PERFORM public.settle_market_outcome(
-            v_market.id, CASE WHEN v_kd_total > 0 THEN 0 ELSE 1 END
-          );
+          -- Defer to the round-stats-gated helper. At status-flip the
+          -- knockdown data isn't loaded yet, so this leaves the prop OPEN
+          -- instead of summing 0 and wrongly settling "No"; the round-stats
+          -- loader (and the cron backstop) settle it once the data lands.
+          PERFORM public.settle_knockdown_props_for_bout(NEW.id);
         ELSE
           PERFORM public.refund_market(v_market.id, 'Unknown prop market');
         END IF;

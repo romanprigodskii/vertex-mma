@@ -2,6 +2,7 @@
 
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { getTranslations } from "next-intl/server";
 
 import { checkAndUnlockAchievements } from "@/lib/achievements";
 import { db } from "@/lib/db";
@@ -104,11 +105,31 @@ export async function updateAvatarUrlAction(
 export async function changePasswordAction(
   formData: FormData,
 ): Promise<{ error?: string; success?: boolean }> {
+  const t = await getTranslations("settings");
+  const currentPassword = String(formData.get("currentPassword") ?? "");
   const newPassword = String(formData.get("newPassword") ?? "");
   if (newPassword.length < 8) {
-    return { error: "Password must be at least 8 characters." };
+    return { error: t("passwordTooShort") };
   }
+  if (!currentPassword) {
+    return { error: t("currentPasswordRequired") };
+  }
+
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user?.email) return { error: t("currentPasswordWrong") };
+
+  // Re-verify the current password before allowing a change — a logged-in
+  // session alone shouldn't be enough to set a new password (defends against
+  // a hijacked tab / shared device).
+  const { error: verifyError } = await supabase.auth.signInWithPassword({
+    email: user.email,
+    password: currentPassword,
+  });
+  if (verifyError) return { error: t("currentPasswordWrong") };
+
   const { error } = await supabase.auth.updateUser({ password: newPassword });
   if (error) return { error: error.message };
   return { success: true };

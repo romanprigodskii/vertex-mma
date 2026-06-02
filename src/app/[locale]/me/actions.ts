@@ -50,23 +50,40 @@ export async function claimDailyBonusAction(): Promise<{
   const amount = dailyBonusAmount(profile.tier);
   const tierLabel = profile.tier;
 
-  await db.transaction(async (tx) => {
-    await tx.execute(sql`
+  const claimed = await db.transaction(async (tx) => {
+    // Atomic claim guard. The TS cooldown check above is only an early,
+    // friendly bail-out — on its own it's a read-then-write race: two
+    // concurrent requests both read the old timestamp, both pass, and both
+    // credit (double bonus). The real guard is this conditional UPDATE: the
+    // cooldown is re-checked against the row's CURRENT timestamp inside the
+    // statement, so concurrent claims serialize on the row lock and the
+    // loser's WHERE no longer matches → it credits nothing. We award only
+    // when a row actually came back.
+    const rows = (await tx.execute(sql`
       UPDATE user_profile
       SET balance_coins = balance_coins + ${amount},
           total_coins_earned = total_coins_earned + ${amount},
           last_daily_bonus_at = NOW()
       WHERE id = ${profile.id}::uuid
-    `);
+        AND (
+          last_daily_bonus_at IS NULL
+          OR last_daily_bonus_at < NOW() - make_interval(hours => ${COOLDOWN_HOURS})
+        )
+      RETURNING balance_coins
+    `)) as unknown as Array<{ balance_coins: number }>;
+
+    if (rows.length === 0) return false; // lost the race / cooldown still active
+
+    const balanceAfter = rows[0]?.balance_coins ?? 0;
     await tx.execute(sql`
       INSERT INTO transaction (user_id, type, amount, balance_after, description)
-      SELECT
+      VALUES (
         ${profile.id}::uuid,
         'daily_bonus',
         ${amount},
-        balance_coins,
+        ${balanceAfter},
         ${`Daily login bonus (${tierLabel})`}
-      FROM user_profile WHERE id = ${profile.id}::uuid
+      )
     `);
     // Wave 47: the bonus just bumped total_coins_earned, so check whether
     // the user crossed into a new tier. Idempotent (no-op when below the
@@ -74,7 +91,13 @@ export async function claimDailyBonusAction(): Promise<{
     await tx.execute(
       sql`SELECT public.check_and_promote_tier(${profile.id}::uuid)`,
     );
+    return true;
   });
+
+  if (!claimed) {
+    // Another concurrent claim won the race (or the cooldown is still active).
+    return { error: "Daily bonus already claimed. Try again later." };
+  }
 
   // After the bonus posts, daily_streak_7 / balance_50k / balance_100k
   // may unlock.

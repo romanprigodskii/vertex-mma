@@ -5,9 +5,10 @@ import { Container } from "@/components/layout/container";
 import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
 import { PredictionEventCard } from "@/components/predictions/prediction-event-card";
+import { PredictionStandings } from "@/components/predictions/prediction-standings";
 import { Link } from "@/i18n/navigation";
 import { getCurrentUser } from "@/lib/auth";
-import { listOpenPredictionEvents } from "@/lib/predictions";
+import { getTopPredictors, listOpenPredictionEvents } from "@/lib/predictions";
 
 export const dynamic = "force-dynamic";
 
@@ -29,9 +30,10 @@ export default async function PredictionsListPage({
   const { locale } = await params;
   setRequestLocale(locale);
   const t = await getTranslations("predictions");
-  const [events, user] = await Promise.all([
+  const [events, user, topPredictors] = await Promise.all([
     listOpenPredictionEvents(20),
     getCurrentUser(),
+    getTopPredictors(10),
   ]);
 
   return (
@@ -92,6 +94,33 @@ export default async function PredictionsListPage({
               ))}
             </ul>
           )}
+
+          {topPredictors.length > 0 ? (
+            <section className="mt-14">
+              <h2 className="font-display text-xl uppercase tracking-tight text-foreground">
+                {t("topPredictorsHeading")}
+              </h2>
+              <p className="mt-1 font-sans text-sm text-foreground-muted">
+                {t("topPredictorsLead")}
+              </p>
+              <div className="mt-4 max-w-2xl">
+                <PredictionStandings
+                  rows={topPredictors.map((p) => ({
+                    rank: p.rank,
+                    user_id: p.user_id,
+                    username: p.username,
+                    display_name: p.display_name,
+                    avatar_url: p.avatar_url,
+                    total_score: p.total_score,
+                    correct: p.total_correct,
+                    events: p.events_played,
+                  }))}
+                  currentUserId={user?.userProfileId ?? null}
+                  showEvents
+                />
+              </div>
+            </section>
+          ) : null}
         </Container>
       </main>
       <Footer />

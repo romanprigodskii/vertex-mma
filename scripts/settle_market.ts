@@ -11,11 +11,14 @@
  *   2. Manual override for legacy markets / one-off corrections.
  *   3. Tests where you need to drive settlement without touching `bout`.
  *
- * Wraps the same `settle_market_winner` PL/pgSQL helper the trigger uses,
- * so re-running on an already-resolved market is a no-op.
+ * Wraps the generic `settle_market_outcome` PL/pgSQL helper, so it settles ANY
+ * market type — winner (idx 0/1), method (0–5), round, distance (0/1) and prop
+ * — by the winning outcome's order_index. Re-running on an already-resolved
+ * market is a no-op.
  *
  * Usage: npx tsx scripts/settle_market.ts <market_id> <winning_order_index>
- *        winning_order_index = 0 → fighter A wins, 1 → fighter B wins.
+ *        winning_order_index is the market_outcome.order_index that won
+ *        (winner: 0 → fighter A, 1 → fighter B).
  */
 import { config } from "dotenv";
 config({ path: ".env.local" });
@@ -34,14 +37,14 @@ async function main() {
     process.exit(1);
   }
   const winIdx = parseInt(winIdxStr, 10);
-  if (winIdx !== 0 && winIdx !== 1) {
-    console.error("winning_order_index must be 0 or 1");
+  if (!Number.isInteger(winIdx) || winIdx < 0) {
+    console.error("winning_order_index must be a non-negative integer");
     process.exit(1);
   }
 
-  await pg`SELECT public.settle_market_winner(${marketId}::uuid, ${winIdx})`;
+  await pg`SELECT public.settle_market_outcome(${marketId}::uuid, ${winIdx})`;
   console.log(
-    `Settled market ${marketId} (idx ${winIdx}) via PL/pgSQL helper.`,
+    `Settled market ${marketId} (outcome idx ${winIdx}) via settle_market_outcome.`,
   );
   await pg.end();
 }

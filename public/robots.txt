@@ -5,5 +5,7 @@ Disallow: /api/
 Disallow: /auth/
 Disallow: /settings
 Disallow: /me/
+Disallow: /style
+Disallow: /ru/style
 
 Sitemap: https://vertexmma.com/sitemap.xml

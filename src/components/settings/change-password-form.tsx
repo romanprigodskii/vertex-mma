@@ -18,8 +18,13 @@ export function ChangePasswordForm() {
     setSaved(false);
 
     const formData = new FormData(e.currentTarget);
+    const currentPassword = String(formData.get("currentPassword") ?? "");
     const newPassword = String(formData.get("newPassword") ?? "");
     const confirm = String(formData.get("confirm") ?? "");
+    if (!currentPassword) {
+      setError(t("currentPasswordRequired"));
+      return;
+    }
     if (newPassword.length < 8) {
       setError(t("passwordTooShort"));
       return;
@@ -42,6 +47,16 @@ export function ChangePasswordForm() {
 
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-4">
+      <label className="flex flex-col gap-1.5">
+        <span className="font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
+          {t("currentPassword")}
+        </span>
+        <PasswordInput
+          name="currentPassword"
+          required
+          autoComplete="current-password"
+        />
+      </label>
       <label className="flex flex-col gap-1.5">
         <span className="font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
           {t("newPassword")}

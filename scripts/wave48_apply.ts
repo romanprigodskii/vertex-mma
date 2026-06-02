@@ -28,7 +28,7 @@ async function main() {
   const fns = await sql<{ routine_name: string }[]>`
     SELECT routine_name FROM information_schema.routines
     WHERE routine_schema = 'public'
-      AND routine_name IN ('settle_market_outcome','on_bout_auto_settle')
+      AND routine_name IN ('settle_market_outcome','on_bout_auto_settle','settle_knockdown_props_for_bout')
     ORDER BY routine_name
   `;
   console.log("\nFunctions:");

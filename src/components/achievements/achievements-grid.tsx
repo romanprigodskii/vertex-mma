@@ -28,8 +28,15 @@ export function AchievementsGrid({
   compact,
 }: Props) {
   const t = useTranslations("profile");
+  const tA = useTranslations("achievements");
   const locale = useLocale();
   const dateLocale = locale === "ru" ? "ru-RU" : "en-US";
+  // Localized achievement copy keyed by slug, falling back to the DB-stored
+  // English when a slug isn't in the messages bundle.
+  const aName = (a: { slug: string; name: string }) =>
+    tA.has(`${a.slug}.name`) ? tA(`${a.slug}.name`) : a.name;
+  const aDesc = (a: { slug: string; description: string }) =>
+    tA.has(`${a.slug}.description`) ? tA(`${a.slug}.description`) : a.description;
   if (compact) {
     if (unlocked.length === 0) return null;
     return (
@@ -38,15 +45,15 @@ export function AchievementsGrid({
           <span
             key={a.id}
             title={t("achievementTooltip", {
-              name: a.name,
-              description: a.description,
+              name: aName(a),
+              description: aDesc(a),
             })}
             className={cn(
               "inline-flex h-6 w-6 items-center justify-center rounded-sm border bg-background-elevated/30 font-mono text-[10px] uppercase",
               RARITY_BORDER[a.rarity] ?? "border-foreground/15",
             )}
           >
-            {a.name.slice(0, 1)}
+            {aName(a).slice(0, 1)}
           </span>
         ))}
       </div>
@@ -88,10 +95,10 @@ export function AchievementsGrid({
                 isUnlocked ? "text-foreground" : "text-foreground-muted",
               )}
             >
-              {a.name}
+              {aName(a)}
             </p>
             <p className="mt-1 font-sans text-xs text-foreground-muted">
-              {a.description}
+              {aDesc(a)}
             </p>
             <p className="mt-2 font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
               {a.rarity}

@@ -1,5 +1,7 @@
+import { hasLocale } from "next-intl";
 import { NextResponse, type NextRequest } from "next/server";
 
+import { routing } from "@/i18n/routing";
 import { safeNext } from "@/lib/safe-redirect";
 import { createClient } from "@/lib/supabase/server";
 
@@ -24,6 +26,12 @@ export async function GET(request: NextRequest) {
   // that isn't a same-origin relative path.
   const next = safeNext(searchParams.get("next"));
   const origin = siteOrigin(request);
+  // Carry the user's locale across the email round-trip (e.g. a password-reset
+  // link opened on another device, which has no NEXT_LOCALE cookie yet). When
+  // present and valid, persist it as the cookie the /auth layout reads so the
+  // landing page renders in their language.
+  const localeParam = searchParams.get("locale");
+  const locale = hasLocale(routing.locales, localeParam) ? localeParam : null;
 
   // Supabase signals errors via query params when redirect target isn't
   // allow-listed or the token already used. Surface them so we don't show
@@ -50,5 +58,13 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  return NextResponse.redirect(`${origin}${next}`);
+  const res = NextResponse.redirect(`${origin}${next}`);
+  if (locale) {
+    res.cookies.set("NEXT_LOCALE", locale, {
+      path: "/",
+      maxAge: 60 * 60 * 24 * 365,
+      sameSite: "lax",
+    });
+  }
+  return res;
 }

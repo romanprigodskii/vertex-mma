@@ -9,6 +9,7 @@ import {
   real,
   text,
   timestamp,
+  unique,
   uuid,
   vector,
 } from "drizzle-orm/pg-core";
@@ -151,5 +152,32 @@ export const newsComment = pgTable(
       "news_comment_body_length",
       sql`char_length(body) BETWEEN 1 AND 2000`,
     ),
+  ],
+);
+
+/** Reader-submitted abuse/spam reports on a comment. One row per reporter per
+ *  comment (unique). Staff act on these via the admin-email allowlist; for now
+ *  they surface as a count and let staff soft-delete the comment. */
+export const newsCommentFlag = pgTable(
+  "news_comment_flag",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    commentId: uuid("comment_id")
+      .notNull()
+      .references(() => newsComment.id, { onDelete: "cascade" }),
+    userProfileId: uuid("user_profile_id")
+      .notNull()
+      .references(() => userProfile.id, { onDelete: "cascade" }),
+    /** Optional short reason chosen by the reporter. */
+    reason: text("reason"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    /** Set when staff has actioned/dismissed the report. */
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+  },
+  (table) => [
+    unique("news_comment_flag_unique").on(table.commentId, table.userProfileId),
+    index("news_comment_flag_comment_idx").on(table.commentId),
   ],
 );

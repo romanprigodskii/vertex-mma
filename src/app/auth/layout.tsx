@@ -1,5 +1,6 @@
+import { cookies } from "next/headers";
 import { Bebas_Neue, Inter, JetBrains_Mono } from "next/font/google";
-import { NextIntlClientProvider } from "next-intl";
+import { hasLocale, NextIntlClientProvider } from "next-intl";
 import { getMessages, setRequestLocale } from "next-intl/server";
 
 import "../globals.css";
@@ -28,21 +29,31 @@ const jetbrainsMono = JetBrains_Mono({
 
 // Password-reset / forgot-password links arrive from Supabase emails with
 // no locale prefix, so this segment lives outside `[locale]`. It still needs
-// its own document shell + intl provider; default to the base locale.
+// its own document shell + intl provider. We honour the NEXT_LOCALE cookie
+// (set by next-intl when the user picks a language), so the dominant
+// same-device flow — switch to RU, click "forgot password", reset in the same
+// browser — stays in the user's language. Falls back to the base locale when
+// the cookie is absent or invalid (e.g. a cross-device email click).
 export default async function AuthLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  setRequestLocale(routing.defaultLocale);
-  const messages = await getMessages();
+  const cookieStore = await cookies();
+  const cookieLocale = cookieStore.get("NEXT_LOCALE")?.value;
+  const locale = hasLocale(routing.locales, cookieLocale)
+    ? cookieLocale
+    : routing.defaultLocale;
+
+  setRequestLocale(locale);
+  const messages = await getMessages({ locale });
 
   return (
     <html
-      lang={routing.defaultLocale}
+      lang={locale}
       className={`${bebasNeue.variable} ${inter.variable} ${jetbrainsMono.variable} h-full`}
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col bg-background-base text-foreground font-sans antialiased">
-        <NextIntlClientProvider locale={routing.defaultLocale} messages={messages}>
+        <NextIntlClientProvider locale={locale} messages={messages}>
           <ThemeProvider>{children}</ThemeProvider>
         </NextIntlClientProvider>
       </body>

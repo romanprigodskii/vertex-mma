@@ -107,4 +107,17 @@ def insert_round_stats(
                 ),
             )
             inserted += 1
+
+        # All of this bout's round stats are now present in the same
+        # transaction, so the "any knockdown?" prop can be graded on real data.
+        # on_bout_auto_settle leaves that prop OPEN at bout-completion time
+        # (the knockdowns column is loaded here, a later pass than the result),
+        # so without this the prop would never settle correctly. The helper is
+        # self-gating + idempotent (no-op if not a clean result or already
+        # resolved).
+        if not dry_run and inserted > 0:
+            cur.execute(
+                "SELECT public.settle_knockdown_props_for_bout(%s::uuid)",
+                (bout_id,),
+            )
         return inserted

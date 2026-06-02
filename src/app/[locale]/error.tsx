@@ -33,11 +33,27 @@ export default function ErrorPage({
   }, [router, reset]);
 
   return (
-    <main className="flex-1">
-      <Container size="md" className="py-20 text-center md:py-32">
-        <p className="font-display text-8xl leading-none tabular text-streak-loss">
-          {t("code")}
-        </p>
+    <>
+      {/* Lightweight static chrome: the full <Navbar/> is a server component
+          and can't be imported into this client error boundary, so we render a
+          minimal brand bar so the 500 page isn't a bare screen. */}
+      <header className="border-b border-foreground/[0.06]">
+        <Container size="xl" className="flex h-14 items-center">
+          <Link
+            href="/"
+            className="font-display text-lg tracking-[0.28em]"
+            aria-label={t("home")}
+          >
+            <span className="text-primary">V</span>
+            <span className="text-foreground">ERTEX</span>
+          </Link>
+        </Container>
+      </header>
+      <main className="flex-1">
+        <Container size="md" className="py-20 text-center md:py-32">
+          <p className="font-display text-8xl leading-none tabular text-streak-loss">
+            {t("code")}
+          </p>
         <h1 className="mt-6 font-display text-4xl uppercase tracking-tight text-foreground">
           {t("title")}
         </h1>
@@ -64,7 +80,8 @@ export default function ErrorPage({
             {t("home")}
           </Link>
         </div>
-      </Container>
-    </main>
+        </Container>
+      </main>
+    </>
   );
 }

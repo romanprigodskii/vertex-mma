@@ -144,6 +144,85 @@ export async function getPredictionEventForUser(
   };
 }
 
+export type PredictionStandingRow = {
+  rank: number;
+  user_id: string;
+  username: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  correct_winners: number;
+  total_score: number;
+};
+
+/**
+ * Per-event standings — the "who won this contest" board. Reads the
+ * already-computed prediction_event_result rows and ranks them by score.
+ * Empty until the card is scored (results are written at settle time).
+ */
+export async function getPredictionEventStandings(
+  predictionEventId: string,
+  limit = 50,
+): Promise<PredictionStandingRow[]> {
+  if (!UUID_RE.test(predictionEventId)) return [];
+  const rows = await db.execute<PredictionStandingRow>(sql`
+    SELECT
+      ROW_NUMBER() OVER (
+        ORDER BY per.total_score DESC, per.correct_winners DESC
+      )::int AS rank,
+      up.id::text AS user_id,
+      up.username,
+      up.display_name,
+      up.avatar_url,
+      per.correct_winners,
+      per.total_score
+    FROM prediction_event_result per
+    JOIN user_profile up ON up.id = per.user_id
+    WHERE per.prediction_event_id = ${predictionEventId}::uuid
+    ORDER BY per.total_score DESC, per.correct_winners DESC
+    LIMIT ${limit}
+  `);
+  return rows as unknown as PredictionStandingRow[];
+}
+
+export type TopPredictorRow = {
+  rank: number;
+  user_id: string;
+  username: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  total_score: number;
+  total_correct: number;
+  events_played: number;
+};
+
+/**
+ * All-time predictions leaderboard — total prediction points across every
+ * scored event. Surfaced on the predictions index so the contest has a
+ * standing payoff loop, not just per-event boards.
+ */
+export async function getTopPredictors(limit = 10): Promise<TopPredictorRow[]> {
+  const rows = await db.execute<TopPredictorRow>(sql`
+    SELECT
+      ROW_NUMBER() OVER (
+        ORDER BY SUM(per.total_score) DESC, SUM(per.correct_winners) DESC
+      )::int AS rank,
+      up.id::text AS user_id,
+      up.username,
+      up.display_name,
+      up.avatar_url,
+      SUM(per.total_score)::int AS total_score,
+      SUM(per.correct_winners)::int AS total_correct,
+      COUNT(*)::int AS events_played
+    FROM prediction_event_result per
+    JOIN user_profile up ON up.id = per.user_id
+    GROUP BY up.id, up.username, up.display_name, up.avatar_url
+    HAVING SUM(per.total_score) > 0
+    ORDER BY SUM(per.total_score) DESC, SUM(per.correct_winners) DESC
+    LIMIT ${limit}
+  `);
+  return rows as unknown as TopPredictorRow[];
+}
+
 export type MyPredictionRow = {
   prediction_event_id: string;
   event_slug: string;

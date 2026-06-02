@@ -22,7 +22,23 @@ export type CurrentUser = {
   joinedAt: string;
   lastDailyBonusAt: string | null;
   usernameLastChangedAt: string | null;
+  /** Staff/moderator capability, derived from the ADMIN_EMAILS allowlist. */
+  isStaff: boolean;
 };
+
+/**
+ * Whether an email is on the staff/moderator allowlist (ADMIN_EMAILS, a
+ * comma-separated env var). This is the project's only privileged role today —
+ * used for trust-and-safety actions like removing another user's comment.
+ */
+export function isStaffEmail(email: string | null | undefined): boolean {
+  if (!email) return false;
+  const allow = (process.env.ADMIN_EMAILS ?? "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+  return allow.includes(email.toLowerCase());
+}
 
 export async function getCurrentUser(): Promise<CurrentUser | null> {
   const supabase = await createClient();
@@ -78,6 +94,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
     usernameLastChangedAt: row.usernameLastChangedAt
       ? row.usernameLastChangedAt.toISOString()
       : null,
+    isStaff: isStaffEmail(user.email),
   };
 }
 

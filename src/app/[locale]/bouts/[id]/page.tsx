@@ -30,6 +30,7 @@ import {
   computeSportsbookOutcomes,
   isBoutBettable,
   marketProbFromOdds,
+  MAX_MARKET_EDGE,
 } from "@/lib/sportsbook";
 export const dynamic = "force-dynamic";
 
@@ -120,8 +121,15 @@ export default async function BoutDetailPage({ params }: PageProps) {
     externalOdds?.winner_a_decimal ?? null,
     externalOdds?.winner_b_decimal ?? null,
   );
-  const liveEdgeA =
+  const rawLiveEdgeA =
     simulation && marketProbA != null ? simulation.probA - marketProbA : null;
+  // The winner odds are edge-guarded to within ±MAX_MARKET_EDGE of the market
+  // line, so the "value" badge must not claim more edge than the offered price
+  // actually reflects — clamp the displayed edge to the same guard band.
+  const liveEdgeA =
+    rawLiveEdgeA == null
+      ? null
+      : Math.max(-MAX_MARKET_EDGE, Math.min(MAX_MARKET_EDGE, rawLiveEdgeA));
   const sportsbookOutcomes =
     bettable && simulation
       ? computeSportsbookOutcomes({

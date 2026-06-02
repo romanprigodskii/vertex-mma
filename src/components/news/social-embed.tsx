@@ -1,4 +1,5 @@
 import * as React from "react";
+import { getLocale, getTranslations } from "next-intl/server";
 import { Play } from "lucide-react";
 
 import {
@@ -28,9 +29,9 @@ export type SocialEmbedData = {
   duration?: string | null;
 };
 
-function formatPostedDate(iso: string): string {
+function formatPostedDate(iso: string, locale: string): string {
   return new Date(iso)
-    .toLocaleDateString("en-US", {
+    .toLocaleDateString(locale === "ru" ? "ru-RU" : "en-US", {
       month: "short",
       day: "numeric",
       year: "numeric",
@@ -52,13 +53,15 @@ function authorInitials(author: string | null | undefined): string {
 /** Self-rendered social card. We never load Instagram embed.js, X widgets.js,
  *  or YouTube iframe_api.js — privacy-friendly, fast, consistently themed.
  *  YouTube thumbnails are pre-fetched at ingest and stored on the row. */
-export function SocialEmbed({
+export async function SocialEmbed({
   embed,
   compact = false,
 }: {
   embed: SocialEmbedData;
   compact?: boolean;
 }) {
+  const t = await getTranslations("news");
+  const locale = await getLocale();
   const showQuote = Boolean(embed.quote && embed.quote.trim().length > 0);
   const isYouTube = embed.platform === "youtube";
   const showThumb = isYouTube && Boolean(embed.thumbnail_url);
@@ -134,22 +137,32 @@ export function SocialEmbed({
 
       <div className="flex items-center justify-between gap-3 font-mono text-[10px] uppercase tracking-[0.16em] text-foreground-subtle">
         <span>
-          {embed.posted_at ? formatPostedDate(embed.posted_at) : platformDisplayName(embed.platform)}
+          {embed.posted_at
+            ? formatPostedDate(embed.posted_at, locale)
+            : platformDisplayName(embed.platform)}
         </span>
         <span className="text-primary group-hover:underline">
-          {isYouTube ? "Watch" : `View on ${platformDisplayName(embed.platform)}`} →
+          {isYouTube
+            ? t("watch")
+            : t("viewOn", { platform: platformDisplayName(embed.platform) })}{" "}
+          →
         </span>
       </div>
     </a>
   );
 }
 
-export function SocialReactions({ embeds }: { embeds: SocialEmbedData[] }) {
+export async function SocialReactions({
+  embeds,
+}: {
+  embeds: SocialEmbedData[];
+}) {
   if (embeds.length === 0) return null;
+  const t = await getTranslations("news");
   return (
     <section className="mt-8 border-t border-foreground/10 pt-5">
       <p className="mb-3 font-mono text-[10px] font-medium uppercase tracking-[0.2em] text-foreground-subtle">
-        Social reactions
+        {t("socialReactions")}
       </p>
       <div className="flex flex-col gap-2.5">
         {embeds.map((e) => (

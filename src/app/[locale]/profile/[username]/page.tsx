@@ -10,6 +10,7 @@ import { AchievementsGrid } from "@/components/achievements/achievements-grid";
 import { Container } from "@/components/layout/container";
 import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
+import { FightCardGridCard } from "@/components/cards/fight-card-grid-card";
 import { DailyBonusButton } from "@/components/me/daily-bonus-button";
 import { TierProgress } from "@/components/profile/tier-progress";
 import { RankingCard } from "@/components/rankings/ranking-card";
@@ -20,6 +21,7 @@ import {
   listUserAchievements,
 } from "@/lib/achievements";
 import { getCurrentUser, getUserProfileByUsername } from "@/lib/auth";
+import { listCardsByUser } from "@/lib/fight-cards";
 import { listRankingsByUser } from "@/lib/rankings";
 import { isTier } from "@/lib/tier";
 
@@ -70,11 +72,15 @@ export default async function PublicProfilePage({ params }: PageProps) {
   if (!profile) notFound();
 
   const isOwner = currentUser?.username === profile.username;
-  const [rankings, userAchievements, allAchievements] = await Promise.all([
-    listRankingsByUser(profile.userProfileId),
-    listUserAchievements(profile.userProfileId),
-    isOwner ? listAchievements() : Promise.resolve(undefined),
-  ]);
+  const [rankings, cards, userAchievements, allAchievements] =
+    await Promise.all([
+      listRankingsByUser(profile.userProfileId),
+      listCardsByUser(profile.userProfileId),
+      listUserAchievements(profile.userProfileId),
+      isOwner ? listAchievements() : Promise.resolve(undefined),
+    ]);
+  // Non-owners only see public cards; the owner sees their drafts too.
+  const visibleCards = isOwner ? cards : cards.filter((c) => c.is_public);
   const joined = new Date(profile.joinedAt);
   const joinedLabel = joined.toLocaleDateString(
     activeLocale === "ru" ? "ru-RU" : "en-US",
@@ -138,12 +144,20 @@ export default async function PublicProfilePage({ params }: PageProps) {
               ) : null}
               <div className="mt-5 flex flex-wrap items-center gap-3 sm:justify-start justify-center">
                 {isOwner ? (
-                  <Link
-                    href="/settings"
-                    className="inline-flex rounded-sm border border-foreground/15 px-4 py-2 font-sans text-sm text-foreground-muted hover:bg-foreground/[0.05] hover:text-foreground"
-                  >
-                    {t("editProfile")}
-                  </Link>
+                  <>
+                    <Link
+                      href="/settings"
+                      className="inline-flex rounded-sm border border-foreground/15 px-4 py-2 font-sans text-sm text-foreground-muted hover:bg-foreground/[0.05] hover:text-foreground"
+                    >
+                      {t("editProfile")}
+                    </Link>
+                    <Link
+                      href="/me/transactions"
+                      className="inline-flex rounded-sm border border-foreground/15 px-4 py-2 font-sans text-sm text-foreground-muted hover:bg-foreground/[0.05] hover:text-foreground"
+                    >
+                      {t("coinActivity")}
+                    </Link>
+                  </>
                 ) : null}
                 <ShareButton
                   url={`/profile/${profile.username}`}
@@ -207,6 +221,31 @@ export default async function PublicProfilePage({ params }: PageProps) {
                 }
                 ctaHref={isOwner ? "/rankings/create" : null}
                 ctaLabel={`${t("createFirstRanking")} →`}
+              />
+            )}
+          </section>
+
+          <section className="mt-12">
+            <h2 className="mb-5 font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
+              {t("cardsBy", { username: profile.username })}
+            </h2>
+            {visibleCards.length > 0 ? (
+              <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {visibleCards.map((c) => (
+                  <li key={c.id}>
+                    <FightCardGridCard card={c} />
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <ProfileEmptySection
+                message={
+                  isOwner
+                    ? t("youNoCards")
+                    : t("theyNoCards", { username: profile.username })
+                }
+                ctaHref={isOwner ? "/cards/create" : null}
+                ctaLabel={`${t("createFirstCard")} →`}
               />
             )}
           </section>

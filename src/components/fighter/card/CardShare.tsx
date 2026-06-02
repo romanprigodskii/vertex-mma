@@ -6,11 +6,18 @@ import { Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface CardShareProps {
-  fighterName: string;
   fighterSlug: string;
+  /** Localized tweet text (built server-side). */
+  shareUrlText: string;
+  /** Localized share button label. */
+  shareButtonLabel: string;
 }
 
-export function CardShare({ fighterName, fighterSlug }: CardShareProps) {
+export function CardShare({
+  fighterSlug,
+  shareUrlText,
+  shareButtonLabel,
+}: CardShareProps) {
   const [origin, setOrigin] = React.useState<string>("");
   React.useEffect(() => {
     setOrigin(window.location.origin);
@@ -19,9 +26,8 @@ export function CardShare({ fighterName, fighterSlug }: CardShareProps) {
   const url = origin
     ? `${origin}/fighters/${fighterSlug}/card`
     : `/fighters/${fighterSlug}/card`;
-  const text = `${fighterName} — Vertex MMA collectible card`;
   const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(
-    text,
+    shareUrlText,
   )}&url=${encodeURIComponent(url)}`;
 
   return (
@@ -29,7 +35,7 @@ export function CardShare({ fighterName, fighterSlug }: CardShareProps) {
       <Button asChild variant="outline" size="sm">
         <a href={tweetUrl} target="_blank" rel="noreferrer noopener">
           <Share2 className="h-4 w-4" />
-          Share on X / Twitter
+          {shareButtonLabel}
         </a>
       </Button>
     </div>

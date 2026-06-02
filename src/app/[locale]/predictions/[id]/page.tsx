@@ -7,9 +7,13 @@ import { Container } from "@/components/layout/container";
 import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
 import { PredictionForm } from "@/components/predictions/prediction-form";
+import { PredictionStandings } from "@/components/predictions/prediction-standings";
 import { Link } from "@/i18n/navigation";
 import { getCurrentUser } from "@/lib/auth";
-import { getPredictionEventForUser } from "@/lib/predictions";
+import {
+  getPredictionEventForUser,
+  getPredictionEventStandings,
+} from "@/lib/predictions";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +43,8 @@ export default async function PredictionDetailPage({ params }: PageProps) {
 
   const evt = await getPredictionEventForUser(id, user.userProfileId);
   if (!evt) notFound();
+
+  const standings = await getPredictionEventStandings(evt.id);
 
   const closed =
     evt.status !== "upcoming" ||
@@ -89,6 +95,34 @@ export default async function PredictionDetailPage({ params }: PageProps) {
               readOnly={closed}
             />
           </div>
+
+          {closed ? (
+            <div className="mt-12">
+              <h2 className="font-display text-xl uppercase tracking-tight text-foreground">
+                {t("standingsHeading")}
+              </h2>
+              {standings.length === 0 ? (
+                <p className="mt-3 rounded-md border border-dashed border-foreground/15 bg-background-elevated/20 px-4 py-8 text-center font-sans text-sm text-foreground-muted">
+                  {t("standingsEmpty")}
+                </p>
+              ) : (
+                <div className="mt-4">
+                  <PredictionStandings
+                    rows={standings.map((s) => ({
+                      rank: s.rank,
+                      user_id: s.user_id,
+                      username: s.username,
+                      display_name: s.display_name,
+                      avatar_url: s.avatar_url,
+                      total_score: s.total_score,
+                      correct: s.correct_winners,
+                    }))}
+                    currentUserId={user.userProfileId}
+                  />
+                </div>
+              )}
+            </div>
+          ) : null}
         </Container>
       </main>
       <Footer />
