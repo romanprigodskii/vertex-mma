@@ -59,6 +59,7 @@ export async function searchFighters(
         fsa.draws_total,
         GREATEST(
           similarity(f.name_en, ${trimmed}),
+          similarity(COALESCE(f.name_ru, ''), ${trimmed}),
           similarity(COALESCE(f.nickname, ''), ${trimmed}),
           COALESCE((
             SELECT MAX(similarity(fa.alias, ${trimmed}))
@@ -68,12 +69,16 @@ export async function searchFighters(
         )::float AS similarity,
         (
           (CASE
-            WHEN lower(f.name_en) = lower(${trimmed}) THEN 4
+            WHEN lower(f.name_en) = lower(${trimmed})
+              OR lower(COALESCE(f.name_ru, '')) = lower(${trimmed}) THEN 4
             WHEN f.name_en ILIKE ${trimmed + "%"}
-              OR f.name_en ILIKE ${"% " + trimmed + "%"} THEN 3
+              OR f.name_en ILIKE ${"% " + trimmed + "%"}
+              OR COALESCE(f.name_ru, '') ILIKE ${trimmed + "%"}
+              OR COALESCE(f.name_ru, '') ILIKE ${"% " + trimmed + "%"} THEN 3
             WHEN COALESCE(f.nickname, '') ILIKE ${trimmed + "%"}
               OR COALESCE(f.nickname, '') ILIKE ${"% " + trimmed + "%"} THEN 2
             WHEN f.name_en ILIKE ${"%" + trimmed + "%"}
+              OR COALESCE(f.name_ru, '') ILIKE ${"%" + trimmed + "%"}
               OR COALESCE(f.nickname, '') ILIKE ${"%" + trimmed + "%"} THEN 1
             ELSE 0
           END) * 1000
@@ -83,8 +88,10 @@ export async function searchFighters(
       LEFT JOIN fighter_stats_aggregate fsa ON fsa.fighter_id = f.id
       WHERE
         f.name_en ILIKE ${"%" + trimmed + "%"}
+        OR COALESCE(f.name_ru, '') ILIKE ${"%" + trimmed + "%"}
         OR f.nickname ILIKE ${"%" + trimmed + "%"}
         OR similarity(f.name_en, ${trimmed}) > 0.3
+        OR similarity(COALESCE(f.name_ru, ''), ${trimmed}) > 0.3
         OR similarity(COALESCE(f.nickname, ''), ${trimmed}) > 0.3
         OR EXISTS (
           SELECT 1 FROM fighter_alias fa2
@@ -241,8 +248,10 @@ function buildWhere(filters: FighterCatalogFilters): SQL {
     const like = `%${trimmedQ}%`;
     conditions.push(sql`(
       f.name_en ILIKE ${like}
+      OR COALESCE(f.name_ru, '') ILIKE ${like}
       OR COALESCE(f.nickname, '') ILIKE ${like}
       OR similarity(f.name_en, ${trimmedQ}) > 0.3
+      OR similarity(COALESCE(f.name_ru, ''), ${trimmedQ}) > 0.3
       OR similarity(COALESCE(f.nickname, ''), ${trimmedQ}) > 0.3
       OR EXISTS (
         SELECT 1 FROM fighter_alias fa
@@ -540,6 +549,7 @@ export async function searchFightersWithFilters(
     ? sql`,
       GREATEST(
         similarity(f.name_en, ${trimmedQ}),
+        similarity(COALESCE(f.name_ru, ''), ${trimmedQ}),
         similarity(COALESCE(f.nickname, ''), ${trimmedQ})
       )::float AS match_score`
     : sql``;
@@ -551,12 +561,16 @@ export async function searchFightersWithFilters(
   const matchTierSelect = trimmedQ
     ? sql`,
       (CASE
-        WHEN lower(f.name_en) = lower(${trimmedQ}) THEN 4
+        WHEN lower(f.name_en) = lower(${trimmedQ})
+          OR lower(COALESCE(f.name_ru, '')) = lower(${trimmedQ}) THEN 4
         WHEN f.name_en ILIKE ${trimmedQ + "%"}
-          OR f.name_en ILIKE ${"% " + trimmedQ + "%"} THEN 3
+          OR f.name_en ILIKE ${"% " + trimmedQ + "%"}
+          OR COALESCE(f.name_ru, '') ILIKE ${trimmedQ + "%"}
+          OR COALESCE(f.name_ru, '') ILIKE ${"% " + trimmedQ + "%"} THEN 3
         WHEN COALESCE(f.nickname, '') ILIKE ${trimmedQ + "%"}
           OR COALESCE(f.nickname, '') ILIKE ${"% " + trimmedQ + "%"} THEN 2
         WHEN f.name_en ILIKE ${"%" + trimmedQ + "%"}
+          OR COALESCE(f.name_ru, '') ILIKE ${"%" + trimmedQ + "%"}
           OR COALESCE(f.nickname, '') ILIKE ${"%" + trimmedQ + "%"} THEN 1
         ELSE 0
       END)::int AS match_tier`
