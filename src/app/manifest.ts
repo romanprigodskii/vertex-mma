@@ -2,9 +2,10 @@ import type { MetadataRoute } from "next";
 
 /**
  * PWA web manifest. Gives the app an installable identity, an "add to home
- * screen" name, and a themed splash/status bar matching the dark UI. Icons are
- * the generated brand-gold "V" (src/app/icon.tsx + apple-icon.tsx); dedicated
- * 192/512 maskable PNGs are a follow-up.
+ * screen" name, and a themed splash/status bar matching the dark UI. Icon is
+ * the static brand-gold "V" (src/app/icon.svg) — a static file so it serves
+ * correctly under `output: standalone` (generated ImageResponse icons 404
+ * there); dedicated 192/512 maskable PNGs are a follow-up.
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
@@ -18,14 +19,9 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: "#0a0b0e",
     icons: [
       {
-        src: "/icon",
-        sizes: "32x32",
-        type: "image/png",
-      },
-      {
-        src: "/apple-icon",
-        sizes: "180x180",
-        type: "image/png",
+        src: "/icon.svg",
+        sizes: "any",
+        type: "image/svg+xml",
       },
     ],
   };
