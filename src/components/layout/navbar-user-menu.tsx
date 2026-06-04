@@ -7,6 +7,7 @@ import {
   ListChecks,
   LogOut,
   Settings as SettingsIcon,
+  ShieldCheck,
   UserCircle,
 } from "lucide-react";
 
@@ -102,6 +103,16 @@ export function NavbarUserMenu({ user }: { user: CurrentUser }) {
             <SettingsIcon className="h-4 w-4" />
             {t("settings")}
           </Link>
+          {user.isStaff ? (
+            <Link
+              href="/admin/news"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-2 rounded-sm px-2 py-1.5 font-sans text-sm text-foreground hover:bg-foreground/[0.05]"
+            >
+              <ShieldCheck className="h-4 w-4 text-primary" />
+              {t("moderation")}
+            </Link>
+          ) : null}
           <hr className="my-1 border-foreground/10" />
           <form action="/auth/signout" method="post">
             <button

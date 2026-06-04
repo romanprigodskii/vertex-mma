@@ -27,8 +27,25 @@
     "myPredictions": "My predictions",
     "notifications": "Notifications",
     "settings": "Settings",
+    "moderation": "Moderation",
     "signOut": "Sign out",
     "accountMenu": "Account menu"
+  },
+  "admin": {
+    "kicker": "Staff",
+    "newsMetaTitle": "News moderation",
+    "newsHeading": "News queue",
+    "newsLead": "{count, plural, =0 {No items awaiting review.} one {# item awaiting your review.} other {# items awaiting your review.}}",
+    "queueEmptyTitle": "Queue clear",
+    "queueEmptyLead": "Nothing is waiting for review. Items the classifier wasn't confident about will appear here.",
+    "approve": "Approve",
+    "reject": "Reject",
+    "approvedMsg": "Approved — now live",
+    "rejectedMsg": "Rejected",
+    "trusted": "Trusted",
+    "confidence": "{pct}% conf",
+    "noBody": "No article text — open the source to review.",
+    "actionFailed": "Action failed"
   },
   "share": {
     "share": "Share",
