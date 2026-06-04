@@ -11,6 +11,9 @@ export type NotificationRow = {
   title: string;
   body: string | null;
   link: string | null;
+  /** Wave 49: structured payload for client-side localization, or null for
+   *  legacy rows (which render from the stored English title/body). */
+  params: Record<string, unknown> | null;
   is_read: boolean;
   created_at: string;
 };
@@ -27,6 +30,7 @@ export async function listNotifications(
       title,
       body,
       link,
+      params,
       is_read,
       created_at::text AS created_at
     FROM notification
@@ -58,6 +62,7 @@ export async function listRecentUnread(
       title,
       body,
       link,
+      params,
       is_read,
       created_at::text AS created_at
     FROM notification

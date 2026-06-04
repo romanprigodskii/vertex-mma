@@ -5,6 +5,7 @@ import {
   check,
   index,
   integer,
+  jsonb,
   pgTable,
   text,
   timestamp,
@@ -138,6 +139,9 @@ export const notification = pgTable(
     title: text("title").notNull(),
     body: text("body"),
     link: text("link"),
+    // Wave 49: structured payload for client-side localization — { key, …vals }.
+    // The stored title/body remain the English fallback for old/unmapped rows.
+    params: jsonb("params").$type<Record<string, unknown>>(),
     isRead: boolean("is_read").default(false).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()

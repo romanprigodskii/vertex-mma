@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Bell } from "lucide-react";
 
+import { useLocalizedNotification } from "@/components/notifications/use-localized-notification";
 import { Link } from "@/i18n/navigation";
 import type { NotificationRow } from "@/lib/notifications";
 
@@ -18,6 +19,7 @@ export function NavbarNotifications({
   initialRecent,
 }: Props) {
   const t = useTranslations("notifications");
+  const localize = useLocalizedNotification();
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
   const ref = React.useRef<HTMLDivElement>(null);
@@ -91,38 +93,41 @@ export function NavbarNotifications({
             </p>
           ) : (
             <ul className="max-h-80 overflow-y-auto">
-              {initialRecent.map((n) => (
-                <li key={n.id}>
-                  {n.link ? (
-                    <Link
-                      href={n.link}
-                      onClick={() => setOpen(false)}
-                      prefetch={false}
-                      className="block border-b border-foreground/[0.06] px-3 py-2 hover:bg-foreground/[0.03]"
-                    >
-                      <p className="font-sans text-sm text-foreground line-clamp-1">
-                        {n.title}
-                      </p>
-                      {n.body ? (
-                        <p className="mt-0.5 font-sans text-xs text-foreground-muted line-clamp-1">
-                          {n.body}
+              {initialRecent.map((n) => {
+                const { title, body } = localize(n);
+                return (
+                  <li key={n.id}>
+                    {n.link ? (
+                      <Link
+                        href={n.link}
+                        onClick={() => setOpen(false)}
+                        prefetch={false}
+                        className="block border-b border-foreground/[0.06] px-3 py-2 hover:bg-foreground/[0.03]"
+                      >
+                        <p className="font-sans text-sm text-foreground line-clamp-1">
+                          {title}
                         </p>
-                      ) : null}
-                    </Link>
-                  ) : (
-                    <div className="border-b border-foreground/[0.06] px-3 py-2">
-                      <p className="font-sans text-sm text-foreground line-clamp-1">
-                        {n.title}
-                      </p>
-                      {n.body ? (
-                        <p className="mt-0.5 font-sans text-xs text-foreground-muted line-clamp-1">
-                          {n.body}
+                        {body ? (
+                          <p className="mt-0.5 font-sans text-xs text-foreground-muted line-clamp-1">
+                            {body}
+                          </p>
+                        ) : null}
+                      </Link>
+                    ) : (
+                      <div className="border-b border-foreground/[0.06] px-3 py-2">
+                        <p className="font-sans text-sm text-foreground line-clamp-1">
+                          {title}
                         </p>
-                      ) : null}
-                    </div>
-                  )}
-                </li>
-              ))}
+                        {body ? (
+                          <p className="mt-0.5 font-sans text-xs text-foreground-muted line-clamp-1">
+                            {body}
+                          </p>
+                        ) : null}
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>

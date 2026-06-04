@@ -4,6 +4,7 @@ import * as React from "react";
 import { useLocale, useTranslations } from "next-intl";
 
 import { markNotificationReadAction } from "@/app/[locale]/notifications/actions";
+import { useLocalizedNotification } from "@/components/notifications/use-localized-notification";
 import { Link } from "@/i18n/navigation";
 import type { NotificationRow as NotificationRowData } from "@/lib/notifications";
 import { cn } from "@/lib/utils";
@@ -42,6 +43,8 @@ function useFormatAgo() {
 export function NotificationRow({ notification: n }: Props) {
   const t = useTranslations("notifications");
   const formatAgo = useFormatAgo();
+  const localize = useLocalizedNotification();
+  const { title, body: localizedBody } = localize(n);
   // Local optimistic flip so the row visually quiets the moment the user
   // clicks — the server action also marks it server-side, and the next
   // page refresh confirms via revalidatePath.
@@ -72,11 +75,11 @@ export function NotificationRow({ notification: n }: Props) {
               : "font-medium text-foreground",
           )}
         >
-          {n.title}
+          {title}
         </p>
-        {n.body ? (
+        {localizedBody ? (
           <p className="mt-0.5 font-sans text-xs text-foreground-muted line-clamp-2">
-            {n.body}
+            {localizedBody}
           </p>
         ) : null}
         <p className="mt-1 font-mono text-[10px] tabular text-foreground-subtle">
