@@ -5,9 +5,11 @@ import { Container } from "@/components/layout/container";
 import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
 import { EventMarketsAccordion } from "@/components/markets/event-markets-accordion";
+import { SportsbookBoard } from "@/components/markets/sportsbook-board";
 import { Link } from "@/i18n/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { listOpenMarketsByEvent } from "@/lib/markets";
+import { getSportsbookBoard } from "@/lib/sportsbook-board";
 
 export const dynamic = "force-dynamic";
 
@@ -29,8 +31,9 @@ export default async function MarketsPage({
   const { locale } = await params;
   setRequestLocale(locale);
   const t = await getTranslations("markets");
-  const [events, user] = await Promise.all([
+  const [events, board, user] = await Promise.all([
     listOpenMarketsByEvent(20),
+    getSportsbookBoard(60),
     getCurrentUser(),
   ]);
 
@@ -79,7 +82,31 @@ export default async function MarketsPage({
             )}
           </header>
 
-          <EventMarketsAccordion events={events} />
+          {board.length > 0 ? (
+            <section className="mb-12">
+              <div className="mb-4">
+                <h2 className="font-display text-xl uppercase tracking-tight text-foreground sm:text-2xl">
+                  {t("sportsbookHeading")}
+                </h2>
+                <p className="mt-1 max-w-xl font-sans text-sm text-foreground-muted">
+                  {t("sportsbookLead")}
+                </p>
+              </div>
+              <SportsbookBoard events={board} />
+            </section>
+          ) : null}
+
+          <section>
+            <div className="mb-4">
+              <h2 className="font-display text-xl uppercase tracking-tight text-foreground sm:text-2xl">
+                {t("lmsrHeading")}
+              </h2>
+              <p className="mt-1 max-w-xl font-sans text-sm text-foreground-muted">
+                {t("lmsrLead")}
+              </p>
+            </div>
+            <EventMarketsAccordion events={events} />
+          </section>
         </Container>
       </main>
       <Footer />
