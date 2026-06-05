@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 
+import { CardDeletedNotice } from "@/components/cards/card-deleted-notice";
 import { FightCardGridCard } from "@/components/cards/fight-card-grid-card";
 import { Container } from "@/components/layout/container";
 import { Footer } from "@/components/layout/footer";
@@ -26,11 +27,14 @@ const SECTION_LABEL =
 
 export default async function CardsListPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ locale: string }>;
+  searchParams: Promise<{ deleted?: string }>;
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
+  const { deleted } = await searchParams;
   const t = await getTranslations("cards");
   const currentUser = await getCurrentUser();
   const [publicCards, myCards] = await Promise.all([
@@ -48,6 +52,7 @@ export default async function CardsListPage({
       <Navbar />
       <main className="flex-1">
         <Container size="xl" className="py-10 md:py-14">
+          {deleted === "1" ? <CardDeletedNotice /> : null}
           <header className="mb-8 flex flex-col items-start gap-4 sm:flex-row sm:flex-wrap sm:items-baseline sm:justify-between sm:gap-3">
             <div className="min-w-0 flex-1">
               <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground-subtle">
