@@ -79,12 +79,13 @@ export default async function EventsListPage({
 
           <nav
             className="mb-6 flex gap-1 border-b border-foreground/10"
-            role="tablist"
+            aria-label={t("navLabel")}
           >
             {TAB_KEYS.map((key) => (
               <Link
                 key={key}
                 href={key === "upcoming" ? "/events" : `/events?filter=${key}`}
+                aria-current={filter === key ? "page" : undefined}
                 className={cn(
                   "px-3 py-2 font-sans text-sm uppercase tracking-widest transition-colors",
                   filter === key

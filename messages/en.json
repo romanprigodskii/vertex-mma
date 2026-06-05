@@ -77,7 +77,8 @@
     "retry": "Retry",
     "back": "Back",
     "seeAll": "See all",
-    "vertex": "Vertex"
+    "vertex": "Vertex",
+    "close": "Close"
   },
   "home": {
     "metaTitle": "Vertex MMA — UFC scores, rankings, betting",
@@ -334,6 +335,7 @@
       "past": "Past",
       "all": "All"
     },
+    "navLabel": "Event filters",
     "empty": "No events.",
     "boutCount": "{count, plural, =1 {1 bout} other {# bouts}}",
     "statusCompleted": "Completed",
@@ -451,6 +453,7 @@
     "kicker": "Community",
     "heading": "Leaderboard",
     "lead": "Top Vertex MMA bettors and listmakers. Pick a sort to switch the ordering — every row links to that user's profile.",
+    "navLabel": "Leaderboard sort",
     "sort_profit": "Net worth",
     "sort_profit_hint": "Lifetime coins earned minus lost (includes bonuses)",
     "sort_volume": "Volume",
@@ -1493,8 +1496,12 @@
     "statusCurrent": "Current",
     "statusProvisional": "Provisional",
     "statusFormer": "Former",
-    "boutsCount": "{n} bouts",
+    "boutsCount": "{n, plural, =1 {1 bout} other {# bouts}}",
     "rowAria": "{division}: {status} rating {score}, {bouts} bouts"
+  },
+  "bmf": {
+    "champion": "BMF Champion",
+    "former": "Former BMF ({startYear}–{endYear})"
   },
   "trophy": {
     "interimChamp": "INTERIM CHAMP",

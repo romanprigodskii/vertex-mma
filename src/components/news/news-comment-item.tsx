@@ -14,6 +14,7 @@ import {
   CommentComposer,
   TierBadge,
 } from "@/components/news/news-comment-composer";
+import { useMounted } from "@/hooks/use-mounted";
 import type { CommentNode, CommentAuthorSnapshot } from "@/lib/news-comments";
 import { cn } from "@/lib/utils";
 
@@ -57,6 +58,7 @@ export function CommentItem({
 }: CommentItemProps) {
   const t = useTranslations("news");
   const relativeTime = useRelativeTime();
+  const mounted = useMounted();
   const [replying, setReplying] = React.useState(false);
   const [deleted, setDeleted] = React.useState(false);
   const [reported, setReported] = React.useState(false);
@@ -101,8 +103,11 @@ export function CommentItem({
             {comment.author.displayName ?? comment.author.username}
           </span>
           <TierBadge tier={comment.author.tier} />
-          <span className="font-mono text-[11px] text-foreground-subtle">
-            {relativeTime(comment.createdAt)}
+          <span
+            className="font-mono text-[11px] text-foreground-subtle"
+            suppressHydrationWarning
+          >
+            {mounted ? relativeTime(comment.createdAt) : null}
           </span>
         </div>
         <p className="mt-1 whitespace-pre-wrap break-words font-sans text-sm leading-[1.55] text-foreground/90">

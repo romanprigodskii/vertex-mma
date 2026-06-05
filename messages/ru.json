@@ -77,7 +77,8 @@
     "retry": "Повторить",
     "back": "Назад",
     "seeAll": "Все",
-    "vertex": "Vertex"
+    "vertex": "Vertex",
+    "close": "Закрыть"
   },
   "home": {
     "metaTitle": "Vertex MMA — рейтинги UFC и ставки",
@@ -334,6 +335,7 @@
       "past": "Прошедшие",
       "all": "Все"
     },
+    "navLabel": "Фильтры турниров",
     "empty": "Турниров нет.",
     "boutCount": "{count, plural, one {# бой} few {# боя} many {# боёв} other {# боя}}",
     "statusCompleted": "Завершён",
@@ -451,6 +453,7 @@
     "kicker": "Сообщество",
     "heading": "Лидерборд",
     "lead": "Топ беттеров и составителей рейтингов Vertex MMA. Выбери сортировку — каждая строка ведёт в профиль пользователя.",
+    "navLabel": "Сортировка лидерборда",
     "sort_profit": "Капитал",
     "sort_profit_hint": "Заработано минус проиграно за всё время (с учётом бонусов)",
     "sort_volume": "Объём",
@@ -1495,6 +1498,10 @@
     "statusFormer": "Бывший",
     "boutsCount": "{n, plural, one {# бой} few {# боя} many {# боёв} other {# боя}}",
     "rowAria": "{division}: {status} рейтинг {score}, {bouts} боёв"
+  },
+  "bmf": {
+    "champion": "Чемпион BMF",
+    "former": "Бывший чемпион BMF ({startYear}–{endYear})"
   },
   "trophy": {
     "interimChamp": "ВРЕМ. ЧЕМПИОН",

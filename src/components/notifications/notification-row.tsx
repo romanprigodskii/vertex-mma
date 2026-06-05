@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from "next-intl";
 
 import { markNotificationReadAction } from "@/app/[locale]/notifications/actions";
 import { useLocalizedNotification } from "@/components/notifications/use-localized-notification";
+import { useMounted } from "@/hooks/use-mounted";
 import { Link } from "@/i18n/navigation";
 import type { NotificationRow as NotificationRowData } from "@/lib/notifications";
 import { cn } from "@/lib/utils";
@@ -42,6 +43,7 @@ function useFormatAgo() {
 export function NotificationRow({ notification: n }: Props) {
   const t = useTranslations("notifications");
   const formatAgo = useFormatAgo();
+  const mounted = useMounted();
   const localize = useLocalizedNotification();
   const { title, body: localizedBody } = localize(n);
   // Local optimistic flip so the row visually quiets the moment the user
@@ -81,8 +83,11 @@ export function NotificationRow({ notification: n }: Props) {
             {localizedBody}
           </p>
         ) : null}
-        <p className="mt-1 font-mono text-[10px] tabular text-foreground-subtle">
-          {formatAgo(n.created_at)}
+        <p
+          className="mt-1 font-mono text-[10px] tabular text-foreground-subtle"
+          suppressHydrationWarning
+        >
+          {mounted ? formatAgo(n.created_at) : null}
         </p>
       </div>
       {!readNow ? (

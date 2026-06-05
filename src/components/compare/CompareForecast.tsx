@@ -3,6 +3,7 @@ import { ArrowRight } from "lucide-react";
 
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
+import { clampHeadline } from "@/lib/vertex-tier";
 
 interface Props {
   fighterAName: string;
@@ -30,6 +31,12 @@ export function CompareForecast({
   basis,
 }: Props) {
   const t = useTranslations("compare");
+  // The win split is computed from the RAW score gap (SCORE_SCALE is tuned on
+  // raw points), but the numbers we PRINT must match the clamped 0–100 headline
+  // shown on cards / profile / search. Clamp at the display point, like
+  // FighterCard does — never leak an all-time score above 100.
+  const displayScoreA = clampHeadline(scoreA) ?? scoreA;
+  const displayScoreB = clampHeadline(scoreB) ?? scoreB;
   const pctA = Math.round(probA * 100);
   const pctB = 100 - pctA;
   const even = Math.abs(pctA - 50) <= 2;
@@ -78,8 +85,8 @@ export function CompareForecast({
         </div>
         <p className="mt-2 text-center font-sans text-[11px] text-foreground-subtle">
           {basis === "all_time"
-            ? t("forecastBasisAllTime", { a: scoreA, b: scoreB })
-            : t("forecastBasisCurrent", { a: scoreA, b: scoreB })}
+            ? t("forecastBasisAllTime", { a: displayScoreA, b: displayScoreB })
+            : t("forecastBasisCurrent", { a: displayScoreA, b: displayScoreB })}
         </p>
       </div>
 

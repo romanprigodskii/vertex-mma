@@ -17,12 +17,13 @@ export async function LeaderboardTable({ rows, activeSort }: Props) {
     <div>
       <nav
         className="mb-6 flex gap-1 overflow-x-auto border-b border-foreground/10"
-        role="tablist"
+        aria-label={t("navLabel")}
       >
         {SORT_KEYS.map((key) => (
           <Link
             key={key}
             href={`/leaderboard?sort=${key}`}
+            aria-current={activeSort === key ? "page" : undefined}
             className={cn(
               "px-3 py-2 font-sans text-sm uppercase tracking-widest transition-colors",
               activeSort === key

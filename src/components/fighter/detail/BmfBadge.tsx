@@ -1,4 +1,6 @@
-import { getBmfReigns, wasBmfChampion } from "@/lib/bmf-history";
+import { useLocale, useTranslations } from "next-intl";
+
+import { getBmfReigns, wasBmfChampion, type BmfReign } from "@/lib/bmf-history";
 import { cn } from "@/lib/utils";
 
 /**
@@ -19,9 +21,15 @@ interface BmfBadgeProps {
 }
 
 export function BmfBadge({ slug, variant, className }: BmfBadgeProps) {
+  const t = useTranslations("bmf");
+  const locale = useLocale();
   if (!wasBmfChampion(slug)) return null;
   const reigns = getBmfReigns(slug);
   const currentReign = reigns.find((r) => r.endDate === null);
+  // Reign notes are stored EN + RU side-by-side in bmf-history; fall back to
+  // the English note when a Russian one is missing.
+  const tooltip = (r: BmfReign) =>
+    locale === "ru" ? r.notesRu ?? r.notes : r.notes;
 
   if (variant === "card") {
     // Card chip — current BMF only. Skip former (keeps catalog cards uncluttered).
@@ -32,7 +40,7 @@ export function BmfBadge({ slug, variant, className }: BmfBadgeProps) {
           "inline-flex items-center rounded-sm bg-amber-400 px-1.5 py-px font-display text-[9px] font-medium uppercase tracking-wider leading-none text-black",
           className,
         )}
-        title={currentReign.notes}
+        title={tooltip(currentReign)}
       >
         BMF
       </span>
@@ -47,9 +55,9 @@ export function BmfBadge({ slug, variant, className }: BmfBadgeProps) {
           "inline-flex items-center rounded-full bg-amber-400 px-2.5 py-1 font-display text-[10px] uppercase tracking-wider leading-none text-black shadow-md",
           className,
         )}
-        title={currentReign.notes}
+        title={tooltip(currentReign)}
       >
-        BMF Champion
+        {t("champion")}
       </span>
     );
   }
@@ -67,9 +75,9 @@ export function BmfBadge({ slug, variant, className }: BmfBadgeProps) {
         "inline-flex items-center rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 font-sans text-[10px] uppercase tracking-wider leading-none text-amber-300/80",
         className,
       )}
-      title={mostRecent.notes}
+      title={tooltip(mostRecent)}
     >
-      Former BMF ({startYear}–{endYear})
+      {t("former", { startYear, endYear })}
     </span>
   );
 }

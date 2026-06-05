@@ -1,8 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
+
+import { useRouter } from "@/i18n/navigation";
 
 import { deleteAccountAction } from "@/app/[locale]/settings/actions";
 
