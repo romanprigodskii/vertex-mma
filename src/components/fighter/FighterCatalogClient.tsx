@@ -132,44 +132,55 @@ export function FighterCatalogClient({
   }, [urlFilterKey]);
 
   // ---------- Filter-change fetch ----------
+  // Extracted so the error banner's "Retry" button can re-run the exact same
+  // request after a transient failure. Pass a signal from the effect (so a
+  // superseding filter change aborts the stale request); the retry path calls
+  // it with no signal.
+  const runCatalogFetch = React.useCallback(
+    (signal?: AbortSignal) => {
+      const key = filtersKey(filters);
+      inflightKeyRef.current = key;
+      setSearching(filters.q.trim().length > 0);
+      setLoading(true);
+      setError(null);
+
+      const params = serializeFilters(filters);
+      params.set("limit", String(PAGE_SIZE));
+      params.set("offset", "0");
+
+      fetch(`/api/fighters?${params.toString()}`, { signal })
+        .then(async (res) => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data: FighterCatalogResponse = await res.json();
+          if (inflightKeyRef.current !== key) return;
+          setFighters(data.fighters);
+          setTotal(data.total);
+          setHasMore(data.hasMore);
+          setOffset(data.fighters.length);
+        })
+        .catch((err: unknown) => {
+          if ((err as Error).name === "AbortError") return;
+          if (inflightKeyRef.current !== key) return;
+          setError(t("loadError"));
+        })
+        .finally(() => {
+          if (inflightKeyRef.current === key) {
+            setLoading(false);
+            setSearching(false);
+          }
+        });
+    },
+    [filters, t],
+  );
+
   React.useEffect(() => {
     const key = filtersKey(filters);
     if (key === initialKeyRef.current) {
       inflightKeyRef.current = key;
       return;
     }
-
-    inflightKeyRef.current = key;
-    setSearching(filters.q.trim().length > 0);
-    setLoading(true);
-    setError(null);
-
-    const params = serializeFilters(filters);
-    params.set("limit", String(PAGE_SIZE));
-    params.set("offset", "0");
-
     const controller = new AbortController();
-    fetch(`/api/fighters?${params.toString()}`, { signal: controller.signal })
-      .then(async (res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data: FighterCatalogResponse = await res.json();
-        if (inflightKeyRef.current !== key) return;
-        setFighters(data.fighters);
-        setTotal(data.total);
-        setHasMore(data.hasMore);
-        setOffset(data.fighters.length);
-      })
-      .catch((err: unknown) => {
-        if ((err as Error).name === "AbortError") return;
-        setError(t("loadError"));
-      })
-      .finally(() => {
-        if (inflightKeyRef.current === key) {
-          setLoading(false);
-          setSearching(false);
-        }
-      });
-
+    runCatalogFetch(controller.signal);
     return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlFilterKey]);
@@ -253,8 +264,9 @@ export function FighterCatalogClient({
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Sticky controls bar */}
-      <div className="sticky top-16 z-30 -mx-4 border-b border-foreground/10 bg-background-base/90 px-4 py-3 backdrop-blur-md sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+      {/* Sticky controls bar. top offset tracks the navbar's responsive height
+          (h-14 on mobile, h-16 at md+) so no content shows through the gap. */}
+      <div className="sticky top-14 z-30 -mx-4 border-b border-foreground/10 bg-background-base/90 px-4 py-3 backdrop-blur-md sm:-mx-6 sm:px-6 md:top-16 lg:-mx-8 lg:px-8">
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <div className="min-w-0 flex-1 sm:max-w-[360px]">
             <SearchBar
@@ -266,22 +278,9 @@ export function FighterCatalogClient({
                 }
               }}
               loading={searching}
+              resultsCount={total}
             />
           </div>
-          <p className="hidden sm:block whitespace-nowrap font-sans text-xs text-foreground-muted">
-            {t.rich("showingOf", {
-              shown: () => (
-                <span className="font-mono tabular text-foreground">
-                  {formatNumber(fighters.length)}
-                </span>
-              ),
-              total: () => (
-                <span className="font-mono tabular text-foreground">
-                  {formatNumber(total)}
-                </span>
-              ),
-            }) as React.ReactNode}
-          </p>
           <div className="ml-auto flex items-center gap-2">
             <div className="hidden w-48 lg:block">
               <SortDropdown
@@ -332,8 +331,16 @@ export function FighterCatalogClient({
         {/* Roster column */}
         <div className="min-w-0 flex-1">
           {error ? (
-            <div className="mb-3 rounded-md border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-foreground">
-              {error}
+            <div className="mb-3 flex items-center justify-between gap-3 rounded-md border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-foreground">
+              <span>{error}</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => runCatalogFetch()}
+                className="shrink-0"
+              >
+                {t("retry")}
+              </Button>
             </div>
           ) : null}
 
@@ -361,7 +368,10 @@ export function FighterCatalogClient({
           {showSkeleton ? (
             <CatalogSkeleton count={12} />
           ) : showEmpty ? (
-            <EmptyState onReset={activeCount > 0 ? onClear : undefined} />
+            <EmptyState
+              filtered={activeCount > 0}
+              onReset={activeCount > 0 ? onClear : undefined}
+            />
           ) : (
             <>
               <motion.ul

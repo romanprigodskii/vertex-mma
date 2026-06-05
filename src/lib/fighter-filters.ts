@@ -1,4 +1,5 @@
 import { WEIGHT_CLASSES } from "@/lib/constants";
+import { CATALOG_MAX_LIMIT } from "@/lib/fighter-search";
 import type {
   CatalogChampionFilter,
   CatalogGenderFilter,
@@ -48,7 +49,6 @@ const VALID_GENDERS: ReadonlySet<CatalogGenderFilter> = new Set([
 // pg_trgm + triple ILIKE), and clamp limit/offset so deep-pagination can't be
 // abused as an unauthenticated full-table scan.
 const MAX_Q_LEN = 64;
-const MAX_LIMIT = 200;
 const MAX_OFFSET = 10_000;
 
 const VALID_WEIGHTS = new Set(WEIGHT_CLASSES.map((w) => w.id as string));
@@ -165,7 +165,7 @@ export function parseCatalogFilters(
     gender,
     sort,
     limit: Number.isFinite(rawLimit)
-      ? Math.min(MAX_LIMIT, Math.max(1, rawLimit))
+      ? Math.min(CATALOG_MAX_LIMIT, Math.max(1, rawLimit))
       : undefined,
     offset: Number.isFinite(rawOffset)
       ? Math.min(MAX_OFFSET, Math.max(0, rawOffset))

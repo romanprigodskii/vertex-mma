@@ -8,7 +8,7 @@ import { Check, ChevronDown } from "lucide-react";
 import type { CatalogSort } from "@/lib/fighter-search";
 import { cn } from "@/lib/utils";
 
-const SORT_IDS: CatalogSort[] = [
+export const SORT_IDS: CatalogSort[] = [
   "vertex_current",
   "vertex_all_time",
   "elite_first",

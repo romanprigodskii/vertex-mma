@@ -2,8 +2,8 @@
 
 import { useTranslations } from "next-intl";
 
+import { FilterRadioGroup } from "@/components/fighter/FilterRadioGroup";
 import type { CatalogGenderFilter } from "@/lib/fighter-search";
-import { cn } from "@/lib/utils";
 
 const OPTIONS: ReadonlyArray<{
   id: CatalogGenderFilter;
@@ -22,31 +22,12 @@ interface GenderToggleProps {
 export function GenderToggle({ value, onChange }: GenderToggleProps) {
   const t = useTranslations("catalog");
   return (
-    <div
-      role="radiogroup"
-      aria-label={t("filterGender")}
+    <FilterRadioGroup
+      value={value}
+      onChange={onChange}
+      ariaLabel={t("filterGender")}
       className="grid grid-cols-3 gap-1"
-    >
-      {OPTIONS.map((opt) => {
-        const isActive = value === opt.id;
-        return (
-          <button
-            key={opt.id}
-            type="button"
-            role="radio"
-            aria-checked={isActive}
-            onClick={() => onChange(opt.id)}
-            className={cn(
-              "inline-flex h-7 items-center justify-center rounded-sm border px-2 text-[11px] transition-colors",
-              isActive
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-foreground/10 bg-transparent text-foreground-muted hover:border-foreground/30 hover:text-foreground",
-            )}
-          >
-            {t(opt.key)}
-          </button>
-        );
-      })}
-    </div>
+      options={OPTIONS.map((opt) => ({ id: opt.id, label: t(opt.key) }))}
+    />
   );
 }

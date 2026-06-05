@@ -1028,7 +1028,10 @@
     "closeFilters": "Закрыть фильтры",
     "reset": "Сбросить",
     "apply": "Применить",
-    "showN": "Показать {n}"
+    "showN": "Показать {n}",
+    "sortHeading": "Сортировка",
+    "retry": "Повторить",
+    "emptyRosterHint": "Ростер сейчас пуст — загляните чуть позже."
   },
   "static": {
     "brand": "Vertex MMA",
@@ -1517,7 +1520,8 @@
     "opensAnywhere": "открывает поиск везде",
     "footerBrand": "Поиск Vertex",
     "trigger": "Поиск",
-    "triggerAria": "Найти бойца"
+    "triggerAria": "Найти бойца",
+    "resultsFound": "{n, plural, one {найден # боец} few {найдено # бойца} many {найдено # бойцов} other {найдено # бойца}}"
   },
   "method": {
     "ko": "КО",
