@@ -7,6 +7,7 @@ import { useTranslations } from "next-intl";
 import { placeFixedOddsBetAction } from "@/app/[locale]/markets/actions";
 import { useBetSlip } from "@/components/markets/bet-slip-context";
 import { Link } from "@/i18n/navigation";
+import { formatNumber } from "@/lib/format";
 import {
   type SportsbookMarketKind,
   type SportsbookOutcome,
@@ -56,7 +57,11 @@ export function SportsbookPanel({
   const { toggleLeg, codeForBout } = useBetSlip();
   const slipCode = codeForBout(boutId);
   const [selected, setSelected] = React.useState<SportsbookOutcome | null>(null);
-  const [stake, setStake] = React.useState("100");
+  // Don't pre-fill more than the user can afford (a near-broke user otherwise
+  // lands on a silently-disabled button with no explanation).
+  const [stake, setStake] = React.useState(() =>
+    userBalance != null ? String(Math.min(100, Math.max(0, userBalance))) : "100",
+  );
   const [pending, setPending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [success, setSuccess] = React.useState<string | null>(null);
@@ -68,6 +73,27 @@ export function SportsbookPanel({
   })();
   const payout = selected ? potentialPayout(parsedStake, selected.decimalOdds) : 0;
   const profit = payout - parsedStake;
+
+  function translateError(code: string): string {
+    switch (code) {
+      case "NOT_SIGNED_IN":
+        return t("errNotSignedIn");
+      case "RATE_LIMITED":
+        return t("errRateLimited");
+      case "INVALID_AMOUNT":
+        return t("errInvalidAmount");
+      case "NOT_ENOUGH_COINS":
+        return t("notEnough");
+      case "BOUT_CLOSED":
+        return t("errBoutClosed");
+      case "NO_MODEL_ODDS":
+        return t("errNoModelOdds");
+      case "MARKET_NOT_OFFERED":
+        return t("errMarketNotOffered");
+      default:
+        return t("errGeneric");
+    }
+  }
 
   // Short label used inside a market section (the section header already
   // carries the market name; method buttons add the fighter prefix inline).
@@ -120,12 +146,12 @@ export function SportsbookPanel({
     const res = await placeFixedOddsBetAction(boutId, selected.code, parsedStake);
     setPending(false);
     if (res.error) {
-      setError(res.error);
+      setError(translateError(res.error));
       return;
     }
     setSuccess(
       t("placed", {
-        payout: res.potentialPayout ?? payout,
+        payout: formatNumber(res.potentialPayout ?? payout),
         odds: formatOdds(res.decimalOdds ?? selected.decimalOdds),
       }),
     );
@@ -135,6 +161,18 @@ export function SportsbookPanel({
 
   const byKind = (k: SportsbookMarketKind) =>
     outcomes.filter((o) => o.marketKind === k);
+
+  const disabledReason = !signedIn
+    ? null
+    : !selected
+      ? t("hintPickOutcome")
+      : userBalance != null && userBalance <= 0
+        ? t("hintOutOfCoins")
+        : parsedStake < 1
+          ? t("hintEnterStake")
+          : userBalance != null && parsedStake > userBalance
+            ? t("hintExceedsBalance")
+            : null;
 
   return (
     <section className="rounded-lg border border-foreground/10 bg-background-elevated/30 p-5 sm:p-6">
@@ -149,7 +187,7 @@ export function SportsbookPanel({
         </div>
         {signedIn ? (
           <p className="shrink-0 font-mono text-[11px] tabular text-foreground-subtle">
-            {t("balance", { n: userBalance!.toLocaleString() })}
+            {t("balance", { n: formatNumber(userBalance!) })}
           </p>
         ) : null}
       </div>
@@ -223,7 +261,8 @@ export function SportsbookPanel({
                       hasValueEdge(edgeA ?? null, o.side) ? (
                         <span
                           title={t("valueTooltip")}
-                          className="mt-1 inline-flex items-center rounded-sm bg-primary/15 px-1.5 py-0.5 font-sans text-[9px] font-semibold uppercase tracking-wide text-primary"
+                          aria-label={t("valueTooltip")}
+                          className="mt-1 inline-flex items-center rounded-sm bg-primary/15 px-1.5 py-0.5 font-sans text-[10px] font-semibold uppercase tracking-wide text-primary"
                         >
                           {t("valueBadge", {
                             pp: Math.round(
@@ -295,7 +334,10 @@ export function SportsbookPanel({
                   max={userBalance ?? undefined}
                   step={1}
                   value={stake}
-                  onChange={(e) => setStake(e.target.value)}
+                  onChange={(e) => {
+                    setStake(e.target.value);
+                    setSuccess(null);
+                  }}
                   className="rounded-sm border border-foreground/15 bg-background-elevated/30 px-3 py-2 font-mono text-sm tabular text-foreground focus:border-primary focus:outline-none"
                 />
               </label>
@@ -306,9 +348,9 @@ export function SportsbookPanel({
                 <p className="font-display text-lg tabular text-foreground">
                   {selected && parsedStake > 0 ? (
                     <>
-                      {payout.toLocaleString()}{" "}
+                      {formatNumber(payout)}{" "}
                       <span className="font-sans text-xs text-foreground-muted">
-                        {t("toWin", { profit: profit.toLocaleString() })}
+                        {t("toWin", { profit: formatNumber(profit) })}
                       </span>
                     </>
                   ) : (
@@ -330,13 +372,25 @@ export function SportsbookPanel({
                 {pending ? t("placing") : t("placeBet")}
               </button>
             </div>
+            {/* Explain a disabled Place button instead of a silent grey-out. */}
+            {!pending && disabledReason ? (
+              <p className="mt-2 font-sans text-[11px] text-foreground-subtle">
+                {disabledReason}
+              </p>
+            ) : null}
             {error ? (
               <p className="mt-3 font-sans text-sm text-streak-loss" role="alert">
                 {error}
               </p>
             ) : null}
             {success ? (
-              <p className="mt-3 font-sans text-sm text-streak-win">{success}</p>
+              <p
+                className="mt-3 font-sans text-sm text-streak-win"
+                role="status"
+                aria-live="polite"
+              >
+                {success}
+              </p>
             ) : null}
           </>
         )}

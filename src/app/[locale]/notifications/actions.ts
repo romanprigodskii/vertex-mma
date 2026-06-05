@@ -28,10 +28,10 @@ export async function markNotificationReadAction(
   notificationId: string,
 ): Promise<{ error?: string }> {
   if (!UUID_RE.test(notificationId)) {
-    return { error: "Invalid notification id." };
+    return { error: "INVALID_ID" };
   }
   const myId = await getMyProfileId();
-  if (!myId) return { error: "Not signed in." };
+  if (!myId) return { error: "NOT_SIGNED_IN" };
 
   await db.execute(sql`
     UPDATE notification
@@ -44,7 +44,7 @@ export async function markNotificationReadAction(
 
 export async function markAllReadAction(): Promise<{ error?: string }> {
   const myId = await getMyProfileId();
-  if (!myId) return { error: "Not signed in." };
+  if (!myId) return { error: "NOT_SIGNED_IN" };
 
   await db.execute(sql`
     UPDATE notification

@@ -8,6 +8,7 @@ import {
   searchFightersForPicker,
 } from "@/app/[locale]/cards/actions";
 import { formatWeightClass } from "@/lib/card-theme";
+import { cn } from "@/lib/utils";
 
 export type BoutFighter = {
   id: string;
@@ -21,6 +22,9 @@ interface Props {
   onPick: (f: PickerFighter) => void;
   onClear: () => void;
   excludedIds: string[];
+  /** Outline the empty slot in red — set when a submit was blocked because
+   *  this slot has no fighter. */
+  invalid?: boolean;
 }
 
 /** One fighter slot in a bout — a filled chip, or an inline fuzzy search. */
@@ -30,6 +34,7 @@ export function FighterSlotPicker({
   onPick,
   onClear,
   excludedIds,
+  invalid = false,
 }: Props) {
   const t = useTranslations("cards");
   if (fighter) {
@@ -63,7 +68,12 @@ export function FighterSlotPicker({
     );
   }
   return (
-    <SlotSearch label={label} onPick={onPick} excludedIds={excludedIds} />
+    <SlotSearch
+      label={label}
+      onPick={onPick}
+      excludedIds={excludedIds}
+      invalid={invalid}
+    />
   );
 }
 
@@ -71,16 +81,21 @@ function SlotSearch({
   label,
   onPick,
   excludedIds,
+  invalid,
 }: {
   label: string;
   onPick: (f: PickerFighter) => void;
   excludedIds: string[];
+  invalid: boolean;
 }) {
   const t = useTranslations("cards");
   const tSearch = useTranslations("search");
   const tWeight = useTranslations("weight");
   const [query, setQuery] = React.useState("");
   const [results, setResults] = React.useState<PickerFighter[]>([]);
+  // The query that `results` actually reflect — used to know when a search
+  // has settled so we don't flash "no results" during the debounce window.
+  const [resultsQuery, setResultsQuery] = React.useState("");
   const [pending, setPending] = React.useState(false);
 
   React.useEffect(() => {
@@ -89,28 +104,43 @@ function SlotSearch({
     // The cleanup flips `cancelled` on the next keystroke / unmount, so a
     // slow request that resolves after the input moved on is discarded.
     let cancelled = false;
-    const t = setTimeout(async () => {
+    const timer = setTimeout(async () => {
       setPending(true);
       try {
         const r = await searchFightersForPicker(trimmed);
-        if (!cancelled) setResults(r);
+        if (!cancelled) {
+          setResults(r);
+          setResultsQuery(trimmed);
+        }
       } finally {
         if (!cancelled) setPending(false);
       }
     }, 200);
     return () => {
       cancelled = true;
-      clearTimeout(t);
+      clearTimeout(timer);
     };
   }, [query]);
 
+  const trimmedQuery = query.trim();
   const excluded = new Set(excludedIds);
-  const visible = query.trim()
+  const visible = trimmedQuery
     ? results.filter((r) => !excluded.has(r.id))
     : [];
+  // Only show an empty message once the search for the *current* query has
+  // finished — otherwise it would flicker between keystrokes.
+  const settled = !pending && resultsQuery === trimmedQuery;
+  const showEmpty = trimmedQuery.length > 0 && settled && visible.length === 0;
+  // Matches existed but every one is already booked elsewhere on the card.
+  const allAlreadyAdded = showEmpty && results.length > 0;
 
   return (
-    <div className="rounded-md border border-dashed border-foreground/15 bg-background-elevated/20 p-2">
+    <div
+      className={cn(
+        "rounded-md border border-dashed bg-background-elevated/20 p-2",
+        invalid ? "border-streak-loss/60" : "border-foreground/15",
+      )}
+    >
       <input
         type="text"
         value={query}
@@ -118,9 +148,14 @@ function SlotSearch({
         placeholder={t("slotPlaceholder", { label })}
         className="w-full rounded-sm border border-foreground/15 bg-background-base px-2.5 py-1.5 font-sans text-sm text-foreground placeholder:text-foreground-subtle focus:border-primary focus:outline-none"
       />
-      {pending && query.trim() ? (
+      {pending && trimmedQuery ? (
         <p className="mt-1.5 font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
           {tSearch("searching")}
+        </p>
+      ) : null}
+      {showEmpty ? (
+        <p className="mt-1.5 font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
+          {allAlreadyAdded ? t("slotAllAdded") : t("slotNoResults")}
         </p>
       ) : null}
       {visible.length > 0 ? (

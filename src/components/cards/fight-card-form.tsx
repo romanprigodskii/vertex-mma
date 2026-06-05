@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useTranslations } from "next-intl";
+import { Check } from "lucide-react";
 
 import {
   createFightCardAction,
@@ -103,11 +104,60 @@ export function FightCardForm({
   );
   const [pending, setPending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  // Keys of bouts flagged on the last failed submit (missing a fighter), so
+  // we can outline the offending bout(s) instead of only a generic banner.
+  const [invalidKeys, setInvalidKeys] = React.useState<Set<string>>(
+    () => new Set(),
+  );
+  const boutRefs = React.useRef<Record<string, HTMLLIElement | null>>({});
+
+  /** Drop the stale invalid-bout highlights once the user edits anything. */
+  function clearInvalid() {
+    setInvalidKeys((cur) => (cur.size === 0 ? cur : new Set()));
+  }
+
+  /** Map a server action's stable error code to a localized message. The
+   *  action layer never returns prose — keep this in sync with actions.ts. */
+  function actionErrorMessage(code: string): string {
+    switch (code) {
+      case "NOT_SIGNED_IN":
+        return t("errNotSignedIn");
+      case "CARD_NOT_FOUND":
+        return t("cardNotFound");
+      case "NOT_YOUR_CARD":
+        return t("errNotYourCard");
+      case "NO_BOUTS":
+        return t("atLeastOneBout");
+      case "TOO_MANY_BOUTS":
+        return t("errTooManyBouts", { max: MAX_BOUTS });
+      case "BOUT_NEEDS_FIGHTERS":
+        return t("needFighters");
+      case "FIGHTER_VS_SELF":
+        return t("errFighterVsSelf");
+      case "INVALID_WEIGHT_CLASS":
+        return t("errInvalidWeight");
+      case "TOO_MANY_MAIN_EVENTS":
+        return t("errTooManyMain");
+      case "INVALID_TITLE":
+        return t("titleTooShort");
+      default:
+        return t("errGeneric");
+    }
+  }
+
+  /** Localized accent-color name, falling back to the registry's English
+   *  label for any id without a translation key. */
+  function colorLabel(id: string): string {
+    const key = `color${id.charAt(0).toUpperCase()}${id.slice(1)}`;
+    if (t.has(key as "colorPrimary")) return t(key as "colorPrimary");
+    return CARD_THEME_COLORS.find((c) => c.id === id)?.label ?? id;
+  }
 
   function addBout() {
     setBouts((cur) => (cur.length >= MAX_BOUTS ? cur : [...cur, freshBout()]));
   }
   function removeBout(key: string) {
+    clearInvalid();
     setBouts((cur) =>
       cur.length <= 1 ? cur : cur.filter((b) => b.key !== key),
     );
@@ -122,6 +172,7 @@ export function FightCardForm({
     });
   }
   function patchBout(key: string, patch: Partial<FormBout>) {
+    clearInvalid();
     setBouts((cur) => cur.map((b) => (b.key === key ? { ...b, ...patch } : b)));
   }
   function toggleMainEvent(key: string) {
@@ -145,10 +196,19 @@ export function FightCardForm({
       setError(t("titleTooShort"));
       return;
     }
-    if (bouts.some((b) => !b.fighterA || !b.fighterB)) {
+    const incomplete = bouts.filter((b) => !b.fighterA || !b.fighterB);
+    if (incomplete.length > 0) {
       setError(t("boutsNeedFighters"));
+      setInvalidKeys(new Set(incomplete.map((b) => b.key)));
+      // Bring the first incomplete bout into view so the user isn't left
+      // hunting for the offending slot on a long card.
+      boutRefs.current[incomplete[0].key]?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
       return;
     }
+    setInvalidKeys(new Set());
 
     setPending(true);
     const formData = new FormData();
@@ -178,7 +238,7 @@ export function FightCardForm({
     setPending(false);
 
     if (res?.error) {
-      setError(res.error);
+      setError(actionErrorMessage(res.error));
       return;
     }
     if (!res?.slug) {
@@ -202,10 +262,11 @@ export function FightCardForm({
     const res = await deleteFightCardAction(cardId);
     setPending(false);
     if (res?.error) {
-      setError(res.error);
+      setError(actionErrorMessage(res.error));
       return;
     }
-    router.push("/cards");
+    // The one-shot `deleted` flag drives a brief success toast on /cards.
+    router.push("/cards?deleted=1");
     router.refresh();
   }
 
@@ -267,24 +328,40 @@ export function FightCardForm({
 
           <div className="flex flex-col gap-1.5">
             <span className={LABEL}>{t("accentColor")}</span>
-            <div className="flex flex-wrap gap-2">
-              {CARD_THEME_COLORS.map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() => setThemeColor(c.id)}
-                  aria-label={c.label}
-                  title={c.label}
-                  className={cn(
-                    "h-8 w-8 rounded-full border-2 transition-transform hover:scale-110",
-                    themeColor === c.id
-                      ? "border-foreground"
-                      : "border-transparent",
-                  )}
-                  style={{ backgroundColor: c.accent }}
-                />
-              ))}
+            <div className="flex flex-wrap items-center gap-2">
+              {CARD_THEME_COLORS.map((c) => {
+                const selected = themeColor === c.id;
+                const label = colorLabel(c.id);
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => setThemeColor(c.id)}
+                    aria-label={label}
+                    aria-pressed={selected}
+                    title={label}
+                    className={cn(
+                      "relative flex h-8 w-8 items-center justify-center rounded-full transition-transform hover:scale-110",
+                      selected
+                        ? "scale-110 ring-2 ring-foreground ring-offset-2 ring-offset-background-base"
+                        : "ring-1 ring-foreground/20",
+                    )}
+                    style={{ backgroundColor: c.accent }}
+                  >
+                    {selected ? (
+                      <Check
+                        className="h-4 w-4 text-background-base"
+                        strokeWidth={3}
+                        aria-hidden
+                      />
+                    ) : null}
+                  </button>
+                );
+              })}
             </div>
+            <p className="font-sans text-[11px] text-foreground-muted">
+              {t("accentSelected", { color: colorLabel(themeColor) })}
+            </p>
           </div>
 
           <div className="flex flex-col gap-1.5">
@@ -354,7 +431,15 @@ export function FightCardForm({
             {bouts.map((b, idx) => (
               <li
                 key={b.key}
-                className="rounded-md border border-foreground/10 bg-background-elevated/30 p-3"
+                ref={(el) => {
+                  boutRefs.current[b.key] = el;
+                }}
+                className={cn(
+                  "rounded-md border bg-background-elevated/30 p-3",
+                  invalidKeys.has(b.key)
+                    ? "border-streak-loss/60"
+                    : "border-foreground/10",
+                )}
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-mono text-[11px] uppercase tracking-widest text-foreground-subtle">
@@ -398,6 +483,7 @@ export function FightCardForm({
                   <FighterSlotPicker
                     label={t("fighterA")}
                     fighter={b.fighterA}
+                    invalid={invalidKeys.has(b.key) && !b.fighterA}
                     onPick={(f) =>
                       patchBout(b.key, { fighterA: toBoutFighter(f) })
                     }
@@ -410,6 +496,7 @@ export function FightCardForm({
                   <FighterSlotPicker
                     label={t("fighterB")}
                     fighter={b.fighterB}
+                    invalid={invalidKeys.has(b.key) && !b.fighterB}
                     onPick={(f) =>
                       patchBout(b.key, { fighterB: toBoutFighter(f) })
                     }
@@ -417,6 +504,14 @@ export function FightCardForm({
                     excludedIds={usedFighterIds}
                   />
                 </div>
+                {invalidKeys.has(b.key) ? (
+                  <p
+                    className="mt-2 font-sans text-[11px] text-streak-loss"
+                    role="alert"
+                  >
+                    {t("incompleteBout")}
+                  </p>
+                ) : null}
 
                 <div className="mt-3 flex flex-wrap items-center gap-4">
                   <label className="flex items-center gap-2">

@@ -40,15 +40,19 @@ export function FightCardGridCard({ card }: { card: FightCardListItem }) {
           ) : null}
         </div>
 
-        {card.headliner ? (
-          <p className="mt-2 font-mono text-[11px] uppercase tracking-widest">
-            <span className="text-foreground">{card.headliner.fighter_a}</span>
-            <span className="text-[var(--card-accent)]"> {t("vsConnector")} </span>
-            <span className="text-foreground">{card.headliner.fighter_b}</span>
-          </p>
-        ) : (
+        {card.bout_count === 0 ? (
           <p className="mt-2 font-mono text-[11px] uppercase tracking-widest text-foreground-subtle">
             {t("emptyCard")}
+          </p>
+        ) : (
+          <p className="mt-2 font-mono text-[11px] uppercase tracking-widest">
+            <span className="text-foreground">
+              {card.headliner?.fighter_a ?? t("tbd")}
+            </span>
+            <span className="text-[var(--card-accent)]"> {t("vsConnector")} </span>
+            <span className="text-foreground">
+              {card.headliner?.fighter_b ?? t("tbd")}
+            </span>
           </p>
         )}
         {card.subtitle ? (
@@ -62,9 +66,14 @@ export function FightCardGridCard({ card }: { card: FightCardListItem }) {
           <span className="flex shrink-0 items-center gap-2">
             <span>{t("boutCount", { count: card.bout_count })}</span>
             <span aria-hidden>·</span>
-            <span className="inline-flex items-center gap-1">
-              <Heart className="h-3 w-3" />
-              {card.like_count}
+            {/* Read-only stat — the interactive like button lives on the card
+                detail page. Labelled for screen readers; icon is decorative. */}
+            <span
+              className="inline-flex items-center gap-1"
+              aria-label={t("likesCount", { count: card.like_count })}
+            >
+              <Heart className="h-3 w-3" aria-hidden />
+              <span className="tabular">{card.like_count}</span>
             </span>
           </span>
         </div>

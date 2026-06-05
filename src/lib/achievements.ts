@@ -163,12 +163,28 @@ export async function checkAndUnlockAchievements(
       WHERE user_id = ${userProfileId}::uuid
         AND payout >= 5000
     `),
-    db.execute<{ days: number }>(sql`
-      SELECT COUNT(DISTINCT DATE_TRUNC('day', created_at AT TIME ZONE 'UTC'))::int AS days
-      FROM transaction
-      WHERE user_id = ${userProfileId}::uuid
-        AND type = 'daily_bonus'
-        AND created_at > NOW() - INTERVAL '8 days'
+    db.execute<{ streak: number }>(sql`
+      -- Longest run of CONSECUTIVE daily-bonus claim days (gaps-and-islands).
+      -- Subtracting the row number from each ordered, de-duplicated claim date
+      -- yields a constant "anchor" date across any maximal consecutive run, so
+      -- grouping on the anchor and taking the largest group size is the true
+      -- streak length. A plain COUNT(DISTINCT day) over a sliding window would
+      -- have counted non-consecutive days (e.g. 1,2,3,4,5,6,8) as a 7-streak.
+      -- The unlock is permanent, so this scans all-time history, not a window.
+      WITH claim_days AS (
+        SELECT DISTINCT (created_at AT TIME ZONE 'UTC')::date AS d
+        FROM transaction
+        WHERE user_id = ${userProfileId}::uuid
+          AND type = 'daily_bonus'
+      ),
+      islands AS (
+        SELECT d - (ROW_NUMBER() OVER (ORDER BY d))::int AS anchor
+        FROM claim_days
+      )
+      SELECT COALESCE(MAX(run), 0)::int AS streak
+      FROM (
+        SELECT COUNT(*)::int AS run FROM islands GROUP BY anchor
+      ) runs
     `),
     db.execute<SbAgg>(sql`
       SELECT
@@ -190,8 +206,8 @@ export async function checkAndUnlockAchievements(
   const rankingCount =
     (rankingRows as unknown as Array<{ c: number }>)[0]?.c ?? 0;
   const lmsrBig = (bigWinRows as unknown as Array<{ c: number }>)[0]?.c ?? 0;
-  const dailyStreakDays =
-    (dailyStreakRows as unknown as Array<{ days: number }>)[0]?.days ?? 0;
+  const dailyStreakRun =
+    (dailyStreakRows as unknown as Array<{ streak: number }>)[0]?.streak ?? 0;
   const sb = (sbWinRows as unknown as SbAgg[])[0] ?? {
     won: 0,
     big: 0,
@@ -221,7 +237,7 @@ export async function checkAndUnlockAchievements(
         profile.avatar_url
       ),
     },
-    { slug: "daily_streak_7", condition: dailyStreakDays >= 7 },
+    { slug: "daily_streak_7", condition: dailyStreakRun >= 7 },
     { slug: "balance_50k", condition: profile.balance >= 50_000 },
     { slug: "balance_100k", condition: profile.balance >= 100_000 },
     { slug: "big_win", condition: bigWinCount >= 1 },

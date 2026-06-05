@@ -74,12 +74,13 @@ export async function SimulationBoutCard({ bout }: Props) {
   const tSim = await getTranslations("boutSimulation");
   const tWeight = await getTranslations("weight");
 
+  // Within ±2pp of an even split, crowning one side as "the pick" is
+  // misleading — surface a neutral "too close to call" state instead.
+  const isPickEm = Math.abs(bout.probA - 0.5) <= 0.02;
   const winnerIsA = bout.probA >= 0.5;
   const winnerName = winnerIsA ? bout.fighterAName : bout.fighterBName;
   const winnerProb = winnerIsA ? bout.probA : bout.probB;
-  const winnerSlug = winnerIsA ? bout.fighterASlug : bout.fighterBSlug;
   const loserName = winnerIsA ? bout.fighterBName : bout.fighterAName;
-  const loserProb = winnerIsA ? bout.probB : bout.probA;
   const cs = CONFIDENCE_STYLE[bout.confidenceLabel] ?? CONFIDENCE_STYLE.low;
   const weightLabel = tWeight.has(bout.weightClass)
     ? tWeight(bout.weightClass as "lightweight")
@@ -98,11 +99,18 @@ export async function SimulationBoutCard({ bout }: Props) {
     <Link
       href={`/bouts/${bout.boutId}`}
       prefetch={false}
-      aria-label={t("cardAria", {
-        winner: winnerName,
-        loser: loserName,
-        pct: pct(winnerProb),
-      })}
+      aria-label={
+        isPickEm
+          ? t("cardAriaPickEm", {
+              a: bout.fighterAName,
+              b: bout.fighterBName,
+            })
+          : t("cardAria", {
+              winner: winnerName,
+              loser: loserName,
+              pct: pct(winnerProb),
+            })
+      }
       className={cn(
         "group flex flex-col gap-3 rounded-md border border-foreground/10 bg-background-elevated/30 px-4 py-4",
         "transition-colors hover:border-primary/30 hover:bg-foreground/[0.04]",
@@ -139,7 +147,9 @@ export async function SimulationBoutCard({ bout }: Props) {
           <span
             className={cn(
               "font-display text-base uppercase tracking-tight leading-tight",
-              winnerIsA ? "text-foreground" : "text-foreground-muted",
+              isPickEm || winnerIsA
+                ? "text-foreground"
+                : "text-foreground-muted",
             )}
           >
             {bout.fighterAName}
@@ -155,7 +165,9 @@ export async function SimulationBoutCard({ bout }: Props) {
           <span
             className={cn(
               "font-display text-base uppercase tracking-tight leading-tight",
-              !winnerIsA ? "text-foreground" : "text-foreground-muted",
+              isPickEm || !winnerIsA
+                ? "text-foreground"
+                : "text-foreground-muted",
             )}
           >
             {bout.fighterBName}
