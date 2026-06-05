@@ -582,7 +582,7 @@
     "password": "Password",
     "confirmPassword": "Confirm password",
     "username": "Username",
-    "usernameHint": "3–24 chars, letters / numbers / underscore.",
+    "usernameHint": "3–30 chars, letters / numbers / underscore.",
     "forgotPassword": "Forgot password?",
     "signingIn": "Signing in...",
     "signIn": "Sign in",
@@ -627,7 +627,10 @@
     "passwordUpdated": "Password updated",
     "passwordUpdatedLead": "You can now sign in with your new password.",
     "chooseNewPassword": "Choose a new password",
-    "chooseNewLead": "Pick something at least 8 characters long."
+    "chooseNewLead": "Pick something at least 8 characters long.",
+    "errLinkExpired": "This link is invalid or has expired. Please request a new one.",
+    "errAuthCallback": "We couldn't complete sign-in. Please try again.",
+    "requestNewLink": "Request a new reset link"
   },
   "settings": {
     "metaTitle": "Settings",
@@ -692,7 +695,18 @@
     "confirmDeletionHeading": "Confirm deletion",
     "typeDeletePrefix": "Type",
     "typeDeleteSuffix": "to confirm. This action cannot be undone.",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "notSignedIn": "You're not signed in.",
+    "countryCodeInvalid": "Country code must be two letters (e.g. BR, US).",
+    "emailInvalid": "Please enter a valid email address.",
+    "emailSameAsCurrent": "That's already your email.",
+    "usernameFormatInvalid": "Username must be 3–30 characters: letters, digits, underscore.",
+    "usernameSameAsCurrent": "That's already your username.",
+    "usernameTaken": "Username already taken.",
+    "usernameCooldown": "You can change your username again in {count, plural, =1 {1 day} other {# days}}.",
+    "profileNotFound": "Profile not found.",
+    "typeDeleteHint": "Type DELETE to enable the button.",
+    "confirmWithPassword": "For your security, confirm your current password to continue."
   },
   "profile": {
     "notFound": "User not found",

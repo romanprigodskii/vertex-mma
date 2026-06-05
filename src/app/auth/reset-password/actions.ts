@@ -15,8 +15,14 @@ export async function resetPasswordAction(
   }
 
   const supabase = await createClient();
-  // The session was already established by /auth/callback during the
-  // recovery flow, so updateUser writes through to the right user.
+  // The recovery session is minted by /auth/callback before the form renders.
+  // If it's gone by submit time (expired/used link, or a direct hit), say so
+  // explicitly instead of falling through to mapAuthError's generic message.
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: t("resetInvalid") };
+
   const { error } = await supabase.auth.updateUser({ password: newPassword });
   if (error) return { error: mapAuthError(error, t) };
   return { success: true };

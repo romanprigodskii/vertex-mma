@@ -7,7 +7,7 @@ import { resetPasswordAction } from "@/app/auth/reset-password/actions";
 import { PasswordInput } from "@/components/auth/PasswordInput";
 import { Link } from "@/i18n/navigation";
 
-export function ResetPasswordForm() {
+export function ResetPasswordForm({ invalid = false }: { invalid?: boolean }) {
   const t = useTranslations("auth");
   const [pending, setPending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -34,6 +34,24 @@ export function ResetPasswordForm() {
     setPending(false);
     if (res?.error) setError(res.error);
     else setSuccess(true);
+  }
+
+  if (invalid) {
+    return (
+      <div className="py-8 text-center">
+        <h1 className="font-display text-3xl uppercase tracking-tight text-foreground">
+          {t("resetInvalid")}
+        </h1>
+        <p className="mt-6 font-sans text-sm text-foreground-muted">
+          <Link
+            href="/auth/forgot-password"
+            className="text-primary hover:underline"
+          >
+            {t("requestNewLink")}
+          </Link>
+        </p>
+      </div>
+    );
   }
 
   if (success) {

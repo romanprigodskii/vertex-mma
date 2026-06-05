@@ -5,6 +5,24 @@ import { routing } from "@/i18n/routing";
 import { safeNext } from "@/lib/safe-redirect";
 import { createClient } from "@/lib/supabase/server";
 
+// Collapse a raw Supabase error string into one of a small set of stable,
+// client-translatable codes. We never forward the raw English `error_description`
+// to /signin — the sign-in form maps these codes to localized copy instead.
+function callbackErrorCode(description: string): string {
+  const d = description.toLowerCase();
+  if (
+    d.includes("expired") ||
+    d.includes("otp") ||
+    d.includes("invalid") ||
+    d.includes("access_denied") ||
+    d.includes("not found") ||
+    d.includes("already")
+  ) {
+    return "link_expired";
+  }
+  return "auth_failed";
+}
+
 function siteOrigin(request: NextRequest): string {
   // Behind Traefik/Coolify the request URL may resolve to the internal
   // container origin (http://10.0.1.8:3000), which then ends up in the
@@ -39,23 +57,20 @@ export async function GET(request: NextRequest) {
   if (errorDescription) {
     console.error("auth/callback: supabase error", errorDescription);
     return NextResponse.redirect(
-      `${origin}/signin?error=${encodeURIComponent(errorDescription)}`,
+      `${origin}/signin?error=${callbackErrorCode(errorDescription)}`,
     );
   }
 
   if (!code) {
-    return NextResponse.redirect(
-      `${origin}/signin?error=${encodeURIComponent("Missing code in callback URL.")}`,
-    );
+    return NextResponse.redirect(`${origin}/signin?error=auth_failed`);
   }
 
   const supabase = await createClient();
   const { error } = await supabase.auth.exchangeCodeForSession(code);
   if (error) {
     console.error("auth/callback: exchangeCodeForSession failed", error.message);
-    return NextResponse.redirect(
-      `${origin}/signin?error=${encodeURIComponent(error.message)}`,
-    );
+    // A failed code exchange is almost always an expired or already-used link.
+    return NextResponse.redirect(`${origin}/signin?error=link_expired`);
   }
 
   const res = NextResponse.redirect(`${origin}${next}`);

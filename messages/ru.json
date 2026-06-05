@@ -582,7 +582,7 @@
     "password": "Пароль",
     "confirmPassword": "Повторите пароль",
     "username": "Никнейм",
-    "usernameHint": "3–24 символа, буквы / цифры / нижнее подчёркивание.",
+    "usernameHint": "3–30 символов, буквы / цифры / нижнее подчёркивание.",
     "forgotPassword": "Забыли пароль?",
     "signingIn": "Входим...",
     "signIn": "Войти",
@@ -627,7 +627,10 @@
     "passwordUpdated": "Пароль обновлён",
     "passwordUpdatedLead": "Теперь можно войти с новым паролем.",
     "chooseNewPassword": "Новый пароль",
-    "chooseNewLead": "Выбери пароль минимум на 8 символов."
+    "chooseNewLead": "Выбери пароль минимум на 8 символов.",
+    "errLinkExpired": "Эта ссылка недействительна или устарела. Запросите новую.",
+    "errAuthCallback": "Не удалось завершить вход. Попробуйте ещё раз.",
+    "requestNewLink": "Запросить новую ссылку"
   },
   "settings": {
     "metaTitle": "Настройки",
@@ -692,7 +695,18 @@
     "confirmDeletionHeading": "Подтверждение удаления",
     "typeDeletePrefix": "Введи",
     "typeDeleteSuffix": "для подтверждения. Действие необратимо.",
-    "cancel": "Отмена"
+    "cancel": "Отмена",
+    "notSignedIn": "Вы не вошли в систему.",
+    "countryCodeInvalid": "Код страны должен состоять из двух букв (например, BR, US).",
+    "emailInvalid": "Введите корректный адрес электронной почты.",
+    "emailSameAsCurrent": "Это уже ваш текущий адрес электронной почты.",
+    "usernameFormatInvalid": "Никнейм должен содержать 3–30 символов: буквы, цифры, подчёркивание.",
+    "usernameSameAsCurrent": "Это уже ваш текущий никнейм.",
+    "usernameTaken": "Этот никнейм уже занят.",
+    "usernameCooldown": "Изменить никнейм можно будет снова через {count, plural, one {# день} few {# дня} many {# дней} other {# дня}}.",
+    "profileNotFound": "Профиль не найден.",
+    "typeDeleteHint": "Введите DELETE, чтобы активировать кнопку.",
+    "confirmWithPassword": "В целях безопасности подтвердите текущий пароль, чтобы продолжить."
   },
   "profile": {
     "notFound": "Пользователь не найден",

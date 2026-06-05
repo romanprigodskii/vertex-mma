@@ -7,6 +7,7 @@ import { getTranslations } from "next-intl/server";
 import { isEmailAlreadyRegisteredError, mapAuthError } from "@/lib/auth-errors";
 import { db } from "@/lib/db";
 import { userProfile } from "@/lib/db/schema/users";
+import { safeNext } from "@/lib/safe-redirect";
 import { createClient } from "@/lib/supabase/server";
 
 const USERNAME_RE = /^[a-zA-Z0-9_]{3,30}$/;
@@ -18,6 +19,10 @@ export async function signUpAction(
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
   const username = String(formData.get("username") ?? "").trim();
+  // Carry the post-signup destination across the email-confirmation round-trip
+  // so a user bounced here from a gated page lands there after confirming —
+  // not on the homepage. safeNext rejects anything but a same-origin path.
+  const next = safeNext(formData.get("next") as string | null);
 
   if (!email || !password || !username) {
     return { error: t("errAllFieldsRequired") };
@@ -52,7 +57,7 @@ export async function signUpAction(
     password,
     options: {
       data: { username },
-      emailRedirectTo: `${origin}/auth/callback`,
+      emailRedirectTo: `${origin}/auth/callback?next=${encodeURIComponent(next)}`,
     },
   });
   if (error) {

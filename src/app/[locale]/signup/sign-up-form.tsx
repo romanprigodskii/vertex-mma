@@ -1,15 +1,19 @@
 "use client";
 
 import * as React from "react";
+import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 
 import { signUpAction } from "@/app/[locale]/signup/actions";
 import { GoogleAuthButton } from "@/components/auth/GoogleAuthButton";
 import { PasswordInput } from "@/components/auth/PasswordInput";
 import { Link } from "@/i18n/navigation";
+import { safeNext } from "@/lib/safe-redirect";
 
 export function SignUpForm() {
   const t = useTranslations("auth");
+  const searchParams = useSearchParams();
+  const next = safeNext(searchParams.get("next"));
   const [pending, setPending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [success, setSuccess] = React.useState(false);
@@ -50,14 +54,14 @@ export function SignUpForm() {
   return (
     <>
       <h1 className="font-display text-3xl uppercase tracking-tight text-foreground sm:text-4xl">
-        {t("signUp")}
+        {t("signUpTitle")}
       </h1>
       <p className="mt-2 font-sans text-sm text-foreground-muted">
         {t("signUpLeadShort")}
       </p>
 
       <div className="mt-8">
-        <GoogleAuthButton next="/" />
+        <GoogleAuthButton next={next} />
       </div>
       <div className="my-6 flex items-center gap-3">
         <span className="h-px flex-1 bg-foreground/10" />
@@ -68,6 +72,7 @@ export function SignUpForm() {
       </div>
 
       <form onSubmit={onSubmit} className="flex flex-col gap-4">
+        <input type="hidden" name="next" value={next} />
         <label className="flex flex-col gap-1.5">
           <span className="font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
             {t("email")}
@@ -127,7 +132,7 @@ export function SignUpForm() {
           disabled={pending}
           className="mt-2 rounded-sm bg-primary px-4 py-2.5 font-display text-sm uppercase tracking-widest text-background-base hover:opacity-90 disabled:opacity-50"
         >
-          {pending ? t("creatingAccount") : t("signUp")}
+          {pending ? t("creatingAccount") : t("createAccount")}
         </button>
 
         <p className="text-center font-sans text-sm text-foreground-muted">
