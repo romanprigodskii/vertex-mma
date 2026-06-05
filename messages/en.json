@@ -18,7 +18,8 @@
     "switchToDark": "Switch to dark",
     "switchToEnglish": "Switch to English",
     "switchToRussian": "Перейти на русский",
-    "brandHome": "Vertex MMA — home"
+    "brandHome": "Vertex MMA — home",
+    "skipToContent": "Skip to content"
   },
   "userMenu": {
     "profile": "Profile",
@@ -1517,7 +1518,8 @@
     "opensAnywhere": "opens this anywhere",
     "footerBrand": "Vertex search",
     "trigger": "Find",
-    "triggerAria": "Find a fighter"
+    "triggerAria": "Find a fighter",
+    "unavailable": "Search is unavailable. Please try again."
   },
   "method": {
     "ko": "KO",

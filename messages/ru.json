@@ -18,7 +18,8 @@
     "switchToDark": "Тёмная тема",
     "switchToEnglish": "Switch to English",
     "switchToRussian": "Перейти на русский",
-    "brandHome": "Vertex MMA — на главную"
+    "brandHome": "Vertex MMA — на главную",
+    "skipToContent": "Перейти к содержимому"
   },
   "userMenu": {
     "profile": "Профиль",
@@ -1517,7 +1518,8 @@
     "opensAnywhere": "открывает поиск везде",
     "footerBrand": "Поиск Vertex",
     "trigger": "Поиск",
-    "triggerAria": "Найти бойца"
+    "triggerAria": "Найти бойца",
+    "unavailable": "Поиск временно недоступен. Попробуйте ещё раз."
   },
   "method": {
     "ko": "КО",

@@ -11,6 +11,7 @@ import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { FighterSearchTrigger } from "@/components/search/fighter-search-palette";
 import { Link } from "@/i18n/navigation";
 import type { CurrentUser } from "@/lib/auth";
+import { formatNumber } from "@/lib/format";
 import type { NotificationRow } from "@/lib/notifications";
 
 interface Props {
@@ -45,6 +46,13 @@ export async function NavbarInner({
           <Logo ariaLabel={t("brandHome")} />
           <NavSections />
           <div className="flex items-center gap-2">
+            {/* Tablet (md–lg) has no hamburger drawer, so surface search as an
+                icon button there; full labelled trigger returns at lg. Phones
+                (<md) reach search from the mobile drawer. */}
+            <FighterSearchTrigger
+              iconOnly
+              className="hidden md:inline-flex lg:hidden"
+            />
             <FighterSearchTrigger className="hidden lg:inline-flex" />
             <LanguageToggle />
             <ThemeToggle className="hidden md:inline-flex" />
@@ -53,7 +61,7 @@ export async function NavbarInner({
                 <div className="hidden h-9 items-center gap-1.5 rounded-md border border-foreground/15 bg-background-elevated px-3 text-sm tabular sm:inline-flex">
                   <Coins className="h-4 w-4 text-gold" aria-hidden />
                   <span className="text-foreground-muted">
-                    {user.balanceCoins.toLocaleString()}
+                    {formatNumber(user.balanceCoins)}
                   </span>
                 </div>
                 <NavbarNotifications

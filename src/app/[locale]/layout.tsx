@@ -7,6 +7,7 @@ import { setRequestLocale } from "next-intl/server";
 import "../globals.css";
 
 import { ScrollToTopOnNav } from "@/components/layout/scroll-to-top-on-nav";
+import { SkipToContent } from "@/components/layout/skip-to-content";
 import { ThemeProvider } from "@/components/layout/theme-provider";
 import { BetSlipProvider } from "@/components/markets/bet-slip-context";
 import { BetSlipWidget } from "@/components/markets/bet-slip-widget";
@@ -94,6 +95,7 @@ export default async function RootLayout({
     >
       <body className="min-h-full flex flex-col bg-background-base text-foreground font-sans antialiased">
         <NextIntlClientProvider>
+          <SkipToContent />
           <ThemeProvider>
             <ScrollToTopOnNav />
             <FighterSearchPalette />
