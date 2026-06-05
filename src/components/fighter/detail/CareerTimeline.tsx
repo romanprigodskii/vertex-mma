@@ -25,22 +25,19 @@ const PADDING_X = 24;
 const TOOLTIP_W = 240;
 const TOOLTIP_GAP = 14;
 
-const METHOD_SHORT: Record<string, string> = {
-  ko: "KO",
-  tko: "TKO",
-  submission: "Sub",
-  decision_unanimous: "U-Dec",
-  decision_split: "S-Dec",
-  decision_majority: "M-Dec",
-  draw: "Draw",
-  no_contest: "NC",
-  dq: "DQ",
+// DB method string → `method` namespace key (localized short labels), so the
+// timeline tooltip's method reads "Суб"/"ЕР" in RU instead of hardcoded English.
+const METHOD_KEY: Record<string, string> = {
+  ko: "ko",
+  tko: "tko",
+  submission: "sub",
+  decision_unanimous: "udec",
+  decision_split: "sdec",
+  decision_majority: "mdec",
+  draw: "draw",
+  no_contest: "nc",
+  dq: "dq",
 };
-
-function methodLabel(method: string | null): string | null {
-  if (!method) return null;
-  return METHOD_SHORT[method] ?? method;
-}
 
 function formatRoundTime(sec: number | null): string {
   if (sec == null) return "";
@@ -81,24 +78,43 @@ type TooltipState = {
   bout: TimelineBout;
   cx: number;
   cy: number;
-  placement: "above" | "below";
 };
 
 function Tooltip({ state }: { state: TooltipState }) {
   const tr = useTranslations("fighter");
-  const viewport =
-    typeof window !== "undefined" ? window.innerWidth : TOOLTIP_W + 64;
-  const left = Math.max(
-    16,
-    Math.min(viewport - TOOLTIP_W - 16, state.cx - TOOLTIP_W / 2),
+  const tMethod = useTranslations("method");
+  const ref = React.useRef<HTMLDivElement>(null);
+  // Measure the rendered tooltip and clamp it into the viewport. A full-stats
+  // bout is much taller than a "no stats" note, so the old fixed 200px height
+  // estimate either left a gap or pushed a tall card off the top of the screen.
+  const [pos, setPos] = React.useState<{ left: number; top: number } | null>(
+    null,
   );
-  const tooltipHeight = 200;
-  const top =
-    state.placement === "above"
-      ? state.cy - TOOLTIP_GAP - tooltipHeight
-      : state.cy + TOOLTIP_GAP + DOT_R;
+  React.useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const margin = 12;
+    const left = Math.max(
+      margin,
+      Math.min(
+        window.innerWidth - rect.width - margin,
+        state.cx - rect.width / 2,
+      ),
+    );
+    // Prefer above the dot; flip below when there isn't room, then clamp to the
+    // viewport so the card never escapes the top or bottom edge.
+    let top = state.cy - TOOLTIP_GAP - rect.height;
+    if (top < margin) top = state.cy + TOOLTIP_GAP + DOT_R;
+    top = Math.max(
+      margin,
+      Math.min(window.innerHeight - rect.height - margin, top),
+    );
+    setPos({ left, top });
+  }, [state]);
 
-  const m = methodLabel(state.bout.method);
+  const methodKey = state.bout.method ? METHOD_KEY[state.bout.method] : null;
+  const m = methodKey ? tMethod(methodKey) : state.bout.method;
   const t = formatRoundTime(state.bout.time_finished_seconds);
   const finishDetail = state.bout.round_finished
     ? `R${state.bout.round_finished}${t ? ` · ${t}` : ""}`
@@ -111,8 +127,14 @@ function Tooltip({ state }: { state: TooltipState }) {
 
   return (
     <div
+      ref={ref}
       role="tooltip"
-      style={{ left, top, width: TOOLTIP_W }}
+      style={{
+        left: pos?.left ?? Math.max(12, state.cx - TOOLTIP_W / 2),
+        top: pos?.top ?? state.cy + TOOLTIP_GAP + DOT_R,
+        width: TOOLTIP_W,
+        visibility: pos ? "visible" : "hidden",
+      }}
       className={cn(
         "pointer-events-none fixed z-50 rounded-md border border-foreground/15 bg-background-elevated/95 px-3 py-2.5 shadow-elevation-2 backdrop-blur-sm",
         "animate-in fade-in-0 duration-100",
@@ -199,6 +221,28 @@ export function CareerTimeline({ bouts }: CareerTimelineProps) {
     moved: boolean;
   } | null>(null);
 
+  const lastBoutMs = React.useMemo(
+    () => bouts.reduce((mx, b) => Math.max(mx, Date.parse(b.event_date)), 0),
+    [bouts],
+  );
+  // Snapshot the clock once after mount rather than reading it during render
+  // (reading Date.now() in render trips react-hooks/purity, and useMounted only
+  // yields a boolean — here we need the actual timestamp). First paint (server +
+  // hydration) uses the last bout's date as a deterministic right edge so the
+  // SVG width / today-tick can't mismatch across a UTC-midnight render; the real
+  // "today" extends the axis on mount.
+  const [clientNow, setClientNow] = React.useState<number | null>(null);
+  const [shadow, setShadow] = React.useState({ left: false, right: false });
+  const updateShadow = React.useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const left = el.scrollLeft > 4;
+    const right = el.scrollLeft < el.scrollWidth - el.clientWidth - 4;
+    setShadow((prev) =>
+      prev.left === left && prev.right === right ? prev : { left, right },
+    );
+  }, []);
+
   const onEnter = (bout: TimelineBout, el: SVGCircleElement) => {
     if (hideTimer.current) {
       window.clearTimeout(hideTimer.current);
@@ -207,8 +251,7 @@ export function CareerTimeline({ bouts }: CareerTimelineProps) {
     const rect = el.getBoundingClientRect();
     const cx = rect.left + rect.width / 2;
     const cy = rect.top + rect.height / 2;
-    const placement: "above" | "below" = cy < 240 ? "below" : "above";
-    setTooltip({ bout, cx, cy, placement });
+    setTooltip({ bout, cx, cy });
   };
 
   const onLeave = () => {
@@ -223,16 +266,24 @@ export function CareerTimeline({ bouts }: CareerTimelineProps) {
     [],
   );
 
-  // After mount, scroll fully to the end so the most recent fights and
-  // the "today" marker are in view — a career reads newest-first. Setting
-  // scrollLeft past the maximum clamps automatically.
   React.useEffect(() => {
-    if (!scrollRef.current) return;
-    scrollRef.current.scrollLeft = scrollRef.current.scrollWidth;
-    // Run once after the first paint — subsequent re-renders should
-    // preserve whatever the user has scrolled to.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // One-time post-mount clock snapshot — same effect-on-mount shape as
+    // use-mounted.ts (which we can't reuse directly: it returns a boolean, not
+    // the timestamp). The sanctioned eslint-disable mirrors use-mounted.ts.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setClientNow(Date.now());
   }, []);
+
+  // After mount, scroll fully to the end so the most recent fights and the
+  // "today" marker are in view — a career reads newest-first. Re-runs when the
+  // real clock extends the axis past the last bout, and refreshes the
+  // scroll-shadow affordance. Setting scrollLeft past the maximum clamps.
+  React.useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollLeft = el.scrollWidth;
+    updateShadow();
+  }, [clientNow, updateShadow]);
 
   if (bouts.length === 0) return null;
 
@@ -240,10 +291,12 @@ export function CareerTimeline({ bouts }: CareerTimelineProps) {
     a.event_date.localeCompare(b.event_date),
   );
 
-  // The timeline's right edge is "today", placed proportionally by
-  // day-of-year — not a padded future year. xForDateMs maps any date to
-  // a fractional-year x, so today's x is simply the axis end.
-  const nowMs = Date.now();
+  // The timeline's right edge is "today", placed proportionally by day-of-year
+  // — not a padded future year. Before mount we fall back to the last bout's
+  // date so the first paint is deterministic; `mounted` gates the dashed
+  // "today" accent so it never points at the last fight during that frame.
+  const mounted = clientNow != null;
+  const nowMs = clientNow ?? lastBoutMs;
   const currentYear = new Date(nowMs).getUTCFullYear();
   const todayX = xForDateMs(nowMs);
   const svgWidth = todayX + PADDING_X;
@@ -269,7 +322,7 @@ export function CareerTimeline({ bouts }: CareerTimelineProps) {
       isToday: false,
     });
   }
-  ticks.push({ year: currentYear, x: todayX, label: true, isToday: true });
+  ticks.push({ year: currentYear, x: todayX, label: true, isToday: mounted });
 
   const wins = bouts.filter((b) => b.result === "W").length;
   const losses = bouts.filter((b) => b.result === "L").length;
@@ -316,12 +369,14 @@ export function CareerTimeline({ bouts }: CareerTimelineProps) {
 
   return (
     <div className="flex flex-col gap-4">
+      <div className="relative">
       <div
         ref={scrollRef}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
+        onScroll={updateShadow}
         className="cursor-grab overflow-x-auto select-none"
         style={{ touchAction: "pan-x", overscrollBehaviorX: "contain" }}
       >
@@ -443,6 +498,55 @@ export function CareerTimeline({ bouts }: CareerTimelineProps) {
           })}
         </svg>
       </div>
+        {/* Scroll-shadow affordance — fades in at whichever edge still has
+            timeline hidden past it, the standard "there's more to scroll" cue. */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-y-0 left-0 w-12 bg-gradient-to-r from-background-base to-background-base/0 transition-opacity duration-200"
+          style={{ opacity: shadow.left ? 1 : 0 }}
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-background-base to-background-base/0 transition-opacity duration-200"
+          style={{ opacity: shadow.right ? 1 : 0 }}
+        />
+      </div>
+
+      {/* Legend — dot colour/size key, including the grey draw/NC dot that the
+          section explainer doesn't call out. */}
+      <ul className="flex flex-wrap items-center gap-x-3 gap-y-1.5 font-sans text-[10px] uppercase tracking-widest text-foreground-subtle">
+        <li className="flex items-center gap-1.5">
+          <span
+            className="h-2 w-2 rounded-full"
+            style={{ backgroundColor: colorFor("W") }}
+            aria-hidden
+          />
+          {t("result_W")}
+        </li>
+        <li className="flex items-center gap-1.5">
+          <span
+            className="h-2 w-2 rounded-full"
+            style={{ backgroundColor: colorFor("L") }}
+            aria-hidden
+          />
+          {t("result_L")}
+        </li>
+        <li className="flex items-center gap-1.5">
+          <span
+            className="h-2 w-2 rounded-full"
+            style={{ backgroundColor: colorFor("D") }}
+            aria-hidden
+          />
+          {t("legendDrawNc")}
+        </li>
+        <li className="flex items-center gap-1.5">
+          <span
+            className="h-3 w-3 rounded-full border border-foreground/40 bg-foreground/15"
+            aria-hidden
+          />
+          {t("titleChip")}
+        </li>
+      </ul>
 
       <p
         className={cn(

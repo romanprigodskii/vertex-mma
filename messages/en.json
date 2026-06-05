@@ -323,7 +323,15 @@
     "cardSub": "Sub",
     "cardDec": "Dec",
     "cardShareButton": "Share on X / Twitter",
-    "cardShareText": "{name} — Vertex MMA collectible card"
+    "cardShareText": "{name} — Vertex MMA collectible card",
+    "winBreakdown": "KO/TKO {ko} · Sub {sub} · Dec {dec}",
+    "winBreakdownWithOther": "KO/TKO {ko} · Sub {sub} · Dec {dec} · Other finish {other}",
+    "openCurrentHistoryScore": "Open per-bout current Vertex score history — current score {score}",
+    "openAllTimeHistoryScore": "Open per-bout all-time Vertex history — all-time score {score}",
+    "noCurrentScoreNote": "No current score — this fighter is inactive, so only the all-time score applies.",
+    "noDecisiveResults": "No decisive results yet",
+    "radarLowConfidence": "Limited bout data — treat this shape as indicative only.",
+    "legendDrawNc": "Draw / No contest"
   },
   "eventsList": {
     "metaTitle": "UFC events",
@@ -1641,8 +1649,8 @@
     "methodDraw": "Draw",
     "methodNc": "NC",
     "methodDq": "DQ",
-    "chartAriaCurrent": "Current Vertex score per bout",
-    "chartAriaAllTime": "All-time Vertex score per bout",
+    "chartAriaCurrent": "Current Vertex score per bout — a visual summary; per-bout values are listed below",
+    "chartAriaAllTime": "All-time Vertex score per bout — a visual summary; per-bout values are listed below",
     "noHistory": "No score history available for this fighter.",
     "noAllTimeReplay": "All-time replay not yet computed for this fighter — run the backfill script.",
     "monthlySnapshot": "Monthly snapshot · no bout"

@@ -42,10 +42,10 @@ function zoneFill(
 ): string {
   // Tint scales with relative share within the silhouette. Landed → gold ramp,
   // absorbed → muted-red ramp.
+  // No strikes in this zone — one neutral, theme-aware "measured zero" fill
+  // (legible on both dark and light surfaces) rather than a hardcoded dark blue.
   if (pct === 0)
-    return side === "landed"
-      ? "oklch(0.20 0.02 240 / 0.9)"
-      : "oklch(0.20 0.02 240 / 0.9)";
+    return "color-mix(in oklch, var(--color-foreground) 14%, transparent)";
   if (side === "landed") {
     if (pct < 0.15) return "oklch(0.40 0.04 70 / 0.6)";
     if (pct < 0.30) return "oklch(0.55 0.10 70 / 0.7)";
@@ -97,7 +97,7 @@ function Silhouette({
           cy={56}
           r={36}
           fill={zoneFill(headPct, side)}
-          stroke="oklch(0.30 0.01 240)"
+          stroke="var(--color-border-strong)"
           strokeWidth={1}
         />
         {/* Body — single rounded path with slightly wider shoulders so the
@@ -115,7 +115,7 @@ function Silhouette({
              Q150 116 138 110
              Z"
           fill={zoneFill(bodyPct, side)}
-          stroke="oklch(0.30 0.01 240)"
+          stroke="var(--color-border-strong)"
           strokeWidth={1}
         />
         {/* Legs — two long rounded rectangles. */}
@@ -126,7 +126,7 @@ function Silhouette({
           height={120}
           rx={14}
           fill={zoneFill(legsPct, side)}
-          stroke="oklch(0.30 0.01 240)"
+          stroke="var(--color-border-strong)"
           strokeWidth={1}
         />
         <rect
@@ -136,7 +136,7 @@ function Silhouette({
           height={120}
           rx={14}
           fill={zoneFill(legsPct, side)}
-          stroke="oklch(0.30 0.01 240)"
+          stroke="var(--color-border-strong)"
           strokeWidth={1}
         />
         {/* Zone labels in-SVG so they stay aligned at small sizes. */}
@@ -145,7 +145,11 @@ function Silhouette({
           y={60}
           textAnchor="middle"
           dominantBaseline="central"
-          fill="oklch(0.98 0 0)"
+          fill="var(--color-foreground)"
+          stroke="var(--color-background-base)"
+          strokeWidth={3}
+          paintOrder="stroke"
+          strokeLinejoin="round"
           style={{ fontSize: 9, letterSpacing: "0.16em" }}
         >
           {labels.head.toUpperCase()}
@@ -155,7 +159,11 @@ function Silhouette({
           y={188}
           textAnchor="middle"
           dominantBaseline="central"
-          fill="oklch(0.98 0 0)"
+          fill="var(--color-foreground)"
+          stroke="var(--color-background-base)"
+          strokeWidth={3}
+          paintOrder="stroke"
+          strokeLinejoin="round"
           style={{ fontSize: 9, letterSpacing: "0.16em" }}
         >
           {labels.body.toUpperCase()}
@@ -165,7 +173,11 @@ function Silhouette({
           y={332}
           textAnchor="middle"
           dominantBaseline="central"
-          fill="oklch(0.98 0 0)"
+          fill="var(--color-foreground)"
+          stroke="var(--color-background-base)"
+          strokeWidth={3}
+          paintOrder="stroke"
+          strokeLinejoin="round"
           style={{ fontSize: 9, letterSpacing: "0.16em" }}
         >
           {labels.legs.toUpperCase()}
@@ -238,7 +250,7 @@ export async function StrikingHeatmap({ boutRounds }: StrikingHeatmapProps) {
   };
 
   return (
-    <div className={cn("grid grid-cols-2 gap-6 sm:gap-10")}>
+    <div className={cn("grid grid-cols-1 gap-6 min-[420px]:grid-cols-2 sm:gap-10")}>
       <Silhouette
         title={landedTitle}
         totals={landed}
