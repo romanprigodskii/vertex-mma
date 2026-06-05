@@ -103,12 +103,12 @@ def upsert_event_listing(
                         )
                         OR (
                           %(date)s IS NOT NULL
-                          AND %(city)s IS NOT NULL AND length(trim(%(city)s)) > 0
+                          AND %(city)s::text IS NOT NULL AND length(trim(%(city)s::text)) > 0
                           AND (e.date AT TIME ZONE 'UTC')::date
                               = (%(date)s AT TIME ZONE 'UTC')::date
                           AND (
-                            e.name ILIKE '%%' || %(city)s || '%%'
-                            OR lower(e.location_city) = lower(%(city)s)
+                            e.name ILIKE '%%' || %(city)s::text || '%%'
+                            OR lower(e.location_city) = lower(%(city)s::text)
                           )
                         )
                       )

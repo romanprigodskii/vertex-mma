@@ -24,6 +24,16 @@ function resultClass(r: RecentFormEntry["result"]): string {
   }
 }
 
+// Localized full result word for the cell's accessible name — the visible text
+// is the bare letter "W"/"L", which a screen reader would otherwise announce as
+// just "W, link". `title` doesn't help touch/keyboard users, so we add aria-label.
+const RESULT_LONG_KEY: Record<RecentFormEntry["result"], string> = {
+  W: "resultWin",
+  L: "resultLoss",
+  D: "resultDraw",
+  NC: "resultNoContest",
+};
+
 function ResultRow({
   name,
   recent,
@@ -55,25 +65,34 @@ function ResultRow({
         </span>
       </p>
       <ol className="flex gap-1.5">
-        {recent.map((r) => (
-          <li key={r.bout_id}>
-            <Link
-              href={`/bouts/${r.bout_id}`}
-              prefetch={false}
-              title={t("cellTooltip", {
-                result: r.result,
-                opp: r.opponent_name,
-                date: r.event_date.slice(0, 10),
-              })}
-              className={cn(
-                "flex h-8 w-8 items-center justify-center rounded-sm border font-display text-sm tabular transition-colors hover:opacity-80",
-                resultClass(r.result),
-              )}
-            >
-              {r.result}
-            </Link>
-          </li>
-        ))}
+        {recent.map((r) => {
+          const date = r.event_date.slice(0, 10);
+          const resultLong = t(RESULT_LONG_KEY[r.result] as "resultWin");
+          return (
+            <li key={r.bout_id}>
+              <Link
+                href={`/bouts/${r.bout_id}`}
+                prefetch={false}
+                title={t("cellTooltip", {
+                  result: r.result,
+                  opp: r.opponent_name,
+                  date,
+                })}
+                aria-label={t("cellAria", {
+                  result: resultLong,
+                  opp: r.opponent_name,
+                  date,
+                })}
+                className={cn(
+                  "flex h-8 w-8 items-center justify-center rounded-sm border font-display text-sm tabular transition-colors hover:opacity-80",
+                  resultClass(r.result),
+                )}
+              >
+                {r.result}
+              </Link>
+            </li>
+          );
+        })}
       </ol>
     </article>
   );
