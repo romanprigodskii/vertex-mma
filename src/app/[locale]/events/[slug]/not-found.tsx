@@ -22,7 +22,7 @@ export default async function EventNotFound() {
           </p>
           <h1
             className="font-display uppercase tracking-tight text-foreground leading-[0.9]"
-            style={{ fontSize: "clamp(40px, 6vw, 80px)" }}
+            style={{ fontSize: "clamp(48px, 7vw, 96px)" }}
           >
             {t("eventTitle")}
           </h1>
@@ -30,9 +30,9 @@ export default async function EventNotFound() {
             {t("eventLead")}
           </p>
           <Button asChild variant="outline" size="sm">
-            <Link href="/fighters">
+            <Link href="/events">
               <ChevronLeft className="h-4 w-4" />
-              {t("backToRoster")}
+              {t("backToEvents")}
             </Link>
           </Button>
         </Container>

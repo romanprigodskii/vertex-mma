@@ -230,14 +230,21 @@ export default async function BoutDetailPage({ params }: PageProps) {
           />
         ) : null}
 
-        <section className="border-t border-foreground/10 py-10 md:py-12">
-          <Container size="xl">
-            <h2 className="mb-4 font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
-              {t("roundByRound")}
-            </h2>
-            <BoutRoundBreakdown bout={bout} />
-          </Container>
-        </section>
+        {/* Round-by-round only makes sense once a bout has been fought. For
+            upcoming/scheduled bouts the empty "no data" box read as missing
+            data rather than "not fought yet", so suppress the whole section —
+            consistent with how Totals/Scorecards are gated below. Completed
+            bouts still get BoutRoundBreakdown's own no-data state. */}
+        {!isUpcoming ? (
+          <section className="border-t border-foreground/10 py-10 md:py-12">
+            <Container size="xl">
+              <h2 className="mb-4 font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
+                {t("roundByRound")}
+              </h2>
+              <BoutRoundBreakdown bout={bout} />
+            </Container>
+          </section>
+        ) : null}
 
         {bout.rounds.length > 0 ? (
           <section className="border-t border-foreground/10 py-10 md:py-12">

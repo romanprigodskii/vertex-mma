@@ -30,9 +30,9 @@ export default async function BoutNotFound() {
             {t("boutLead")}
           </p>
           <Button asChild variant="outline" size="sm">
-            <Link href="/fighters">
+            <Link href="/events">
               <ChevronLeft className="h-4 w-4" />
-              {t("backToRoster")}
+              {t("backToEvents")}
             </Link>
           </Button>
         </Container>
