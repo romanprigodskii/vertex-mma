@@ -17,6 +17,19 @@ interface FightHistoryListProps {
 export function FightHistoryList({ history }: FightHistoryListProps) {
   const [expanded, setExpanded] = React.useState(false);
   const t = useTranslations("fighter");
+  const rootRef = React.useRef<HTMLDivElement>(null);
+
+  const onToggle = () => {
+    const next = !expanded;
+    setExpanded(next);
+    // Collapsing a long list leaves the viewport scrolled far down with a
+    // now-short list; pull the list header back into view after the collapse.
+    if (!next) {
+      requestAnimationFrame(() =>
+        rootRef.current?.scrollIntoView({ block: "start", behavior: "smooth" }),
+      );
+    }
+  };
 
   if (history.length === 0) {
     return (
@@ -34,7 +47,7 @@ export function FightHistoryList({ history }: FightHistoryListProps) {
   const hasMore = history.length > INITIAL_VISIBLE;
 
   return (
-    <div>
+    <div ref={rootRef} className="scroll-mt-24">
       <ul className="flex flex-col">
         {visible.map((entry) => (
           <FightHistoryRow key={entry.bout_id} entry={entry} />
@@ -52,7 +65,7 @@ export function FightHistoryList({ history }: FightHistoryListProps) {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setExpanded((v) => !v)}
+            onClick={onToggle}
           >
             {expanded
               ? t("showFewer")

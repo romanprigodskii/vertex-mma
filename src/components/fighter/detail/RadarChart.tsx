@@ -17,6 +17,10 @@ interface RadarChartProps {
   /** Accessible label for the whole chart (server-translated by the
    *  caller). */
   ariaLabel?: string;
+  /** When the fighter has very few bouts the attributes are near-meaningless;
+   *  render the data polygon dashed + dimmed so it doesn't imply more
+   *  certainty than exists. */
+  lowConfidence?: boolean;
 }
 
 const RING_PERCENTS = [20, 40, 60, 80, 100] as const;
@@ -60,6 +64,7 @@ export function RadarChart({
   className,
   labels: labelsOverride,
   ariaLabel = "Fighter attribute radar",
+  lowConfidence = false,
 }: RadarChartProps) {
   const cx = size / 2;
   const cy = size / 2;
@@ -125,7 +130,7 @@ export function RadarChart({
           key={`grid-${idx}`}
           points={poly}
           fill="none"
-          stroke="oklch(0.45 0.01 240)"
+          stroke="var(--color-border-strong)"
           strokeWidth={idx === gridPolys.length - 1 ? 1 : 0.5}
           strokeOpacity={0.35}
         />
@@ -136,7 +141,7 @@ export function RadarChart({
         <line
           key={`spoke-${i}`}
           {...s}
-          stroke="oklch(0.45 0.01 240)"
+          stroke="var(--color-border-strong)"
           strokeOpacity={0.25}
           strokeWidth={0.5}
         />
@@ -145,10 +150,16 @@ export function RadarChart({
       {/* Data polygon */}
       <polygon
         points={polygonString(dataPoints)}
-        fill="oklch(0.78 0.15 70 / 0.35)"
+        fill={
+          lowConfidence
+            ? "oklch(0.78 0.15 70 / 0.12)"
+            : "oklch(0.78 0.15 70 / 0.35)"
+        }
         stroke="oklch(0.78 0.15 70)"
         strokeWidth={1.5}
         strokeLinejoin="round"
+        strokeDasharray={lowConfidence ? "4 3" : undefined}
+        strokeOpacity={lowConfidence ? 0.6 : 1}
       />
 
       {/* Data point dots */}
@@ -159,6 +170,7 @@ export function RadarChart({
           cy={y}
           r={2.5}
           fill="oklch(0.78 0.15 70)"
+          opacity={lowConfidence ? 0.5 : 1}
         />
       ))}
 
@@ -168,7 +180,7 @@ export function RadarChart({
           <text
             x={l.x}
             y={l.y}
-            fill="oklch(0.65 0.01 240)"
+            fill="var(--color-foreground-muted)"
             textAnchor={l.anchor}
             dominantBaseline={l.baseline}
             className="font-sans"
@@ -183,7 +195,7 @@ export function RadarChart({
           <text
             x={l.vx}
             y={l.vy}
-            fill="oklch(0.98 0 0)"
+            fill="var(--color-foreground)"
             textAnchor={l.anchor}
             dominantBaseline={l.baseline}
             className="font-display"

@@ -414,16 +414,16 @@ export function RoundByRoundChart({ boutRounds }: RoundByRoundChartProps) {
                       return (
                         <td key={r} className="py-3 pl-3 align-middle">
                           <div className="flex flex-col gap-1">
+                            {/* Full-width baseline track so a measured zero
+                                reads as "measured, zero" (empty track + 0.00),
+                                distinct from a missing round (em-dash, no track). */}
                             <div
-                              className="h-1.5 rounded-sm"
+                              className="h-1.5 w-full rounded-sm bg-foreground/[0.06]"
                               aria-hidden
-                              style={{ width: `${pct}%` }}
                             >
                               <div
-                                className={cn(
-                                  "h-full w-full rounded-sm",
-                                  metric.bar,
-                                )}
+                                className={cn("h-full rounded-sm", metric.bar)}
+                                style={{ width: `${pct}%` }}
                               />
                             </div>
                             <span className="font-mono tabular text-[11px] text-foreground">

@@ -322,7 +322,15 @@
     "cardSub": "Сабм",
     "cardDec": "Реш",
     "cardShareButton": "Поделиться в X / Twitter",
-    "cardShareText": "{name} — коллекционная карта Vertex MMA"
+    "cardShareText": "{name} — коллекционная карта Vertex MMA",
+    "winBreakdown": "КО/ТКО {ko} · Сабм {sub} · Реш {dec}",
+    "winBreakdownWithOther": "КО/ТКО {ko} · Сабм {sub} · Реш {dec} · Проч. финиш {other}",
+    "openCurrentHistoryScore": "Открыть историю текущего Vertex по боям — текущий счёт {score}",
+    "openAllTimeHistoryScore": "Открыть историю Vertex за всё время — счёт за всё время {score}",
+    "noCurrentScoreNote": "Текущего счёта нет — боец неактивен, поэтому действует только счёт за всё время.",
+    "noDecisiveResults": "Решающих результатов пока нет",
+    "radarLowConfidence": "Мало данных по боям — форма ориентировочная.",
+    "legendDrawNc": "Ничья / No contest"
   },
   "eventsList": {
     "metaTitle": "Турниры UFC",
@@ -1483,8 +1491,8 @@
     "methodDraw": "Ничья",
     "methodNc": "NC",
     "methodDq": "DQ",
-    "chartAriaCurrent": "Актуальный Vertex Score по боям",
-    "chartAriaAllTime": "Vertex Score за всё время по боям",
+    "chartAriaCurrent": "Актуальный Vertex Score по боям — визуальная сводка; значения по каждому бою — в таблице ниже",
+    "chartAriaAllTime": "Vertex Score за всё время по боям — визуальная сводка; значения по каждому бою — в таблице ниже",
     "noHistory": "Истории счёта по этому бойцу нет.",
     "noAllTimeReplay": "Реплей за всё время пока не посчитан для этого бойца — запусти backfill.",
     "monthlySnapshot": "Месячный снапшот · без боя"
