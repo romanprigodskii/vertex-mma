@@ -19,10 +19,21 @@ export function SignInForm() {
   const next = safeNext(searchParams.get("next"));
   const t = useTranslations("auth");
 
+  // The callback route hands us a stable code (never raw Supabase text); map it
+  // to localized copy. Unknown/legacy values fall back to a generic message so
+  // we never render low-level English reflected from the URL.
+  const errorParam = searchParams.get("error");
+  const initialError =
+    errorParam === "link_expired"
+      ? t("errLinkExpired")
+      : errorParam === "auth_failed"
+        ? t("errAuthCallback")
+        : errorParam
+          ? t("errGeneric")
+          : null;
+
   const [pending, setPending] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(
-    searchParams.get("error"),
-  );
+  const [error, setError] = React.useState<string | null>(initialError);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();

@@ -66,7 +66,8 @@ export function ChangeUsernameForm({
         <input
           type="text"
           value={`@${currentUsername}`}
-          disabled
+          readOnly
+          title={`@${currentUsername}`}
           className="rounded-sm border border-foreground/10 bg-background-elevated/20 px-3 py-2 font-sans text-sm text-foreground-muted"
         />
       </label>
@@ -88,8 +89,9 @@ export function ChangeUsernameForm({
           className={INPUT_CLASS}
         />
         <span className="font-sans text-[11px] text-foreground-subtle">
-          {t("usernameRule")}
-          {locked ? t("availableInDays", { count: daysLeft }) : ""}
+          {locked
+            ? t("usernameCooldown", { count: daysLeft })
+            : t("usernameRule")}
         </span>
       </label>
 
@@ -99,7 +101,9 @@ export function ChangeUsernameForm({
         </p>
       ) : null}
       {success ? (
-        <p className="font-sans text-sm text-streak-win">{success}</p>
+        <p className="font-sans text-sm text-streak-win" role="status">
+          {success}
+        </p>
       ) : null}
 
       <button

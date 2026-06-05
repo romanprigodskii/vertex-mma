@@ -88,7 +88,7 @@ export function ChangePasswordForm() {
         </p>
       ) : null}
       {saved ? (
-        <p className="font-sans text-sm text-streak-win">
+        <p className="font-sans text-sm text-streak-win" role="status">
           {t("passwordUpdated")}
         </p>
       ) : null}

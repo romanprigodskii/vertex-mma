@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { getTranslations } from "next-intl/server";
 
 import { checkAndUnlockAchievements } from "@/lib/achievements";
+import { userHasPassword } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { userProfile } from "@/lib/db/schema/users";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -20,11 +21,12 @@ const USERNAME_CHANGE_COOLDOWN_DAYS = 30;
 export async function updateProfileAction(
   formData: FormData,
 ): Promise<{ error?: string; success?: boolean }> {
+  const t = await getTranslations("settings");
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { error: "Not signed in." };
+  if (!user) return { error: t("notSignedIn") };
 
   const displayName = String(formData.get("displayName") ?? "")
     .trim()
@@ -36,7 +38,7 @@ export async function updateProfileAction(
     .slice(0, 2);
 
   if (countryCodeRaw && !COUNTRY_RE.test(countryCodeRaw)) {
-    return { error: "Country code must be two letters (e.g. BR, US)." };
+    return { error: t("countryCodeInvalid") };
   }
 
   const updated = await db
@@ -208,18 +210,36 @@ export async function changePasswordAction(
 export async function changeEmailAction(
   formData: FormData,
 ): Promise<{ error?: string; success?: boolean }> {
+  const t = await getTranslations("settings");
   const newEmail = String(formData.get("newEmail") ?? "").trim().toLowerCase();
   if (!EMAIL_RE.test(newEmail)) {
-    return { error: "Please enter a valid email address." };
+    return { error: t("emailInvalid") };
   }
 
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { error: "Not signed in." };
+  if (!user) return { error: t("notSignedIn") };
   if (user.email === newEmail) {
-    return { error: "That is already your email." };
+    return { error: t("emailSameAsCurrent") };
+  }
+
+  // Changing the account email is the first step of a takeover (the new
+  // address can later drive password recovery). For password accounts,
+  // re-verify the current password before initiating the change — matching
+  // changePasswordAction — so a hijacked tab / borrowed session can't reroute
+  // the email on the live session alone. OAuth-only accounts have no password
+  // to verify and rely on Supabase's double-confirmation instead.
+  if (userHasPassword(user)) {
+    if (!user.email) return { error: t("currentPasswordWrong") };
+    const currentPassword = String(formData.get("currentPassword") ?? "");
+    if (!currentPassword) return { error: t("currentPasswordRequired") };
+    const { error: verifyError } = await supabase.auth.signInWithPassword({
+      email: user.email,
+      password: currentPassword,
+    });
+    if (verifyError) return { error: t("currentPasswordWrong") };
   }
 
   // Supabase auto-handles double-confirmation: a "Confirm change" link is
@@ -230,15 +250,33 @@ export async function changeEmailAction(
   return { success: true };
 }
 
-export async function deleteAccountAction(): Promise<{
+export async function deleteAccountAction(formData?: FormData): Promise<{
   error?: string;
   success?: boolean;
 }> {
+  const t = await getTranslations("settings");
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { error: "Not signed in." };
+  if (!user) return { error: t("notSignedIn") };
+
+  // Account deletion is irreversible and cascades the entire profile, so it
+  // demands step-up auth — a live session alone (hijacked tab, borrowed
+  // device, stolen cookie, or a direct call bypassing the typed-DELETE prompt)
+  // must not be enough. Re-verify the current password for password accounts
+  // before touching anything. OAuth-only accounts have no password to verify,
+  // so they fall back to the deliberate typed-DELETE confirmation.
+  if (userHasPassword(user)) {
+    if (!user.email) return { error: t("currentPasswordWrong") };
+    const currentPassword = String(formData?.get("currentPassword") ?? "");
+    if (!currentPassword) return { error: t("currentPasswordRequired") };
+    const { error: verifyError } = await supabase.auth.signInWithPassword({
+      email: user.email,
+      password: currentPassword,
+    });
+    if (verifyError) return { error: t("currentPasswordWrong") };
+  }
 
   const userId = user.id;
   // Clear session cookies first so the client lands on a signed-out state
@@ -261,18 +299,16 @@ export async function changeUsernameAction(
   success?: boolean;
   newUsername?: string;
 }> {
+  const t = await getTranslations("settings");
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { error: "Not signed in." };
+  if (!user) return { error: t("notSignedIn") };
 
   const newUsername = String(formData.get("newUsername") ?? "").trim();
   if (!USERNAME_RE.test(newUsername)) {
-    return {
-      error:
-        "Username must be 3–30 chars: letters, digits, underscore.",
-    };
+    return { error: t("usernameFormatInvalid") };
   }
 
   const profileRows = await db
@@ -285,10 +321,10 @@ export async function changeUsernameAction(
     .where(eq(userProfile.authUserId, user.id))
     .limit(1);
   const profile = profileRows[0];
-  if (!profile) return { error: "Profile not found." };
+  if (!profile) return { error: t("profileNotFound") };
 
   if (profile.currentUsername === newUsername) {
-    return { error: "That is already your username." };
+    return { error: t("usernameSameAsCurrent") };
   }
 
   if (profile.lastChanged) {
@@ -299,9 +335,7 @@ export async function changeUsernameAction(
       const daysLeft = Math.ceil(
         USERNAME_CHANGE_COOLDOWN_DAYS - daysSince,
       );
-      return {
-        error: `You can change again in ${daysLeft} day${daysLeft === 1 ? "" : "s"}.`,
-      };
+      return { error: t("usernameCooldown", { count: daysLeft }) };
     }
   }
 
@@ -314,7 +348,7 @@ export async function changeUsernameAction(
     .where(eq(userProfile.username, newUsername))
     .limit(1);
   if (existing.length > 0) {
-    return { error: "Username already taken." };
+    return { error: t("usernameTaken") };
   }
 
   await db

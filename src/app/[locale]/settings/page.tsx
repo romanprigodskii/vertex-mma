@@ -43,7 +43,7 @@ export default async function SettingsPage({
       <Navbar />
       <main className="flex-1">
         <div className="border-b border-foreground/[0.06]">
-          <Container size="xl" className="py-3">
+          <Container size="md" className="py-3">
             <Link
               href="/me"
               className="inline-flex items-center gap-1.5 font-sans text-sm text-foreground-muted hover:text-primary"
@@ -98,7 +98,10 @@ export default async function SettingsPage({
             <h2 className="mb-4 font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
               {t("sectionEmail")}
             </h2>
-            <ChangeEmailForm currentEmail={user.email ?? ""} />
+            <ChangeEmailForm
+              currentEmail={user.email ?? ""}
+              hasPassword={user.hasPassword}
+            />
           </section>
 
           <section>
@@ -112,7 +115,7 @@ export default async function SettingsPage({
             <h2 className="mb-4 font-sans text-[11px] font-medium uppercase tracking-widest text-streak-loss">
               {t("dangerZone")}
             </h2>
-            <DeleteAccountSection />
+            <DeleteAccountSection hasPassword={user.hasPassword} />
           </section>
         </Container>
       </main>
