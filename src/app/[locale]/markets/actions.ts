@@ -32,6 +32,67 @@ const MIN_COINS_PER_BET = 1;
 const MAX_COINS_PER_BET = 1_000_000;
 
 /**
+ * Stable machine error codes. Server actions NEVER return human-readable
+ * English — a Russian user must not see English in an otherwise-localized UI.
+ * The client maps these codes to localized strings (markets.* / sportsbook.*),
+ * defaulting any unrecognised code (e.g. a leaked DB message) to a generic
+ * "couldn't place your bet" string. Inside a db.transaction we `throw` the
+ * code as an Error.message and re-surface it from the catch via `errorCode()`.
+ */
+type BetError =
+  | "NOT_SIGNED_IN"
+  | "RATE_LIMITED"
+  | "INVALID_AMOUNT"
+  | "PROFILE_NOT_FOUND"
+  | "NOT_ENOUGH_COINS"
+  | "MARKET_NOT_FOUND"
+  | "MARKET_CLOSED"
+  | "NO_OUTCOMES"
+  | "OUTCOME_NOT_FOUND"
+  | "COMPUTE_FAILED"
+  | "UNKNOWN_SELECTION"
+  | "BOUT_NOT_FOUND"
+  | "BOUT_CLOSED"
+  | "NO_MODEL_ODDS"
+  | "MARKET_NOT_OFFERED"
+  | "PARLAY_LEG_COUNT"
+  | "PARLAY_DUP_BOUT"
+  | "PARLAY_LEG_CLOSED"
+  | "PARLAY_NO_ODDS"
+  | "BET_FAILED";
+
+const KNOWN_CODES = new Set<string>([
+  "NOT_SIGNED_IN",
+  "RATE_LIMITED",
+  "INVALID_AMOUNT",
+  "PROFILE_NOT_FOUND",
+  "NOT_ENOUGH_COINS",
+  "MARKET_NOT_FOUND",
+  "MARKET_CLOSED",
+  "NO_OUTCOMES",
+  "OUTCOME_NOT_FOUND",
+  "COMPUTE_FAILED",
+  "UNKNOWN_SELECTION",
+  "BOUT_NOT_FOUND",
+  "BOUT_CLOSED",
+  "NO_MODEL_ODDS",
+  "MARKET_NOT_OFFERED",
+  "PARLAY_LEG_COUNT",
+  "PARLAY_DUP_BOUT",
+  "PARLAY_LEG_CLOSED",
+  "PARLAY_NO_ODDS",
+  "BET_FAILED",
+]);
+
+/** Re-surface a code thrown from inside a transaction. Anything that isn't one
+ *  of our known codes (a raw Postgres error, etc.) collapses to the supplied
+ *  fallback so an English DB message never reaches the user. */
+function errorCode(err: unknown, fallback: BetError): BetError {
+  const msg = err instanceof Error ? err.message : "";
+  return (KNOWN_CODES.has(msg) ? msg : fallback) as BetError;
+}
+
+/**
  * Unlock achievements as a POST-COMMIT, best-effort side effect. The bet (or
  * parlay) is already durably committed by the time we get here, so a failure
  * unlocking achievements must NEVER bubble up as a bet error: the user would
@@ -60,9 +121,9 @@ export async function placeBetAction(
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { error: "Not signed in." };
+  if (!user) return { error: "NOT_SIGNED_IN" };
   if (!allowAction(`bet:${user.id}`, COOLDOWN_MS.bet)) {
-    return { error: "Slow down — wait a moment before betting again." };
+    return { error: "RATE_LIMITED" };
   }
 
   if (
@@ -70,7 +131,7 @@ export async function placeBetAction(
     coinsToSpend < MIN_COINS_PER_BET ||
     coinsToSpend > MAX_COINS_PER_BET
   ) {
-    return { error: `Bet must be between ${MIN_COINS_PER_BET} and ${MAX_COINS_PER_BET} coins.` };
+    return { error: "INVALID_AMOUNT" };
   }
   const coinsInt = Math.floor(coinsToSpend);
 
@@ -80,8 +141,8 @@ export async function placeBetAction(
     .where(eq(userProfile.authUserId, user.id))
     .limit(1);
   const profile = profileRows[0];
-  if (!profile) return { error: "Profile not found." };
-  if (profile.balance < coinsInt) return { error: "Not enough coins." };
+  if (!profile) return { error: "PROFILE_NOT_FOUND" };
+  if (profile.balance < coinsInt) return { error: "NOT_ENOUGH_COINS" };
 
   let result: { sharesBought: number; coinsSpent: number };
   try {
@@ -105,11 +166,11 @@ export async function placeBetAction(
         b_parameter: number;
         closes_at: string;
       }>;
-      if (marketArr.length === 0) throw new Error("Market not found.");
+      if (marketArr.length === 0) throw new Error("MARKET_NOT_FOUND");
       const mRow = marketArr[0];
-      if (mRow.status !== "open") throw new Error("Market is closed.");
+      if (mRow.status !== "open") throw new Error("MARKET_CLOSED");
       if (new Date(mRow.closes_at).getTime() <= Date.now()) {
-        throw new Error("Market has closed.");
+        throw new Error("MARKET_CLOSED");
       }
 
       const outcomeRows = await tx.execute<{
@@ -128,10 +189,10 @@ export async function placeBetAction(
         order_index: number;
         current_shares: number;
       }>;
-      if (outcomes.length === 0) throw new Error("No outcomes.");
+      if (outcomes.length === 0) throw new Error("NO_OUTCOMES");
 
       const targetIdx = outcomes.findIndex((o) => o.id === outcomeId);
-      if (targetIdx < 0) throw new Error("Outcome not found.");
+      if (targetIdx < 0) throw new Error("OUTCOME_NOT_FOUND");
 
       const shares = outcomes.map((o) => o.current_shares);
       const b = mRow.b_parameter;
@@ -140,7 +201,7 @@ export async function placeBetAction(
       // client last computed it. Round actual cost up so the bookmaker
       // never accidentally hands out fractional-coin freebies.
       const sharesBought = lmsrSharesForCoins(shares, b, targetIdx, coinsInt);
-      if (!(sharesBought > 0)) throw new Error("Could not compute shares.");
+      if (!(sharesBought > 0)) throw new Error("COMPUTE_FAILED");
       const actualCost = Math.ceil(lmsrBuyCost(shares, b, targetIdx, sharesBought));
 
       // Lock the profile row and re-read the AUTHORITATIVE balance inside the
@@ -161,8 +222,8 @@ export async function placeBetAction(
       const lockedBalance = (
         balanceRows as unknown as Array<{ balance_coins: number }>
       )[0]?.balance_coins;
-      if (typeof lockedBalance !== "number") throw new Error("Profile not found.");
-      if (actualCost > lockedBalance) throw new Error("Not enough coins.");
+      if (typeof lockedBalance !== "number") throw new Error("PROFILE_NOT_FOUND");
+      if (actualCost > lockedBalance) throw new Error("NOT_ENOUGH_COINS");
 
       const newShares = shares.slice();
       newShares[targetIdx] += sharesBought;
@@ -232,8 +293,7 @@ export async function placeBetAction(
       return { sharesBought, coinsSpent: actualCost };
     });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "Bet failed.";
-    return { error: msg };
+    return { error: errorCode(err, "BET_FAILED") };
   }
 
   // Post-commit, best-effort: the bet is already committed. first_bet /
@@ -251,7 +311,8 @@ export async function placeBetAction(
 /**
  * Read-only cost preview for the bet form. Doesn't lock rows — the real
  * placeBetAction re-solves under FOR UPDATE so a stale preview can't lead
- * to over-spending.
+ * to over-spending. The error codes here are never surfaced (the form just
+ * hides the preview), but we keep the same machine-code contract for tidiness.
  */
 export async function previewBetCost(
   marketId: string,
@@ -269,10 +330,10 @@ export async function previewBetCost(
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { error: "Not signed in." };
+  if (!user) return { error: "NOT_SIGNED_IN" };
 
   if (!Number.isFinite(coins) || coins <= 0) {
-    return { error: "Coins must be > 0." };
+    return { error: "INVALID_AMOUNT" };
   }
   // Clamp to the same ceiling placeBetAction enforces so the solver can never
   // be fed an arbitrarily large amount.
@@ -282,7 +343,7 @@ export async function previewBetCost(
     SELECT b_parameter FROM market WHERE id = ${marketId}::uuid LIMIT 1
   `);
   const mArr = marketRows as unknown as Array<{ b_parameter: number }>;
-  if (mArr.length === 0) return { error: "Market not found." };
+  if (mArr.length === 0) return { error: "MARKET_NOT_FOUND" };
   const b = mArr[0].b_parameter;
 
   const outcomeRows = await db.execute<{
@@ -301,11 +362,11 @@ export async function previewBetCost(
     current_shares: number;
   }>;
   const idx = outcomes.findIndex((o) => o.id === outcomeId);
-  if (idx < 0) return { error: "Outcome not found." };
+  if (idx < 0) return { error: "OUTCOME_NOT_FOUND" };
 
   const sharesArr = outcomes.map((o) => o.current_shares);
   const shares = lmsrSharesForCoins(sharesArr, b, idx, coinsInt);
-  if (!(shares > 0)) return { error: "Coins too small." };
+  if (!(shares > 0)) return { error: "COMPUTE_FAILED" };
   const cost = Math.ceil(lmsrBuyCost(sharesArr, b, idx, shares));
   const newSharesArr = sharesArr.slice();
   newSharesArr[idx] += shares;
@@ -316,6 +377,43 @@ export async function previewBetCost(
 /* -------------------------------------------------------------------------- */
 /*                  Vertex Sportsbook — fixed-odds bet placement              */
 /* -------------------------------------------------------------------------- */
+
+/** Re-read a bout (+ its event date) and re-assert it's still open for betting
+ *  INSIDE the placement transaction. A plain pre-tx SELECT is a TOCTOU: a
+ *  scraper UPDATE flipping the bout to in_progress/completed (and the
+ *  settlement trigger it fires) can interleave between the gate and the
+ *  INSERT, locking in a stake on an already-decided fight. We take a FOR SHARE
+ *  lock on the bout row BEFORE the user_profile FOR UPDATE — the same
+ *  bout→profile order the settlement trigger uses (UPDATE bout → FOR UPDATE
+ *  user_profile), so the two paths can't deadlock. Throws the supplied code. */
+async function assertBoutsBettableLocked(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  boutIds: string[],
+  closedCode: "BOUT_CLOSED" | "PARLAY_LEG_CLOSED",
+): Promise<void> {
+  if (boutIds.length === 0) return;
+  const idList = sql.join(
+    boutIds.map((id) => sql`${id}::uuid`),
+    sql`, `,
+  );
+  const rows = (await tx.execute<{
+    id: string;
+    status: string;
+    event_date: string | null;
+  }>(sql`
+    SELECT b.id::text AS id, b.status::text AS status, e.date::text AS event_date
+    FROM bout b JOIN event e ON e.id = b.event_id
+    WHERE b.id IN (${idList})
+    FOR SHARE OF b
+  `)) as unknown as Array<{ id: string; status: string; event_date: string | null }>;
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  for (const id of boutIds) {
+    const r = byId.get(id);
+    if (!r || !isBoutBettable(r.status, r.event_date)) {
+      throw new Error(closedCode);
+    }
+  }
+}
 
 /**
  * Place a FIXED-ODDS bet on a bout outcome at our model-derived "Vertex
@@ -338,12 +436,12 @@ export async function placeFixedOddsBetAction(
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { error: "Not signed in." };
+  if (!user) return { error: "NOT_SIGNED_IN" };
   if (!allowAction(`bet:${user.id}`, COOLDOWN_MS.bet)) {
-    return { error: "Slow down — wait a moment before betting again." };
+    return { error: "RATE_LIMITED" };
   }
 
-  if (!isSelectionCode(selectionCode)) return { error: "Unknown selection." };
+  if (!isSelectionCode(selectionCode)) return { error: "UNKNOWN_SELECTION" };
   const code = selectionCode as SportsbookSelectionCode;
 
   if (
@@ -351,9 +449,7 @@ export async function placeFixedOddsBetAction(
     stake < MIN_COINS_PER_BET ||
     stake > MAX_COINS_PER_BET
   ) {
-    return {
-      error: `Stake must be between ${MIN_COINS_PER_BET} and ${MAX_COINS_PER_BET} coins.`,
-    };
+    return { error: "INVALID_AMOUNT" };
   }
   const stakeInt = Math.floor(stake);
 
@@ -363,10 +459,12 @@ export async function placeFixedOddsBetAction(
     .where(eq(userProfile.authUserId, user.id))
     .limit(1);
   const profile = profileRows[0];
-  if (!profile) return { error: "Profile not found." };
-  if (profile.balance < stakeInt) return { error: "Not enough coins." };
+  if (!profile) return { error: "PROFILE_NOT_FOUND" };
+  if (profile.balance < stakeInt) return { error: "NOT_ENOUGH_COINS" };
 
   // Bout context + bettability gate (status scheduled + event in the future).
+  // This is a cheap early-reject; the authoritative re-check happens under a
+  // FOR SHARE lock inside the transaction below (see assertBoutsBettableLocked).
   const boutRows = (await db.execute<{
     status: string;
     fighter_a_id: string;
@@ -387,9 +485,9 @@ export async function placeFixedOddsBetAction(
     event_date: string;
   }>;
   const boutRow = boutRows[0];
-  if (!boutRow) return { error: "Bout not found." };
+  if (!boutRow) return { error: "BOUT_NOT_FOUND" };
   if (!isBoutBettable(boutRow.status, boutRow.event_date)) {
-    return { error: "Betting is closed for this bout." };
+    return { error: "BOUT_CLOSED" };
   }
 
   // Recompute the odds from the latest model — the authoritative price.
@@ -399,7 +497,7 @@ export async function placeFixedOddsBetAction(
     getBoutSimulation(boutId),
     getBoutExternalOdds(boutId),
   ]);
-  if (!sim) return { error: "No model odds available for this bout yet." };
+  if (!sim) return { error: "NO_MODEL_ODDS" };
   const outcomes = computeSportsbookOutcomes({
     probA: sim.probA,
     probB: sim.probB,
@@ -420,7 +518,7 @@ export async function placeFixedOddsBetAction(
       : null,
   });
   const offered = outcomes.find((o) => o.code === code);
-  if (!offered) return { error: "That market isn't offered for this bout." };
+  if (!offered) return { error: "MARKET_NOT_OFFERED" };
 
   const decimalOdds = offered.decimalOdds;
   const payout = potentialPayout(stakeInt, decimalOdds);
@@ -434,14 +532,18 @@ export async function placeFixedOddsBetAction(
 
   try {
     await db.transaction(async (tx) => {
+      // Re-assert the bout is still open under a FOR SHARE lock BEFORE locking
+      // the balance — closes the bet-after-result race (see helper).
+      await assertBoutsBettableLocked(tx, [boutId], "BOUT_CLOSED");
+
       // Authoritative balance under lock (mirrors placeBetAction — guards the
       // lost-update race for the same user betting concurrently).
       const balanceRows = (await tx.execute<{ balance_coins: number }>(sql`
         SELECT balance_coins::float8 AS balance_coins FROM user_profile WHERE id = ${profile.id}::uuid FOR UPDATE
       `)) as unknown as Array<{ balance_coins: number }>;
       const locked = balanceRows[0]?.balance_coins;
-      if (typeof locked !== "number") throw new Error("Profile not found.");
-      if (stakeInt > locked) throw new Error("Not enough coins.");
+      if (typeof locked !== "number") throw new Error("PROFILE_NOT_FOUND");
+      if (stakeInt > locked) throw new Error("NOT_ENOUGH_COINS");
 
       await tx.execute(sql`
         INSERT INTO fixed_odds_bet
@@ -470,7 +572,7 @@ export async function placeFixedOddsBetAction(
       `);
     });
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "Bet failed." };
+    return { error: errorCode(err, "BET_FAILED") };
   }
 
   // Post-commit, best-effort (see unlockAchievementsBestEffort): the bet is
@@ -495,12 +597,12 @@ type PricedLeg = {
 };
 
 /** Re-price one leg server-side (same odds + edge-guard as a single bet).
- *  Returns the priced leg or an error string the caller surfaces. */
+ *  Returns the priced leg or an error code the caller surfaces. */
 async function priceParlayLeg(
   boutId: string,
   rawCode: string,
-): Promise<PricedLeg | { error: string }> {
-  if (!isSelectionCode(rawCode)) return { error: "Unknown selection in slip." };
+): Promise<PricedLeg | { error: BetError }> {
+  if (!isSelectionCode(rawCode)) return { error: "UNKNOWN_SELECTION" };
   const code = rawCode as SportsbookSelectionCode;
 
   const boutRows = (await db.execute<{
@@ -523,16 +625,16 @@ async function priceParlayLeg(
     event_date: string;
   }>;
   const boutRow = boutRows[0];
-  if (!boutRow) return { error: "A pick's bout was not found." };
+  if (!boutRow) return { error: "BOUT_NOT_FOUND" };
   if (!isBoutBettable(boutRow.status, boutRow.event_date)) {
-    return { error: "A pick is no longer open for betting." };
+    return { error: "PARLAY_LEG_CLOSED" };
   }
 
   const [sim, externalOdds] = await Promise.all([
     getBoutSimulation(boutId),
     getBoutExternalOdds(boutId),
   ]);
-  if (!sim) return { error: "No model odds for one of your picks yet." };
+  if (!sim) return { error: "PARLAY_NO_ODDS" };
 
   const outcomes = computeSportsbookOutcomes({
     probA: sim.probA,
@@ -554,7 +656,7 @@ async function priceParlayLeg(
       : null,
   });
   const offered = outcomes.find((o) => o.code === code);
-  if (!offered) return { error: "A pick isn't offered for its bout." };
+  if (!offered) return { error: "MARKET_NOT_OFFERED" };
 
   const side = selectionSide(code);
   const selectedFighterId =
@@ -593,9 +695,9 @@ export async function placeParlayAction(
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { error: "Not signed in." };
+  if (!user) return { error: "NOT_SIGNED_IN" };
   if (!allowAction(`bet:${user.id}`, COOLDOWN_MS.bet)) {
-    return { error: "Slow down — wait a moment before betting again." };
+    return { error: "RATE_LIMITED" };
   }
 
   if (
@@ -603,22 +705,18 @@ export async function placeParlayAction(
     legs.length < MIN_PARLAY_LEGS ||
     legs.length > MAX_PARLAY_LEGS
   ) {
-    return {
-      error: `A parlay needs ${MIN_PARLAY_LEGS}–${MAX_PARLAY_LEGS} picks.`,
-    };
+    return { error: "PARLAY_LEG_COUNT" };
   }
   const boutIds = legs.map((l) => l.boutId);
   if (new Set(boutIds).size !== boutIds.length) {
-    return { error: "Only one pick per fight in a parlay." };
+    return { error: "PARLAY_DUP_BOUT" };
   }
   if (
     !Number.isFinite(stake) ||
     stake < MIN_COINS_PER_BET ||
     stake > MAX_COINS_PER_BET
   ) {
-    return {
-      error: `Stake must be between ${MIN_COINS_PER_BET} and ${MAX_COINS_PER_BET} coins.`,
-    };
+    return { error: "INVALID_AMOUNT" };
   }
   const stakeInt = Math.floor(stake);
 
@@ -628,14 +726,14 @@ export async function placeParlayAction(
     .where(eq(userProfile.authUserId, user.id))
     .limit(1);
   const profile = profileRows[0];
-  if (!profile) return { error: "Profile not found." };
-  if (profile.balance < stakeInt) return { error: "Not enough coins." };
+  if (!profile) return { error: "PROFILE_NOT_FOUND" };
+  if (profile.balance < stakeInt) return { error: "NOT_ENOUGH_COINS" };
 
   // Price every leg server-side (authoritative odds + edge-guard).
   const priced = await Promise.all(
     legs.map((l) => priceParlayLeg(l.boutId, l.code)),
   );
-  const bad = priced.find((p): p is { error: string } => "error" in p);
+  const bad = priced.find((p): p is { error: BetError } => "error" in p);
   if (bad) return { error: bad.error };
   const pricedLegs = priced as PricedLeg[];
 
@@ -645,12 +743,20 @@ export async function placeParlayAction(
   let createdParlayId: string | null = null;
   try {
     await db.transaction(async (tx) => {
+      // Re-assert every leg's bout is still open under FOR SHARE locks BEFORE
+      // locking the balance — closes the bet-after-result race per leg.
+      await assertBoutsBettableLocked(
+        tx,
+        pricedLegs.map((l) => l.boutId),
+        "PARLAY_LEG_CLOSED",
+      );
+
       const balanceRows = (await tx.execute<{ balance_coins: number }>(sql`
         SELECT balance_coins::float8 AS balance_coins FROM user_profile WHERE id = ${profile.id}::uuid FOR UPDATE
       `)) as unknown as Array<{ balance_coins: number }>;
       const locked = balanceRows[0]?.balance_coins;
-      if (typeof locked !== "number") throw new Error("Profile not found.");
-      if (stakeInt > locked) throw new Error("Not enough coins.");
+      if (typeof locked !== "number") throw new Error("PROFILE_NOT_FOUND");
+      if (stakeInt > locked) throw new Error("NOT_ENOUGH_COINS");
 
       const parlayRows = (await tx.execute<{ id: string }>(sql`
         INSERT INTO parlay (user_id, stake_coins, combined_odds, potential_payout, num_legs)
@@ -658,7 +764,7 @@ export async function placeParlayAction(
         RETURNING id::text AS id
       `)) as unknown as Array<{ id: string }>;
       const parlayId = parlayRows[0]?.id;
-      if (!parlayId) throw new Error("Could not create parlay.");
+      if (!parlayId) throw new Error("BET_FAILED");
       createdParlayId = parlayId;
 
       for (const leg of pricedLegs) {
@@ -688,7 +794,7 @@ export async function placeParlayAction(
       `);
     });
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "Parlay failed." };
+    return { error: errorCode(err, "BET_FAILED") };
   }
 
   // Post-commit, best-effort (see unlockAchievementsBestEffort): the parlay is

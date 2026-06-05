@@ -8,6 +8,7 @@ import { Navbar } from "@/components/layout/navbar";
 import { ShareButton } from "@/components/share/share-button";
 import { Link, getPathname } from "@/i18n/navigation";
 import {
+  MAX_PARLAY_ODDS,
   type SportsbookSelectionCode,
   describeSelection,
   formatOdds,
@@ -53,6 +54,7 @@ const STATUS_STYLE: Record<string, { key: string; cls: string }> = {
 export default async function ParlayPage({ params }: PageProps) {
   const { id, locale } = await params;
   setRequestLocale(locale);
+  const dateLocale = locale === "ru" ? "ru-RU" : "en-US";
   const t = await getTranslations("parlay");
   const tSb = await getTranslations("sportsbook");
   const p = await getParlayById(id);
@@ -123,10 +125,17 @@ export default async function ParlayPage({ params }: PageProps) {
                 {formatOdds(p.combined_odds)}
                 <span className="text-foreground-muted">×</span>
               </p>
+              {/* The combined odds are capped (a 12-leg longshot can exceed it);
+                  flag the cap so a round 1000.00× doesn't look like a bug. */}
+              {p.combined_odds >= MAX_PARLAY_ODDS ? (
+                <p className="mt-0.5 font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
+                  {t("maxOdds")}
+                </p>
+              ) : null}
               <p className="mt-1 font-mono text-sm tabular text-foreground-subtle">
                 {t("stakeToWin", {
-                  stake: p.stake_coins.toLocaleString(),
-                  payout: p.potential_payout.toLocaleString(),
+                  stake: p.stake_coins.toLocaleString(dateLocale),
+                  payout: p.potential_payout.toLocaleString(dateLocale),
                 })}
               </p>
             </div>
@@ -140,7 +149,7 @@ export default async function ParlayPage({ params }: PageProps) {
               {/* Only a WIN shows "+payout" — a void/push refunds the stake,
                   so a "+" there would read as profit (it's net zero). */}
               {p.status === "won" && p.payout != null
-                ? ` +${p.payout.toLocaleString()}`
+                ? ` +${p.payout.toLocaleString(dateLocale)}`
                 : ""}
             </span>
           </div>
@@ -150,9 +159,9 @@ export default async function ParlayPage({ params }: PageProps) {
             {t("legsHeading")}
           </h2>
           <ul className="overflow-hidden rounded-lg border border-foreground/10 bg-background-elevated/20">
-            {p.legs.map((leg, i) => (
+            {p.legs.map((leg) => (
               <li
-                key={i}
+                key={`${leg.fighter_a_slug}-${leg.fighter_b_slug}-${leg.selection_code}`}
                 className="flex items-center gap-3 border-b border-foreground/[0.06] px-4 py-3 last:border-b-0"
               >
                 <span className={cn("font-mono text-lg leading-none", legDot(leg.status))}>

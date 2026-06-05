@@ -62,7 +62,8 @@ function PriceButton({
         {showValue ? (
           <span
             title={t("valueTooltip")}
-            className="shrink-0 rounded-sm bg-primary/15 px-1 py-0.5 font-sans text-[8px] font-semibold uppercase tracking-wide text-primary"
+            aria-label={t("valueTooltip")}
+            className="shrink-0 rounded-sm bg-primary/15 px-1 py-0.5 font-sans text-[10px] font-semibold uppercase tracking-wide text-primary"
           >
             {t("valueBadge", {
               pp: Math.round((modelEdgeForSide(edgeA, side) ?? 0) * 100),

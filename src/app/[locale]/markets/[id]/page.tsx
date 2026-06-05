@@ -106,7 +106,9 @@ export default async function MarketDetailPage({ params }: PageProps) {
           </Container>
         </div>
 
-        <Container size="lg" className="py-10 md:py-14">
+        {/* Extra bottom padding reserves room for the floating parlay slip
+            (fixed bottom-right) so it can't cover the bet form / stats on mobile. */}
+        <Container size="lg" className="pt-10 pb-24 md:pt-14 md:pb-14">
           <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground-subtle">
             <Link
               href={`/events/${market.event_slug}`}
@@ -122,8 +124,8 @@ export default async function MarketDetailPage({ params }: PageProps) {
             })}
           </p>
           <h1
-            className="mt-3 font-display uppercase tracking-tight text-foreground"
-            style={{ fontSize: "clamp(32px, 4vw, 56px)" }}
+            className="mt-3 break-words text-balance font-display uppercase tracking-tight text-foreground"
+            style={{ fontSize: "clamp(26px, 4vw, 56px)" }}
           >
             {market.type === "method" ? (
               t("methodHeading")

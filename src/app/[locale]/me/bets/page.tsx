@@ -42,6 +42,7 @@ export default async function MyBetsPage({
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
+  const dateLocale = locale === "ru" ? "ru-RU" : "en-US";
   const t = await getTranslations("me");
   const tMarkets = await getTranslations("markets");
   const tSb = await getTranslations("sportsbook");
@@ -111,7 +112,7 @@ export default async function MyBetsPage({
           <p className="mt-2 font-sans text-sm text-foreground-muted">
             {t("balance")}{" "}
             <span className="text-foreground">
-              {user.balanceCoins.toLocaleString()} {t("coinsSuffix")}
+              {user.balanceCoins.toLocaleString(dateLocale)} {t("coinsSuffix")}
             </span>
           </p>
 
@@ -155,7 +156,7 @@ export default async function MyBetsPage({
                             <p className="mt-1 truncate font-mono text-[11px] tabular text-foreground-subtle">
                               {sbLabel(b)} ·{" "}
                               {t("sbStaked", {
-                                coins: b.stake_coins.toLocaleString(),
+                                coins: b.stake_coins.toLocaleString(dateLocale),
                                 odds: formatOdds(b.decimal_odds),
                               })}
                             </p>
@@ -164,13 +165,13 @@ export default async function MyBetsPage({
                             {b.status === "won" ? (
                               <p className="font-mono text-xs tabular text-streak-win">
                                 {t("wonSuffix", {
-                                  coins: (b.payout ?? 0).toLocaleString(),
+                                  coins: (b.payout ?? 0).toLocaleString(dateLocale),
                                 })}
                               </p>
                             ) : b.status === "void" ? (
                               <p className="font-mono text-xs tabular text-foreground-muted">
                                 {t("refundedSuffix", {
-                                  coins: (b.payout ?? 0).toLocaleString(),
+                                  coins: (b.payout ?? 0).toLocaleString(dateLocale),
                                 })}
                               </p>
                             ) : b.status === "lost" ? (
@@ -179,7 +180,7 @@ export default async function MyBetsPage({
                               </p>
                             ) : (
                               <p className="font-mono text-xs tabular text-foreground-subtle">
-                                {t("pending")} → {b.potential_payout.toLocaleString()}
+                                {t("pending")} → {b.potential_payout.toLocaleString(dateLocale)}
                               </p>
                             )}
                           </div>
@@ -220,13 +221,13 @@ export default async function MyBetsPage({
                             {p.status === "won" ? (
                               <p className="font-mono text-xs tabular text-streak-win">
                                 {t("wonSuffix", {
-                                  coins: (p.payout ?? 0).toLocaleString(),
+                                  coins: (p.payout ?? 0).toLocaleString(dateLocale),
                                 })}
                               </p>
                             ) : p.status === "void" ? (
                               <p className="font-mono text-xs tabular text-foreground-muted">
                                 {t("refundedSuffix", {
-                                  coins: (p.payout ?? 0).toLocaleString(),
+                                  coins: (p.payout ?? 0).toLocaleString(dateLocale),
                                 })}
                               </p>
                             ) : p.status === "lost" ? (
@@ -235,16 +236,16 @@ export default async function MyBetsPage({
                               </p>
                             ) : (
                               <p className="font-mono text-xs tabular text-foreground-subtle">
-                                {t("pending")} → {p.potential_payout.toLocaleString()}
+                                {t("pending")} → {p.potential_payout.toLocaleString(dateLocale)}
                               </p>
                             )}
                             </div>
                           </div>
                         </div>
                         <ul className="mt-2 space-y-1 border-t border-foreground/[0.06] pt-2">
-                          {p.legs.map((leg, i) => (
+                          {p.legs.map((leg) => (
                             <li
-                              key={`${p.parlay_id}-${i}`}
+                              key={`${p.parlay_id}-${leg.bout_id}`}
                               className="flex items-center justify-between gap-2 font-mono text-[11px] tabular"
                             >
                               <span className="min-w-0 truncate text-foreground-muted">
@@ -267,7 +268,7 @@ export default async function MyBetsPage({
                         </ul>
                         <p className="mt-2 font-mono text-[10px] tabular text-foreground-subtle">
                           {t("sbStaked", {
-                            coins: p.stake_coins.toLocaleString(),
+                            coins: p.stake_coins.toLocaleString(dateLocale),
                             odds: formatOdds(p.combined_odds),
                           })}
                         </p>
@@ -278,7 +279,11 @@ export default async function MyBetsPage({
               ) : null}
               {bets.length > 0 ? (
                 <section>
-                  {sbBets.length > 0 ? (
+                  {/* Show the heading whenever another section is present, so a
+                      user with parlays but no sportsbook bets doesn't get an
+                      unlabeled prediction-market list reading as a stray
+                      continuation of the Parlays section. */}
+                  {sbBets.length > 0 || parlays.length > 0 ? (
                     <h2 className="mb-3 font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-subtle">
                       {t("predictionSection")}
                     </h2>
@@ -308,7 +313,7 @@ export default async function MyBetsPage({
                     <div className="shrink-0 text-right">
                       <p className="font-mono text-sm tabular text-foreground-muted">
                         {t("spentForShares", {
-                          coins: b.coins_spent.toLocaleString(),
+                          coins: b.coins_spent.toLocaleString(dateLocale),
                           shares: b.shares_bought.toFixed(1),
                         })}
                       </p>
@@ -319,13 +324,13 @@ export default async function MyBetsPage({
                         b.market_status === "cancelled" ? (
                           <p className="font-mono text-xs tabular text-foreground-muted">
                             {t("refundedSuffix", {
-                              coins: (b.payout ?? 0).toLocaleString(),
+                              coins: (b.payout ?? 0).toLocaleString(dateLocale),
                             })}
                           </p>
                         ) : b.is_winning ? (
                           <p className="font-mono text-xs tabular text-streak-win">
                             {t("wonSuffix", {
-                              coins: (b.payout ?? 0).toLocaleString(),
+                              coins: (b.payout ?? 0).toLocaleString(dateLocale),
                             })}
                           </p>
                         ) : (

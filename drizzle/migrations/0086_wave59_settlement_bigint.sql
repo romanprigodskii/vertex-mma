@@ -1,96 +1,25 @@
-/**
- * Vertex Sportsbook — instant PARLAY settlement (+ DRY the grading truth).
- *
- * Extracts the per-selection grading into two IMMUTABLE SQL helpers so single
- * bets AND parlay legs grade through ONE source (no drift):
- *   fixed_odds_method_bucket(method)  → ko|sub|dec|dq|draw|nc|unknown
- *   fixed_odds_grade(code, winner, a, b, mb, went_distance, round) → won|lost|void
- * (port of settleSelection's switch; terminal void — cancel/NC — handled by
- * the callers, mirroring the TS structure.)
- *
- * settle_fixed_odds_bets_for_bout is refactored onto these helpers (same
- * behaviour, re-verified). settle_parlay_legs_for_bout grades a bout's open
- * legs then finalizes each affected parlay: any leg lost → parlay lost now
- * (even with legs still open — it's dead); else once all legs resolve, all
- * void → refund stake, otherwise won with payout = floor(stake × Π surviving
- * odds) (void legs drop out). The trigger calls both settle fns.
- *
- * MONEY-PATH TYPES: balance / payout locals are bigint — user_profile.balance_
- * coins and transaction.balance_after are bigint (Wave 58), so an int4 local
- * would overflow / `integer out of range` once a balance crosses ~2.1e9 (a
- * 1M-stake parlay can pay 1e9). unlock_betting_achievements likewise takes
- * bigint. KEEP IN SYNC with drizzle/migrations/0086_wave59_settlement_bigint.sql.
- *
- * NOTIFICATIONS: every settlement notification dual-writes a structured `params`
- * jsonb ({key,coins}) so the client localizes title/body (the stored English is
- * only the fallback). Mirrors scripts/apply_notification_params.ts — KEEP THE
- * params IN SYNC so re-running either script can't regress RU localization.
- *
- * Idempotent / re-runnable. Usage: npx tsx scripts/apply_parlay_settlement.ts
- */
-import { config } from "dotenv";
-config({ path: ".env.local" });
+-- Wave 59 — widen settlement money-path locals to bigint.
+--
+-- Wave 58 widened user_profile.balance_coins / total_coins_earned /
+-- total_coins_lost and transaction.amount / balance_after to bigint, but the
+-- settlement functions still declared their balance/payout locals (and the
+-- unlock_betting_achievements parameters) as int4. `RETURNING balance_coins
+-- INTO v_new_balance` then truncates / raises `integer out of range` once a
+-- balance crosses the int4 ceiling (~2.147e9) — a single 1M-stake parlay can
+-- pay floor(1e6 × 1000) = 1e9, so accumulated balances cross it — corrupting
+-- the recorded transaction.balance_after and the balance_*k achievement gate.
+--
+-- This regenerates the three functions with bigint locals/params. The bodies
+-- are otherwise IDENTICAL to the live Wave-49 (params) definitions — only the
+-- declared types change. Idempotent: CREATE OR REPLACE everywhere, and the
+-- old int4 unlock_betting_achievements overload is dropped first (its arg types
+-- are part of its identity, so CREATE OR REPLACE alone would leave a duplicate
+-- overload behind and make the call ambiguous).
+--
+-- KEEP IN SYNC with scripts/apply_parlay_settlement.ts (same definitions).
 
-import postgres from "postgres";
+DROP FUNCTION IF EXISTS public.unlock_betting_achievements(uuid, int, real, boolean, int);
 
-const url = process.env.DATABASE_URL;
-if (!url) throw new Error("DATABASE_URL not set");
-
-const sql = postgres(url, { prepare: false, max: 1 });
-
-const METHOD_BUCKET_FN = `
-CREATE OR REPLACE FUNCTION public.fixed_odds_method_bucket(p_method text)
-RETURNS text LANGUAGE sql IMMUTABLE AS $$
-  SELECT CASE
-    WHEN p_method IN ('ko','tko')   THEN 'ko'
-    WHEN p_method = 'submission'    THEN 'sub'
-    WHEN p_method LIKE 'decision%'  THEN 'dec'
-    WHEN p_method = 'dq'            THEN 'dq'
-    WHEN p_method = 'draw'          THEN 'draw'
-    WHEN p_method = 'no_contest'    THEN 'nc'
-    ELSE 'unknown'
-  END
-$$;
-`;
-
-const GRADE_FN = `
-CREATE OR REPLACE FUNCTION public.fixed_odds_grade(
-  p_code text, p_winner uuid, p_a uuid, p_b uuid,
-  p_mb text, p_went_distance boolean, p_round int
-) RETURNS text LANGUAGE sql IMMUTABLE AS $$
-  SELECT CASE p_code
-    WHEN 'win_a' THEN CASE WHEN p_winner IS NULL THEN 'void' WHEN p_winner = p_a THEN 'won' ELSE 'lost' END
-    WHEN 'win_b' THEN CASE WHEN p_winner IS NULL THEN 'void' WHEN p_winner = p_b THEN 'won' ELSE 'lost' END
-    WHEN 'a_ko'  THEN CASE WHEN p_winner IS NULL OR p_mb='dq' THEN 'void' WHEN p_winner=p_a AND p_mb='ko'  THEN 'won' ELSE 'lost' END
-    WHEN 'a_sub' THEN CASE WHEN p_winner IS NULL OR p_mb='dq' THEN 'void' WHEN p_winner=p_a AND p_mb='sub' THEN 'won' ELSE 'lost' END
-    WHEN 'a_dec' THEN CASE WHEN p_winner IS NULL OR p_mb='dq' THEN 'void' WHEN p_winner=p_a AND p_mb='dec' THEN 'won' ELSE 'lost' END
-    WHEN 'b_ko'  THEN CASE WHEN p_winner IS NULL OR p_mb='dq' THEN 'void' WHEN p_winner=p_b AND p_mb='ko'  THEN 'won' ELSE 'lost' END
-    WHEN 'b_sub' THEN CASE WHEN p_winner IS NULL OR p_mb='dq' THEN 'void' WHEN p_winner=p_b AND p_mb='sub' THEN 'won' ELSE 'lost' END
-    WHEN 'b_dec' THEN CASE WHEN p_winner IS NULL OR p_mb='dq' THEN 'void' WHEN p_winner=p_b AND p_mb='dec' THEN 'won' ELSE 'lost' END
-    WHEN 'o2_5'  THEN CASE WHEN p_went_distance THEN 'won' WHEN p_round IS NULL THEN 'void' WHEN p_round <= 2 THEN 'lost' ELSE 'won' END
-    WHEN 'u2_5'  THEN CASE WHEN p_went_distance THEN 'lost' WHEN p_round IS NULL THEN 'void' WHEN p_round <= 2 THEN 'won' ELSE 'lost' END
-    WHEN 'dist_yes' THEN CASE WHEN p_went_distance THEN 'won' ELSE 'lost' END
-    WHEN 'dist_no'  THEN CASE WHEN p_went_distance THEN 'lost' ELSE 'won' END
-    ELSE 'void'
-  END
-$$;
-`;
-
-// Settle-time achievement unlock for the sportsbook. The LMSR settle helpers
-// already fire tier promotion + a win notification per winning bet; the
-// fixed-odds / parlay path never did, so sportsbook wins only unlocked
-// achievements (and promoted tiers) on the user's NEXT page action. This helper
-// mirrors the win/balance conditions in src/lib/achievements.ts
-// (checkAndUnlockAchievements) so the unlock happens at settlement. KEEP IN
-// SYNC with that TS function. unlock_achievement is idempotent (no-op if the
-// user already holds it, or the slug doesn't exist), and itself awards the
-// reward, posts a notification, and re-checks tier.
-//
-// p_payout / p_new_balance are BIGINT: balances are bigint (Wave 58) and the
-// balance_*k thresholds compare against them, so an int4 param would overflow.
-// The old int4 signature is DROPped in main() before this runs (CREATE OR
-// REPLACE can't change a parameter's type — it would create a second overload).
-const UNLOCK_ACHIEVEMENTS_FN = `
 CREATE OR REPLACE FUNCTION public.unlock_betting_achievements(
   p_user_id uuid, p_payout bigint, p_odds real, p_is_parlay boolean, p_new_balance bigint
 ) RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
@@ -101,7 +30,6 @@ BEGIN
   IF p_odds >= 3.0 THEN PERFORM public.unlock_achievement(p_user_id, 'underdog_win'); END IF;
   IF p_new_balance >= 100000 THEN PERFORM public.unlock_achievement(p_user_id, 'balance_100k'); END IF;
   IF p_new_balance >= 50000  THEN PERFORM public.unlock_achievement(p_user_id, 'balance_50k'); END IF;
-  -- bet_10_wins: total settled wins across the LMSR market, fixed-odds and parlays.
   SELECT (SELECT count(*) FROM bet WHERE user_id = p_user_id AND payout > 0 AND resolved_at IS NOT NULL)
        + (SELECT count(*) FROM fixed_odds_bet WHERE user_id = p_user_id AND status = 'won')
        + (SELECT count(*) FROM parlay WHERE user_id = p_user_id AND status = 'won')
@@ -109,9 +37,7 @@ BEGIN
   IF v_total_wins >= 10 THEN PERFORM public.unlock_achievement(p_user_id, 'bet_10_wins'); END IF;
 END;
 $$;
-`;
 
-const SETTLE_BETS_FN = `
 CREATE OR REPLACE FUNCTION public.settle_fixed_odds_bets_for_bout(p_bout_id uuid)
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
@@ -144,8 +70,6 @@ BEGIN
         WHERE id=v_bet.user_id RETURNING balance_coins INTO v_new_balance;
       INSERT INTO transaction (user_id,type,amount,balance_after,description)
         VALUES (v_bet.user_id,'bet_won',v_bet.potential_payout,v_new_balance,'Sportsbook win on bout '||p_bout_id);
-      -- Mirror the LMSR settle side-effects the fixed-odds path was missing:
-      -- a win notification (with localizable params), tier promotion, unlock.
       INSERT INTO notification (user_id,type,title,body,link,params)
         VALUES (v_bet.user_id,'bet_settled',
                 'Bet won · +'||v_bet.potential_payout||' coins',
@@ -174,9 +98,7 @@ BEGIN
   END LOOP;
 END;
 $$;
-`;
 
-const SETTLE_PARLAY_FN = `
 CREATE OR REPLACE FUNCTION public.settle_parlay_legs_for_bout(p_bout_id uuid)
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
@@ -195,7 +117,6 @@ BEGIN
      AND v_bout.winner_id IS NULL AND v_mb NOT IN ('draw','nc') THEN RETURN; END IF;
   v_terminal_void := (v_bout.status='cancelled' OR v_bout.status='no_contest' OR v_mb='nc');
 
-  -- 1) grade this bout's open legs
   FOR v_leg IN
     SELECT id, selection_code FROM parlay_leg WHERE bout_id = p_bout_id AND status='open' FOR UPDATE
   LOOP
@@ -206,7 +127,6 @@ BEGIN
     UPDATE parlay_leg SET status = v_outcome::fixed_odds_bet_status, settled_at=NOW() WHERE id=v_leg.id;
   END LOOP;
 
-  -- 2) finalize each still-open parlay touching this bout
   FOR v_p IN
     SELECT p.id, p.stake_coins, p.user_id
     FROM parlay p
@@ -221,7 +141,6 @@ BEGIN
     FROM parlay_leg WHERE parlay_id = v_p.id;
 
     IF v_lost > 0 THEN
-      -- dead parlay → settle lost now (even if legs remain open)
       UPDATE parlay SET status='lost', payout=0, settled_at=NOW() WHERE id=v_p.id;
     ELSIF v_open = 0 THEN
       IF v_won = 0 THEN
@@ -247,8 +166,6 @@ BEGIN
           WHERE id=v_p.user_id RETURNING balance_coins INTO v_new_balance;
         INSERT INTO transaction (user_id,type,amount,balance_after,description)
           VALUES (v_p.user_id,'bet_won',v_payout,v_new_balance,'Parlay win');
-        -- Mirror the LMSR settle side-effects: win notification (localizable
-        -- params), tier promotion, achievement unlock (parlay_win / etc.).
         INSERT INTO notification (user_id,type,title,body,link,params)
           VALUES (v_p.user_id,'bet_settled',
                   'Parlay won · +'||v_payout||' coins',
@@ -263,51 +180,3 @@ BEGIN
   END LOOP;
 END;
 $$;
-`;
-
-const TRIGGER_FN = `
-CREATE OR REPLACE FUNCTION public.on_bout_settle_fixed_odds()
-RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
-BEGIN
-  IF NEW.status IN ('completed','no_contest','cancelled')
-     AND (OLD.status IS DISTINCT FROM NEW.status
-          OR OLD.winner_id IS DISTINCT FROM NEW.winner_id
-          OR OLD.method IS DISTINCT FROM NEW.method)
-  THEN
-    PERFORM public.settle_fixed_odds_bets_for_bout(NEW.id);
-    PERFORM public.settle_parlay_legs_for_bout(NEW.id);
-  END IF;
-  RETURN NEW;
-END;
-$$;
-`;
-
-async function main() {
-  await sql.unsafe(METHOD_BUCKET_FN);
-  await sql.unsafe(GRADE_FN);
-  // CREATE OR REPLACE can't change a parameter's type, so the old int4
-  // signature would linger as a second overload (ambiguous resolution). Drop
-  // it first; the callers below resolve to the bigint version (int upcasts).
-  await sql.unsafe(
-    `DROP FUNCTION IF EXISTS public.unlock_betting_achievements(uuid, int, real, boolean, int);`,
-  );
-  await sql.unsafe(UNLOCK_ACHIEVEMENTS_FN);
-  await sql.unsafe(SETTLE_BETS_FN);
-  await sql.unsafe(SETTLE_PARLAY_FN);
-  await sql.unsafe(TRIGGER_FN);
-  await sql.unsafe(`DROP TRIGGER IF EXISTS on_bout_settle_fixed_odds ON bout;`);
-  await sql.unsafe(`
-    CREATE TRIGGER on_bout_settle_fixed_odds
-      AFTER UPDATE OF status, winner_id, method ON bout
-      FOR EACH ROW EXECUTE FUNCTION public.on_bout_settle_fixed_odds();
-  `);
-  console.log(
-    "Installed grading helpers + unlock_betting_achievements (bigint) + settle_fixed_odds_bets_for_bout + settle_parlay_legs_for_bout + trigger.",
-  );
-  await sql.end();
-}
-
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});

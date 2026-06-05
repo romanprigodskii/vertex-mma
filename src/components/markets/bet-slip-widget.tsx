@@ -8,6 +8,7 @@ import { Share2, Ticket, X } from "lucide-react";
 import { placeParlayAction } from "@/app/[locale]/markets/actions";
 import { encodeSlip, useBetSlip } from "@/components/markets/bet-slip-context";
 import { Link } from "@/i18n/navigation";
+import { formatNumber } from "@/lib/format";
 import {
   MIN_PARLAY_LEGS,
   combineParlayOdds,
@@ -49,6 +50,31 @@ export function BetSlipWidget() {
   const payout = potentialPayout(parsedStake, combined);
   const enoughLegs = legs.length >= MIN_PARLAY_LEGS;
 
+  function translateError(code: string): string {
+    switch (code) {
+      case "NOT_SIGNED_IN":
+        return t("errNotSignedIn");
+      case "RATE_LIMITED":
+        return t("errRateLimited");
+      case "INVALID_AMOUNT":
+        return t("errInvalidAmount");
+      case "NOT_ENOUGH_COINS":
+        return t("notEnough");
+      case "PARLAY_LEG_COUNT":
+        return t("errParlayLegs");
+      case "PARLAY_DUP_BOUT":
+        return t("errParlayDup");
+      case "PARLAY_LEG_CLOSED":
+        return t("errParlayLegClosed");
+      case "PARLAY_NO_ODDS":
+        return t("errParlayNoOdds");
+      case "MARKET_NOT_OFFERED":
+        return t("errMarketNotOffered");
+      default:
+        return t("errGeneric");
+    }
+  }
+
   async function onShare() {
     const url = `${window.location.origin}/${locale}/markets?slip=${encodeURIComponent(
       encodeSlip(legs),
@@ -77,8 +103,10 @@ export function BetSlipWidget() {
     );
     setPending(false);
     if (res.error) {
-      if (/signed in/i.test(res.error)) setNeedAuth(true);
-      setError(res.error);
+      // Branch on the stable machine code, NOT the (now localized) message —
+      // regex-matching the human text broke the moment errors were localized.
+      if (res.error === "NOT_SIGNED_IN") setNeedAuth(true);
+      setError(translateError(res.error));
       return;
     }
     setPlaced({
@@ -94,9 +122,13 @@ export function BetSlipWidget() {
   if (legs.length === 0 && placed) {
     return (
       <div className="fixed bottom-4 right-4 z-50 w-[min(92vw,360px)] rounded-lg border border-foreground/15 bg-background-elevated/95 p-4 shadow-elevation-2 backdrop-blur">
-        <p className="font-sans text-sm text-streak-win">
+        <p
+          className="font-sans text-sm text-streak-win"
+          role="status"
+          aria-live="polite"
+        >
           {t("parlayPlaced", {
-            payout: placed.payout.toLocaleString(),
+            payout: formatNumber(placed.payout),
             odds: formatOdds(placed.odds),
           })}
         </p>
@@ -210,7 +242,10 @@ export function BetSlipWidget() {
                     {t("toWinLabel")}
                   </span>
                   <span className="font-display text-lg tabular text-foreground">
-                    {parsedStake > 0 ? payout.toLocaleString() : "—"}
+                    {/* Only show a concrete "to win" once the parlay is actually
+                        placeable (≥ MIN legs) — otherwise it implies a payout a
+                        1-leg slip can't collect. */}
+                    {enoughLegs && parsedStake > 0 ? formatNumber(payout) : "—"}
                   </span>
                 </div>
               </div>
@@ -227,6 +262,19 @@ export function BetSlipWidget() {
                     ? t("placeParlay")
                     : t("needMorePicks")}
               </button>
+
+              {/* Explain what's missing rather than relying on a greyed button. */}
+              {!pending && !needAuth && !error ? (
+                !enoughLegs ? (
+                  <p className="mt-2 font-sans text-[11px] text-foreground-subtle">
+                    {t("slipAddMore")}
+                  </p>
+                ) : parsedStake < 1 ? (
+                  <p className="mt-2 font-sans text-[11px] text-foreground-subtle">
+                    {t("hintEnterStake")}
+                  </p>
+                ) : null
+              ) : null}
 
               {needAuth ? (
                 <Link
