@@ -1,8 +1,10 @@
 import { getTranslations } from "next-intl/server";
+import { ChevronLeft } from "lucide-react";
 
 import { Container } from "@/components/layout/container";
 import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
+import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/navigation";
 
 export default async function RankingNotFound() {
@@ -11,22 +13,28 @@ export default async function RankingNotFound() {
     <>
       <Navbar />
       <main className="flex-1">
-        <Container size="sm" className="py-16 text-center">
-          <p className="font-mono text-xs uppercase tracking-widest text-foreground-subtle">
-            {t("code")}
+        <Container
+          size="xl"
+          className="flex flex-col items-center justify-center gap-6 py-24 text-center md:py-32"
+        >
+          <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-foreground-subtle">
+            {t("rankingKicker")}
           </p>
-          <h1 className="mt-2 font-display text-3xl uppercase tracking-tight text-foreground">
+          <h1
+            className="font-display uppercase tracking-tight text-foreground leading-[0.9]"
+            style={{ fontSize: "clamp(48px, 7vw, 96px)" }}
+          >
             {t("rankingTitle")}
           </h1>
-          <p className="mt-4 font-sans text-sm text-foreground-muted">
+          <p className="max-w-md font-sans text-sm text-foreground-muted">
             {t("rankingLead")}
           </p>
-          <Link
-            href="/rankings"
-            className="mt-6 inline-flex rounded-sm border border-foreground/15 px-4 py-2 font-sans text-sm text-foreground-muted hover:bg-foreground/[0.05] hover:text-foreground"
-          >
-            {t("backToRankings")}
-          </Link>
+          <Button asChild variant="outline" size="sm">
+            <Link href="/rankings">
+              <ChevronLeft className="h-4 w-4" />
+              {t("backToRankings")}
+            </Link>
+          </Button>
         </Container>
       </main>
       <Footer />

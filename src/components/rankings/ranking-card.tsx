@@ -1,4 +1,4 @@
-import { getLocale } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 
 import { Link } from "@/i18n/navigation";
 
@@ -10,6 +10,7 @@ interface Props {
 
 export async function RankingCard({ ranking }: Props) {
   const locale = await getLocale();
+  const t = await getTranslations("rankings");
   const date = new Date(ranking.created_at);
   const dateLabel = date.toLocaleDateString(locale === "ru" ? "ru-RU" : "en-US", {
     month: "short",
@@ -32,9 +33,11 @@ export async function RankingCard({ ranking }: Props) {
         </p>
       ) : null}
       <div className="mt-3 flex items-center justify-between gap-2 font-mono text-[11px] tabular text-foreground-subtle">
-        <span className="truncate">by @{ranking.author_username}</span>
+        <span className="truncate">
+          {t("by")} @{ranking.author_username}
+        </span>
         <span className="shrink-0">
-          {ranking.entry_count} fighter{ranking.entry_count === 1 ? "" : "s"}
+          {t("fighterCount", { count: ranking.entry_count })}
           {" · "}
           {dateLabel}
         </span>

@@ -10,12 +10,24 @@ import {
   searchFightersForPicker,
   updateRankingAction,
 } from "@/app/[locale]/rankings/actions";
+import {
+  RANKING_LIMITS,
+  RankingError,
+} from "@/app/[locale]/rankings/ranking-constants";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useRouter } from "@/i18n/navigation";
 
 const INPUT_CLASS =
   "rounded-sm border border-foreground/15 bg-background-elevated/30 px-3 py-2 font-sans text-sm text-foreground focus:border-primary focus:outline-none";
 
-const MAX_ENTRIES = 25;
+const { TITLE_MIN, TITLE_MAX, DESC_MAX, NOTE_MAX, MAX_ENTRIES } = RANKING_LIMITS;
 
 export interface RankingFormEntry {
   fighter_id: string;
@@ -34,6 +46,21 @@ interface Props {
   initialEntries?: RankingFormEntry[];
 }
 
+/** Subtle live character counter; turns to the loss colour near the limit. */
+function CharCount({ value, max }: { value: number; max: number }) {
+  const near = value >= max * 0.8;
+  return (
+    <span
+      className={`font-mono text-[10px] tabular normal-case tracking-normal ${
+        near ? "text-streak-loss" : "text-foreground-subtle"
+      }`}
+      aria-hidden
+    >
+      {value}/{max}
+    </span>
+  );
+}
+
 export function RankingForm({
   mode,
   rankingId,
@@ -50,6 +77,38 @@ export function RankingForm({
     React.useState<RankingFormEntry[]>(initialEntries);
   const [pending, setPending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = React.useState(false);
+
+  // Map a stable server error code to a localized message so a RU user never
+  // sees an English sentence (unknown codes fall back to a generic message).
+  function errorMessage(code: string): string {
+    switch (code) {
+      case RankingError.NOT_SIGNED_IN:
+        return t("errorNotSignedIn");
+      case RankingError.RANKING_NOT_FOUND:
+        return t("errorRankingNotFound");
+      case RankingError.NOT_OWNER:
+        return t("errorNotOwner");
+      case RankingError.TITLE_LENGTH:
+        return t("errorTitleLength", { min: TITLE_MIN, max: TITLE_MAX });
+      case RankingError.DESCRIPTION_LENGTH:
+        return t("errorDescriptionLength", { max: DESC_MAX });
+      case RankingError.NO_FIGHTERS:
+        return t("errorNoFighters");
+      case RankingError.TOO_MANY_FIGHTERS:
+        return t("errorTooManyFighters", { max: MAX_ENTRIES });
+      case RankingError.DUPLICATE_FIGHTER:
+        return t("errorDuplicateFighter");
+      case RankingError.NOTE_LENGTH:
+        return t("errorNoteLength", { max: NOTE_MAX });
+      case RankingError.INVALID_FIGHTER:
+        return t("errorInvalidFighter");
+      case RankingError.FIGHTER_MISSING:
+        return t("errorFighterMissing");
+      default:
+        return t("errorGeneric");
+    }
+  }
 
   function addEntry(f: PickerFighter) {
     setEntries((curr) => {
@@ -119,7 +178,7 @@ export function RankingForm({
     setPending(false);
 
     if (res?.error) {
-      setError(res.error);
+      setError(errorMessage(res.error));
       return;
     }
 
@@ -133,55 +192,53 @@ export function RankingForm({
     router.refresh();
   }
 
-  async function onDelete() {
+  async function performDelete() {
     if (!rankingId) return;
-    if (
-      typeof window !== "undefined" &&
-      !window.confirm(t("deleteConfirm"))
-    ) {
-      return;
-    }
+    setConfirmingDelete(false);
     setPending(true);
     setError(null);
     const res = await deleteRankingAction(rankingId);
     setPending(false);
     if (res?.error) {
-      setError(res.error);
+      setError(errorMessage(res.error));
       return;
     }
     router.push("/rankings");
     router.refresh();
   }
 
-  const submitDisabled =
-    pending || entries.length === 0 || title.trim().length < 3;
+  const titleTooShort = title.trim().length < TITLE_MIN;
+  const noEntries = entries.length === 0;
+  const submitDisabled = pending || noEntries || titleTooShort;
 
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-6">
       <label className="flex flex-col gap-1.5">
-        <span className="font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
-          {t("titleLabel")}
+        <span className="flex items-center justify-between gap-2 font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
+          <span>{t("titleLabel")}</span>
+          <CharCount value={title.length} max={TITLE_MAX} />
         </span>
         <input
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           required
-          minLength={3}
-          maxLength={100}
+          minLength={TITLE_MIN}
+          maxLength={TITLE_MAX}
           className={INPUT_CLASS}
           placeholder={t("titlePlaceholder")}
         />
       </label>
 
       <label className="flex flex-col gap-1.5">
-        <span className="font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
-          {t("descriptionLabel")}
+        <span className="flex items-center justify-between gap-2 font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
+          <span>{t("descriptionLabel")}</span>
+          <CharCount value={description.length} max={DESC_MAX} />
         </span>
         <textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          maxLength={500}
+          maxLength={DESC_MAX}
           rows={3}
           className={`${INPUT_CLASS} resize-y`}
           placeholder={t("descriptionPlaceholder")}
@@ -246,9 +303,14 @@ export function RankingForm({
                         updateNote(e.fighter_id, evt.target.value)
                       }
                       placeholder={t("notePlaceholder")}
-                      maxLength={200}
+                      maxLength={NOTE_MAX}
                       className="mt-2 w-full rounded-sm border border-foreground/10 bg-background-elevated/20 px-2 py-1 font-sans text-xs text-foreground focus:border-primary focus:outline-none"
                     />
+                    {e.note.length > NOTE_MAX * 0.75 ? (
+                      <span className="mt-1 flex justify-end">
+                        <CharCount value={e.note.length} max={NOTE_MAX} />
+                      </span>
+                    ) : null}
                   </div>
                   <div className="flex shrink-0 flex-col gap-1">
                     <button
@@ -291,29 +353,63 @@ export function RankingForm({
         </p>
       ) : null}
 
-      <div className="flex flex-wrap items-center gap-3">
-        <button
-          type="submit"
-          disabled={submitDisabled}
-          className="rounded-sm bg-primary px-4 py-2.5 font-display text-sm uppercase tracking-widest text-background-base hover:opacity-90 disabled:opacity-50"
-        >
-          {pending
-            ? t("saving")
-            : mode === "create"
-              ? t("publish")
-              : t("saveChanges")}
-        </button>
-        {mode === "edit" ? (
+      <div className="flex flex-col gap-2">
+        <div className="flex flex-wrap items-center gap-3">
           <button
-            type="button"
-            onClick={onDelete}
-            disabled={pending}
-            className="rounded-sm border border-streak-loss/30 px-4 py-2 font-sans text-sm text-streak-loss hover:bg-streak-loss/10 disabled:opacity-50"
+            type="submit"
+            disabled={submitDisabled}
+            className="rounded-sm bg-primary px-4 py-2.5 font-display text-sm uppercase tracking-widest text-background-base hover:opacity-90 disabled:opacity-50"
           >
-            {t("deleteRanking")}
+            {pending
+              ? t("saving")
+              : mode === "create"
+                ? t("publish")
+                : t("saveChanges")}
           </button>
+          {mode === "edit" ? (
+            <button
+              type="button"
+              onClick={() => setConfirmingDelete(true)}
+              disabled={pending}
+              className="rounded-sm border border-streak-loss/30 px-4 py-2 font-sans text-sm text-streak-loss hover:bg-streak-loss/10 disabled:opacity-50"
+            >
+              {t("deleteRanking")}
+            </button>
+          ) : null}
+        </div>
+        {!pending && (noEntries || titleTooShort) ? (
+          <p className="font-sans text-xs text-foreground-subtle">
+            {t("publishHint", { min: TITLE_MIN })}
+          </p>
         ) : null}
       </div>
+
+      <Dialog open={confirmingDelete} onOpenChange={setConfirmingDelete}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="font-display uppercase tracking-tight">
+              {t("deleteRanking")}
+            </DialogTitle>
+            <DialogDescription>{t("deleteConfirm")}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <button
+              type="button"
+              onClick={() => setConfirmingDelete(false)}
+              className="rounded-sm border border-foreground/15 px-4 py-2 font-sans text-sm text-foreground-muted hover:bg-foreground/[0.05]"
+            >
+              {t("cancel")}
+            </button>
+            <button
+              type="button"
+              onClick={performDelete}
+              className="rounded-sm bg-streak-loss px-4 py-2 font-sans text-sm text-background-base hover:opacity-90"
+            >
+              {t("confirmDelete")}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </form>
   );
 }
@@ -332,6 +428,10 @@ function FighterPickerInline({
   const tWeight = useTranslations("weight");
   const [query, setQuery] = React.useState("");
   const [results, setResults] = React.useState<PickerFighter[]>([]);
+  // Trimmed query that `results` actually correspond to, so the "no results"
+  // message only shows after a completed search for the current query (not
+  // during the debounce window, which would flash it on every keystroke).
+  const [resultsQuery, setResultsQuery] = React.useState("");
   const [pending, setPending] = React.useState(false);
   const queryRef = React.useRef(query);
   queryRef.current = query;
@@ -347,7 +447,10 @@ function FighterPickerInline({
       try {
         const r = await searchFightersForPicker(snapshot);
         // If the input changed while we were waiting, drop the stale results.
-        if (queryRef.current === snapshot) setResults(r);
+        if (queryRef.current === snapshot) {
+          setResults(r);
+          setResultsQuery(snapshot.trim());
+        }
       } finally {
         if (queryRef.current === snapshot) setPending(false);
       }
@@ -357,6 +460,16 @@ function FighterPickerInline({
 
   const excludedSet = new Set(excludedIds);
   const visible = results.filter((r) => !excludedSet.has(r.id));
+  const trimmedQuery = query.trim();
+  // A search has settled for the CURRENT query — used to avoid flashing an
+  // empty-state during the 200ms debounce window before results arrive.
+  const searchSettled =
+    !pending && trimmedQuery !== "" && resultsQuery === trimmedQuery;
+  const showNoResults = searchSettled && results.length === 0;
+  // Matches existed but every one is already in the ranking — distinct from a
+  // genuine zero-match search so the copy isn't misleading.
+  const showAllAdded =
+    searchSettled && results.length > 0 && visible.length === 0;
 
   return (
     <div className="rounded-md border border-foreground/10 bg-background-elevated/30 p-3">
@@ -375,6 +488,14 @@ function FighterPickerInline({
       {pending ? (
         <p className="mt-2 font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
           {tSearch("searching")}
+        </p>
+      ) : showNoResults ? (
+        <p className="mt-2 font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
+          {t("noFightersFound")}
+        </p>
+      ) : showAllAdded ? (
+        <p className="mt-2 font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
+          {t("allFightersAdded")}
         </p>
       ) : null}
       {visible.length > 0 ? (

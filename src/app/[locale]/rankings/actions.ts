@@ -14,15 +14,13 @@ import { userProfile } from "@/lib/db/schema/users";
 import { searchFighters } from "@/lib/fighter-search";
 import { createClient } from "@/lib/supabase/server";
 
+import { RANKING_LIMITS, RankingError } from "./ranking-constants";
+
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-const TITLE_MIN = 3;
-const TITLE_MAX = 100;
-const DESC_MAX = 500;
-const NOTE_MAX = 200;
-const MIN_ENTRIES = 1;
-const MAX_ENTRIES = 25;
+const { TITLE_MIN, TITLE_MAX, DESC_MAX, NOTE_MAX, MIN_ENTRIES, MAX_ENTRIES } =
+  RANKING_LIMITS;
 
 type EntryInput = {
   fighter_id: string;
@@ -39,7 +37,11 @@ function parseEntries(raw: string): EntryInput[] | null {
         typeof e === "object" &&
         e !== null &&
         typeof (e as { fighter_id: unknown }).fighter_id === "string" &&
-        typeof (e as { position: unknown }).position === "number",
+        typeof (e as { position: unknown }).position === "number" &&
+        // Honor the `note?: string | null` contract: a non-string note (crafted
+        // payload) would otherwise reach e.note.trim() and throw a raw 500.
+        ((e as { note?: unknown }).note == null ||
+          typeof (e as { note: unknown }).note === "string"),
     );
   } catch {
     return null;
@@ -75,6 +77,10 @@ export async function searchFightersForPicker(
   const results = await searchFighters(query, 8);
   return results.map((r) => ({
     id: r.id,
+    // `r.name_en` is already locale-resolved: searchFighters aliases
+    // localizedNameSql(...) AS name_en, so this carries the Russian name on the
+    // RU site (falling back to English when name_ru is null). Saved entries and
+    // the public view re-resolve the same way via getRankingById.
     name: r.name_en,
     nickname: r.nickname,
     photo_thumbnail_url: r.photo_thumbnail_url,
@@ -86,18 +92,18 @@ function validateEntries(
   entries: EntryInput[] | null,
 ): { error: string } | { entries: EntryInput[] } {
   if (!entries || entries.length < MIN_ENTRIES) {
-    return { error: `Add at least ${MIN_ENTRIES} fighter.` };
+    return { error: RankingError.NO_FIGHTERS };
   }
   if (entries.length > MAX_ENTRIES) {
-    return { error: `Max ${MAX_ENTRIES} entries per ranking.` };
+    return { error: RankingError.TOO_MANY_FIGHTERS };
   }
   const ids = new Set(entries.map((e) => e.fighter_id));
   if (ids.size !== entries.length) {
-    return { error: "Same fighter cannot appear twice." };
+    return { error: RankingError.DUPLICATE_FIGHTER };
   }
   for (const e of entries) {
     if (e.note && e.note.length > NOTE_MAX) {
-      return { error: `Notes must be under ${NOTE_MAX} chars each.` };
+      return { error: RankingError.NOTE_LENGTH };
     }
   }
   // Server normalizes positions to 1..N regardless of client input order.
@@ -118,14 +124,14 @@ async function verifyFighters(
   ids: string[],
 ): Promise<{ error: string } | null> {
   if (ids.some((id) => !UUID_RE.test(id))) {
-    return { error: "Invalid fighter selection." };
+    return { error: RankingError.INVALID_FIGHTER };
   }
   const found = await db
     .select({ id: fighter.id })
     .from(fighter)
     .where(inArray(fighter.id, ids));
   if (found.length !== ids.length) {
-    return { error: "One or more selected fighters no longer exist." };
+    return { error: RankingError.FIGHTER_MISSING };
   }
   return null;
 }
@@ -134,17 +140,17 @@ export async function createRankingAction(
   formData: FormData,
 ): Promise<{ error?: string; rankingId?: string; newlyUnlocked?: string[] }> {
   const myId = await getMyProfileId();
-  if (!myId) return { error: "Not signed in." };
+  if (!myId) return { error: RankingError.NOT_SIGNED_IN };
 
   const title = String(formData.get("title") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
   const entriesRaw = String(formData.get("entries") ?? "");
 
   if (title.length < TITLE_MIN || title.length > TITLE_MAX) {
-    return { error: `Title must be ${TITLE_MIN}–${TITLE_MAX} chars.` };
+    return { error: RankingError.TITLE_LENGTH };
   }
   if (description.length > DESC_MAX) {
-    return { error: `Description must be under ${DESC_MAX} chars.` };
+    return { error: RankingError.DESCRIPTION_LENGTH };
   }
 
   const validated = validateEntries(parseEntries(entriesRaw));
@@ -186,25 +192,25 @@ export async function updateRankingAction(
   formData: FormData,
 ): Promise<{ error?: string }> {
   const myId = await getMyProfileId();
-  if (!myId) return { error: "Not signed in." };
+  if (!myId) return { error: RankingError.NOT_SIGNED_IN };
 
   const existing = await db
     .select({ id: customRanking.id, userId: customRanking.userId })
     .from(customRanking)
     .where(eq(customRanking.id, rankingId))
     .limit(1);
-  if (existing.length === 0) return { error: "Ranking not found." };
-  if (existing[0].userId !== myId) return { error: "Not your ranking." };
+  if (existing.length === 0) return { error: RankingError.RANKING_NOT_FOUND };
+  if (existing[0].userId !== myId) return { error: RankingError.NOT_OWNER };
 
   const title = String(formData.get("title") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
   const entriesRaw = String(formData.get("entries") ?? "");
 
   if (title.length < TITLE_MIN || title.length > TITLE_MAX) {
-    return { error: `Title must be ${TITLE_MIN}–${TITLE_MAX} chars.` };
+    return { error: RankingError.TITLE_LENGTH };
   }
   if (description.length > DESC_MAX) {
-    return { error: `Description must be under ${DESC_MAX} chars.` };
+    return { error: RankingError.DESCRIPTION_LENGTH };
   }
 
   const validated = validateEntries(parseEntries(entriesRaw));
@@ -248,15 +254,15 @@ export async function deleteRankingAction(
   rankingId: string,
 ): Promise<{ error?: string; success?: boolean }> {
   const myId = await getMyProfileId();
-  if (!myId) return { error: "Not signed in." };
+  if (!myId) return { error: RankingError.NOT_SIGNED_IN };
 
   const existing = await db
     .select({ id: customRanking.id, userId: customRanking.userId })
     .from(customRanking)
     .where(eq(customRanking.id, rankingId))
     .limit(1);
-  if (existing.length === 0) return { error: "Ranking not found." };
-  if (existing[0].userId !== myId) return { error: "Not your ranking." };
+  if (existing.length === 0) return { error: RankingError.RANKING_NOT_FOUND };
+  if (existing[0].userId !== myId) return { error: RankingError.NOT_OWNER };
 
   // FK cascade drops custom_ranking_entry rows.
   await db.delete(customRanking).where(eq(customRanking.id, rankingId));
