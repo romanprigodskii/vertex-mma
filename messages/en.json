@@ -1518,7 +1518,21 @@
     "scoreModeAllTime": "All-time",
     "vertexLabel": "Vertex",
     "componentLabel": "Component",
-    "yourPick": "Your pick"
+    "yourPick": "Your pick",
+    "comparing": "Comparing…",
+    "loadingComparison": "Loading comparison…",
+    "srLeads": "leads",
+    "srTied": "tied",
+    "resultWin": "Win",
+    "resultLoss": "Loss",
+    "resultDraw": "Draw",
+    "resultNoContest": "No contest",
+    "cellAria": "{result} vs {opp}, {date}",
+    "streakWins": "{n, plural, one {# win} other {# wins}}",
+    "streakLosses": "{n, plural, one {# loss} other {# losses}}",
+    "breakdownPartial": "{name} doesn't have enough UFC bouts for a component breakdown.",
+    "interimChampionShort": "{division} · Interim",
+    "interimChampionAria": "Interim {division} champion"
   },
   "sportsbook": {
     "title": "Vertex Sportsbook",

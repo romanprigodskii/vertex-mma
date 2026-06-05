@@ -150,21 +150,25 @@ function FighterIdentity({ fighter, champion, align }: IdentityProps) {
       {champion ? (
         <span
           className="inline-flex items-center gap-1.5 rounded-md border border-primary/45 bg-primary/15 px-2 py-1 font-sans text-[11px] uppercase tracking-[0.2em] text-primary backdrop-blur-sm"
-          aria-label={t("championAria", { division: champion.division })}
+          aria-label={
+            champion.isInterim
+              ? t("interimChampionAria", { division: champion.division })
+              : t("championAria", { division: champion.division })
+          }
         >
           <Trophy className="h-3 w-3" aria-hidden />
           {champion.isInterim
-            ? t("interimChampion")
+            ? t("interimChampionShort", { division: champion.divisionShort })
             : t("champion", { division: champion.divisionShort })}
         </span>
       ) : null}
 
       <h2
-        className="font-display uppercase leading-[0.85] tracking-tight text-foreground"
+        className="max-w-full overflow-hidden break-words hyphens-auto font-display uppercase leading-[0.85] tracking-tight text-foreground"
         style={{ fontSize: "clamp(40px, 6.5vw, 88px)" }}
       >
-        <span className="block">{first}</span>
-        {rest ? <span className="block">{rest}</span> : null}
+        <span className="block break-words">{first}</span>
+        {rest ? <span className="block break-words">{rest}</span> : null}
       </h2>
 
       {fighter.nickname ? (
@@ -208,7 +212,7 @@ function FighterIdentity({ fighter, champion, align }: IdentityProps) {
       <Link
         href={`/fighters/${fighter.slug}`}
         prefetch={false}
-        className="mt-2 inline-flex items-center gap-1.5 font-sans text-sm uppercase tracking-widest text-foreground-muted transition-colors hover:text-primary"
+        className="mt-2 inline-flex items-center gap-1.5 font-sans text-sm uppercase tracking-widest text-foreground transition-colors hover:text-primary"
       >
         {isLeft ? (
           <>
@@ -304,15 +308,22 @@ function MobileBanner({
         style={{ textShadow: TEXT_SHADOW }}
       >
         {champion ? (
-          <span className="inline-flex items-center gap-1 rounded-md border border-primary/45 bg-primary/15 px-1.5 py-0.5 font-sans text-[9px] uppercase tracking-[0.2em] text-primary backdrop-blur-sm">
+          <span
+            className="inline-flex items-center gap-1 rounded-md border border-primary/45 bg-primary/15 px-1.5 py-0.5 font-sans text-[9px] uppercase tracking-[0.2em] text-primary backdrop-blur-sm"
+            aria-label={
+              champion.isInterim
+                ? t("interimChampionAria", { division: champion.division })
+                : t("championAria", { division: champion.division })
+            }
+          >
             <Trophy className="h-2.5 w-2.5" aria-hidden />
             {champion.isInterim
-              ? t("interimChampion")
+              ? t("interimChampionShort", { division: champion.divisionShort })
               : t("champion", { division: champion.divisionShort })}
           </span>
         ) : null}
         <p
-          className="font-display uppercase leading-[0.9] tracking-tight text-foreground"
+          className="max-w-full break-words hyphens-auto font-display uppercase leading-[0.9] tracking-tight text-foreground"
           style={{ fontSize: 30 }}
         >
           {fighter.name_en}

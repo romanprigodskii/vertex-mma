@@ -49,6 +49,14 @@ export function ScoreCompare({
   const rowCount = Math.max(rowsA.length, rowsB.length);
   const labelA = lastName(fighterAName);
   const labelB = lastName(fighterBName);
+  // When exactly one fighter has a breakdown, the other's whole column is a
+  // run of em-dashes. Name the fighter who lacks the data so the asymmetry
+  // reads as "not enough bouts" rather than a glitch.
+  const missingName = !breakdownA
+    ? fighterAName
+    : !breakdownB
+      ? fighterBName
+      : null;
 
   return (
     <div className="mt-4 space-y-6">
@@ -186,6 +194,12 @@ export function ScoreCompare({
           </tbody>
         </table>
       </div>
+
+      {missingName ? (
+        <p className="text-center font-sans text-xs text-foreground-subtle">
+          {t("breakdownPartial", { name: missingName })}
+        </p>
+      ) : null}
     </div>
   );
 }

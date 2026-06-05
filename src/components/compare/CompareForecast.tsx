@@ -43,6 +43,10 @@ export function CompareForecast({
   const aFav = probA >= probB;
   const favName = aFav ? fighterAName : fighterBName;
   const favPct = Math.max(pctA, pctB);
+  // When it's "too close to call" the headline says neither is favoured, so the
+  // bar must not paint one side gold — keep both halves neutral to match.
+  const highlightA = !even && aFav;
+  const highlightB = !even && !aFav;
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-5">
@@ -67,7 +71,7 @@ export function CompareForecast({
           <div
             className={cn(
               "flex items-center justify-start px-2 font-mono text-[11px] tabular transition-[width]",
-              aFav ? "bg-primary text-background-base" : "bg-foreground/15 text-foreground",
+              highlightA ? "bg-primary text-background-base" : "bg-foreground/15 text-foreground",
             )}
             style={{ width: `${pctA}%` }}
           >
@@ -76,7 +80,7 @@ export function CompareForecast({
           <div
             className={cn(
               "flex items-center justify-end px-2 font-mono text-[11px] tabular transition-[width]",
-              !aFav ? "bg-primary text-background-base" : "bg-foreground/15 text-foreground",
+              highlightB ? "bg-primary text-background-base" : "bg-foreground/15 text-foreground",
             )}
             style={{ width: `${pctB}%` }}
           >

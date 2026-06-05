@@ -109,7 +109,7 @@ export default async function ComparePage({ params, searchParams }: PageProps) {
               <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground-subtle">
                 {t("kicker")}
               </p>
-              <h1 className="mt-3 font-display uppercase tracking-tight text-foreground text-hero">
+              <h1 className="mt-3 font-display uppercase tracking-tight text-foreground text-h1">
                 {t("heading")}
               </h1>
               <p className="mt-4 max-w-xl font-sans text-sm text-foreground-muted">

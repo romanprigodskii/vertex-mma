@@ -1518,7 +1518,21 @@
     "scoreModeAllTime": "За всё время",
     "vertexLabel": "Vertex",
     "componentLabel": "Компонент",
-    "yourPick": "Твой выбор"
+    "yourPick": "Твой выбор",
+    "comparing": "Сравниваем…",
+    "loadingComparison": "Загрузка сравнения…",
+    "srLeads": "лидирует",
+    "srTied": "поровну",
+    "resultWin": "Победа",
+    "resultLoss": "Поражение",
+    "resultDraw": "Ничья",
+    "resultNoContest": "Без результата",
+    "cellAria": "{result} — {opp}, {date}",
+    "streakWins": "{n, plural, one {# победа} few {# победы} many {# побед} other {# побед}}",
+    "streakLosses": "{n, plural, one {# поражение} few {# поражения} many {# поражений} other {# поражений}}",
+    "breakdownPartial": "{name}: недостаточно боёв в UFC для покомпонентного разбора.",
+    "interimChampionShort": "{division} · Врем.",
+    "interimChampionAria": "Временный чемпион {division}"
   },
   "sportsbook": {
     "title": "Vertex Букмекер",

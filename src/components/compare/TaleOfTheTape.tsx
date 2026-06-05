@@ -56,8 +56,14 @@ export function TaleOfTheTape({
       return { value: "—", note: null };
     }
     const statusKey = f.status ? STATUS_KEY[f.status] : null;
+    // Localized, pluralized phrase ("5 wins" / "3 losses") instead of the raw
+    // English enum letter "W5"/"L3", which RU users couldn't read.
+    const value =
+      f.current_streak_type === "W"
+        ? t("streakWins", { n: f.current_streak_count })
+        : t("streakLosses", { n: f.current_streak_count });
     return {
-      value: `${f.current_streak_type}${f.current_streak_count}`,
+      value,
       note: statusKey ? tCatalog(statusKey as "statusActive") : null,
     };
   }

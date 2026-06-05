@@ -1,3 +1,4 @@
+import { useTranslations } from "next-intl";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -100,10 +101,17 @@ export function StatCompareRow({
   noteA,
   noteB,
 }: StatCompareRowProps) {
+  const t = useTranslations("compare");
   const leader = decideLeader(valueA, valueB, higherIsBetter);
   const aWon = leader === "a";
   const bWon = leader === "b";
   const tie = leader === "tie";
+  // The leading value is otherwise conveyed only by color + an aria-hidden
+  // arrow. Add an sr-only marker so the comparison's whole point — who leads —
+  // is announced, e.g. "185 cm, leads". The tie marker rides on the A cell so
+  // it's read once, not on both values.
+  const markA = aWon ? t("srLeads") : tie ? t("srTied") : null;
+  const markB = bWon ? t("srLeads") : null;
 
   return (
     <div className="border-b border-foreground/[0.06] py-4 last:border-b-0 sm:py-5">
@@ -120,6 +128,7 @@ export function StatCompareRow({
             )}
           >
             <span>{format(valueA, fmt, decimals, unit)}</span>
+            {markA ? <span className="sr-only">, {markA}</span> : null}
             {noteA ? (
               <p className="font-sans text-[10px] uppercase tracking-widest text-foreground-subtle">
                 {noteA}
@@ -136,6 +145,7 @@ export function StatCompareRow({
             )}
           >
             <span>{format(valueB, fmt, decimals, unit)}</span>
+            {markB ? <span className="sr-only">, {markB}</span> : null}
             {noteB ? (
               <p className="font-sans text-[10px] uppercase tracking-widest text-foreground-subtle">
                 {noteB}
@@ -154,6 +164,7 @@ export function StatCompareRow({
           )}
         >
           <span>{format(valueA, fmt, decimals, unit)}</span>
+          {markA ? <span className="sr-only">, {markA}</span> : null}
           {noteA ? (
             <p className="font-sans text-[11px] uppercase tracking-widest text-foreground-subtle">
               {noteA}
@@ -194,6 +205,7 @@ export function StatCompareRow({
           )}
         >
           <span>{format(valueB, fmt, decimals, unit)}</span>
+          {markB ? <span className="sr-only">, {markB}</span> : null}
           {noteB ? (
             <p className="font-sans text-[11px] uppercase tracking-widest text-foreground-subtle">
               {noteB}
