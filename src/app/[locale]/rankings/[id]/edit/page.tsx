@@ -47,7 +47,7 @@ export default async function EditRankingPage({ params }: PageProps) {
       <Navbar />
       <main className="flex-1">
         <div className="border-b border-foreground/[0.06]">
-          <Container size="xl" className="py-3">
+          <Container size="lg" className="py-3">
             <Link
               href={`/rankings/${ranking.id}`}
               className="inline-flex items-center gap-1.5 font-sans text-sm text-foreground-muted hover:text-primary"
@@ -62,7 +62,7 @@ export default async function EditRankingPage({ params }: PageProps) {
             <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground-subtle">
               {t("editHeading")}
             </p>
-            <h1 className="mt-2 font-display text-3xl uppercase tracking-tight text-foreground sm:text-4xl">
+            <h1 className="mt-2 line-clamp-2 break-words font-display text-3xl uppercase tracking-tight text-foreground sm:text-4xl">
               {ranking.title}
             </h1>
           </header>
