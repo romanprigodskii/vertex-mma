@@ -18,7 +18,8 @@
     "switchToDark": "Switch to dark",
     "switchToEnglish": "Switch to English",
     "switchToRussian": "Перейти на русский",
-    "brandHome": "Vertex MMA — home"
+    "brandHome": "Vertex MMA — home",
+    "skipToContent": "Skip to content"
   },
   "userMenu": {
     "profile": "Profile",
@@ -1074,44 +1075,125 @@
     "aboutTitle": "About",
     "aboutBody": "Vertex MMA is a community platform for UFC fight discussion, custom rankings, and virtual coin betting. The Vertex Score is a 0–100 measure combining quality wins, championship pedigree, recent form, finishing rate, and defensive vulnerability across every UFC fighter with three or more bouts.",
     "aboutSections": [
-      { "heading": "What the Vertex Score is", "body": "The Vertex Score rates each fighter from 0 to 100 from their UFC results — weighting quality wins, championship pedigree, recent form, finishing rate, activity and defensive vulnerability. Active fighters are shown on a current/divisional basis; retired fighters on an all-time basis." },
-      { "heading": "Where our data comes from", "body": "Fighter, event and bout data is compiled from publicly available UFC statistics. The news feed aggregates headlines from public RSS sources, which we automatically classify and rephrase. Model picks and simulations are our own estimates and can be wrong." },
-      { "heading": "Virtual currency", "body": "Coins are a free, in-app score for entertainment. They have no monetary value, can't be bought, sold, or cashed out, and don't represent real-money betting." }
+      {
+        "heading": "What the Vertex Score is",
+        "body": "The Vertex Score rates each fighter from 0 to 100 from their UFC results — weighting quality wins, championship pedigree, recent form, finishing rate, activity and defensive vulnerability. Active fighters are shown on a current/divisional basis; retired fighters on an all-time basis."
+      },
+      {
+        "heading": "Where our data comes from",
+        "body": "Fighter, event and bout data is compiled from publicly available UFC statistics. The news feed aggregates headlines from public RSS sources, which we automatically classify and rephrase. Model picks and simulations are our own estimates and can be wrong."
+      },
+      {
+        "heading": "Virtual currency",
+        "body": "Coins are a free, in-app score for entertainment. They have no monetary value, can't be bought, sold, or cashed out, and don't represent real-money betting."
+      }
     ],
     "privacyTitle": "Privacy",
     "privacyLead": "This policy explains what Vertex MMA collects, why, and the choices you have. We keep it short and collect as little as we can.",
     "privacySections": [
-      { "heading": "Data we collect", "body": "• Account: your email and a securely hashed password, handled by our authentication provider.\n• Profile: username, display name, and any optional bio, country and avatar you add.\n• Activity: your bets, parlays, custom rankings, fight cards, comments and coin transaction history.\n• Technical: a sign-in session cookie, your language and theme preferences, and basic server logs." },
-      { "heading": "How we use it", "body": "To run your account, place and settle virtual bets, compute leaderboards, tiers and achievements, display the content you create, and keep the platform secure. We do not sell your data or use it for third-party advertising." },
-      { "heading": "Cookies", "body": "We use a sign-in session cookie (needed to stay logged in) and small preference cookies for language and theme. We do not use third-party advertising or cross-site tracking cookies." },
-      { "heading": "Service providers", "body": "• Supabase provides our database, authentication and file storage, and delivers account emails such as password resets.\n• Our news pipeline reads public RSS feeds and uses a large-language-model service to classify and rephrase headlines; no personal user data is sent to it.\n• The app runs on our own server infrastructure." },
-      { "heading": "Retention and your rights", "body": "We keep your data while your account is active. You can edit your profile in Settings and delete your account at any time from Settings, which removes your profile and associated data. You can also request access or correction by email." },
-      { "heading": "Children", "body": "Vertex MMA is not directed at children and is intended for users who are 18 or older (or the age of majority where they live)." },
-      { "heading": "Changes", "body": "We may update this policy; material changes will be reflected by the date above." }
+      {
+        "heading": "Data we collect",
+        "body": "• Account: your email and a securely hashed password, handled by our authentication provider.\n• Profile: username, display name, and any optional bio, country and avatar you add.\n• Activity: your bets, parlays, custom rankings, fight cards, comments and coin transaction history.\n• Technical: a sign-in session cookie, your language and theme preferences, and basic server logs."
+      },
+      {
+        "heading": "How we use it",
+        "body": "To run your account, place and settle virtual bets, compute leaderboards, tiers and achievements, display the content you create, and keep the platform secure. We do not sell your data or use it for third-party advertising."
+      },
+      {
+        "heading": "Cookies",
+        "body": "We use a sign-in session cookie (needed to stay logged in) and small preference cookies for language and theme. We do not use third-party advertising or cross-site tracking cookies."
+      },
+      {
+        "heading": "Service providers",
+        "body": "• Supabase provides our database, authentication and file storage, and delivers account emails such as password resets.\n• Our news pipeline reads public RSS feeds and uses a large-language-model service to classify and rephrase headlines; no personal user data is sent to it.\n• The app runs on our own server infrastructure."
+      },
+      {
+        "heading": "Retention and your rights",
+        "body": "We keep your data while your account is active. You can edit your profile in Settings and delete your account at any time from Settings, which removes your profile and associated data. You can also request access or correction by email."
+      },
+      {
+        "heading": "Children",
+        "body": "Vertex MMA is not directed at children and is intended for users who are 18 or older (or the age of majority where they live)."
+      },
+      {
+        "heading": "Changes",
+        "body": "We may update this policy; material changes will be reflected by the date above."
+      }
     ],
     "termsTitle": "Terms",
     "termsLead": "By using Vertex MMA you agree to these terms. Please read them — especially the virtual-currency and no-warranty sections.",
     "termsSections": [
-      { "heading": "Your account", "body": "You are responsible for activity on your account and for keeping your credentials safe. Provide accurate information and do not impersonate others." },
-      { "heading": "Virtual currency", "body": "Coins are a free, in-app feature for entertainment only. They have NO monetary value, cannot be purchased, sold, transferred, or redeemed for real money or prizes, and are not gambling. We may adjust, reset, or remove balances to correct errors or abuse." },
-      { "heading": "Acceptable use", "body": "Do not post unlawful, hateful, harassing, or spam content; do not abuse, scrape, or attack the service; do not attempt to manipulate leaderboards, markets, or bonuses. We may remove content or suspend accounts that break these rules." },
-      { "heading": "Your content", "body": "You keep ownership of the rankings, fight cards, comments and other content you create, and grant us a licence to display it within the platform. You are responsible for what you post." },
-      { "heading": "No warranty", "body": "The Vertex Score, model picks and simulations are informational estimates — not predictions or betting advice — and may be inaccurate or out of date. The service is provided \"as is\", without warranties." },
-      { "heading": "Liability", "body": "To the extent permitted by law, Vertex MMA is not liable for indirect or incidental damages arising from your use of the service." },
-      { "heading": "Changes", "body": "We may update these terms; continued use after a change means you accept it." }
+      {
+        "heading": "Your account",
+        "body": "You are responsible for activity on your account and for keeping your credentials safe. Provide accurate information and do not impersonate others."
+      },
+      {
+        "heading": "Virtual currency",
+        "body": "Coins are a free, in-app feature for entertainment only. They have NO monetary value, cannot be purchased, sold, transferred, or redeemed for real money or prizes, and are not gambling. We may adjust, reset, or remove balances to correct errors or abuse."
+      },
+      {
+        "heading": "Acceptable use",
+        "body": "Do not post unlawful, hateful, harassing, or spam content; do not abuse, scrape, or attack the service; do not attempt to manipulate leaderboards, markets, or bonuses. We may remove content or suspend accounts that break these rules."
+      },
+      {
+        "heading": "Your content",
+        "body": "You keep ownership of the rankings, fight cards, comments and other content you create, and grant us a licence to display it within the platform. You are responsible for what you post."
+      },
+      {
+        "heading": "No warranty",
+        "body": "The Vertex Score, model picks and simulations are informational estimates — not predictions or betting advice — and may be inaccurate or out of date. The service is provided \"as is\", without warranties."
+      },
+      {
+        "heading": "Liability",
+        "body": "To the extent permitted by law, Vertex MMA is not liable for indirect or incidental damages arising from your use of the service."
+      },
+      {
+        "heading": "Changes",
+        "body": "We may update these terms; continued use after a change means you accept it."
+      }
     ]
   },
   "achievements": {
-    "first_bet": { "name": "First Bet", "description": "Placed your first bet on a market." },
-    "bet_10_wins": { "name": "Streak of Ten", "description": "Won 10 bets — paid out at least 10 separate winning markets." },
-    "first_ranking": { "name": "Listmaker", "description": "Published your first custom ranking." },
-    "profile_complete": { "name": "Fully Suited", "description": "Set display name, bio, country, and avatar." },
-    "daily_streak_7": { "name": "Week One", "description": "Claimed daily bonus 7 days in a row." },
-    "balance_50k": { "name": "Half-Mil Club", "description": "Hold 50,000+ coins in balance." },
-    "balance_100k": { "name": "Six-Figure Roller", "description": "Hold 100,000+ coins in balance." },
-    "big_win": { "name": "Big Hit", "description": "Win a single bet paying out 5,000+ coins." },
-    "parlay_win": { "name": "Parlay Hit", "description": "Won a parlay — every leg landed." },
-    "underdog_win": { "name": "Upset Special", "description": "Won a sportsbook bet at 3.00+ odds." }
+    "first_bet": {
+      "name": "First Bet",
+      "description": "Placed your first bet on a market."
+    },
+    "bet_10_wins": {
+      "name": "Streak of Ten",
+      "description": "Won 10 bets — paid out at least 10 separate winning markets."
+    },
+    "first_ranking": {
+      "name": "Listmaker",
+      "description": "Published your first custom ranking."
+    },
+    "profile_complete": {
+      "name": "Fully Suited",
+      "description": "Set display name, bio, country, and avatar."
+    },
+    "daily_streak_7": {
+      "name": "Week One",
+      "description": "Claimed daily bonus 7 days in a row."
+    },
+    "balance_50k": {
+      "name": "Half-Mil Club",
+      "description": "Hold 50,000+ coins in balance."
+    },
+    "balance_100k": {
+      "name": "Six-Figure Roller",
+      "description": "Hold 100,000+ coins in balance."
+    },
+    "big_win": {
+      "name": "Big Hit",
+      "description": "Win a single bet paying out 5,000+ coins."
+    },
+    "parlay_win": {
+      "name": "Parlay Hit",
+      "description": "Won a parlay — every leg landed."
+    },
+    "underdog_win": {
+      "name": "Upset Special",
+      "description": "Won a sportsbook bet at 3.00+ odds."
+    }
   },
   "transactions": {
     "metaTitle": "Coin activity",
@@ -1572,7 +1654,8 @@
     "footerBrand": "Vertex search",
     "trigger": "Find",
     "triggerAria": "Find a fighter",
-    "resultsFound": "{n, plural, one {# fighter found} other {# fighters found}}"
+    "resultsFound": "{n, plural, one {# fighter found} other {# fighters found}}",
+    "unavailable": "Search is unavailable. Please try again."
   },
   "method": {
     "ko": "KO",

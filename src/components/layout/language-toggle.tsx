@@ -1,6 +1,6 @@
 "use client";
 
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { Languages } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 
@@ -14,12 +14,16 @@ import { cn } from "@/lib/utils";
  *  shows the language you'll switch TO. */
 export function LanguageToggle({ className }: { className?: string }) {
   const locale = useLocale();
+  const t = useTranslations("nav");
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
   const other = locale === "ru" ? "en" : "ru";
   const otherLabel = other === "ru" ? "RU" : "EN";
+  // Mirror the mobile drawer (mobile-nav): the label names the language you'll
+  // switch TO, localized in the *current* locale's voice.
+  const switchLabel = other === "ru" ? t("switchToRussian") : t("switchToEnglish");
 
   return (
     <button
@@ -32,8 +36,8 @@ export function LanguageToggle({ className }: { className?: string }) {
           locale: other as (typeof routing.locales)[number],
         });
       }}
-      aria-label={`Switch language to ${otherLabel}`}
-      title={`Switch language to ${otherLabel}`}
+      aria-label={switchLabel}
+      title={switchLabel}
       className={cn(
         "inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-foreground/20 bg-background-elevated px-2.5 font-mono text-[11px] uppercase tracking-widest text-foreground-muted transition-colors hover:border-foreground/40 hover:bg-foreground/[0.04] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
         className,
