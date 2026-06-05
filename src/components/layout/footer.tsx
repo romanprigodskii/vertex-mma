@@ -13,7 +13,6 @@ type FooterTKey =
   | "myBets"
   | "simulation"
   | "community"
-  | "predictions"
   | "rankings"
   | "leaderboard"
   | "about"
@@ -43,7 +42,6 @@ const COLUMNS: Array<{
   {
     titleKey: "community",
     links: [
-      { href: "/predictions", labelKey: "predictions" },
       { href: "/rankings", labelKey: "rankings" },
       { href: "/leaderboard", labelKey: "leaderboard" },
     ],

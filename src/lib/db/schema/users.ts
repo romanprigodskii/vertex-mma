@@ -32,7 +32,6 @@ export const userProfile = pgTable(
     totalCoinsEarned: integer("total_coins_earned").default(10000).notNull(),
     totalCoinsLost: integer("total_coins_lost").default(0).notNull(),
 
-    predictionCount: integer("prediction_count").default(0).notNull(),
     betCount: integer("bet_count").default(0).notNull(),
     currentStreak: integer("current_streak").default(0).notNull(),
     bestStreak: integer("best_streak").default(0).notNull(),

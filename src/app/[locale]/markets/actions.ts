@@ -29,6 +29,21 @@ const MIN_COINS_PER_BET = 1;
 // CHECK(balance_coins >= 0) constraint + FOR UPDATE lock cap the rest.
 const MAX_COINS_PER_BET = 1_000_000;
 
+/**
+ * Unlock achievements as a POST-COMMIT, best-effort side effect. The bet (or
+ * parlay) is already durably committed by the time we get here, so a failure
+ * unlocking achievements must NEVER bubble up as a bet error: the user would
+ * see {error} on a bet that actually went through, assume it failed, and re-bet
+ * — an accidental double bet. We swallow and let the next user action catch up.
+ */
+async function unlockAchievementsBestEffort(profileId: string): Promise<string[]> {
+  try {
+    return await checkAndUnlockAchievements(profileId);
+  } catch {
+    return [];
+  }
+}
+
 export async function placeBetAction(
   marketId: string,
   outcomeId: string,
@@ -63,8 +78,9 @@ export async function placeBetAction(
   if (!profile) return { error: "Profile not found." };
   if (profile.balance < coinsInt) return { error: "Not enough coins." };
 
+  let result: { sharesBought: number; coinsSpent: number };
   try {
-    const result = await db.transaction(async (tx) => {
+    result = await db.transaction(async (tx) => {
       // Lock the market row first so concurrent bets on the same market
       // serialise behind us.
       const marketLockRows = await tx.execute<{
@@ -208,20 +224,21 @@ export async function placeBetAction(
 
       return { sharesBought, coinsSpent: actualCost };
     });
-
-    // After the bet posts, first_bet / balance thresholds may unlock.
-    // Settlement-time achievements (bet_10_wins, big_win) fire on payout,
-    // not at placement — those need a separate hook in Wave 41+.
-    const newlyUnlocked = await checkAndUnlockAchievements(profile.id);
-
-    revalidatePath(`/markets/${marketId}`);
-    revalidatePath("/markets");
-    revalidatePath("/me/bets");
-    return { ...result, newlyUnlocked };
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Bet failed.";
     return { error: msg };
   }
+
+  // Post-commit, best-effort: the bet is already committed. first_bet /
+  // balance thresholds may unlock here, but a failure must NOT surface as a
+  // bet error (the user would assume it failed and re-bet → accidental double
+  // bet). Settlement-time achievements (bet_10_wins, big_win) fire on payout,
+  // not at placement — those need a separate hook in Wave 41+.
+  const newlyUnlocked = await unlockAchievementsBestEffort(profile.id);
+  revalidatePath(`/markets/${marketId}`);
+  revalidatePath("/markets");
+  revalidatePath("/me/bets");
+  return { ...result, newlyUnlocked };
 }
 
 /**
@@ -433,7 +450,9 @@ export async function placeFixedOddsBetAction(
     return { error: err instanceof Error ? err.message : "Bet failed." };
   }
 
-  const newlyUnlocked = await checkAndUnlockAchievements(profile.id);
+  // Post-commit, best-effort (see unlockAchievementsBestEffort): the bet is
+  // committed; an achievement failure must not throw and read as a failed bet.
+  const newlyUnlocked = await unlockAchievementsBestEffort(profile.id);
   revalidatePath(`/bouts/${boutId}`);
   revalidatePath("/me/bets");
   return { decimalOdds, potentialPayout: payout, newlyUnlocked };
@@ -646,7 +665,9 @@ export async function placeParlayAction(
     return { error: err instanceof Error ? err.message : "Parlay failed." };
   }
 
-  const newlyUnlocked = await checkAndUnlockAchievements(profile.id);
+  // Post-commit, best-effort (see unlockAchievementsBestEffort): the parlay is
+  // committed; an achievement failure must not throw and read as a failed bet.
+  const newlyUnlocked = await unlockAchievementsBestEffort(profile.id);
   revalidatePath("/me/bets");
   return {
     parlayId: createdParlayId ?? undefined,

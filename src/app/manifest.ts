@@ -12,7 +12,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "Vertex MMA",
     short_name: "Vertex",
     description:
-      "AI-powered MMA fight simulator, UFC rankings, predictions and a virtual sportsbook.",
+      "AI-powered MMA fight simulator, UFC rankings and a virtual sportsbook.",
     start_url: "/",
     display: "standalone",
     background_color: "#0a0b0e",

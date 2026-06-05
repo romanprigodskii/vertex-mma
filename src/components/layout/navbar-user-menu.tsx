@@ -4,7 +4,6 @@ import * as React from "react";
 import { useTranslations } from "next-intl";
 import {
   Coins,
-  ListChecks,
   LogOut,
   Settings as SettingsIcon,
   ShieldCheck,
@@ -86,14 +85,6 @@ export function NavbarUserMenu({ user }: { user: CurrentUser }) {
           >
             <Coins className="h-4 w-4" />
             {t("myBets")}
-          </Link>
-          <Link
-            href="/me/predictions"
-            onClick={() => setOpen(false)}
-            className="flex items-center gap-2 rounded-sm px-2 py-1.5 font-sans text-sm text-foreground hover:bg-foreground/[0.05]"
-          >
-            <ListChecks className="h-4 w-4" />
-            {t("myPredictions")}
           </Link>
           <Link
             href="/settings"

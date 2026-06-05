@@ -11,7 +11,6 @@ import { cn } from "@/lib/utils";
 
 const TYPE_ICON: Record<string, string> = {
   bet_settled: "💰",
-  prediction_scored: "🎯",
   achievement_unlocked: "⭐",
   system: "📢",
 };

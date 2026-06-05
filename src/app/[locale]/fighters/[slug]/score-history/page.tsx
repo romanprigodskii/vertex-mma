@@ -34,9 +34,8 @@ export async function generateMetadata({
 }: PageProps): Promise<Metadata> {
   const { slug, locale } = await params;
   const t = await getTranslations({ locale, namespace: "scoreHistory" });
-  const tPred = await getTranslations({ locale, namespace: "predictions" });
   const fighter = await getFighterBySlug(slug);
-  if (!fighter) return { title: tPred("scoreHistoryNotFound") };
+  if (!fighter) return { title: t("scoreHistoryNotFound") };
   const { mode: rawMode } = await searchParams;
   const mode = resolveMode(rawMode);
   const label = mode === "current" ? t("labelCurrent") : t("labelAllTime");

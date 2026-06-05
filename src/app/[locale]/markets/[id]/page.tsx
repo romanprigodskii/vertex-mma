@@ -75,8 +75,9 @@ export default async function MarketDetailPage({ params }: PageProps) {
   const closed =
     market.status !== "open" ||
     new Date(market.closes_at).getTime() <= Date.now();
-  // Cold-start markets sit at the uniform LMSR default; flag so we frame the
-  // shown price as an untraded "opening line" rather than a real consensus.
+  // Cold-start markets sit at the uniform LMSR default. Gate the entire odds
+  // grid on this so we never render placeholder prices (6.00/2.00); an "odds
+  // coming soon" notice shows until an odds-sync or a real trade moves them.
   const hasOdds = marketHasOdds(market.outcomes, market.total_volume);
 
   return (
@@ -148,12 +149,6 @@ export default async function MarketDetailPage({ params }: PageProps) {
                 : `${market.fighter_a_name} vs ${market.fighter_b_name} · ${market.question}`}
           </p>
 
-          {!hasOdds && !closed ? (
-            <p className="mt-6 rounded-md border border-foreground/15 bg-foreground/[0.03] px-4 py-3 text-center font-sans text-xs text-foreground-muted">
-              {t("openingLineBanner")}
-            </p>
-          ) : null}
-
           {!closed ? (
             <Link
               href={`/bouts/${market.bout_id}`}
@@ -164,7 +159,14 @@ export default async function MarketDetailPage({ params }: PageProps) {
             </Link>
           ) : null}
 
-          {market.type === "method" ? (
+          {!hasOdds ? (
+            // Cold-start market still sitting at the uniform LMSR default —
+            // never print the 6.00/2.00 placeholder odds (mirrors the card and
+            // the accordion). Real prices appear after an odds-sync or a trade.
+            <p className="mt-8 rounded-md border border-foreground/10 bg-background-elevated/30 px-4 py-6 text-center font-sans text-sm text-foreground-muted">
+              {t("oddsComingSoon")}
+            </p>
+          ) : market.type === "method" ? (
             <div className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-2">
               <FighterOutcomesPanel
                 fighterName={market.fighter_a_name}

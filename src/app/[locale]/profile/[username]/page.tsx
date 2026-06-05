@@ -170,8 +170,7 @@ export default async function PublicProfilePage({ params }: PageProps) {
             </div>
           </div>
 
-          <dl className="mt-10 grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <Stat label={t("predictions")} value={profile.predictionCount} />
+          <dl className="mt-10 grid grid-cols-2 gap-4 sm:grid-cols-3">
             <Stat label={t("bets")} value={profile.betCount} />
             <Stat label={t("currentStreak")} value={profile.currentStreak} />
             <Stat label={t("bestStreak")} value={profile.bestStreak} />

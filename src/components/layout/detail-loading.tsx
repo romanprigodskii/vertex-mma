@@ -4,7 +4,7 @@ import { Navbar } from "@/components/layout/navbar";
 
 /**
  * Generic skeleton for dynamic detail routes (bout, market, news, ranking,
- * card, parlay, prediction). Keeps the nav + footer chrome and a pulsing
+ * card, parlay). Keeps the nav + footer chrome and a pulsing
  * placeholder so navigation to a share-critical page never flashes blank.
  */
 export function DetailLoading() {

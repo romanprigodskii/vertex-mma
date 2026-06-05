@@ -15,7 +15,6 @@ export type CurrentUser = {
   countryCode: string | null;
   balanceCoins: number;
   tier: string;
-  predictionCount: number;
   betCount: number;
   currentStreak: number;
   bestStreak: number;
@@ -58,7 +57,6 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
       countryCode: userProfile.countryCode,
       balanceCoins: userProfile.balanceCoins,
       tier: userProfile.tier,
-      predictionCount: userProfile.predictionCount,
       betCount: userProfile.betCount,
       currentStreak: userProfile.currentStreak,
       bestStreak: userProfile.bestStreak,
@@ -83,7 +81,6 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
     countryCode: row.countryCode,
     balanceCoins: row.balanceCoins,
     tier: row.tier,
-    predictionCount: row.predictionCount,
     betCount: row.betCount,
     currentStreak: row.currentStreak,
     bestStreak: row.bestStreak,
@@ -110,7 +107,6 @@ export type PublicProfile = {
   countryCode: string | null;
   tier: string;
   totalCoinsEarned: number;
-  predictionCount: number;
   betCount: number;
   currentStreak: number;
   bestStreak: number;
@@ -131,7 +127,6 @@ export async function getUserProfileByUsername(
       countryCode: userProfile.countryCode,
       tier: userProfile.tier,
       totalCoinsEarned: userProfile.totalCoinsEarned,
-      predictionCount: userProfile.predictionCount,
       betCount: userProfile.betCount,
       currentStreak: userProfile.currentStreak,
       bestStreak: userProfile.bestStreak,
