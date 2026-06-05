@@ -49,22 +49,29 @@ export function install(): void {
 
   const originalLookup = dns.lookup;
 
+  // Widened to match the real dns.lookup callback contract: with
+  // `options.all` the address is a LookupAddress[], otherwise a string.
+  type Cb = (
+    err: NodeJS.ErrnoException | null,
+    address: string | LookupAddress[],
+    family?: number,
+  ) => void;
+
   function patched(
     host: string,
-    optionsOrCb: number | LookupOptions | ((err: NodeJS.ErrnoException | null, address: string | LookupAddress[], family?: number) => void),
+    optionsOrCb: number | LookupOptions | Cb,
     cb?: (err: NodeJS.ErrnoException | null, address: string, family: number) => void,
   ): void {
-    type Cb = (err: NodeJS.ErrnoException | null, address: string, family: number) => void;
     let options: LookupOptions = {};
     let callback: Cb;
     if (typeof optionsOrCb === "function") {
-      callback = optionsOrCb as Cb;
+      callback = optionsOrCb;
     } else {
       options =
         typeof optionsOrCb === "number"
           ? { family: optionsOrCb }
           : optionsOrCb;
-      callback = cb as Cb;
+      callback = cb as unknown as Cb;
     }
 
     // Use the original lookup first. Only fall through if it fails with a
@@ -88,7 +95,13 @@ export function install(): void {
           return;
         }
         fallbackLookup(host).then(
-          (ip) => callback(null, ip, 4),
+          // Honor the caller's `options.all` contract: with all:true dns.lookup
+          // must call back with an address array, not a bare string. The
+          // c-ares fallback only resolves A records, so family is always 4.
+          (ip) =>
+            options.all
+              ? callback(null, [{ address: ip, family: 4 }])
+              : callback(null, ip, 4),
           () => callback(err, address, family),
         );
       },

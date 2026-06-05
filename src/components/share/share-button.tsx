@@ -5,6 +5,8 @@ import { useTranslations } from "next-intl";
 import * as Popover from "@radix-ui/react-popover";
 import { Check, Copy, Download, Share2 } from "lucide-react";
 
+import { useMounted } from "@/hooks/use-mounted";
+
 interface ShareButtonProps {
   /** Path or absolute URL to share. Resolved to absolute via window.location.origin. */
   url: string;
@@ -29,9 +31,25 @@ export function ShareButton({
   variant = "primary",
 }: ShareButtonProps) {
   const t = useTranslations("share");
+  const mounted = useMounted();
   const effectiveLabel = label ?? t("share");
   const [copied, setCopied] = React.useState(false);
   const [downloading, setDownloading] = React.useState(false);
+  // Surfaced in an aria-live region so copy/save/share outcomes are both
+  // visible and announced to screen readers — previously failures were a
+  // silent console.error and "Copied!" was a visual-only swap. The `nonce`
+  // bumps on every announce so the live region re-fires even when the same
+  // message repeats (e.g. copying twice) — screen readers drop unchanged text.
+  const seq = React.useRef(0);
+  const [feedback, setFeedback] = React.useState<{
+    tone: "success" | "error";
+    text: string;
+    nonce: number;
+  } | null>(null);
+  function announce(tone: "success" | "error", text: string) {
+    seq.current += 1;
+    setFeedback({ tone, text, nonce: seq.current });
+  }
 
   // Resolve to absolute URLs on first client render — the server-rendered
   // useMemo would just get the relative input back, which is fine for
@@ -48,13 +66,22 @@ export function ShareButton({
       : `${window.location.origin}${ogImageUrl}`;
   }, [ogImageUrl]);
 
+  // The native share sheet (mobile / some desktops) only exists in secure
+  // contexts. Gate on `mounted` so SSR and the first client render match — the
+  // native option only appears after hydration.
+  const canNativeShare =
+    mounted &&
+    typeof navigator !== "undefined" &&
+    typeof navigator.share === "function";
+
   async function onCopy() {
     try {
       await navigator.clipboard.writeText(absoluteUrl);
       setCopied(true);
+      announce("success", t("copied"));
       setTimeout(() => setCopied(false), 1500);
     } catch {
-      // Older / locked-down browsers — silently no-op rather than throw.
+      announce("error", t("copyFailed"));
     }
   }
 
@@ -72,10 +99,24 @@ export function ShareButton({
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(blobUrl);
+      announce("success", t("imageSaved"));
     } catch (err) {
       console.error("save image failed", err);
+      announce("error", t("saveFailed"));
     } finally {
       setDownloading(false);
+    }
+  }
+
+  async function onNativeShare() {
+    try {
+      await navigator.share({ title, url: absoluteUrl });
+    } catch (err) {
+      // Dismissing the native sheet rejects with AbortError — not a real
+      // failure, so don't surface it.
+      if ((err as Error)?.name !== "AbortError") {
+        announce("error", t("shareFailed"));
+      }
     }
   }
 
@@ -87,7 +128,17 @@ export function ShareButton({
   )}&text=${encodeURIComponent(title)}`;
 
   return (
-    <Popover.Root>
+    <Popover.Root
+      onOpenChange={(open) => {
+        // Reset transient state each time the popover closes so a reopen
+        // starts clean (and the live region re-announces fresh outcomes).
+        if (!open) {
+          setFeedback(null);
+          setCopied(false);
+          setDownloading(false);
+        }
+      }}
+    >
       <Popover.Trigger asChild>
         {variant === "icon" ? (
           <button
@@ -114,6 +165,19 @@ export function ShareButton({
           sideOffset={8}
           className="z-50 w-64 rounded-md border border-foreground/10 bg-background-elevated p-1 shadow-lg"
         >
+          {canNativeShare ? (
+            <>
+              <button
+                type="button"
+                onClick={onNativeShare}
+                className="flex w-full items-center gap-3 rounded-sm px-3 py-2 text-left font-sans text-sm text-foreground hover:bg-foreground/[0.05]"
+              >
+                <Share2 className="h-4 w-4 text-foreground-muted" />
+                <span>{t("nativeShare")}</span>
+              </button>
+              <hr className="my-1 border-foreground/10" />
+            </>
+          ) : null}
           <button
             type="button"
             onClick={onCopy}
@@ -158,6 +222,20 @@ export function ShareButton({
             </span>
             <span>{t("shareToTelegram")}</span>
           </a>
+          <div role="status" aria-live="polite" aria-atomic="true">
+            {feedback ? (
+              <p
+                key={feedback.nonce}
+                className={`mt-1 border-t border-foreground/10 px-3 pb-1 pt-2 font-sans text-xs ${
+                  feedback.tone === "error"
+                    ? "text-streak-loss"
+                    : "text-streak-win"
+                }`}
+              >
+                {feedback.text}
+              </p>
+            ) : null}
+          </div>
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>

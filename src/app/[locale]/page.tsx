@@ -150,21 +150,16 @@ export default async function HomePage({
               >
                 {t("browseFighters")}
               </Link>
-              {user ? (
-                <Link
-                  href="/markets"
-                  className="rounded-sm border border-foreground/15 px-5 py-2.5 font-display text-sm uppercase tracking-widest text-foreground hover:bg-foreground/[0.05]"
-                >
-                  {t("openMarkets")}
-                </Link>
-              ) : (
-                <Link
-                  href="/signup"
-                  className="rounded-sm border border-foreground/15 px-5 py-2.5 font-display text-sm uppercase tracking-widest text-foreground hover:bg-foreground/[0.05]"
-                >
-                  {t("createAccount")}
-                </Link>
-              )}
+              {/* /markets is public (force-dynamic, no auth gate), and this page
+                  shows a markets section + "All markets →" link just below — so
+                  surface "Open markets" to everyone. Anonymous visitors still get
+                  a dedicated signup CTA in the section at the bottom. */}
+              <Link
+                href="/markets"
+                className="rounded-sm border border-foreground/15 px-5 py-2.5 font-display text-sm uppercase tracking-widest text-foreground hover:bg-foreground/[0.05]"
+              >
+                {t("openMarkets")}
+              </Link>
             </div>
           </Container>
         </section>
@@ -220,14 +215,19 @@ export default async function HomePage({
                           {weightLabel(f.division)}
                         </p>
                       </div>
-                      <div className="shrink-0 text-right">
-                        <p className="font-display text-2xl tabular text-foreground">
-                          {f.score ?? "—"}
-                        </p>
-                        <p className="font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
-                          {tCommon("vertex")}
-                        </p>
-                      </div>
+                      {/* The query filters out null scores, so this is purely
+                          defensive — but if it ever fires, hide the whole block
+                          rather than render a giant "—" over the VERTEX caption. */}
+                      {f.score != null ? (
+                        <div className="shrink-0 text-right">
+                          <p className="font-display text-2xl tabular text-foreground">
+                            {f.score}
+                          </p>
+                          <p className="font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
+                            {tCommon("vertex")}
+                          </p>
+                        </div>
+                      ) : null}
                     </Link>
                   </li>
                 ))}
@@ -250,21 +250,25 @@ export default async function HomePage({
               </Link>
             </div>
             {topMarkets.length === 0 ? (
-              hasAnyMarkets ? (
+              <>
+                {/* User-facing copy for everyone — whether markets exist without a
+                    line yet or there are none at all. The CLI hint is an internal
+                    instruction, so only surface it in development. */}
                 <p className="font-sans text-sm text-foreground-muted">
                   {t("noLiveMarketsYet")}
                 </p>
-              ) : (
-                <p className="font-sans text-sm text-foreground-muted">
-                  {t.rich("noMarketsHint", {
-                    cmd: () => (
-                      <code className="rounded-sm bg-foreground/[0.05] px-1 py-0.5 font-mono text-xs">
-                        pnpm markets:generate
-                      </code>
-                    ),
-                  })}
-                </p>
-              )
+                {!hasAnyMarkets && process.env.NODE_ENV !== "production" ? (
+                  <p className="mt-2 font-sans text-xs text-foreground-subtle">
+                    {t.rich("noMarketsHint", {
+                      cmd: (chunks) => (
+                        <code className="rounded-sm bg-foreground/[0.05] px-1 py-0.5 font-mono text-xs">
+                          {chunks}
+                        </code>
+                      ),
+                    })}
+                  </p>
+                ) : null}
+              </>
             ) : (
               <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {topMarkets.map((m) => (
