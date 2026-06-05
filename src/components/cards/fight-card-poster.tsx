@@ -62,6 +62,10 @@ export function FightCardPoster({
 
   const headliner = bouts.find((b) => b.isMain) ?? bouts[0] ?? null;
   const undercard = bouts.filter((b) => b !== headliner);
+  // Only stamp the "MAIN EVENT" badge when the builder explicitly flagged a
+  // bout. Otherwise the first bout is shown as a plain headliner — never
+  // crowned with a label the user didn't choose.
+  const hasExplicitMain = bouts.some((b) => b.isMain);
 
   return (
     <div
@@ -79,7 +83,7 @@ export function FightCardPoster({
         </p>
         <h2
           className={cn(
-            "mt-3 uppercase leading-[0.95] tracking-tight text-foreground",
+            "mt-3 uppercase leading-[0.95] tracking-tight text-foreground line-clamp-3 break-words [text-wrap:balance]",
             font.className,
           )}
           style={{ fontSize: "clamp(28px, 4.6vw, 52px)" }}
@@ -95,7 +99,7 @@ export function FightCardPoster({
 
         {headliner ? (
           <div className="mt-8">
-            <PosterHeadliner bout={headliner} />
+            <PosterHeadliner bout={headliner} showMainBadge={hasExplicitMain} />
           </div>
         ) : (
           <p className="mt-8 font-sans text-sm text-foreground-subtle">
@@ -117,7 +121,13 @@ export function FightCardPoster({
   );
 }
 
-function PosterHeadliner({ bout }: { bout: PosterDisplayBout }) {
+function PosterHeadliner({
+  bout,
+  showMainBadge,
+}: {
+  bout: PosterDisplayBout;
+  showMainBadge: boolean;
+}) {
   const t = useTranslations("cards");
   const weightLabel = useWeightLabel();
   return (
@@ -130,9 +140,11 @@ function PosterHeadliner({ bout }: { bout: PosterDisplayBout }) {
       }}
     >
       <div className="flex items-center justify-center gap-2">
-        <span className="rounded-sm bg-[var(--card-accent)] px-2 py-0.5 font-mono text-[10px] font-medium uppercase tracking-widest text-background-base">
-          {t("mainEvent")}
-        </span>
+        {showMainBadge ? (
+          <span className="rounded-sm bg-[var(--card-accent)] px-2 py-0.5 font-mono text-[10px] font-medium uppercase tracking-widest text-background-base">
+            {t("mainEvent")}
+          </span>
+        ) : null}
         <span className="font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
           {weightLabel(bout.weightClass)}
         </span>
@@ -171,7 +183,7 @@ function PosterFighterColumn({
   }
 
   const nameNode = (
-    <span className="font-display text-base uppercase leading-tight tracking-tight text-foreground sm:text-xl">
+    <span className="font-display text-base uppercase leading-tight tracking-tight text-foreground line-clamp-2 break-words [text-wrap:balance] sm:text-xl">
       {fighter.name}
     </span>
   );

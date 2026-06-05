@@ -104,28 +104,31 @@ function parseBouts(raw: string): FightCardBout[] | null {
   }
 }
 
+// Server actions return stable, machine-readable error codes (never English
+// prose). The client maps each code to a localized message — see
+// `actionErrorMessage` in fight-card-form.tsx. Keep these in sync.
 function validateBouts(
   bouts: FightCardBout[] | null,
 ): { error: string } | { bouts: FightCardBout[] } {
   if (!bouts || bouts.length < MIN_BOUTS) {
-    return { error: `Add at least ${MIN_BOUTS} bout.` };
+    return { error: "NO_BOUTS" };
   }
   if (bouts.length > MAX_BOUTS) {
-    return { error: `Max ${MAX_BOUTS} bouts per card.` };
+    return { error: "TOO_MANY_BOUTS" };
   }
   for (const b of bouts) {
     if (!UUID_RE.test(b.fighterAId) || !UUID_RE.test(b.fighterBId)) {
-      return { error: "Every bout needs two fighters." };
+      return { error: "BOUT_NEEDS_FIGHTERS" };
     }
     if (b.fighterAId === b.fighterBId) {
-      return { error: "A fighter can't be booked against themselves." };
+      return { error: "FIGHTER_VS_SELF" };
     }
     if (!WEIGHT_SET.has(b.weightClass)) {
-      return { error: "Each bout needs a valid weight class." };
+      return { error: "INVALID_WEIGHT_CLASS" };
     }
   }
   if (bouts.filter((b) => b.isMain).length > 1) {
-    return { error: "Only one bout can be the main event." };
+    return { error: "TOO_MANY_MAIN_EVENTS" };
   }
   // Normalize `order` to 0..N-1 in array order.
   return { bouts: bouts.map((b, i) => ({ ...b, order: i })) };
@@ -148,10 +151,10 @@ function readCardForm(
   const subtitle = String(formData.get("subtitle") ?? "").trim();
 
   if (title.length < TITLE_MIN || title.length > TITLE_MAX) {
-    return { error: `Title must be ${TITLE_MIN}–${TITLE_MAX} characters.` };
+    return { error: "INVALID_TITLE" };
   }
   if (subtitle.length > SUBTITLE_MAX) {
-    return { error: `Subtitle must be under ${SUBTITLE_MAX} characters.` };
+    return { error: "INVALID_SUBTITLE" };
   }
 
   const validated = validateBouts(
@@ -203,7 +206,7 @@ export async function createFightCardAction(
   formData: FormData,
 ): Promise<{ error?: string; slug?: string }> {
   const myId = await getMyProfileId();
-  if (!myId) return { error: "Not signed in." };
+  if (!myId) return { error: "NOT_SIGNED_IN" };
 
   const parsed = readCardForm(formData);
   if ("error" in parsed) return { error: parsed.error };
@@ -231,8 +234,8 @@ export async function updateFightCardAction(
   formData: FormData,
 ): Promise<{ error?: string; slug?: string }> {
   const myId = await getMyProfileId();
-  if (!myId) return { error: "Not signed in." };
-  if (!UUID_RE.test(cardId)) return { error: "Card not found." };
+  if (!myId) return { error: "NOT_SIGNED_IN" };
+  if (!UUID_RE.test(cardId)) return { error: "CARD_NOT_FOUND" };
 
   const existing = await db
     .select({
@@ -243,8 +246,8 @@ export async function updateFightCardAction(
     .from(fightCard)
     .where(eq(fightCard.id, cardId))
     .limit(1);
-  if (existing.length === 0) return { error: "Card not found." };
-  if (existing[0].userId !== myId) return { error: "Not your card." };
+  if (existing.length === 0) return { error: "CARD_NOT_FOUND" };
+  if (existing[0].userId !== myId) return { error: "NOT_YOUR_CARD" };
 
   const parsed = readCardForm(formData);
   if ("error" in parsed) return { error: parsed.error };
@@ -275,16 +278,16 @@ export async function deleteFightCardAction(
   cardId: string,
 ): Promise<{ error?: string; success?: boolean }> {
   const myId = await getMyProfileId();
-  if (!myId) return { error: "Not signed in." };
-  if (!UUID_RE.test(cardId)) return { error: "Card not found." };
+  if (!myId) return { error: "NOT_SIGNED_IN" };
+  if (!UUID_RE.test(cardId)) return { error: "CARD_NOT_FOUND" };
 
   const existing = await db
     .select({ id: fightCard.id, userId: fightCard.userId })
     .from(fightCard)
     .where(eq(fightCard.id, cardId))
     .limit(1);
-  if (existing.length === 0) return { error: "Card not found." };
-  if (existing[0].userId !== myId) return { error: "Not your card." };
+  if (existing.length === 0) return { error: "CARD_NOT_FOUND" };
+  if (existing[0].userId !== myId) return { error: "NOT_YOUR_CARD" };
 
   // FK cascade drops fight_card_like rows.
   await db.delete(fightCard).where(eq(fightCard.id, cardId));
@@ -297,18 +300,18 @@ export async function toggleLikeAction(
   cardId: string,
 ): Promise<{ error?: string; liked?: boolean; likeCount?: number }> {
   const myId = await getMyProfileId();
-  if (!myId) return { error: "Sign in to like cards." };
+  if (!myId) return { error: "SIGN_IN_TO_LIKE" };
   if (!allowAction(`like:${myId}`, COOLDOWN_MS.like)) {
-    return { error: "Slow down — wait a moment." };
+    return { error: "RATE_LIMITED" };
   }
-  if (!UUID_RE.test(cardId)) return { error: "Card not found." };
+  if (!UUID_RE.test(cardId)) return { error: "CARD_NOT_FOUND" };
 
   const card = await db
     .select({ id: fightCard.id, slug: fightCard.slug })
     .from(fightCard)
     .where(eq(fightCard.id, cardId))
     .limit(1);
-  if (card.length === 0) return { error: "Card not found." };
+  if (card.length === 0) return { error: "CARD_NOT_FOUND" };
 
   const existing = await db
     .select({ userId: fightCardLike.userId })

@@ -140,15 +140,21 @@ export default async function CardViewPage({ params }: PageProps) {
           <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
             <p className="flex flex-wrap items-center gap-2 font-sans text-sm text-foreground-muted">
               {card.author_avatar_url ? (
+                // Decorative — the "@username" text follows immediately, so the
+                // avatar adds no information for screen readers.
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={card.author_avatar_url}
-                  alt={card.author_username}
+                  alt=""
+                  aria-hidden
                   className="h-6 w-6 rounded-full border border-foreground/15 object-cover"
                 />
               ) : (
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/15 font-display text-[10px] uppercase text-primary">
-                  {card.author_username.slice(0, 2)}
+                <span
+                  aria-hidden
+                  className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/15 font-display text-[10px] uppercase text-primary"
+                >
+                  {card.author_username.trim().slice(0, 2).toUpperCase() || "?"}
                 </span>
               )}
               <span>

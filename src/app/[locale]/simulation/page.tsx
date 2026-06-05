@@ -7,6 +7,7 @@ import { Navbar } from "@/components/layout/navbar";
 import { RecentGradedList } from "@/components/simulation/recent-graded-list";
 import { SimulationBoutCard } from "@/components/simulation/simulation-bout-card";
 import { Link } from "@/i18n/navigation";
+import { formatNumber } from "@/lib/format";
 import {
   getGradedSimulations,
   summarizeAccuracy,
@@ -125,7 +126,7 @@ export default async function SimulationIndexPage({
                   {t("modelVersion", { version: summary.modelVersion })}
                 </p>
                 <p className="font-display text-2xl tabular text-foreground">
-                  {summary.totalBouts.toLocaleString()}
+                  {formatNumber(summary.totalBouts)}
                 </p>
                 <p className="font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
                   {t("totalBouts", { count: summary.totalBouts })}
@@ -134,34 +135,46 @@ export default async function SimulationIndexPage({
             ) : null}
           </header>
 
-          {/* Quick stats strip — 4 cells: events, high-confidence,
-              value picks, recent accuracy from graded history. */}
+          {/* Quick stats strip. The three upcoming-derived tiles only render
+              when there are upcoming bouts — otherwise they would show a row
+              of zeros beside a real accuracy %, which reads as broken. The
+              accuracy tile stands on its own whenever there's graded history. */}
           {summary.totalBouts > 0 || accuracy.total > 0 ? (
-            <ul className="mb-6 grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <li className="rounded-md border border-foreground/10 bg-background-elevated/30 px-3 py-3 sm:px-4">
-                <p className="font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
-                  {t("statEvents")}
-                </p>
-                <p className="mt-1 font-display text-2xl tabular text-foreground">
-                  {summary.totalEvents}
-                </p>
-              </li>
-              <li className="rounded-md border border-foreground/10 bg-background-elevated/30 px-3 py-3 sm:px-4">
-                <p className="font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
-                  {t("statHighConfidence")}
-                </p>
-                <p className="mt-1 font-display text-2xl tabular text-streak-win">
-                  {summary.highConfidence}
-                </p>
-              </li>
-              <li className="rounded-md border border-foreground/10 bg-background-elevated/30 px-3 py-3 sm:px-4">
-                <p className="font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
-                  {t("statWithEdge")}
-                </p>
-                <p className="mt-1 font-display text-2xl tabular text-primary">
-                  {summary.withMarketEdge}
-                </p>
-              </li>
+            <ul
+              className={`mb-6 grid gap-2 ${
+                summary.totalBouts > 0
+                  ? "grid-cols-2 sm:grid-cols-4"
+                  : "grid-cols-1 sm:max-w-xs"
+              }`}
+            >
+              {summary.totalBouts > 0 ? (
+                <>
+                  <li className="rounded-md border border-foreground/10 bg-background-elevated/30 px-3 py-3 sm:px-4">
+                    <p className="font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
+                      {t("statEvents")}
+                    </p>
+                    <p className="mt-1 font-display text-2xl tabular text-foreground">
+                      {formatNumber(summary.totalEvents)}
+                    </p>
+                  </li>
+                  <li className="rounded-md border border-foreground/10 bg-background-elevated/30 px-3 py-3 sm:px-4">
+                    <p className="font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
+                      {t("statHighConfidence")}
+                    </p>
+                    <p className="mt-1 font-display text-2xl tabular text-streak-win">
+                      {formatNumber(summary.highConfidence)}
+                    </p>
+                  </li>
+                  <li className="rounded-md border border-foreground/10 bg-background-elevated/30 px-3 py-3 sm:px-4">
+                    <p className="font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
+                      {t("statWithEdge")}
+                    </p>
+                    <p className="mt-1 font-display text-2xl tabular text-primary">
+                      {formatNumber(summary.withMarketEdge)}
+                    </p>
+                  </li>
+                </>
+              ) : null}
               <li className="rounded-md border border-foreground/10 bg-background-elevated/30 px-3 py-3 sm:px-4">
                 <p className="font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
                   {t("statRecentAccuracy")}
