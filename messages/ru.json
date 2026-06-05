@@ -328,7 +328,7 @@
     "openCurrentHistoryScore": "Открыть историю текущего Vertex по боям — текущий счёт {score}",
     "openAllTimeHistoryScore": "Открыть историю Vertex за всё время — счёт за всё время {score}",
     "noCurrentScoreNote": "Текущего счёта нет — боец неактивен, поэтому действует только счёт за всё время.",
-    "noDecisiveResults": "Решающих результатов пока нет",
+    "noDecisiveResults": "Пока без побед и поражений",
     "radarLowConfidence": "Мало данных по боям — форма ориентировочная.",
     "legendDrawNc": "Ничья / No contest"
   },
@@ -1491,8 +1491,8 @@
     "methodDraw": "Ничья",
     "methodNc": "NC",
     "methodDq": "DQ",
-    "chartAriaCurrent": "Актуальный Vertex Score по боям — визуальная сводка; значения по каждому бою — в таблице ниже",
-    "chartAriaAllTime": "Vertex Score за всё время по боям — визуальная сводка; значения по каждому бою — в таблице ниже",
+    "chartAriaCurrent": "Актуальный Vertex Score по боям — визуальная сводка; значения по каждому бою — в списке ниже",
+    "chartAriaAllTime": "Vertex Score за всё время по боям — визуальная сводка; значения по каждому бою — в списке ниже",
     "noHistory": "Истории счёта по этому бойцу нет.",
     "noAllTimeReplay": "Реплей за всё время пока не посчитан для этого бойца — запусти backfill.",
     "monthlySnapshot": "Месячный снапшот · без боя"

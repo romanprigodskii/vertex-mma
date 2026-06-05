@@ -108,6 +108,12 @@ export function ScoreBreakdown({ data, divisionalStatus }: ScoreBreakdownProps) 
             })}
           </div>
 
+          {currentEmpty ? (
+            <p className="mt-2 font-sans text-[11px] text-foreground-subtle">
+              {t("noCurrentScoreNote")}
+            </p>
+          ) : null}
+
           {tab === "current" ? (
             <BreakdownTable
               rows={data.current.rows}

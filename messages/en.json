@@ -1491,8 +1491,8 @@
     "methodDraw": "Draw",
     "methodNc": "NC",
     "methodDq": "DQ",
-    "chartAriaCurrent": "Current Vertex score per bout — a visual summary; per-bout values are in the table below",
-    "chartAriaAllTime": "All-time Vertex score per bout — a visual summary; per-bout values are in the table below",
+    "chartAriaCurrent": "Current Vertex score per bout — a visual summary; per-bout values are listed below",
+    "chartAriaAllTime": "All-time Vertex score per bout — a visual summary; per-bout values are listed below",
     "noHistory": "No score history available for this fighter.",
     "noAllTimeReplay": "All-time replay not yet computed for this fighter — run the backfill script.",
     "monthlySnapshot": "Monthly snapshot · no bout"

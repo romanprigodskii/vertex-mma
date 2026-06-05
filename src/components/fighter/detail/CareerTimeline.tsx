@@ -225,10 +225,12 @@ export function CareerTimeline({ bouts }: CareerTimelineProps) {
     () => bouts.reduce((mx, b) => Math.max(mx, Date.parse(b.event_date)), 0),
     [bouts],
   );
-  // Snapshot the clock once after mount instead of reading Date.now() during
-  // render: first paint (server + hydration) uses the last bout's date as a
-  // deterministic right edge so the SVG width / today-tick can't mismatch
-  // across a UTC-midnight render; the real "today" extends the axis on mount.
+  // Snapshot the clock once after mount rather than reading it during render
+  // (reading Date.now() in render trips react-hooks/purity, and useMounted only
+  // yields a boolean — here we need the actual timestamp). First paint (server +
+  // hydration) uses the last bout's date as a deterministic right edge so the
+  // SVG width / today-tick can't mismatch across a UTC-midnight render; the real
+  // "today" extends the axis on mount.
   const [clientNow, setClientNow] = React.useState<number | null>(null);
   const [shadow, setShadow] = React.useState({ left: false, right: false });
   const updateShadow = React.useCallback(() => {
@@ -265,8 +267,9 @@ export function CareerTimeline({ bouts }: CareerTimelineProps) {
   );
 
   React.useEffect(() => {
-    // One-time post-mount clock snapshot — same effect-on-mount pattern as
-    // useMounted, not render-driven state sync.
+    // One-time post-mount clock snapshot — same effect-on-mount shape as
+    // use-mounted.ts (which we can't reuse directly: it returns a boolean, not
+    // the timestamp). The sanctioned eslint-disable mirrors use-mounted.ts.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setClientNow(Date.now());
   }, []);
@@ -499,12 +502,12 @@ export function CareerTimeline({ bouts }: CareerTimelineProps) {
             timeline hidden past it, the standard "there's more to scroll" cue. */}
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-y-0 left-0 w-12 bg-gradient-to-r from-background-base to-transparent transition-opacity duration-200"
+          className="pointer-events-none absolute inset-y-0 left-0 w-12 bg-gradient-to-r from-background-base to-background-base/0 transition-opacity duration-200"
           style={{ opacity: shadow.left ? 1 : 0 }}
         />
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-background-base to-transparent transition-opacity duration-200"
+          className="pointer-events-none absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-background-base to-background-base/0 transition-opacity duration-200"
           style={{ opacity: shadow.right ? 1 : 0 }}
         />
       </div>

@@ -3,9 +3,9 @@ import { getTranslations } from "next-intl/server";
 import type { FighterDetail } from "@/lib/fighter-detail";
 import { formatNumber } from "@/lib/format";
 
-// DB method string → `method` namespace key (localized short labels).
-// Mirrors ScoreHistoryChart's METHOD_KEY pattern so KO/Sub/Dec labels are
-// translated everywhere instead of leaking hardcoded English into the RU UI.
+// DB method string → `method` namespace key (localized short labels), so
+// KO/Sub/Dec read in the active locale instead of leaking hardcoded English
+// into the RU UI (the same DB-string→i18n-key shape ScoreHistoryChart uses).
 const METHOD_KEY: Record<string, string> = {
   ko: "ko",
   tko: "tko",

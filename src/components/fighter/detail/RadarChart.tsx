@@ -159,7 +159,7 @@ export function RadarChart({
         strokeWidth={1.5}
         strokeLinejoin="round"
         strokeDasharray={lowConfidence ? "4 3" : undefined}
-        strokeOpacity={lowConfidence ? 0.6 : 1}
+        strokeOpacity={lowConfidence ? 0.75 : 1}
       />
 
       {/* Data point dots */}
