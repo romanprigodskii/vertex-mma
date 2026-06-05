@@ -53,7 +53,12 @@
     "downloading": "Downloading…",
     "saveImage": "Save image",
     "shareToX": "Share to X / Twitter",
-    "shareToTelegram": "Share to Telegram"
+    "shareToTelegram": "Share to Telegram",
+    "nativeShare": "Share via…",
+    "copyFailed": "Couldn't copy link",
+    "imageSaved": "Image saved",
+    "saveFailed": "Couldn't save image",
+    "shareFailed": "Couldn't share"
   },
   "footer": {
     "fighters": "Fighters",
@@ -1136,6 +1141,7 @@
   "static": {
     "brand": "Vertex MMA",
     "lastUpdated": "Last updated: June 2026",
+    "lastUpdatedLabel": "Last updated: {date}",
     "contactBody": "Questions about this page? Email support@vertexmma.com. Vertex MMA is an independent project and is not affiliated with, or endorsed by, the UFC or Zuffa LLC.",
     "aboutTitle": "About",
     "aboutBody": "Vertex MMA is a community platform for UFC fight discussion, custom rankings, and virtual coin betting. The Vertex Score is a 0–100 measure combining quality wins, championship pedigree, recent form, finishing rate, and defensive vulnerability across every UFC fighter with three or more bouts.",

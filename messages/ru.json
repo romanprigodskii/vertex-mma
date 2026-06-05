@@ -53,7 +53,12 @@
     "downloading": "Загрузка…",
     "saveImage": "Сохранить картинку",
     "shareToX": "Поделиться в X / Twitter",
-    "shareToTelegram": "Поделиться в Telegram"
+    "shareToTelegram": "Поделиться в Telegram",
+    "nativeShare": "Поделиться через…",
+    "copyFailed": "Не удалось скопировать ссылку",
+    "imageSaved": "Картинка сохранена",
+    "saveFailed": "Не удалось сохранить картинку",
+    "shareFailed": "Не удалось поделиться"
   },
   "footer": {
     "fighters": "Бойцы",
@@ -288,8 +293,8 @@
       "suspended": "Отстранён"
     },
     "stance_value": {
-      "orthodox": "Левосторонняя",
-      "southpaw": "Правосторонняя",
+      "orthodox": "Ортодоксальная",
+      "southpaw": "Южная",
       "switch": "Переменная",
       "sideways": "Боковая",
       "unknown": "Неизвестно"
@@ -1136,6 +1141,7 @@
   "static": {
     "brand": "Vertex MMA",
     "lastUpdated": "Обновлено: июнь 2026",
+    "lastUpdatedLabel": "Обновлено: {date}",
     "contactBody": "Вопросы по этой странице? Пишите на support@vertexmma.com. Vertex MMA — независимый проект, не связанный с UFC или Zuffa LLC и не одобренный ими.",
     "aboutTitle": "О проекте",
     "aboutBody": "Vertex MMA — это сообщество для обсуждения боёв UFC, создания собственных рейтингов и ставок виртуальными монетами. Vertex Score — это число от 0 до 100, которое учитывает качество побед, чемпионский путь, недавнюю форму, процент финишей и защитную уязвимость для каждого бойца UFC, у которого минимум 3 боя.",

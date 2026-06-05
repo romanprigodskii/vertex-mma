@@ -1,5 +1,6 @@
 import { ImageResponse } from "next/og";
 
+import { formatNumber } from "@/lib/format";
 import { OG_CACHE_HEADERS, OG_COLORS, OG_FONTS, OG_SIZE } from "@/lib/og";
 import { getParlayById } from "@/lib/sportsbook-data";
 import {
@@ -153,10 +154,10 @@ export async function GET(_req: Request, ctx: RouteContext) {
           </div>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
             <span style={{ color: OG_COLORS.subtle, fontSize: 18, fontFamily: OG_FONTS.mono, letterSpacing: 2 }}>
-              {p.stake_coins.toLocaleString()} → TO WIN
+              {formatNumber(p.stake_coins)} → TO WIN
             </span>
             <span style={{ color: OG_COLORS.primary, fontSize: 48, fontWeight: 800 }}>
-              {p.potential_payout.toLocaleString()}
+              {formatNumber(p.potential_payout)}
             </span>
           </div>
         </div>
