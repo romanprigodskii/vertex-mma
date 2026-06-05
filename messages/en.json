@@ -342,7 +342,15 @@
     "statusUpcoming": "Upcoming",
     "statusInProgress": "In progress",
     "statusCancelled": "Cancelled",
-    "statusPostponed": "Postponed"
+    "statusPostponed": "Postponed",
+    "emptyUpcomingTitle": "No upcoming events scheduled",
+    "emptyUpcomingHint": "New cards appear here as soon as they're announced — recent results are still up under Past.",
+    "emptyPastTitle": "No past events on record",
+    "emptyPastHint": "Completed cards will show up here once they've been fought.",
+    "emptyAllTitle": "No events yet",
+    "emptyAllHint": "Events will appear here once they've been added to the database.",
+    "emptyCtaPast": "Browse past results",
+    "emptyCtaUpcoming": "See upcoming events"
   },
   "event": {
     "back": "Back",

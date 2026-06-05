@@ -342,7 +342,15 @@
     "statusUpcoming": "Скоро",
     "statusInProgress": "Идёт",
     "statusCancelled": "Отменён",
-    "statusPostponed": "Перенесён"
+    "statusPostponed": "Перенесён",
+    "emptyUpcomingTitle": "Предстоящих турниров пока нет",
+    "emptyUpcomingHint": "Новые карды появятся здесь сразу после анонса — свежие результаты доступны во вкладке «Прошедшие».",
+    "emptyPastTitle": "Прошедших турниров нет",
+    "emptyPastHint": "Завершённые карды появятся здесь после проведения.",
+    "emptyAllTitle": "Турниров пока нет",
+    "emptyAllHint": "Турниры появятся здесь после добавления в базу.",
+    "emptyCtaPast": "Смотреть прошедшие",
+    "emptyCtaUpcoming": "Смотреть предстоящие"
   },
   "event": {
     "back": "Назад",
