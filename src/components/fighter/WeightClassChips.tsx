@@ -28,6 +28,7 @@ export function WeightClassChips({ selected, onToggle }: WeightClassChipsProps) 
             aria-pressed={isActive}
             className={cn(
               "inline-flex h-6 items-center gap-1 rounded-sm border px-1.5 text-[11px] transition-colors",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background-base",
               isActive
                 ? "border-primary bg-primary text-primary-foreground"
                 : "border-foreground/10 bg-transparent text-foreground-muted hover:border-foreground/30 hover:text-foreground",

@@ -1062,7 +1062,10 @@
     "closeFilters": "Close filters",
     "reset": "Reset",
     "apply": "Apply",
-    "showN": "Show {n}"
+    "showN": "Show {n}",
+    "sortHeading": "Sort",
+    "retry": "Retry",
+    "emptyRosterHint": "The roster is empty right now — check back soon."
   },
   "static": {
     "brand": "Vertex MMA",
@@ -1568,7 +1571,8 @@
     "opensAnywhere": "opens this anywhere",
     "footerBrand": "Vertex search",
     "trigger": "Find",
-    "triggerAria": "Find a fighter"
+    "triggerAria": "Find a fighter",
+    "resultsFound": "{n, plural, one {# fighter found} other {# fighters found}}"
   },
   "method": {
     "ko": "KO",

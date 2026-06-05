@@ -238,7 +238,9 @@ export type FighterCatalogResponse = {
 };
 
 export const CATALOG_DEFAULT_LIMIT = 48;
-const MAX_LIMIT = 96;
+/** Hard ceiling on a single catalog page. Shared with parseCatalogFilters so
+ *  the URL-param clamp and the query clamp can't silently drift apart. */
+export const CATALOG_MAX_LIMIT = 96;
 
 function buildWhere(filters: FighterCatalogFilters): SQL {
   const conditions: SQL[] = [];
@@ -536,7 +538,7 @@ export async function searchFightersWithFilters(
 ): Promise<FighterCatalogResponse> {
   const offset = Math.max(0, filters.offset ?? 0);
   const limit = Math.min(
-    MAX_LIMIT,
+    CATALOG_MAX_LIMIT,
     Math.max(1, filters.limit ?? CATALOG_DEFAULT_LIMIT),
   );
 

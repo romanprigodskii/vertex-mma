@@ -8,6 +8,7 @@ import { CountrySelect } from "@/components/fighter/CountrySelect";
 import { StanceChips } from "@/components/fighter/StanceChips";
 import { ChampionRadio } from "@/components/fighter/ChampionRadio";
 import { GenderToggle } from "@/components/fighter/GenderToggle";
+import { SortRadio } from "@/components/fighter/SortRadio";
 import { StatusRadio } from "@/components/fighter/StatusRadio";
 import { TierRadio } from "@/components/fighter/TierRadio";
 import { WeightClassChips } from "@/components/fighter/WeightClassChips";
@@ -49,6 +50,12 @@ interface FilterSidebarProps {
    * intentionally stays a touch roomier.
    */
   dense?: boolean;
+  /**
+   * Render an in-panel Sort section. The desktop layout has its own
+   * SortDropdown beside the search box, but that control is `lg`-only, so the
+   * mobile drawer passes this to expose sorting on phones/tablets.
+   */
+  showSort?: boolean;
   className?: string;
 }
 
@@ -84,7 +91,7 @@ function Section({
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="flex w-full items-center justify-between gap-2 py-2.5 text-left"
+        className="flex w-full items-center justify-between gap-2 rounded-sm py-2.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset"
       >
         <span className="font-sans text-[11px] font-medium uppercase tracking-[0.16em] text-foreground-muted">
           {title}
@@ -121,20 +128,23 @@ function ToggleRow({
   return (
     <label className="flex cursor-pointer items-center justify-between gap-3 py-1.5 text-xs text-foreground-muted hover:text-foreground transition-colors">
       <span>{label}</span>
+      {/* The checkbox is the peer; keeping it a sibling *before* the visible
+          track lets peer-focus-visible drive the track's focus ring. */}
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="peer sr-only"
+      />
       <span
+        aria-hidden
         className={cn(
           "relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors",
+          "peer-focus-visible:ring-2 peer-focus-visible:ring-primary peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-background-base",
           checked ? "bg-primary" : "bg-background-overlay border border-border",
         )}
       >
-        <input
-          type="checkbox"
-          checked={checked}
-          onChange={(e) => onChange(e.target.checked)}
-          className="sr-only"
-        />
         <span
-          aria-hidden
           className={cn(
             "inline-block h-3.5 w-3.5 rounded-full bg-foreground shadow transition-transform",
             checked ? "translate-x-[18px]" : "translate-x-[3px]",
@@ -152,6 +162,7 @@ export function FilterSidebar({
   countries,
   resultCount,
   dense = false,
+  showSort = false,
   className,
 }: FilterSidebarProps) {
   const t = useTranslations("catalog");
@@ -204,6 +215,15 @@ export function FilterSidebar({
             </Button>
           ) : null}
         </div>
+      ) : null}
+
+      {showSort ? (
+        <Section title={t("sortHeading")}>
+          <SortRadio
+            value={filters.sort}
+            onChange={(sort) => onChange({ sort })}
+          />
+        </Section>
       ) : null}
 
       <Section title={t("weightClass")}>
