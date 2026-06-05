@@ -49,10 +49,10 @@ export async function getLeaderboard(
         up.display_name,
         up.avatar_url,
         up.tier::text AS tier,
-        up.balance_coins AS balance,
-        (up.total_coins_earned - up.total_coins_lost) AS profit,
-        up.total_coins_lost AS total_lost,
-        up.bet_count,
+        up.balance_coins::float8 AS balance,
+        (up.total_coins_earned - up.total_coins_lost)::float8 AS profit,
+        up.total_coins_lost::float8 AS total_lost,
+        up.bet_count::float8 AS bet_count,
         (SELECT COUNT(*)::int FROM user_achievement WHERE user_id = up.id) AS achievement_count
       FROM user_profile up
       WHERE up.bet_count > 0 OR up.balance_coins <> 10000
@@ -73,10 +73,10 @@ export async function getLeaderboard(
         up.display_name,
         up.avatar_url,
         up.tier::text AS tier,
-        up.balance_coins AS balance,
-        (up.total_coins_earned - up.total_coins_lost) AS profit,
-        up.total_coins_lost AS total_lost,
-        up.bet_count,
+        up.balance_coins::float8 AS balance,
+        (up.total_coins_earned - up.total_coins_lost)::float8 AS profit,
+        up.total_coins_lost::float8 AS total_lost,
+        up.bet_count::float8 AS bet_count,
         COALESCE(ach.c, 0) AS achievement_count
       FROM user_profile up
       LEFT JOIN ach ON ach.user_id = up.id
@@ -93,10 +93,10 @@ export async function getLeaderboard(
         up.display_name,
         up.avatar_url,
         up.tier::text AS tier,
-        up.balance_coins AS balance,
-        (up.total_coins_earned - up.total_coins_lost) AS profit,
-        up.total_coins_lost AS total_lost,
-        up.bet_count,
+        up.balance_coins::float8 AS balance,
+        (up.total_coins_earned - up.total_coins_lost)::float8 AS profit,
+        up.total_coins_lost::float8 AS total_lost,
+        up.bet_count::float8 AS bet_count,
         (SELECT COUNT(*)::int FROM user_achievement WHERE user_id = up.id) AS achievement_count
       FROM user_profile up
       WHERE up.bet_count > 0 OR up.balance_coins <> 10000

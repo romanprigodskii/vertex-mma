@@ -41,7 +41,7 @@ export async function listOpenMarkets(limit = 50): Promise<MarketListItem[]> {
       m.question,
       m.status::text AS status,
       m.closes_at::text AS closes_at,
-      m.total_volume,
+      m.total_volume::float8 AS total_volume,
       m.unique_traders,
       ${localizedColSql("e.name", "e.name_ru", isRu)} AS event_name,
       e.slug AS event_slug,
@@ -174,7 +174,7 @@ export async function listOpenMarketsByEvent(
       m.id::text AS market_id,
       m.type::text AS market_type,
       m.question AS market_question,
-      m.total_volume AS market_total_volume,
+      m.total_volume::float8 AS market_total_volume,
       m.unique_traders AS market_unique_traders,
       COALESCE(
         (
@@ -314,7 +314,7 @@ export async function getMarketById(id: string): Promise<MarketDetail | null> {
       m.status::text AS status,
       m.closes_at::text AS closes_at,
       m.b_parameter,
-      m.total_volume,
+      m.total_volume::float8 AS total_volume,
       m.unique_traders,
       ${localizedColSql("e.name", "e.name_ru", isRu)} AS event_name,
       e.slug AS event_slug,

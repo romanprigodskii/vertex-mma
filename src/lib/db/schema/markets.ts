@@ -1,5 +1,7 @@
 import {
+  bigint,
   boolean,
+  doublePrecision,
   index,
   integer,
   pgTable,
@@ -37,7 +39,10 @@ export const market = pgTable(
 
     bParameter: real("b_parameter").default(100).notNull(),
 
-    totalVolume: integer("total_volume").default(0).notNull(),
+    // bigint: lifetime traded volume accumulates unbounded; int4 overflows.
+    totalVolume: bigint("total_volume", { mode: "number" })
+      .default(0)
+      .notNull(),
     uniqueTraders: integer("unique_traders").default(0).notNull(),
 
     opensAt: timestamp("opens_at", { withTimezone: true })
@@ -68,7 +73,10 @@ export const marketOutcome = pgTable(
     label: text("label").notNull(),
     orderIndex: integer("order_index").notNull(),
 
-    currentShares: real("current_shares").default(0).notNull(),
+    // double precision (not real/float4): the LMSR share total feeds payout via
+    // ROUND(shares_bought); float32's ~0.06 granularity at large positions drifts
+    // sub-coin. Prices stay real — they live in [0,1] where float32 is plenty.
+    currentShares: doublePrecision("current_shares").default(0).notNull(),
     currentPrice: real("current_price").notNull(),
 
     isWinning: boolean("is_winning"),
@@ -94,7 +102,8 @@ export const bet = pgTable(
       .notNull()
       .references(() => marketOutcome.id),
 
-    sharesBought: real("shares_bought").notNull(),
+    // double precision: this is the payout basis via ROUND(shares_bought).
+    sharesBought: doublePrecision("shares_bought").notNull(),
     coinsSpent: integer("coins_spent").notNull(),
     priceAtPurchase: real("price_at_purchase").notNull(),
 

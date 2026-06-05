@@ -1,10 +1,11 @@
 "use server";
 
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 import { checkAndUnlockAchievements } from "@/lib/achievements";
 import { db } from "@/lib/db";
+import { fighter } from "@/lib/db/schema/fighters";
 import {
   customRanking,
   customRankingEntry,
@@ -12,6 +13,9 @@ import {
 import { userProfile } from "@/lib/db/schema/users";
 import { searchFighters } from "@/lib/fighter-search";
 import { createClient } from "@/lib/supabase/server";
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const TITLE_MIN = 3;
 const TITLE_MAX = 100;
@@ -103,6 +107,29 @@ function validateEntries(
   return { entries: sorted };
 }
 
+/**
+ * Guard the fighter_id values before they hit the uuid FK column. Without this,
+ * a malformed id ("not-a-uuid") or a stale/nonexistent id surfaces as a raw 500
+ * (invalid uuid syntax / FK violation) instead of a clean validation error. The
+ * existence check is a single batched query — entries are already de-duped by
+ * fighter_id in validateEntries, so a count mismatch means at least one is gone.
+ */
+async function verifyFighters(
+  ids: string[],
+): Promise<{ error: string } | null> {
+  if (ids.some((id) => !UUID_RE.test(id))) {
+    return { error: "Invalid fighter selection." };
+  }
+  const found = await db
+    .select({ id: fighter.id })
+    .from(fighter)
+    .where(inArray(fighter.id, ids));
+  if (found.length !== ids.length) {
+    return { error: "One or more selected fighters no longer exist." };
+  }
+  return null;
+}
+
 export async function createRankingAction(
   formData: FormData,
 ): Promise<{ error?: string; rankingId?: string; newlyUnlocked?: string[] }> {
@@ -122,6 +149,11 @@ export async function createRankingAction(
 
   const validated = validateEntries(parseEntries(entriesRaw));
   if ("error" in validated) return { error: validated.error };
+
+  const fighterError = await verifyFighters(
+    validated.entries.map((e) => e.fighter_id),
+  );
+  if (fighterError) return fighterError;
 
   const [created] = await db
     .insert(customRanking)
@@ -177,6 +209,11 @@ export async function updateRankingAction(
 
   const validated = validateEntries(parseEntries(entriesRaw));
   if ("error" in validated) return { error: validated.error };
+
+  const fighterError = await verifyFighters(
+    validated.entries.map((e) => e.fighter_id),
+  );
+  if (fighterError) return fighterError;
 
   await db
     .update(customRanking)

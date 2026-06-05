@@ -69,7 +69,7 @@ export async function claimDailyBonusAction(): Promise<{
           last_daily_bonus_at IS NULL
           OR last_daily_bonus_at < NOW() - make_interval(hours => ${COOLDOWN_HOURS})
         )
-      RETURNING balance_coins
+      RETURNING balance_coins::float8 AS balance_coins
     `)) as unknown as Array<{ balance_coins: number }>;
 
     if (rows.length === 0) return false; // lost the race / cooldown still active

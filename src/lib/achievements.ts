@@ -111,8 +111,8 @@ export async function checkAndUnlockAchievements(
     avatar_url: string | null;
   }>(sql`
     SELECT
-      balance_coins AS balance,
-      bet_count,
+      balance_coins::float8 AS balance,
+      bet_count::float8 AS bet_count,
       display_name,
       bio,
       country_code,

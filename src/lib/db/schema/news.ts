@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  type AnyPgColumn,
   boolean,
   check,
   index,
@@ -128,8 +129,11 @@ export const newsComment = pgTable(
       .notNull()
       .references(() => userProfile.id, { onDelete: "cascade" }),
     /** NULL for top-level comments; a comment id for replies. Replies-of-replies
-     *  are flattened to the same parent at the API layer. */
-    parentId: uuid("parent_id"),
+     *  are flattened to the same parent at the API layer. Self-FK with
+     *  ON DELETE CASCADE: hard-deleting a parent comment removes its replies. */
+    parentId: uuid("parent_id").references((): AnyPgColumn => newsComment.id, {
+      onDelete: "cascade",
+    }),
     body: text("body").notNull(),
     upvotes: integer("upvotes").default(0).notNull(),
     downvotes: integer("downvotes").default(0).notNull(),

@@ -24,9 +24,10 @@ import {
 import { createClient } from "@/lib/supabase/server";
 
 const MIN_COINS_PER_BET = 1;
-// 1M is already 100× the 10k signup grant — generous, but far below the point
-// where cumulative total_volume / lifetime tallies (int4) could overflow. The
-// CHECK(balance_coins >= 0) constraint + FOR UPDATE lock cap the rest.
+// 1M is already 100× the 10k signup grant — generous. Lifetime tallies
+// (total_volume / balance_coins / total_coins_*) are bigint, so multi-year
+// accumulation can't overflow. The CHECK(balance_coins >= 0) constraint +
+// FOR UPDATE lock cap the rest.
 const MAX_COINS_PER_BET = 1_000_000;
 
 /**
@@ -145,8 +146,10 @@ export async function placeBetAction(
       // serialised, and each wrote `startingBalance - ownCost` (absolute),
       // letting the user overspend / mint coins. Locking user_profile here
       // also serialises the same user's concurrent bets across all markets.
+      // ::float8 — balance_coins is bigint; postgres.js returns int8 as a
+      // string, so cast to a JS number for the typeof check + arithmetic below.
       const balanceRows = await tx.execute<{ balance_coins: number }>(sql`
-        SELECT balance_coins
+        SELECT balance_coins::float8 AS balance_coins
         FROM user_profile
         WHERE id = ${profile.id}::uuid
         FOR UPDATE
@@ -414,7 +417,7 @@ export async function placeFixedOddsBetAction(
       // Authoritative balance under lock (mirrors placeBetAction — guards the
       // lost-update race for the same user betting concurrently).
       const balanceRows = (await tx.execute<{ balance_coins: number }>(sql`
-        SELECT balance_coins FROM user_profile WHERE id = ${profile.id}::uuid FOR UPDATE
+        SELECT balance_coins::float8 AS balance_coins FROM user_profile WHERE id = ${profile.id}::uuid FOR UPDATE
       `)) as unknown as Array<{ balance_coins: number }>;
       const locked = balanceRows[0]?.balance_coins;
       if (typeof locked !== "number") throw new Error("Profile not found.");
@@ -620,7 +623,7 @@ export async function placeParlayAction(
   try {
     await db.transaction(async (tx) => {
       const balanceRows = (await tx.execute<{ balance_coins: number }>(sql`
-        SELECT balance_coins FROM user_profile WHERE id = ${profile.id}::uuid FOR UPDATE
+        SELECT balance_coins::float8 AS balance_coins FROM user_profile WHERE id = ${profile.id}::uuid FOR UPDATE
       `)) as unknown as Array<{ balance_coins: number }>;
       const locked = balanceRows[0]?.balance_coins;
       if (typeof locked !== "number") throw new Error("Profile not found.");

@@ -1,11 +1,13 @@
 import { sql } from "drizzle-orm";
 import {
+  bigint,
   boolean,
   char,
   check,
   index,
   integer,
   jsonb,
+  pgSchema,
   pgTable,
   text,
   timestamp,
@@ -14,13 +16,27 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { transactionTypeEnum, userTierEnum } from "./enums";
+import { bet } from "./markets";
+
+// Supabase manages auth.users in the `auth` schema. We declare a minimal handle
+// to it here ONLY so user_profile.auth_user_id can carry a real FK: deleting an
+// auth user (app, admin API, or Supabase dashboard) now structurally cascades
+// the whole per-user graph, independent of any trigger being present. drizzle-kit's
+// schemaFilter is `public`, so it uses this for the FK but never manages the table.
+const authUsers = pgSchema("auth").table("users", {
+  id: uuid("id").primaryKey(),
+});
 
 export const userProfile = pgTable(
   "user_profile",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    // References supabase auth.users.id — FK left out because that table is in another schema.
-    authUserId: uuid("auth_user_id").notNull().unique(),
+    // Hard FK to auth.users with ON DELETE CASCADE — orphan prevention is now
+    // enforced by the DB, not just the on_auth_user_deleted trigger.
+    authUserId: uuid("auth_user_id")
+      .notNull()
+      .unique()
+      .references(() => authUsers.id, { onDelete: "cascade" }),
 
     username: text("username").notNull().unique(),
     displayName: text("display_name"),
@@ -28,11 +44,20 @@ export const userProfile = pgTable(
     bio: text("bio"),
     countryCode: char("country_code", { length: 2 }),
 
-    balanceCoins: integer("balance_coins").default(10000).notNull(),
-    totalCoinsEarned: integer("total_coins_earned").default(10000).notNull(),
-    totalCoinsLost: integer("total_coins_lost").default(0).notNull(),
+    // bigint (not int4): these are lifetime accumulators that grow unbounded
+    // over years; int4 overflows past ~2.1B. mode:"number" keeps the TS type a
+    // plain number (coin totals stay well under 2^53).
+    balanceCoins: bigint("balance_coins", { mode: "number" })
+      .default(10000)
+      .notNull(),
+    totalCoinsEarned: bigint("total_coins_earned", { mode: "number" })
+      .default(10000)
+      .notNull(),
+    totalCoinsLost: bigint("total_coins_lost", { mode: "number" })
+      .default(0)
+      .notNull(),
 
-    betCount: integer("bet_count").default(0).notNull(),
+    betCount: bigint("bet_count", { mode: "number" }).default(0).notNull(),
     currentStreak: integer("current_streak").default(0).notNull(),
     bestStreak: integer("best_streak").default(0).notNull(),
 
@@ -70,13 +95,21 @@ export const transaction = pgTable(
       .references(() => userProfile.id, { onDelete: "cascade" }),
 
     type: transactionTypeEnum("type").notNull(),
-    amount: integer("amount").notNull(),
-    balanceAfter: integer("balance_after").notNull(),
+    // bigint to match balance_coins: amount/balance_after share the coin domain,
+    // and balance_after is a direct snapshot of the (now bigint) balance.
+    amount: bigint("amount", { mode: "number" }).notNull(),
+    balanceAfter: bigint("balance_after", { mode: "number" }).notNull(),
 
     description: text("description"),
-    // FKs intentionally omitted — wave 4/5 will decide cardinality.
-    relatedBetId: uuid("related_bet_id"),
-    relatedAchievementId: uuid("related_achievement_id"),
+    // The ledger is immutable history, so a deleted bet/achievement must not
+    // delete its ledger row — null the reference instead (ON DELETE SET NULL).
+    relatedBetId: uuid("related_bet_id").references(() => bet.id, {
+      onDelete: "set null",
+    }),
+    relatedAchievementId: uuid("related_achievement_id").references(
+      () => achievement.id,
+      { onDelete: "set null" },
+    ),
 
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
