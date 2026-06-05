@@ -212,13 +212,21 @@ export function FighterPicker({ initialA, initialB }: FighterPickerProps) {
   const router = useRouter();
   const [a, setA] = React.useState<PickerSlot>(initialA);
   const [b, setB] = React.useState<PickerSlot>(initialB);
+  // The compare results page is force-dynamic and runs ~8 DB queries, so the
+  // server round-trip after navigating is visibly slow. Drive the button's
+  // pending state off the navigation transition so the tap gives feedback
+  // (spinner + disabled) instead of looking dead. A route-level loading.tsx
+  // skeleton covers the gap once navigation commits.
+  const [isPending, startTransition] = React.useTransition();
 
   const canCompare =
     a.slug != null && b.slug != null && a.slug !== b.slug;
 
   const onCompare = () => {
     if (!canCompare) return;
-    router.push(`/fighters/compare?a=${a.slug}&b=${b.slug}`);
+    startTransition(() => {
+      router.push(`/fighters/compare?a=${a.slug}&b=${b.slug}`);
+    });
   };
 
   return (
@@ -241,11 +249,12 @@ export function FighterPicker({ initialA, initialB }: FighterPickerProps) {
         <Button
           onClick={onCompare}
           disabled={!canCompare}
+          loading={isPending}
           size="lg"
           className="w-full max-w-xs"
         >
-          {t("compareCta")}
-          <ArrowRight className="h-4 w-4" />
+          {isPending ? t("comparing") : t("compareCta")}
+          {isPending ? null : <ArrowRight className="h-4 w-4" />}
         </Button>
         {a.slug && b.slug && a.slug === b.slug ? (
           <p className="font-sans text-xs text-foreground-muted">
