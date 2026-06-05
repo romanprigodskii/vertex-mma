@@ -14,7 +14,16 @@ import {
   CommentComposer,
   TierBadge,
 } from "@/components/news/news-comment-composer";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useMounted } from "@/hooks/use-mounted";
+import { formatNumber } from "@/lib/format";
 import type { CommentNode, CommentAuthorSnapshot } from "@/lib/news-comments";
 import { cn } from "@/lib/utils";
 
@@ -66,6 +75,11 @@ export function CommentItem({
   const [down, setDown] = React.useState(comment.downvotes);
   const [userVote, setUserVote] = React.useState(comment.userVote);
   const [voting, setVoting] = React.useState(false);
+  const [confirmKind, setConfirmKind] = React.useState<
+    null | "report" | "delete"
+  >(null);
+  const [acting, setActing] = React.useState(false);
+  const replyComposerId = React.useId();
   const isOwner = currentAuthor?.userProfileId === comment.author.userProfileId;
   const canReply = Boolean(currentAuthor);
   const canVote = Boolean(currentAuthor);
@@ -81,6 +95,21 @@ export function CommentItem({
       setUserVote(res.userVote);
     }
   }
+
+  async function runConfirm() {
+    if (!confirmKind || acting) return;
+    setActing(true);
+    if (confirmKind === "report") {
+      const res = await reportCommentAction({ commentId: comment.id });
+      if (res.ok) setReported(true);
+    } else {
+      const res = await deleteCommentAction({ commentId: comment.id });
+      if (res.ok) setDeleted(true);
+    }
+    setActing(false);
+    setConfirmKind(null);
+  }
+
   const canModerate = Boolean(currentAuthor?.isStaff);
   const canDelete = isOwner || canModerate;
   const canReport = Boolean(currentAuthor) && !isOwner;
@@ -104,7 +133,7 @@ export function CommentItem({
           </span>
           <TierBadge tier={comment.author.tier} />
           <span
-            className="font-mono text-[11px] text-foreground-subtle"
+            className="font-mono text-[11px] text-foreground-muted"
             suppressHydrationWarning
           >
             {mounted ? relativeTime(comment.createdAt) : null}
@@ -113,7 +142,7 @@ export function CommentItem({
         <p className="mt-1 whitespace-pre-wrap break-words font-sans text-sm leading-[1.55] text-foreground/90">
           {comment.body}
         </p>
-        <div className="mt-1.5 flex items-center gap-3 font-mono text-[11px] tracking-wide text-foreground-subtle">
+        <div className="mt-1.5 flex items-center gap-3 font-mono text-[11px] tracking-wide text-foreground-muted">
           <button
             type="button"
             onClick={() => onVote(1)}
@@ -128,7 +157,7 @@ export function CommentItem({
             <ArrowBigUp
               className={cn("h-3.5 w-3.5", userVote === 1 && "fill-current")}
             />{" "}
-            {up}
+            <span className="tabular-nums">{formatNumber(up)}</span>
           </button>
           <button
             type="button"
@@ -144,12 +173,14 @@ export function CommentItem({
             <ArrowBigDown
               className={cn("h-3.5 w-3.5", userVote === -1 && "fill-current")}
             />{" "}
-            {down}
+            <span className="tabular-nums">{formatNumber(down)}</span>
           </button>
           {canReply && !isReply ? (
             <button
               type="button"
               onClick={() => setReplying((v) => !v)}
+              aria-expanded={replying}
+              aria-controls={replyComposerId}
               className="transition-colors hover:text-foreground"
             >
               {replying ? t("cancel") : t("replyAction")}
@@ -157,20 +188,14 @@ export function CommentItem({
           ) : null}
           {canReport ? (
             reported ? (
-              <span className="ml-auto inline-flex items-center gap-1 text-foreground-subtle">
+              <span className="ml-auto inline-flex items-center gap-1 text-foreground-muted">
                 <Flag className="h-3.5 w-3.5" />
                 {t("reported")}
               </span>
             ) : (
               <button
                 type="button"
-                onClick={async () => {
-                  if (!confirm(t("reportConfirm"))) return;
-                  const result = await reportCommentAction({
-                    commentId: comment.id,
-                  });
-                  if (result.ok) setReported(true);
-                }}
+                onClick={() => setConfirmKind("report")}
                 className="ml-auto inline-flex items-center gap-1 transition-colors hover:text-foreground"
                 aria-label={t("reportAction")}
               >
@@ -182,13 +207,7 @@ export function CommentItem({
           {canDelete ? (
             <button
               type="button"
-              onClick={async () => {
-                if (!confirm(t("deleteConfirm"))) return;
-                const result = await deleteCommentAction({
-                  commentId: comment.id,
-                });
-                if (result.ok) setDeleted(true);
-              }}
+              onClick={() => setConfirmKind("delete")}
               className={cn(
                 "inline-flex items-center transition-colors hover:text-foreground",
                 canReport ? "" : "ml-auto",
@@ -204,7 +223,7 @@ export function CommentItem({
         </div>
 
         {replying && currentAuthor ? (
-          <div className="mt-3">
+          <div id={replyComposerId} className="mt-3">
             <CommentComposer
               newsItemId={newsItemId}
               parentId={comment.id}
@@ -229,6 +248,45 @@ export function CommentItem({
             ))}
           </div>
         ) : null}
+
+        <Dialog
+          open={confirmKind !== null}
+          onOpenChange={(open) => {
+            if (!open && !acting) setConfirmKind(null);
+          }}
+        >
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>
+                {confirmKind === "delete"
+                  ? t("deleteConfirm")
+                  : t("reportConfirm")}
+              </DialogTitle>
+            </DialogHeader>
+            <DialogFooter>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setConfirmKind(null)}
+                disabled={acting}
+              >
+                {t("cancel")}
+              </Button>
+              <Button
+                variant={confirmKind === "delete" ? "danger" : "default"}
+                size="sm"
+                onClick={runConfirm}
+                loading={acting}
+              >
+                {confirmKind === "delete"
+                  ? !isOwner && canModerate
+                    ? t("removeAction")
+                    : t("deleteAction")
+                  : t("reportAction")}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </article>
   );

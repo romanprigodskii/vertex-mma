@@ -8,9 +8,13 @@ import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
 import { NewsClassificationBadge } from "@/components/news/news-classification-badge";
 import { NewsComments } from "@/components/news/news-comments";
-import { NewsSidebar } from "@/components/news/news-sidebar";
+import {
+  NewsNextEventCompact,
+  NewsSidebar,
+} from "@/components/news/news-sidebar";
 import { NewsTimestamp } from "@/components/news/news-timestamp";
 import { RelatedNews } from "@/components/news/related-news";
+import { safeHttpUrl } from "@/components/news/safe-url";
 import {
   SocialEmbed,
   SocialReactions,
@@ -143,6 +147,9 @@ export default async function NewsArticlePage({ params }: PageProps) {
     featuredByParagraph.set(slot, list);
   }
 
+  const heroImage = safeHttpUrl(item.image_url);
+  const sourceHref = safeHttpUrl(item.url);
+
   return (
     <>
       <Navbar />
@@ -156,10 +163,12 @@ export default async function NewsArticlePage({ params }: PageProps) {
             <ChevronLeft className="h-4 w-4" aria-hidden /> {t("allNews")}
           </Link>
 
+          {nextEvent ? <NewsNextEventCompact event={nextEvent} /> : null}
+
           <div className="mt-6 grid grid-cols-1 gap-x-12 gap-y-10 lg:grid-cols-[minmax(0,1fr)_320px]">
             <article className="min-w-0 max-w-[720px]">
               <header>
-                <div className="flex flex-wrap items-center gap-2 font-mono text-[11px] uppercase tracking-widest text-foreground-subtle">
+                <div className="flex flex-wrap items-center gap-2 font-mono text-[11px] uppercase tracking-widest text-foreground-muted">
                   <NewsClassificationBadge classification={item.classification} />
                   <span className="truncate text-foreground-muted">
                     {item.source_name}
@@ -179,16 +188,16 @@ export default async function NewsArticlePage({ params }: PageProps) {
                     </>
                   ) : null}
                 </div>
-                <h1 className="mt-4 font-display uppercase tracking-tight text-foreground text-h2">
+                <h1 className="mt-4 font-display uppercase tracking-tight text-foreground text-h2 break-words">
                   {item.title}
                 </h1>
               </header>
 
-              {item.image_url ? (
+              {heroImage ? (
                 <figure className="mt-6 overflow-hidden rounded-md border border-foreground/10 bg-background-elevated/30">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={item.image_url}
+                    src={heroImage}
                     alt=""
                     loading="lazy"
                     referrerPolicy="no-referrer"
@@ -231,7 +240,7 @@ export default async function NewsArticlePage({ params }: PageProps) {
                               ) : (
                                 <p
                                   key={li}
-                                  className="mb-1 mt-4 font-mono text-[11px] uppercase tracking-widest text-foreground-subtle first:mt-2"
+                                  className="mb-1 mt-4 font-mono text-[11px] uppercase tracking-widest text-foreground-muted first:mt-2"
                                 >
                                   {line}
                                 </p>
@@ -239,7 +248,16 @@ export default async function NewsArticlePage({ params }: PageProps) {
                             )}
                           </div>
                         ) : i === 0 ? (
-                          <p className="whitespace-pre-line text-lg leading-[1.65] text-foreground first-letter:float-left first-letter:mr-3 first-letter:font-display first-letter:text-[3.8em] first-letter:leading-[0.85] first-letter:text-primary">
+                          <p
+                            className={
+                              // Drop-cap only when the paragraph opens with an
+                              // actual letter — a digit, quote or emoji rendered
+                              // at 3.8em in the primary color looks broken.
+                              /^\p{L}/u.test(p)
+                                ? "whitespace-pre-line text-lg leading-[1.65] text-foreground first-letter:float-left first-letter:mr-3 first-letter:font-display first-letter:text-[3.8em] first-letter:leading-[0.85] first-letter:text-primary"
+                                : "whitespace-pre-line text-lg leading-[1.65] text-foreground"
+                            }
+                          >
                             {autolinkParagraph(
                               p,
                               allFighters,
@@ -272,7 +290,7 @@ export default async function NewsArticlePage({ params }: PageProps) {
 
               {allFighters.length > 0 ? (
                 <div className="mt-7">
-                  <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.2em] text-foreground-subtle">
+                  <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.2em] text-foreground-muted">
                     {t("fightersMentioned")}
                   </p>
                   <div className="flex flex-wrap gap-1.5">
@@ -296,17 +314,19 @@ export default async function NewsArticlePage({ params }: PageProps) {
                 />
               ) : null}
 
-              <div className="mt-8 border-t border-foreground/10 pt-6">
-                <a
-                  href={item.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 font-sans text-sm text-primary hover:underline"
-                >
-                  {t("readOriginal", { source: item.source_name })}
-                  <ExternalLink className="h-3.5 w-3.5" aria-hidden />
-                </a>
-              </div>
+              {sourceHref ? (
+                <div className="mt-8 border-t border-foreground/10 pt-6">
+                  <a
+                    href={sourceHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 font-sans text-sm text-primary hover:underline"
+                  >
+                    {t("readOriginal", { source: item.source_name })}
+                    <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+                  </a>
+                </div>
+              ) : null}
 
               <RelatedNews items={related} heading={t("moreNews")} />
 

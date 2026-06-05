@@ -85,6 +85,6 @@ export function platformDisplayName(platform: Platform): string {
     case "tiktok":
       return "TikTok";
     case "link":
-      return "link";
+      return "Link";
   }
 }
