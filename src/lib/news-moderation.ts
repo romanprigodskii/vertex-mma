@@ -11,7 +11,9 @@ const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Strip HTML entities the same way the public feed does — kept local to avoid
- *  exporting the private helper from news.ts. Mirrors news.ts decodeEntities. */
+ *  exporting the private helper from news.ts. Mirrors news.ts decodeEntities.
+ *  SECURITY: the decoded result must only ever render as a React child (which
+ *  auto-escapes); never feed it to dangerouslySetInnerHTML or a raw-HTML sink. */
 function decodeEntities(text: string): string {
   return text
     .replace(/&amp;/g, "&")

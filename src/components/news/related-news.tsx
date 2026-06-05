@@ -2,6 +2,7 @@ import { getTranslations } from "next-intl/server";
 
 import { NewsClassificationBadge } from "@/components/news/news-classification-badge";
 import { NewsTimestamp } from "@/components/news/news-timestamp";
+import { safeHttpUrl } from "@/components/news/safe-url";
 import { Link } from "@/i18n/navigation";
 import type { NewsFeedItem } from "@/lib/news";
 
@@ -29,40 +30,44 @@ export async function RelatedNews({
           {t("allNews")} →
         </Link>
       </div>
-      <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {items.map((item) => (
-          <li key={item.id}>
-            <Link
-              href={`/news/${item.id}`}
-              prefetch={false}
-              className="flex h-full flex-col overflow-hidden rounded-md border border-foreground/10 bg-background-elevated/40 transition-colors hover:border-foreground/25 hover:bg-foreground/[0.04]"
-            >
-              {item.image_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={item.image_url}
-                  alt=""
-                  loading="lazy"
-                  referrerPolicy="no-referrer"
-                  className="aspect-[16/9] w-full object-cover"
-                />
-              ) : null}
-              <div className="flex flex-1 flex-col p-4">
-                <div className="flex flex-wrap items-center gap-2 font-mono text-[10px] uppercase tracking-[0.16em] text-foreground-subtle">
-                  <NewsClassificationBadge classification={item.classification} />
-                  <NewsTimestamp
-                    iso={item.published_at}
-                    variant="compact"
-                    className="tabular-nums"
+      <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {items.map((item) => {
+          const imageUrl = safeHttpUrl(item.image_url);
+          return (
+            <li key={item.id}>
+              <Link
+                href={`/news/${item.id}`}
+                prefetch={false}
+                className="flex h-full flex-col overflow-hidden rounded-md border border-foreground/10 bg-background-elevated/40 transition-colors hover:border-foreground/25 hover:bg-foreground/[0.04]"
+              >
+                {imageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={imageUrl}
+                    alt=""
+                    loading="lazy"
+                    referrerPolicy="no-referrer"
+                    className="aspect-[16/9] w-full object-cover"
                   />
+                ) : null}
+                <div className="flex flex-1 flex-col p-4">
+                  <div className="flex flex-wrap items-center gap-2 font-mono text-[10px] uppercase tracking-[0.16em] text-foreground-muted">
+                    <NewsClassificationBadge classification={item.classification} />
+                    <NewsTimestamp
+                      iso={item.published_at}
+                      variant="compact"
+                      relative
+                      className="tabular-nums"
+                    />
+                  </div>
+                  <p className="mt-2 line-clamp-3 text-sm leading-snug text-foreground">
+                    {item.title}
+                  </p>
                 </div>
-                <p className="mt-2 line-clamp-3 text-sm leading-snug text-foreground">
-                  {item.title}
-                </p>
-              </div>
-            </Link>
-          </li>
-        ))}
+              </Link>
+            </li>
+          );
+        })}
       </ul>
     </section>
   );

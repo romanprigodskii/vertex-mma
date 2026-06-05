@@ -10,6 +10,7 @@ import {
 } from "@/app/[locale]/admin/news/actions";
 import { NewsClassificationBadge } from "@/components/news/news-classification-badge";
 import { NewsTimestamp } from "@/components/news/news-timestamp";
+import { safeHttpUrl } from "@/components/news/safe-url";
 import type { PendingNewsItem } from "@/lib/news-moderation";
 import { cn } from "@/lib/utils";
 
@@ -59,6 +60,10 @@ export function PendingNewsCard({ item }: { item: PendingNewsItem }) {
 
   const confidencePct =
     item.confidence != null ? Math.round(item.confidence * 100) : null;
+  // Scheme guard even in the staff queue: a moderator clicking a stored
+  // javascript: link runs in their authenticated admin session.
+  const href = safeHttpUrl(item.url);
+  const imageUrl = safeHttpUrl(item.image_url);
 
   return (
     <div className="flex gap-4 rounded-md border border-foreground/10 bg-background-elevated/30 p-4">
@@ -95,18 +100,24 @@ export function PendingNewsCard({ item }: { item: PendingNewsItem }) {
           />
         </div>
 
-        <a
-          href={item.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-2 flex items-start gap-1.5 font-sans text-base font-medium text-foreground hover:text-primary"
-        >
-          <span>{item.title}</span>
-          <ExternalLink
-            className="mt-1 h-3.5 w-3.5 shrink-0 text-foreground-subtle"
-            aria-hidden
-          />
-        </a>
+        {href ? (
+          <a
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-2 flex items-start gap-1.5 font-sans text-base font-medium text-foreground hover:text-primary"
+          >
+            <span>{item.title}</span>
+            <ExternalLink
+              className="mt-1 h-3.5 w-3.5 shrink-0 text-foreground-subtle"
+              aria-hidden
+            />
+          </a>
+        ) : (
+          <p className="mt-2 font-sans text-base font-medium text-foreground">
+            {item.title}
+          </p>
+        )}
 
         {item.snippet ? (
           <p className="mt-2 line-clamp-4 font-sans text-sm text-foreground-muted">
@@ -144,10 +155,10 @@ export function PendingNewsCard({ item }: { item: PendingNewsItem }) {
         </div>
       </div>
 
-      {item.image_url ? (
+      {imageUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={item.image_url}
+          src={imageUrl}
           alt=""
           loading="lazy"
           referrerPolicy="no-referrer"

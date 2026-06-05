@@ -1,7 +1,7 @@
 import "server-only";
 
 import { revalidatePath } from "next/cache";
-import { and, asc, desc, eq, isNull, gt, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, gt, sql } from "drizzle-orm";
 
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -91,10 +91,20 @@ export async function listCommentsForNews(
   const voteMap = new Map<string, number>();
   if (currentUserProfileId && UUID_RE.test(currentUserProfileId) && rows.length) {
     try {
+      // Scope to THIS article's comments — without the inArray we'd fetch the
+      // viewer's entire site-wide vote history on every article view.
       const votes = await db
         .select({ commentId: newsCommentVote.commentId, dir: newsCommentVote.dir })
         .from(newsCommentVote)
-        .where(eq(newsCommentVote.userProfileId, currentUserProfileId));
+        .where(
+          and(
+            eq(newsCommentVote.userProfileId, currentUserProfileId),
+            inArray(
+              newsCommentVote.commentId,
+              rows.map((r) => r.id),
+            ),
+          ),
+        );
       for (const v of votes) voteMap.set(v.commentId, v.dir);
     } catch {
       // Votes table not pushed yet → treat as no votes.
@@ -147,6 +157,13 @@ export async function listCommentsForNews(
 
 const RATE_LIMIT_SECONDS = 10;
 
+/** Cooldown between comment reports from one user. The DB unique index caps it
+ *  to one row per (user, comment); this stops a single account firing
+ *  reportCommentAction at every comment to flood the moderation queue. */
+const FLAG_COOLDOWN_MS = 3_000;
+
+/** `error` is a stable MACHINE CODE (e.g. "RATE_LIMITED"), not a user-facing
+ *  sentence — the client maps it to localized copy (see `commentError*` keys). */
 export type AddCommentResult =
   | { ok: true; commentId: string }
   | { ok: false; error: string };
@@ -157,19 +174,18 @@ export async function addNewsComment(opts: {
   body: string;
 }): Promise<AddCommentResult> {
   if (!UUID_RE.test(opts.newsItemId)) {
-    return { ok: false, error: "Bad article" };
+    return { ok: false, error: "ARTICLE_UNAVAILABLE" };
   }
   if (opts.parentId !== null && !UUID_RE.test(opts.parentId)) {
-    return { ok: false, error: "Bad reply target" };
+    return { ok: false, error: "BAD_REPLY" };
   }
 
   const trimmed = opts.body.trim();
-  if (trimmed.length === 0) return { ok: false, error: "Empty comment" };
-  if (trimmed.length > 2000)
-    return { ok: false, error: "Too long (2000 char max)" };
+  if (trimmed.length === 0) return { ok: false, error: "EMPTY" };
+  if (trimmed.length > 2000) return { ok: false, error: "TOO_LONG" };
 
   const user = await getCurrentUser();
-  if (!user) return { ok: false, error: "Sign in to comment" };
+  if (!user) return { ok: false, error: "SIGN_IN" };
 
   const recent = await db
     .select({ id: newsComment.id })
@@ -185,7 +201,22 @@ export async function addNewsComment(opts: {
     )
     .limit(1);
   if (recent.length > 0) {
-    return { ok: false, error: "Slow down — wait a few seconds" };
+    return { ok: false, error: "RATE_LIMITED" };
+  }
+
+  // Only published articles accept comments. Without this, a signed-in user who
+  // guesses a news_item UUID could seed comments on items still in the
+  // moderation queue (pending) or deliberately hidden (rejected).
+  const article = (await db.execute<{ status: string }>(sql`
+    SELECT status::text AS status FROM news_item
+    WHERE id = ${opts.newsItemId}::uuid
+    LIMIT 1
+  `)) as unknown as Array<{ status: string }>;
+  if (
+    article.length === 0 ||
+    (article[0].status !== "approved" && article[0].status !== "auto_approved")
+  ) {
+    return { ok: false, error: "ARTICLE_UNAVAILABLE" };
   }
 
   // Flatten reply-of-reply: if the parent has its own parent, attach to the
@@ -197,7 +228,7 @@ export async function addNewsComment(opts: {
       .from(newsComment)
       .where(eq(newsComment.id, parentId))
       .limit(1);
-    if (parent.length === 0) return { ok: false, error: "Reply target missing" };
+    if (parent.length === 0) return { ok: false, error: "REPLY_MISSING" };
     if (parent[0].parentId) parentId = parent[0].parentId;
   }
 
@@ -254,6 +285,9 @@ export async function flagComment(
   if (!UUID_RE.test(commentId)) return { ok: false, error: "Bad id" };
   const user = await getCurrentUser();
   if (!user) return { ok: false, error: "Sign in" };
+  if (!allowAction(`flag:${user.userProfileId}`, FLAG_COOLDOWN_MS)) {
+    return { ok: false, error: "Slow down" };
+  }
 
   // Can't report your own comment.
   const rows = await db
@@ -324,40 +358,58 @@ export async function voteComment(
     eq(newsCommentVote.userProfileId, user.userProfileId),
   );
   try {
-    const existing = await db
-      .select({ dir: newsCommentVote.dir })
-      .from(newsCommentVote)
-      .where(where)
-      .limit(1);
+    const result = await db.transaction(async (tx) => {
+      // Lock the comment row so two concurrent votes (or a vote racing a
+      // delete) can't each read a stale vote set and write back a count that
+      // clobbers the other — the read-modify-write below must be serialized.
+      await tx.execute(
+        sql`SELECT 1 FROM news_comment WHERE id = ${commentId}::uuid FOR UPDATE`,
+      );
 
-    let userVote: number;
-    if (existing.length === 0) {
-      await db
-        .insert(newsCommentVote)
-        .values({ commentId, userProfileId: user.userProfileId, dir });
-      userVote = dir;
-    } else if (existing[0].dir === dir) {
-      await db.delete(newsCommentVote).where(where);
-      userVote = 0;
-    } else {
-      await db.update(newsCommentVote).set({ dir }).where(where);
-      userVote = dir;
-    }
+      const existing = await tx
+        .select({ dir: newsCommentVote.dir })
+        .from(newsCommentVote)
+        .where(where)
+        .limit(1);
 
-    const agg = (await db.execute<{ up: number; down: number }>(sql`
-      SELECT
-        COUNT(*) FILTER (WHERE dir = 1)::int AS up,
-        COUNT(*) FILTER (WHERE dir = -1)::int AS down
-      FROM news_comment_vote WHERE comment_id = ${commentId}::uuid
-    `)) as unknown as Array<{ up: number; down: number }>;
-    const counts = agg[0] ?? { up: 0, down: 0 };
-    await db
-      .update(newsComment)
-      .set({ upvotes: counts.up, downvotes: counts.down })
-      .where(eq(newsComment.id, commentId));
+      let userVote: number;
+      if (existing.length === 0) {
+        await tx
+          .insert(newsCommentVote)
+          .values({ commentId, userProfileId: user.userProfileId, dir });
+        userVote = dir;
+      } else if (existing[0].dir === dir) {
+        await tx.delete(newsCommentVote).where(where);
+        userVote = 0;
+      } else {
+        await tx.update(newsCommentVote).set({ dir }).where(where);
+        userVote = dir;
+      }
 
-    revalidatePath(`/news/${rows[0].newsItemId}`);
-    return { ok: true, upvotes: counts.up, downvotes: counts.down, userVote };
+      const agg = (await tx.execute<{ up: number; down: number }>(sql`
+        SELECT
+          COUNT(*) FILTER (WHERE dir = 1)::int AS up,
+          COUNT(*) FILTER (WHERE dir = -1)::int AS down
+        FROM news_comment_vote WHERE comment_id = ${commentId}::uuid
+      `)) as unknown as Array<{ up: number; down: number }>;
+      const counts = agg[0] ?? { up: 0, down: 0 };
+      await tx
+        .update(newsComment)
+        .set({ upvotes: counts.up, downvotes: counts.down })
+        .where(eq(newsComment.id, commentId));
+
+      return { up: counts.up, down: counts.down, userVote };
+    });
+
+    // No revalidatePath on votes: the client updates its local count from this
+    // return value. Revalidating would re-render the whole article RSC tree
+    // (body, fighters, related, sidebar) on every single up/down tap.
+    return {
+      ok: true,
+      upvotes: result.up,
+      downvotes: result.down,
+      userVote: result.userVote,
+    };
   } catch {
     return { ok: false, error: "Vote failed" };
   }

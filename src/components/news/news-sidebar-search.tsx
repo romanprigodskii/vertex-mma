@@ -67,6 +67,7 @@ export function NewsSidebarSearch() {
           value={value}
           onChange={(e) => setValue(e.target.value)}
           placeholder={t("searchFightersPlaceholder")}
+          aria-label={t("searchFightersPlaceholder")}
           className={cn(
             "h-full flex-1 bg-transparent text-sm text-foreground outline-none",
             "placeholder:text-foreground-subtle",

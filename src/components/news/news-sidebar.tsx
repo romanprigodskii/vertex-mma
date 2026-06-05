@@ -2,6 +2,7 @@ import { getLocale, getTranslations } from "next-intl/server";
 import { ArrowRight } from "lucide-react";
 
 import { NewsSidebarSearch } from "@/components/news/news-sidebar-search";
+import { safeHttpUrl } from "@/components/news/safe-url";
 import { Link } from "@/i18n/navigation";
 import type { UpcomingEventSidebar } from "@/lib/event-detail";
 import type { NewsFeedItem } from "@/lib/news";
@@ -61,7 +62,7 @@ function Widget({
 }) {
   return (
     <section className="rounded-md border border-foreground/10 bg-background-elevated/60 p-4">
-      <p className="mb-3 font-mono text-[10px] font-medium uppercase tracking-[0.2em] text-foreground-subtle">
+      <p className="mb-3 font-mono text-[10px] font-medium uppercase tracking-[0.2em] text-foreground-muted">
         {label}
       </p>
       {children}
@@ -130,14 +131,16 @@ function LatestNewsWidget({
 }) {
   if (items.length === 0) {
     return (
-      <p className="font-sans text-xs text-foreground-subtle">
+      <p className="font-sans text-xs text-foreground-muted">
         {labels.noOther}
       </p>
     );
   }
   return (
     <ul className="flex flex-col">
-      {items.map((item, i) => (
+      {items.map((item, i) => {
+        const imageUrl = safeHttpUrl(item.image_url);
+        return (
         <li
           key={item.id}
           className={
@@ -147,7 +150,7 @@ function LatestNewsWidget({
           }
         >
           <div className="flex gap-3">
-            {item.image_url ? (
+            {imageUrl ? (
               <Link
                 href={`/news/${item.id}`}
                 prefetch={false}
@@ -157,7 +160,7 @@ function LatestNewsWidget({
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={item.image_url}
+                  src={imageUrl}
                   alt=""
                   loading="lazy"
                   referrerPolicy="no-referrer"
@@ -166,7 +169,7 @@ function LatestNewsWidget({
               </Link>
             ) : null}
             <div className="min-w-0 flex-1">
-              <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-foreground-subtle">
+              <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-foreground-muted">
                 {item.source_name} · {formatRelative(item.published_at, labels, locale)}
               </span>
               <Link
@@ -179,7 +182,8 @@ function LatestNewsWidget({
             </div>
           </div>
         </li>
-      ))}
+        );
+      })}
     </ul>
   );
 }
@@ -214,9 +218,14 @@ export async function NewsSidebar({
   return (
     <aside className="flex flex-col gap-4 lg:sticky lg:top-8">
       {nextEvent ? (
-        <Widget label={labels.nextEventLabel}>
-          <NextEventWidget event={nextEvent} labels={labels} locale={locale} />
-        </Widget>
+        // Hidden on mobile — there the next event is hoisted above the article
+        // by <NewsNextEventCompact>, since the whole sidebar otherwise sits
+        // below the article body AND the entire comment thread.
+        <div className="hidden lg:block">
+          <Widget label={labels.nextEventLabel}>
+            <NextEventWidget event={nextEvent} labels={labels} locale={locale} />
+          </Widget>
+        </div>
       ) : null}
       <Widget label={labels.latestNewsLabel}>
         <LatestNewsWidget items={latestNews} labels={labels} locale={locale} />
@@ -225,5 +234,43 @@ export async function NewsSidebar({
         <NewsSidebarSearch />
       </Widget>
     </aside>
+  );
+}
+
+/** Compact next-event card hoisted ABOVE the article on small screens (`lg:hidden`).
+ *  On mobile the full <NewsSidebar> stacks below the article and its comments, so
+ *  the "next event" jump-off is otherwise unreachable without scrolling past
+ *  everything. Hidden at lg+, where the full widget lives in the sidebar column. */
+export async function NewsNextEventCompact({
+  event,
+}: {
+  event: UpcomingEventSidebar;
+}) {
+  const t = await getTranslations("news");
+  const matchup =
+    event.main_event_fighter_a && event.main_event_fighter_b
+      ? `${event.main_event_fighter_a} vs ${event.main_event_fighter_b}`
+      : null;
+  return (
+    <Link
+      href={`/events/${event.slug}`}
+      prefetch={false}
+      className="group mt-6 flex items-center justify-between gap-3 rounded-md border border-foreground/10 bg-background-elevated/60 p-3 lg:hidden"
+    >
+      <div className="min-w-0">
+        <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-primary">
+          {t("nextEventLabel")}
+        </span>
+        <p className="truncate font-display text-base uppercase leading-tight tracking-tight text-foreground">
+          {event.short_name ?? event.name}
+        </p>
+        {matchup ? (
+          <p className="truncate text-xs text-foreground-muted">{matchup}</p>
+        ) : null}
+      </div>
+      <span className="shrink-0 font-mono text-[10px] uppercase tracking-[0.16em] text-primary group-hover:underline">
+        {t("viewCard")} →
+      </span>
+    </Link>
   );
 }
