@@ -17,6 +17,7 @@ import {
 } from "@/lib/db/schema/cards";
 import { userProfile } from "@/lib/db/schema/users";
 import { searchFighters } from "@/lib/fighter-search";
+import { COOLDOWN_MS, allowAction } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 import { slugify } from "@/lib/utils";
 
@@ -297,6 +298,9 @@ export async function toggleLikeAction(
 ): Promise<{ error?: string; liked?: boolean; likeCount?: number }> {
   const myId = await getMyProfileId();
   if (!myId) return { error: "Sign in to like cards." };
+  if (!allowAction(`like:${myId}`, COOLDOWN_MS.like)) {
+    return { error: "Slow down — wait a moment." };
+  }
   if (!UUID_RE.test(cardId)) return { error: "Card not found." };
 
   const card = await db

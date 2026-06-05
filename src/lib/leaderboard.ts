@@ -11,7 +11,6 @@ export type LeaderboardRow = {
   display_name: string | null;
   avatar_url: string | null;
   tier: string;
-  balance: number;
   profit: number;
   total_lost: number;
   bet_count: number;
@@ -49,7 +48,6 @@ export async function getLeaderboard(
         up.display_name,
         up.avatar_url,
         up.tier::text AS tier,
-        up.balance_coins::float8 AS balance,
         (up.total_coins_earned - up.total_coins_lost)::float8 AS profit,
         up.total_coins_lost::float8 AS total_lost,
         up.bet_count::float8 AS bet_count,
@@ -73,7 +71,6 @@ export async function getLeaderboard(
         up.display_name,
         up.avatar_url,
         up.tier::text AS tier,
-        up.balance_coins::float8 AS balance,
         (up.total_coins_earned - up.total_coins_lost)::float8 AS profit,
         up.total_coins_lost::float8 AS total_lost,
         up.bet_count::float8 AS bet_count,
@@ -93,7 +90,6 @@ export async function getLeaderboard(
         up.display_name,
         up.avatar_url,
         up.tier::text AS tier,
-        up.balance_coins::float8 AS balance,
         (up.total_coins_earned - up.total_coins_lost)::float8 AS profit,
         up.total_coins_lost::float8 AS total_lost,
         up.bet_count::float8 AS bet_count,

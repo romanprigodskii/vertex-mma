@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { headers } from "next/headers";
 import { getTranslations } from "next-intl/server";
 
-import { mapAuthError } from "@/lib/auth-errors";
+import { isEmailAlreadyRegisteredError, mapAuthError } from "@/lib/auth-errors";
 import { db } from "@/lib/db";
 import { userProfile } from "@/lib/db/schema/users";
 import { createClient } from "@/lib/supabase/server";
@@ -13,7 +13,7 @@ const USERNAME_RE = /^[a-zA-Z0-9_]{3,30}$/;
 
 export async function signUpAction(
   formData: FormData,
-): Promise<{ error?: string }> {
+): Promise<{ error?: string; success?: boolean }> {
   const t = await getTranslations("auth");
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
@@ -55,7 +55,14 @@ export async function signUpAction(
       emailRedirectTo: `${origin}/auth/callback`,
     },
   });
-  if (error) return { error: mapAuthError(error, t) };
+  if (error) {
+    // Don't reveal whether the email is already registered — return the same
+    // neutral "check your email" state as a fresh signup (mirrors the
+    // forgot-password flow, which never discloses account existence). Genuine
+    // errors (weak password, send rate-limit) still surface.
+    if (isEmailAlreadyRegisteredError(error)) return { success: true };
+    return { error: mapAuthError(error, t) };
+  }
 
-  return {};
+  return { success: true };
 }

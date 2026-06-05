@@ -7,6 +7,23 @@
 type AuthErrorLike = { code?: string | null; message?: string | null } | null;
 type Translator = (key: string) => string;
 
+/**
+ * True when Supabase is telling us the email is already registered. Callers
+ * that must not leak account existence (signup) use this to swallow the case
+ * and fall through to a neutral "check your email" state instead of surfacing
+ * a distinct error.
+ */
+export function isEmailAlreadyRegisteredError(error: AuthErrorLike): boolean {
+  if (!error) return false;
+  const code = (error.code ?? "").toLowerCase();
+  const msg = (error.message ?? "").toLowerCase();
+  return (
+    code === "user_already_exists" ||
+    msg.includes("already registered") ||
+    msg.includes("already been registered")
+  );
+}
+
 export function mapAuthError(error: AuthErrorLike, t: Translator): string {
   if (!error) return t("errGeneric");
   const code = (error.code ?? "").toLowerCase();
@@ -15,11 +32,7 @@ export function mapAuthError(error: AuthErrorLike, t: Translator): string {
   if (code === "invalid_credentials" || msg.includes("invalid login")) {
     return t("errInvalidCredentials");
   }
-  if (
-    code === "user_already_exists" ||
-    msg.includes("already registered") ||
-    msg.includes("already been registered")
-  ) {
+  if (isEmailAlreadyRegisteredError(error)) {
     return t("errEmailTaken");
   }
   if (

@@ -23,7 +23,7 @@ export function SignUpForm() {
     setPending(false);
     if (res?.error) {
       setError(res.error);
-    } else {
+    } else if (res?.success) {
       setSuccess(true);
     }
   }

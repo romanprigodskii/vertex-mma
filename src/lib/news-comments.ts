@@ -11,6 +11,7 @@ import {
   newsCommentVote,
 } from "@/lib/db/schema/news";
 import { userProfile } from "@/lib/db/schema/users";
+import { COOLDOWN_MS, allowAction } from "@/lib/rate-limit";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -302,6 +303,9 @@ export async function voteComment(
   if (dir !== 1 && dir !== -1) return { ok: false, error: "Bad direction" };
   const user = await getCurrentUser();
   if (!user) return { ok: false, error: "Sign in" };
+  if (!allowAction(`vote:${user.userProfileId}`, COOLDOWN_MS.vote)) {
+    return { ok: false, error: "Slow down — wait a moment" };
+  }
 
   const rows = await db
     .select({

@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { checkAndUnlockAchievements } from "@/lib/achievements";
 import { db } from "@/lib/db";
 import { userProfile } from "@/lib/db/schema/users";
+import { COOLDOWN_MS, allowAction } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 import { dailyBonusAmount } from "@/lib/tier";
 
@@ -21,6 +22,11 @@ export async function claimDailyBonusAction(): Promise<{
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "Not signed in." };
+  // The 20h cooldown is enforced below; this just stops a script from pounding
+  // the endpoint (and the pooler) far faster than that check can run.
+  if (!allowAction(`daily:${user.id}`, COOLDOWN_MS.dailyBonus)) {
+    return { error: "Slow down — try again in a moment." };
+  }
 
   const profileRows = await db
     .select({

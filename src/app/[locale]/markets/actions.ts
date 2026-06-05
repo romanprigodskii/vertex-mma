@@ -21,6 +21,7 @@ import {
   potentialPayout,
   selectionSide,
 } from "@/lib/sportsbook";
+import { COOLDOWN_MS, allowAction } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 
 const MIN_COINS_PER_BET = 1;
@@ -60,6 +61,9 @@ export async function placeBetAction(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "Not signed in." };
+  if (!allowAction(`bet:${user.id}`, COOLDOWN_MS.bet)) {
+    return { error: "Slow down — wait a moment before betting again." };
+  }
 
   if (
     !Number.isFinite(coinsToSpend) ||
@@ -257,9 +261,22 @@ export async function previewBetCost(
   | { shares: number; cost: number; newPrice: number }
   | { error: string }
 > {
+  // Auth-gate: this runs an LMSR bisection on caller-supplied numbers, so an
+  // unauthenticated caller is free, unaccounted compute. The bet form is only
+  // reachable when signed in, so a session check costs legitimate users
+  // nothing while shutting the anonymous endpoint.
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Not signed in." };
+
   if (!Number.isFinite(coins) || coins <= 0) {
     return { error: "Coins must be > 0." };
   }
+  // Clamp to the same ceiling placeBetAction enforces so the solver can never
+  // be fed an arbitrarily large amount.
+  const coinsInt = Math.min(Math.floor(coins), MAX_COINS_PER_BET);
 
   const marketRows = await db.execute<{ b_parameter: number }>(sql`
     SELECT b_parameter FROM market WHERE id = ${marketId}::uuid LIMIT 1
@@ -287,7 +304,7 @@ export async function previewBetCost(
   if (idx < 0) return { error: "Outcome not found." };
 
   const sharesArr = outcomes.map((o) => o.current_shares);
-  const shares = lmsrSharesForCoins(sharesArr, b, idx, Math.floor(coins));
+  const shares = lmsrSharesForCoins(sharesArr, b, idx, coinsInt);
   if (!(shares > 0)) return { error: "Coins too small." };
   const cost = Math.ceil(lmsrBuyCost(sharesArr, b, idx, shares));
   const newSharesArr = sharesArr.slice();
@@ -322,6 +339,9 @@ export async function placeFixedOddsBetAction(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "Not signed in." };
+  if (!allowAction(`bet:${user.id}`, COOLDOWN_MS.bet)) {
+    return { error: "Slow down — wait a moment before betting again." };
+  }
 
   if (!isSelectionCode(selectionCode)) return { error: "Unknown selection." };
   const code = selectionCode as SportsbookSelectionCode;
@@ -574,6 +594,9 @@ export async function placeParlayAction(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "Not signed in." };
+  if (!allowAction(`bet:${user.id}`, COOLDOWN_MS.bet)) {
+    return { error: "Slow down — wait a moment before betting again." };
+  }
 
   if (
     !Array.isArray(legs) ||
