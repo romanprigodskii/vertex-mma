@@ -21,6 +21,7 @@ import {
   listUserAchievements,
 } from "@/lib/achievements";
 import { getCurrentUser, getUserProfileByUsername } from "@/lib/auth";
+import { formatNumber } from "@/lib/format";
 import { listCardsByUser } from "@/lib/fight-cards";
 import { listRankingsByUser } from "@/lib/rankings";
 import { isTier } from "@/lib/tier";
@@ -120,7 +121,7 @@ export default async function PublicProfilePage({ params }: PageProps) {
             </div>
 
             <div className="flex-1 text-center sm:text-left">
-              <h1 className="font-display text-3xl uppercase tracking-tight text-foreground sm:text-4xl">
+              <h1 className="font-display uppercase tracking-tight text-foreground text-h1">
                 {profile.displayName || profile.username}
               </h1>
               <p className="mt-1 font-mono text-sm text-foreground-muted">
@@ -287,7 +288,7 @@ function Stat({ label, value }: { label: string; value: number }) {
         {label}
       </dt>
       <dd className="mt-1 font-display text-2xl tabular text-foreground">
-        {value.toLocaleString()}
+        {formatNumber(value)}
       </dd>
     </div>
   );

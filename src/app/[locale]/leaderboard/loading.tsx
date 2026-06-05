@@ -25,7 +25,7 @@ export default function LeaderboardLoading() {
             {Array.from({ length: 10 }).map((_, i) => (
               <li
                 key={i}
-                className="grid grid-cols-[2.5rem_2.5rem_1fr_auto] items-center gap-3 rounded-md border border-foreground/10 bg-background-elevated/30 px-3 py-2.5"
+                className="grid grid-cols-[2rem_2.25rem_minmax(0,1fr)_auto] items-center gap-2 rounded-md border border-foreground/10 bg-background-elevated/30 px-2.5 py-2.5 sm:grid-cols-[2.5rem_2.5rem_minmax(0,1fr)_auto] sm:gap-3 sm:px-3"
               >
                 <div className="h-5 w-8 animate-pulse rounded bg-foreground/[0.05]" />
                 <div className="h-8 w-8 animate-pulse rounded-full bg-foreground/[0.05]" />

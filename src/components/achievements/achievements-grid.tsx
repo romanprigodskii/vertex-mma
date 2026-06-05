@@ -4,6 +4,7 @@ import type {
   AchievementRow,
   UserAchievementRow,
 } from "@/lib/achievements";
+import { formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -102,7 +103,7 @@ export function AchievementsGrid({
             </p>
             <p className="mt-2 font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
               {a.rarity}
-              {a.reward_coins > 0 ? ` · +${a.reward_coins}c` : ""}
+              {a.reward_coins > 0 ? ` · +${formatNumber(a.reward_coins)}c` : ""}
               {isUnlocked && unlockedRow
                 ? ` · ${new Date(unlockedRow.unlocked_at).toLocaleDateString(dateLocale)}`
                 : ""}

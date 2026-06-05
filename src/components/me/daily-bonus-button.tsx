@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 
 import { claimDailyBonusAction } from "@/app/[locale]/me/actions";
 import { useMounted } from "@/hooks/use-mounted";
+import { formatNumber } from "@/lib/format";
 import { dailyBonusAmount } from "@/lib/tier";
 
 const COOLDOWN_HOURS = 20;
@@ -41,6 +42,25 @@ export function DailyBonusButton({ lastDailyBonusAt, tier }: Props) {
   const eligible =
     lastIso === null || (mounted && hoursUntilEligible(lastIso) <= 0);
 
+  // The server action returns a stable machine code (not an English sentence)
+  // so the message stays localized; map it to the active locale here.
+  function errorMessage(code: string, hoursLeft?: number): string {
+    switch (code) {
+      case "COOLDOWN_ACTIVE":
+        return t("error_cooldown", { hours: hoursLeft ?? COOLDOWN_HOURS });
+      case "RATE_LIMITED":
+        return t("error_rateLimited");
+      case "ALREADY_CLAIMED":
+        return t("error_alreadyClaimed");
+      case "NOT_SIGNED_IN":
+        return t("error_notSignedIn");
+      case "PROFILE_NOT_FOUND":
+        return t("error_profileNotFound");
+      default:
+        return t("error_generic");
+    }
+  }
+
   async function onClick() {
     setPending(true);
     setFeedback(null);
@@ -49,10 +69,10 @@ export function DailyBonusButton({ lastDailyBonusAt, tier }: Props) {
     setPending(false);
     if (res.error) {
       setIsError(true);
-      setFeedback(res.error);
+      setFeedback(errorMessage(res.error, res.hoursLeft));
       return;
     }
-    const awardedAmount = res.awarded?.toLocaleString() ?? amount.toLocaleString();
+    const awardedAmount = formatNumber(res.awarded ?? amount);
     let msg = t("claimedToast", { amount: awardedAmount });
     if (res.newlyUnlocked && res.newlyUnlocked.length > 0) {
       msg += ` ${t("unlockedToast", { list: res.newlyUnlocked.join(", ") })}`;
@@ -89,7 +109,7 @@ export function DailyBonusButton({ lastDailyBonusAt, tier }: Props) {
       >
         {pending
           ? t("claiming")
-          : t("claimDaily", { amount: amount.toLocaleString() })}
+          : t("claimDaily", { amount: formatNumber(amount) })}
       </button>
       {feedback ? (
         <p

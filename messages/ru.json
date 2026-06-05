@@ -456,8 +456,8 @@
     "navLabel": "Сортировка лидерборда",
     "sort_profit": "Капитал",
     "sort_profit_hint": "Заработано минус проиграно за всё время (с учётом бонусов)",
-    "sort_volume": "Объём",
-    "sort_volume_hint": "Сумма ставок",
+    "sort_volume": "Проиграно",
+    "sort_volume_hint": "Всего проиграно монет",
     "sort_achievements": "Ачивки",
     "sort_achievements_hint": "Больше всего открытых ачивок",
     "emptyTitle": "Активных беттеров пока нет",
@@ -712,7 +712,13 @@
     "moreCoins": "ещё {n} монет",
     "lifetimeEarned": "Заработано за всё время: {earned} из {target}",
     "noAchievementsYet": "Достижений пока нет.",
-    "achievementTooltip": "{name} — {description}"
+    "achievementTooltip": "{name} — {description}",
+    "error_generic": "Что-то пошло не так. Попробуй ещё раз.",
+    "error_notSignedIn": "Войди, чтобы получить ежедневный бонус.",
+    "error_rateLimited": "Не так быстро — попробуй через мгновение.",
+    "error_profileNotFound": "Не удалось найти твой профиль.",
+    "error_cooldown": "Ежедневный бонус снова доступен через {hours} ч.",
+    "error_alreadyClaimed": "Ежедневный бонус уже получен. Попробуй позже."
   },
   "me": {
     "myBetsTitle": "Мои ставки",
@@ -741,6 +747,7 @@
     "markAllRead": "Прочитать все",
     "marking": "Отмечаю…",
     "unread": "Не прочитано",
+    "truncatedNote": "Показаны последние {count} уведомлений. Более старые не отображаются.",
     "seeAll": "Все",
     "allCaughtUp": "Всё прочитано.",
     "unreadAria": "Уведомления · {count} непрочитанных",
