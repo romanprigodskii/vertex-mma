@@ -3,21 +3,18 @@
 import * as React from "react";
 import { useTranslations } from "next-intl";
 
-import { updateAvatarUrlAction } from "@/app/[locale]/settings/actions";
-import { createClient } from "@/lib/supabase/client";
+import { uploadAvatarAction } from "@/app/[locale]/settings/actions";
 
 interface Props {
   currentUrl: string | null;
-  authUserId: string;
   username: string;
 }
 
 const ALLOWED = ["image/png", "image/jpeg", "image/webp"];
 const MAX_BYTES = 2 * 1024 * 1024;
 
-export function AvatarUpload({ currentUrl, authUserId, username }: Props) {
+export function AvatarUpload({ currentUrl, username }: Props) {
   const t = useTranslations("settings");
-  const supabase = React.useMemo(() => createClient(), []);
   const [preview, setPreview] = React.useState<string | null>(currentUrl);
   const [pending, setPending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -29,6 +26,8 @@ export function AvatarUpload({ currentUrl, authUserId, username }: Props) {
     if (inputRef.current) inputRef.current.value = "";
     if (!file) return;
 
+    // Client-side pre-checks for instant feedback; the server re-validates
+    // and is the actual gate (it owns the storage path and the upload).
     if (file.size > MAX_BYTES) {
       setError(t("avatarTooLarge"));
       return;
@@ -41,29 +40,11 @@ export function AvatarUpload({ currentUrl, authUserId, username }: Props) {
     setError(null);
     setPending(true);
     try {
-      const ext =
-        file.type === "image/jpeg"
-          ? "jpg"
-          : file.type === "image/webp"
-            ? "webp"
-            : "png";
-      const path = `${authUserId}/avatar.${ext}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from("avatars")
-        .upload(path, file, { upsert: true, contentType: file.type });
-      if (uploadError) throw uploadError;
-
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from("avatars").getPublicUrl(path);
-
-      // Cache-bust so the CDN-cached <img src> refreshes immediately.
-      const versionedUrl = `${publicUrl}?v=${Date.now()}`;
-      const res = await updateAvatarUrlAction(versionedUrl);
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await uploadAvatarAction(formData);
       if (res?.error) throw new Error(res.error);
-
-      setPreview(versionedUrl);
+      if (res?.url) setPreview(res.url);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("uploadFailed"));
     } finally {

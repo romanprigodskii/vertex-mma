@@ -69,7 +69,6 @@ export default async function SettingsPage({
             </h2>
             <AvatarUpload
               currentUrl={user.avatarUrl}
-              authUserId={user.authUserId}
               username={user.username}
             />
           </section>

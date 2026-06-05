@@ -59,36 +59,106 @@ export async function updateProfileAction(
   return { success: true };
 }
 
-// Avatar URL is set after a successful client-side upload to the avatars
-// bucket. The uploader passes the public URL back so the server can
-// persist it on user_profile.avatar_url.
-const ALLOWED_AVATAR_HOST_SUFFIX = ".supabase.co";
+// Avatar uploads run entirely server-side. The browser POSTs the raw file
+// to this action; we validate it, write it to the avatars bucket via the
+// service-role client, then persist the public URL on user_profile.
+//
+// The storage path is derived from the authenticated session — NEVER from
+// client input — so a user can only ever overwrite their own avatar. That
+// guarantee no longer leans on storage RLS policies being present or
+// correct: the service role bypasses RLS, and the path is the boundary.
+const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
 
-export async function updateAvatarUrlAction(
-  publicUrl: string,
-): Promise<{ error?: string; success?: boolean }> {
+// We sniff the actual leading bytes rather than trusting the browser-declared
+// file.type: the extension AND the stored content-type are both derived from
+// what the file genuinely is, so a renamed/mislabelled payload can never land
+// in storage with a mismatched content-type.
+function sniffAvatar(bytes: Buffer): { mime: string; ext: string } | null {
+  // PNG: 89 50 4E 47 0D 0A 1A 0A
+  if (
+    bytes.length >= 8 &&
+    bytes[0] === 0x89 &&
+    bytes[1] === 0x50 &&
+    bytes[2] === 0x4e &&
+    bytes[3] === 0x47 &&
+    bytes[4] === 0x0d &&
+    bytes[5] === 0x0a &&
+    bytes[6] === 0x1a &&
+    bytes[7] === 0x0a
+  ) {
+    return { mime: "image/png", ext: "png" };
+  }
+  // JPEG: FF D8 FF
+  if (
+    bytes.length >= 3 &&
+    bytes[0] === 0xff &&
+    bytes[1] === 0xd8 &&
+    bytes[2] === 0xff
+  ) {
+    return { mime: "image/jpeg", ext: "jpg" };
+  }
+  // WebP: "RIFF" .... "WEBP"
+  if (
+    bytes.length >= 12 &&
+    bytes[0] === 0x52 &&
+    bytes[1] === 0x49 &&
+    bytes[2] === 0x46 &&
+    bytes[3] === 0x46 &&
+    bytes[8] === 0x57 &&
+    bytes[9] === 0x45 &&
+    bytes[10] === 0x42 &&
+    bytes[11] === 0x50
+  ) {
+    return { mime: "image/webp", ext: "webp" };
+  }
+  return null;
+}
+
+export async function uploadAvatarAction(
+  formData: FormData,
+): Promise<{ error?: string; success?: boolean; url?: string }> {
+  const t = await getTranslations("settings");
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "Not signed in." };
 
-  // Sanity: only accept URLs pointing at our Supabase storage host. Stops
-  // a malicious client from pasting an arbitrary external URL (which
-  // would still pass RLS but isn't an upload we'd want surfaced).
-  let host: string;
-  try {
-    host = new URL(publicUrl).host;
-  } catch {
-    return { error: "Invalid avatar URL." };
+  const file = formData.get("file");
+  // Re-validate server-side; never trust the client's size/type checks.
+  if (!(file instanceof File) || file.size === 0) {
+    return { error: t("uploadFailed") };
   }
-  if (!host.endsWith(ALLOWED_AVATAR_HOST_SUFFIX)) {
-    return { error: "Avatar URL must be a Supabase storage URL." };
+  if (file.size > MAX_AVATAR_BYTES) {
+    return { error: t("avatarTooLarge") };
   }
+
+  const bytes = Buffer.from(await file.arrayBuffer());
+  // Content sniff is the real type gate — covers both a wrong declared type
+  // and bytes that don't match any allowed image format.
+  const kind = sniffAvatar(bytes);
+  if (!kind) {
+    return { error: t("avatarWrongType") };
+  }
+
+  // Path comes from the session, not the upload — this is the real authz.
+  const path = `${user.id}/avatar.${kind.ext}`;
+
+  const admin = createAdminClient();
+  const { error: uploadError } = await admin.storage
+    .from("avatars")
+    .upload(path, bytes, { upsert: true, contentType: kind.mime });
+  if (uploadError) return { error: uploadError.message };
+
+  const {
+    data: { publicUrl },
+  } = admin.storage.from("avatars").getPublicUrl(path);
+  // Cache-bust so the CDN-cached <img src> refreshes immediately.
+  const versionedUrl = `${publicUrl}?v=${Date.now()}`;
 
   const updated = await db
     .update(userProfile)
-    .set({ avatarUrl: publicUrl })
+    .set({ avatarUrl: versionedUrl })
     .where(eq(userProfile.authUserId, user.id))
     .returning({ id: userProfile.id });
 
@@ -99,7 +169,7 @@ export async function updateAvatarUrlAction(
 
   revalidatePath("/me");
   revalidatePath("/settings");
-  return { success: true };
+  return { success: true, url: versionedUrl };
 }
 
 export async function changePasswordAction(

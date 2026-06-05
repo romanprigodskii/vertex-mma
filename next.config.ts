@@ -10,6 +10,14 @@ const nextConfig: NextConfig = {
   // instead of dragging the full pnpm store.
   output: "standalone",
   reactCompiler: true,
+  experimental: {
+    // Avatar uploads POST the raw file (≤2 MB) to a server action, so the
+    // 1 MB server-action body default would reject them. Headroom for the
+    // multipart envelope on top of the 2 MB image cap.
+    serverActions: {
+      bodySizeLimit: "3mb",
+    },
+  },
   turbopack: {
     root: path.resolve(__dirname),
   },
