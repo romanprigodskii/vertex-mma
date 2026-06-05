@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import { sql } from "drizzle-orm";
 import type { Metadata } from "next";
 import { getTranslations, setRequestLocale } from "next-intl/server";
@@ -10,7 +11,7 @@ import { RankingCard } from "@/components/rankings/ranking-card";
 import { Link } from "@/i18n/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { isRuLocale, localizedNameSql } from "@/lib/i18n-name";
+import { localizedNameSql } from "@/lib/i18n-name";
 import { marketHasOdds } from "@/lib/market-odds";
 import { listOpenMarkets } from "@/lib/markets";
 import { listRecentRankings } from "@/lib/rankings";
@@ -40,14 +41,16 @@ type TopFighter = {
   score: number | null;
 };
 
-async function getTopFighters(limit: number): Promise<TopFighter[]> {
+async function getTopFighters(
+  isRu: boolean,
+  limit: number,
+): Promise<TopFighter[]> {
   // Headline score = the fighter's divisional score in their current
   // division (Wave 14B.2 — the same number the profile hero shows),
   // falling back to the global vertex_score when no divisional row
   // exists. Sort AND display by that one canonical number so the home
   // list never contradicts the profile (e.g. Pereira 80 LHW, not the
   // global 85).
-  const isRu = await isRuLocale();
   const result = await db.execute<TopFighter>(sql`
     SELECT
       f.id::text AS id,
@@ -72,6 +75,21 @@ async function getTopFighters(limit: number): Promise<TopFighter[]> {
   return [...(result as unknown as TopFighter[])];
 }
 
+/** The page is force-dynamic (it personalizes off the session), but the top-
+ *  fighters roster sort doesn't depend on the request — its inputs only move
+ *  when the rating pipeline reruns. Cache it per locale for an hour so the
+ *  whole-roster COALESCE sort isn't re-run on every page view. */
+function getCachedTopFighters(
+  isRu: boolean,
+  limit: number,
+): Promise<TopFighter[]> {
+  return unstable_cache(
+    () => getTopFighters(isRu, limit),
+    ["home-top-fighters", isRu ? "ru" : "en", String(limit)],
+    { revalidate: 3600 },
+  )();
+}
+
 export default async function HomePage({
   params,
 }: {
@@ -89,7 +107,7 @@ export default async function HomePage({
   };
   const [user, topFighters, openMarketsRaw, recentRankings] = await Promise.all([
     getCurrentUser(),
-    getTopFighters(5),
+    getCachedTopFighters(locale === "ru", 5),
     listOpenMarkets(40),
     listRecentRankings(3),
   ]);

@@ -1,10 +1,11 @@
 import { ImageResponse } from "next/og";
 
-import { getBoutById } from "@/lib/bout-detail";
-import { OG_COLORS, OG_FONTS, OG_SIZE } from "@/lib/og";
+import { getBoutOgData } from "@/lib/bout-detail";
+import { OG_CACHE_HEADERS, OG_COLORS, OG_FONTS, OG_SIZE } from "@/lib/og";
 
 export const runtime = "nodejs";
 export const contentType = "image/png";
+export const revalidate = 3600;
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -12,7 +13,7 @@ interface RouteContext {
 
 export async function GET(_req: Request, ctx: RouteContext) {
   const { id } = await ctx.params;
-  const b = await getBoutById(id);
+  const b = await getBoutOgData(id);
   if (!b) {
     return new ImageResponse(
       (
@@ -37,13 +38,13 @@ export async function GET(_req: Request, ctx: RouteContext) {
   }
 
   const winnerName =
-    b.winner_id === b.fighter_a.id
-      ? b.fighter_a.name_en
-      : b.winner_id === b.fighter_b.id
-        ? b.fighter_b.name_en
+    b.winner_id === b.fighter_a_id
+      ? b.fighter_a_name
+      : b.winner_id === b.fighter_b_id
+        ? b.fighter_b_name
         : null;
 
-  const dateLabel = new Date(b.event.date).toLocaleDateString("en-US", {
+  const dateLabel = new Date(b.event_date).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -98,7 +99,7 @@ export async function GET(_req: Request, ctx: RouteContext) {
             textTransform: "uppercase",
           }}
         >
-          {b.event.short_name || b.event.name} · {dateLabel}
+          {b.event_short_name || b.event_name} · {dateLabel}
         </div>
 
         <div
@@ -111,8 +112,8 @@ export async function GET(_req: Request, ctx: RouteContext) {
           }}
         >
           <FighterCol
-            name={b.fighter_a.name_en}
-            isWinner={b.winner_id === b.fighter_a.id}
+            name={b.fighter_a_name}
+            isWinner={b.winner_id === b.fighter_a_id}
           />
           <div
             style={{
@@ -127,8 +128,8 @@ export async function GET(_req: Request, ctx: RouteContext) {
             VS
           </div>
           <FighterCol
-            name={b.fighter_b.name_en}
-            isWinner={b.winner_id === b.fighter_b.id}
+            name={b.fighter_b_name}
+            isWinner={b.winner_id === b.fighter_b_id}
             align="right"
           />
         </div>
@@ -166,7 +167,7 @@ export async function GET(_req: Request, ctx: RouteContext) {
         </div>
       </div>
     ),
-    OG_SIZE,
+    { ...OG_SIZE, headers: OG_CACHE_HEADERS },
   );
 }
 

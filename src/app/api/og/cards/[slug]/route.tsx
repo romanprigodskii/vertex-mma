@@ -1,10 +1,11 @@
 import { ImageResponse } from "next/og";
 
 import { getFightCardBySlug } from "@/lib/fight-cards";
-import { OG_COLORS, OG_FONTS, OG_SIZE } from "@/lib/og";
+import { OG_CACHE_HEADERS, OG_COLORS, OG_FONTS, OG_SIZE } from "@/lib/og";
 
 export const runtime = "nodejs";
 export const contentType = "image/png";
+export const revalidate = 3600;
 
 // Theme accents are stored as oklch (CSS custom props); Satori needs a plain
 // color, so map the five theme ids to hex. Falls back to the brand primary.
@@ -157,7 +158,7 @@ export async function GET(_req: Request, ctx: RouteContext) {
         </div>
       </div>
     ),
-    OG_SIZE,
+    { ...OG_SIZE, headers: OG_CACHE_HEADERS },
   );
 }
 

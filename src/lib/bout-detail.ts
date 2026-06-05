@@ -127,11 +127,64 @@ type BoutHeaderRow = {
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+export type BoutOgData = {
+  fighter_a_id: string;
+  fighter_a_name: string;
+  fighter_b_id: string;
+  fighter_b_name: string;
+  event_name: string;
+  event_short_name: string | null;
+  event_date: string;
+  status: string;
+  winner_id: string | null;
+  method: string | null;
+  round_finished: number | null;
+};
+
+/**
+ * Minimal single-query loader for the bout OG image. `getBoutById` runs four
+ * round-trips (header + per-round stats + scorecards + videos), but the OG
+ * card only draws the two names, the event line, and the result — so this
+ * fetches exactly those in one query. Social crawlers refetch aggressively,
+ * so dropping three queries per hit meaningfully unloads the session pooler.
+ */
+export async function getBoutOgData(id: string): Promise<BoutOgData | null> {
+  if (!UUID_RE.test(id)) return null;
+  const isRu = await isRuLocale();
+  const rows = (await db.execute<BoutOgData>(sql`
+    SELECT
+      fa.id::text AS fighter_a_id,
+      ${localizedNameSql("fa", isRu)} AS fighter_a_name,
+      fb.id::text AS fighter_b_id,
+      ${localizedNameSql("fb", isRu)} AS fighter_b_name,
+      ${localizedColSql("e.name", "e.name_ru", isRu)} AS event_name,
+      ${localizedEventNameSql("e", isRu)} AS event_short_name,
+      e.date::text AS event_date,
+      b.status::text AS status,
+      b.winner_id::text AS winner_id,
+      b.method::text AS method,
+      b.round_finished
+    FROM bout b
+    JOIN event e ON e.id = b.event_id
+    JOIN fighter fa ON fa.id = b.fighter_a_id
+    JOIN fighter fb ON fb.id = b.fighter_b_id
+    WHERE b.id = ${id}::uuid
+    LIMIT 1
+  `)) as unknown as BoutOgData[];
+  return rows[0] ?? null;
+}
+
 export async function getBoutById(id: string): Promise<BoutDetail | null> {
   if (!UUID_RE.test(id)) return null;
 
   const isRu = await isRuLocale();
-  const headerResult = await db.execute<BoutHeaderRow>(sql`
+  // The header is needed for the existence check, but the per-round stats,
+  // scorecards, and videos depend only on the id — fire all four together
+  // instead of four sequential round-trips (the id is already validated, so
+  // a miss just discards three cheap reads).
+  const [headerResult, roundsResult, scorecardResult, videoResult] =
+    await Promise.all([
+      db.execute<BoutHeaderRow>(sql`
     SELECT
       b.id::text AS id,
       b.event_id::text AS event_id,
@@ -173,12 +226,8 @@ export async function getBoutById(id: string): Promise<BoutDetail | null> {
     JOIN fighter fb ON fb.id = b.fighter_b_id
     WHERE b.id = ${id}::uuid
     LIMIT 1
-  `);
-  const headerRows = headerResult as unknown as BoutHeaderRow[];
-  if (headerRows.length === 0) return null;
-  const r = headerRows[0];
-
-  const roundsResult = await db.execute<BoutRoundStatsRow>(sql`
+  `),
+      db.execute<BoutRoundStatsRow>(sql`
     SELECT
       brs.round,
       brs.fighter_id::text AS fighter_id,
@@ -204,10 +253,8 @@ export async function getBoutById(id: string): Promise<BoutDetail | null> {
     FROM bout_round_stats brs
     WHERE brs.bout_id = ${id}::uuid
     ORDER BY brs.round ASC, brs.fighter_id ASC
-  `);
-  const rounds = [...(roundsResult as unknown as BoutRoundStatsRow[])];
-
-  const scorecardResult = await db.execute<{
+  `),
+      db.execute<{
     judge_name: string;
     round: number;
     fighter_a_score: number;
@@ -217,17 +264,8 @@ export async function getBoutById(id: string): Promise<BoutDetail | null> {
     FROM bout_scorecard
     WHERE bout_id = ${id}::uuid
     ORDER BY judge_name ASC, round ASC
-  `);
-  const scorecards = groupScorecardsByJudge(
-    [...(scorecardResult as unknown as Array<{
-      judge_name: string;
-      round: number;
-      fighter_a_score: number;
-      fighter_b_score: number;
-    }>)],
-  );
-
-  const videoResult = await db.execute<BoutDetailVideo>(sql`
+  `),
+      db.execute<BoutDetailVideo>(sql`
     SELECT
       bv.id::text AS id,
       bv.youtube_video_id,
@@ -241,7 +279,21 @@ export async function getBoutById(id: string): Promise<BoutDetail | null> {
       CASE bv.kind WHEN 'free_fight' THEN 0 ELSE 1 END,
       bv.duration_seconds DESC NULLS LAST,
       bv.created_at DESC
-  `);
+  `),
+    ]);
+
+  const headerRows = headerResult as unknown as BoutHeaderRow[];
+  if (headerRows.length === 0) return null;
+  const r = headerRows[0];
+  const rounds = [...(roundsResult as unknown as BoutRoundStatsRow[])];
+  const scorecards = groupScorecardsByJudge(
+    [...(scorecardResult as unknown as Array<{
+      judge_name: string;
+      round: number;
+      fighter_a_score: number;
+      fighter_b_score: number;
+    }>)],
+  );
   const videos = [...(videoResult as unknown as BoutDetailVideo[])];
 
   return {

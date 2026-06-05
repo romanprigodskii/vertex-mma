@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import { sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
@@ -233,11 +234,10 @@ export type MentionedEvent = {
  *  We return both `match_text` (the prefix that's actually in the body)
  *  and the canonical `short_name`/`name` so the autolinker can prefer a
  *  longer alias if the full string also happens to appear. */
-export async function detectMentionedEvents(
+async function scanEventsInBody(
   body: string,
+  isRu: boolean,
 ): Promise<MentionedEvent[]> {
-  if (!body || body.trim().length === 0) return [];
-  const isRu = await isRuLocale();
   const rows = (await db.execute<MentionedEvent>(sql`
     WITH candidate AS (
       SELECT
@@ -262,6 +262,32 @@ export async function detectMentionedEvents(
     LIMIT 20
   `)) as unknown as MentionedEvent[];
   return rows;
+}
+
+export async function detectMentionedEvents(
+  body: string,
+): Promise<MentionedEvent[]> {
+  if (!body || body.trim().length === 0) return [];
+  const isRu = await isRuLocale();
+  return scanEventsInBody(body, isRu);
+}
+
+/** Cached variant of {@link detectMentionedEvents} for the article page. The
+ *  body is immutable after ingest, so the full-event scan depends only on
+ *  (articleId, locale) — cache it for an hour rather than re-scanning every
+ *  event on each view. Locale is passed in so the cached body never touches
+ *  request headers. */
+export function cachedMentionedEvents(
+  articleId: string,
+  body: string,
+  isRu: boolean,
+): Promise<MentionedEvent[]> {
+  if (!body || body.trim().length === 0) return Promise.resolve([]);
+  return unstable_cache(
+    () => scanEventsInBody(body, isRu),
+    ["news-mentioned-events", articleId, isRu ? "ru" : "en"],
+    { revalidate: 3600 },
+  )();
 }
 
 export type UpcomingEventSidebar = {

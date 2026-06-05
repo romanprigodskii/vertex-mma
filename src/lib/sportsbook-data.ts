@@ -162,6 +162,7 @@ export type MyParlayRow = {
 /** A user's parlays (with legs), newest first. */
 export async function listMyParlays(
   userProfileId: string,
+  limit = 100,
 ): Promise<MyParlayRow[]> {
   if (!UUID_RE.test(userProfileId)) return [];
   const isRu = await isRuLocale();
@@ -180,6 +181,7 @@ export async function listMyParlays(
            created_at::text AS created_at
     FROM parlay WHERE user_id = ${userProfileId}::uuid
     ORDER BY created_at DESC
+    LIMIT ${limit}
   `)) as unknown as Array<{
     parlay_id: string;
     stake_coins: number;
@@ -192,6 +194,13 @@ export async function listMyParlays(
   }>;
   if (parlays.length === 0) return [];
 
+  // Fetch legs only for the (capped) page of parlays we just loaded, not for
+  // every parlay the user has ever placed — the old `WHERE p.user_id = …`
+  // join walked the user's entire parlay history through a 6-table join.
+  const parlayIds = sql.join(
+    parlays.map((p) => sql`${p.parlay_id}::uuid`),
+    sql`, `,
+  );
   const legRows = (await db.execute<MyParlayLeg & { parlay_id: string }>(sql`
     SELECT pl.parlay_id::text AS parlay_id,
            pl.bout_id::text AS bout_id,
@@ -201,11 +210,10 @@ export async function listMyParlays(
            ${localizedNameSql("fa", isRu)} AS fighter_a_name,
            ${localizedNameSql("fb", isRu)} AS fighter_b_name
     FROM parlay_leg pl
-    JOIN parlay p ON p.id = pl.parlay_id
     JOIN bout bo ON bo.id = pl.bout_id
     JOIN fighter fa ON fa.id = bo.fighter_a_id
     JOIN fighter fb ON fb.id = bo.fighter_b_id
-    WHERE p.user_id = ${userProfileId}::uuid
+    WHERE pl.parlay_id IN (${parlayIds})
     ORDER BY pl.created_at ASC
   `)) as unknown as Array<MyParlayLeg & { parlay_id: string }>;
 
@@ -228,6 +236,7 @@ export async function listMyParlays(
 /** A user's fixed-odds bet history, newest first. */
 export async function listMyFixedOddsBets(
   userProfileId: string,
+  limit = 100,
 ): Promise<MyFixedOddsBetRow[]> {
   if (!UUID_RE.test(userProfileId)) return [];
   const isRu = await isRuLocale();
@@ -258,6 +267,7 @@ export async function listMyFixedOddsBets(
     JOIN fighter fb2 ON fb2.id = bo.fighter_b_id
     WHERE fb.user_id = ${userProfileId}::uuid
     ORDER BY fb.created_at DESC
+    LIMIT ${limit}
   `);
   return rows as unknown as MyFixedOddsBetRow[];
 }

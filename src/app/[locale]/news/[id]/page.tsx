@@ -18,11 +18,11 @@ import {
 } from "@/components/news/social-embed";
 import { Link } from "@/i18n/navigation";
 import {
-  detectMentionedEvents,
+  cachedMentionedEvents,
   getNextUpcomingEventForSidebar,
 } from "@/lib/event-detail";
 import {
-  detectMentionedFighters,
+  cachedMentionedFighters,
   getNewsItemById,
   listLatestNewsExcluding,
   listRelatedNews,
@@ -86,12 +86,13 @@ export default async function NewsArticlePage({ params }: PageProps) {
 
   const body = item.body_rephrased ?? item.body ?? "";
   const existingFighterIds = new Set(item.fighters.map((f) => f.id));
+  const isRu = locale === "ru";
 
   const [
     nextEvent,
     latestNews,
     related,
-    detectedFighters,
+    detectedFightersAll,
     mentionedEvents,
   ] = await Promise.all([
     getNextUpcomingEventForSidebar(),
@@ -102,9 +103,16 @@ export default async function NewsArticlePage({ params }: PageProps) {
       classification: item.classification,
       limit: 4,
     }),
-    detectMentionedFighters(body, existingFighterIds),
-    detectMentionedEvents(body),
+    cachedMentionedFighters(item.id, body, isRu),
+    cachedMentionedEvents(item.id, body, isRu),
   ]);
+
+  // The cached scan returns the full match set; drop the ingest-tagged
+  // fighters here (they're prepended below) so the exclude Set never has to
+  // be part of the cache key.
+  const detectedFighters = detectedFightersAll.filter(
+    (f) => !existingFighterIds.has(f.id),
+  );
 
   // Merge ingest-tagged fighters with runtime-detected ones. Ingest-tagged
   // come first so they win the chip order; detected fighters fill in the

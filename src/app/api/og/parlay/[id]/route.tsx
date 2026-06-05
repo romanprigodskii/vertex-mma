@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-import { OG_COLORS, OG_FONTS, OG_SIZE } from "@/lib/og";
+import { OG_CACHE_HEADERS, OG_COLORS, OG_FONTS, OG_SIZE } from "@/lib/og";
 import { getParlayById } from "@/lib/sportsbook-data";
 import {
   formatOdds,
@@ -11,6 +11,7 @@ import {
 
 export const runtime = "nodejs";
 export const contentType = "image/png";
+export const revalidate = 3600;
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -223,6 +224,6 @@ export async function GET(_req: Request, ctx: RouteContext) {
         </div>
       </div>
     ),
-    OG_SIZE,
+    { ...OG_SIZE, headers: OG_CACHE_HEADERS },
   );
 }

@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import { sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
@@ -303,12 +304,10 @@ export async function listRelatedNews(opts: {
  *  references). SQL: scan fighter.name_en for substring match against the
  *  body. Sequential scan on ~4k rows, fast enough for SSR. char_length >= 5
  *  filters out short surnames that would over-match. */
-export async function detectMentionedFighters(
+async function scanFightersInBody(
   body: string,
-  excludeIds: Set<string>,
+  isRu: boolean,
 ): Promise<NewsFighter[]> {
-  if (!body || body.trim().length === 0) return [];
-  const isRu = await isRuLocale();
   const rows = (await db.execute<{ id: string; slug: string; name: string }>(sql`
     SELECT id::text AS id, slug, ${localizedNameSql("fighter", isRu)} AS name
     FROM fighter
@@ -318,7 +317,37 @@ export async function detectMentionedFighters(
     ORDER BY char_length(name_en) DESC
     LIMIT 40
   `)) as unknown as Array<{ id: string; slug: string; name: string }>;
+  return rows;
+}
+
+export async function detectMentionedFighters(
+  body: string,
+  excludeIds: Set<string>,
+): Promise<NewsFighter[]> {
+  if (!body || body.trim().length === 0) return [];
+  const isRu = await isRuLocale();
+  const rows = await scanFightersInBody(body, isRu);
   return rows.filter((r) => !excludeIds.has(r.id));
+}
+
+/** Cached variant of {@link detectMentionedFighters} for the article page. A
+ *  news body is immutable after ingest, so the catalog scan result depends
+ *  only on (articleId, locale) — cache the FULL match set for an hour instead
+ *  of re-scanning ~4k fighters on every view. The locale is passed in (never
+ *  read via isRuLocale inside the cache, which would touch request headers)
+ *  and `excludeIds` is applied by the caller so the volatile Set stays out of
+ *  the cache key. */
+export function cachedMentionedFighters(
+  articleId: string,
+  body: string,
+  isRu: boolean,
+): Promise<NewsFighter[]> {
+  if (!body || body.trim().length === 0) return Promise.resolve([]);
+  return unstable_cache(
+    () => scanFightersInBody(body, isRu),
+    ["news-mentioned-fighters", articleId, isRu ? "ru" : "en"],
+    { revalidate: 3600 },
+  )();
 }
 
 /** Approved news mentioning a given fighter. Chips are omitted — the reader

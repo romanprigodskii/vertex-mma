@@ -108,10 +108,11 @@ export type EventMarketsGroup = {
 /**
  * Tournament-grouped view for /markets. Returns up to `limit` upcoming
  * events, each with its bouts and each bout's open markets (one row per
- * market). The single flat SQL query joins through bout + event + both
- * fighters and uses a json_agg subselect to bundle outcomes per market;
- * grouping into the nested shape happens in TS so the structure stays
- * obvious.
+ * market). A `limited_events` CTE picks the earliest `limit` events that
+ * actually have an open market FIRST, so the main join only ever materializes
+ * rows for those events — on a busy week the old version pulled every open
+ * market and threw most away with a JS `.slice()`. Grouping into the nested
+ * shape still happens in TS so the structure stays obvious.
  */
 export async function listOpenMarketsByEvent(
   limit = 20,
@@ -140,6 +141,20 @@ export async function listOpenMarketsByEvent(
     market_unique_traders: number;
     outcomes_json: MarketCardOutcome[];
   }>(sql`
+    WITH limited_events AS (
+      SELECT e.id
+      FROM event e
+      WHERE EXISTS (
+        SELECT 1
+        FROM market m
+        JOIN bout b ON b.id = m.bout_id
+        WHERE b.event_id = e.id
+          AND m.status = 'open'
+          AND m.closes_at > NOW()
+      )
+      ORDER BY e.date ASC
+      LIMIT ${limit}
+    )
     SELECT
       e.id::text AS event_id,
       e.slug AS event_slug,
@@ -180,6 +195,7 @@ export async function listOpenMarketsByEvent(
     JOIN fighter fb ON fb.id = b.fighter_b_id
     WHERE m.status = 'open'
       AND m.closes_at > NOW()
+      AND e.id IN (SELECT id FROM limited_events)
     ORDER BY e.date ASC, b.bout_order DESC NULLS LAST, b.id ASC, m.type ASC
   `);
 
@@ -250,6 +266,8 @@ export async function listOpenMarketsByEvent(
     evt.total_markets++;
   }
 
+  // The CTE already capped the result to `limit` events; the slice is a
+  // defensive no-op in case the query is ever changed.
   return Array.from(eventMap.values()).slice(0, limit);
 }
 
@@ -411,7 +429,10 @@ export async function getBoutExternalOdds(
   return arr[0] ?? null;
 }
 
-export async function listMyBets(userProfileId: string): Promise<MyBetRow[]> {
+export async function listMyBets(
+  userProfileId: string,
+  limit = 100,
+): Promise<MyBetRow[]> {
   if (!UUID_RE.test(userProfileId)) return [];
   const isRu = await isRuLocale();
   const rows = await db.execute<MyBetRow>(sql`
@@ -439,6 +460,7 @@ export async function listMyBets(userProfileId: string): Promise<MyBetRow[]> {
     JOIN fighter fb ON fb.id = bo.fighter_b_id
     WHERE bt.user_id = ${userProfileId}::uuid
     ORDER BY bt.created_at DESC
+    LIMIT ${limit}
   `);
   return rows as unknown as MyBetRow[];
 }
