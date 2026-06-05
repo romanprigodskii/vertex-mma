@@ -482,8 +482,8 @@
     "navLabel": "Leaderboard sort",
     "sort_profit": "Net worth",
     "sort_profit_hint": "Lifetime coins earned minus lost (includes bonuses)",
-    "sort_volume": "Volume",
-    "sort_volume_hint": "Total coins wagered",
+    "sort_volume": "Coins lost",
+    "sort_volume_hint": "Total coins lost",
     "sort_achievements": "Achievements",
     "sort_achievements_hint": "Most achievements unlocked",
     "emptyTitle": "No bettors with activity yet",
@@ -763,7 +763,13 @@
     "moreCoins": "{n} more coins",
     "lifetimeEarned": "Lifetime earned: {earned} of {target}",
     "noAchievementsYet": "No achievements yet.",
-    "achievementTooltip": "{name} — {description}"
+    "achievementTooltip": "{name} — {description}",
+    "error_generic": "Something went wrong. Try again.",
+    "error_notSignedIn": "Sign in to claim your daily bonus.",
+    "error_rateLimited": "Slow down — try again in a moment.",
+    "error_profileNotFound": "We couldn't find your profile.",
+    "error_cooldown": "Daily bonus available again in {hours}h.",
+    "error_alreadyClaimed": "Daily bonus already claimed. Try again later."
   },
   "me": {
     "myBetsTitle": "My bets",
@@ -792,6 +798,7 @@
     "markAllRead": "Mark all read",
     "marking": "Marking…",
     "unread": "Unread",
+    "truncatedNote": "Showing your {count} most recent notifications. Older ones aren't shown.",
     "seeAll": "See all",
     "allCaughtUp": "All caught up.",
     "unreadAria": "Notifications · {count} unread",

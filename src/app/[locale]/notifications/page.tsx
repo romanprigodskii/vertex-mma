@@ -33,7 +33,12 @@ export default async function NotificationsPage({
   const user = await getCurrentUser();
   if (!user) redirect("/signin?next=/notifications");
 
-  const items = await listNotifications(user.userProfileId, 100);
+  const LIMIT = 100;
+  // Fetch one extra to detect (without a second query) whether older
+  // notifications exist beyond the cap, then trim to the limit for display.
+  const fetched = await listNotifications(user.userProfileId, LIMIT + 1);
+  const items = fetched.slice(0, LIMIT);
+  const hasMore = fetched.length > LIMIT;
   const hasUnread = items.some((n) => !n.is_read);
 
   return (
@@ -58,13 +63,20 @@ export default async function NotificationsPage({
               {t("empty")}
             </p>
           ) : (
-            <ul className="flex flex-col rounded-md border border-foreground/10 bg-background-elevated/30">
-              {items.map((n) => (
-                <li key={n.id} className="last:[&>*]:border-b-0">
-                  <NotificationRow notification={n} />
-                </li>
-              ))}
-            </ul>
+            <>
+              <ul className="flex flex-col rounded-md border border-foreground/10 bg-background-elevated/30">
+                {items.map((n) => (
+                  <li key={n.id} className="last:[&>*]:border-b-0">
+                    <NotificationRow notification={n} />
+                  </li>
+                ))}
+              </ul>
+              {hasMore ? (
+                <p className="mt-4 text-center font-sans text-xs text-foreground-subtle">
+                  {t("truncatedNote", { count: LIMIT })}
+                </p>
+              ) : null}
+            </>
           )}
         </Container>
       </main>
