@@ -42,7 +42,10 @@ export type FightCardListItem = {
   author_username: string;
   author_display_name: string | null;
   author_avatar_url: string | null;
-  headliner: { fighter_a: string; fighter_b: string } | null;
+  // Present whenever the card has at least one bout. A name is null only when
+  // its fighter row can't be resolved (e.g. deleted) — distinct from a card
+  // with no bouts at all, where `headliner` itself is null.
+  headliner: { fighter_a: string | null; fighter_b: string | null } | null;
 };
 
 export type FightCardDetail = {
@@ -204,8 +207,9 @@ async function queryCards(
       author_username: row.author_username,
       author_display_name: row.author_display_name,
       author_avatar_url: row.author_avatar_url,
-      headliner:
-        a && b ? { fighter_a: a.name, fighter_b: b.name } : null,
+      headliner: headliner
+        ? { fighter_a: a?.name ?? null, fighter_b: b?.name ?? null }
+        : null,
     };
   });
 }

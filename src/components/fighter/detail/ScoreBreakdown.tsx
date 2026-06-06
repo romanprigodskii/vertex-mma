@@ -31,8 +31,12 @@ export function ScoreBreakdown({ data, divisionalStatus }: ScoreBreakdownProps) 
   // Wave 29: retired fighters have no Current score — default the tab to
   // All-Time so the breakdown lands on a populated view. User can still
   // switch to the (empty) Current tab manually.
+  // Retired/inactive fighters have no current score; the Current tab would
+  // render an all-dashes table that reads as broken data. Default to All-Time
+  // and disable Current entirely (with an explanatory tooltip).
+  const currentEmpty = data.current.finalScore == null;
   const [tab, setTab] = React.useState<"current" | "all-time">(
-    data.current.finalScore == null ? "all-time" : "current",
+    currentEmpty ? "all-time" : "current",
   );
 
   const sourceLabel = (() => {
@@ -76,24 +80,39 @@ export function ScoreBreakdown({ data, divisionalStatus }: ScoreBreakdownProps) 
             aria-label={t("scoreBreakdownView")}
             className="flex gap-1 border-b border-foreground/10"
           >
-            {(["current", "all-time"] as const).map((tabKey) => (
-              <button
-                key={tabKey}
-                type="button"
-                role="tab"
-                aria-selected={tab === tabKey}
-                onClick={() => setTab(tabKey)}
-                className={cn(
-                  "px-3 py-1.5 font-sans text-[11px] uppercase tracking-widest transition-colors",
-                  tab === tabKey
-                    ? "border-b-2 border-foreground text-foreground"
-                    : "border-b-2 border-transparent text-foreground-muted hover:text-foreground",
-                )}
-              >
-                {tabKey === "current" ? t("tabCurrent") : t("tabAllTime")}
-              </button>
-            ))}
+            {(["current", "all-time"] as const).map((tabKey) => {
+              const disabled = tabKey === "current" && currentEmpty;
+              return (
+                <button
+                  key={tabKey}
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === tabKey}
+                  aria-disabled={disabled || undefined}
+                  title={disabled ? t("noCurrentScoreNote") : undefined}
+                  onClick={() => {
+                    if (!disabled) setTab(tabKey);
+                  }}
+                  className={cn(
+                    "px-3 py-1.5 font-sans text-[11px] uppercase tracking-widest transition-colors",
+                    disabled
+                      ? "border-b-2 border-transparent cursor-not-allowed text-foreground-subtle/50"
+                      : tab === tabKey
+                        ? "border-b-2 border-foreground text-foreground"
+                        : "border-b-2 border-transparent text-foreground-muted hover:text-foreground",
+                  )}
+                >
+                  {tabKey === "current" ? t("tabCurrent") : t("tabAllTime")}
+                </button>
+              );
+            })}
           </div>
+
+          {currentEmpty ? (
+            <p className="mt-2 font-sans text-[11px] text-foreground-subtle">
+              {t("noCurrentScoreNote")}
+            </p>
+          ) : null}
 
           {tab === "current" ? (
             <BreakdownTable

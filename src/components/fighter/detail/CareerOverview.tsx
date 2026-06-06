@@ -3,16 +3,19 @@ import { getTranslations } from "next-intl/server";
 import type { FighterDetail } from "@/lib/fighter-detail";
 import { formatNumber } from "@/lib/format";
 
-const METHOD_SHORT: Record<string, string> = {
-  ko: "KO",
-  tko: "TKO",
-  submission: "Sub",
-  decision_unanimous: "U-Dec",
-  decision_split: "S-Dec",
-  decision_majority: "M-Dec",
-  draw: "Draw",
-  no_contest: "NC",
-  dq: "DQ",
+// DB method string → `method` namespace key (localized short labels), so
+// KO/Sub/Dec read in the active locale instead of leaking hardcoded English
+// into the RU UI (the same DB-string→i18n-key shape ScoreHistoryChart uses).
+const METHOD_KEY: Record<string, string> = {
+  ko: "ko",
+  tko: "tko",
+  submission: "sub",
+  decision_unanimous: "udec",
+  decision_split: "sdec",
+  decision_majority: "mdec",
+  draw: "draw",
+  no_contest: "nc",
+  dq: "dq",
 };
 
 interface CareerOverviewProps {
@@ -49,6 +52,12 @@ function StatRow({
 
 export async function CareerOverview({ fighter }: CareerOverviewProps) {
   const t = await getTranslations("fighter");
+  const tMethod = await getTranslations("method");
+  const methodLabel = (method: string | null): string | null => {
+    if (!method) return null;
+    const key = METHOD_KEY[method];
+    return key ? tMethod(key) : method;
+  };
   const ufcWins = fighter.ufc_wins;
   // Finishes we know the method for vs. ones the scraper left as NULL.
   const knownFinishMethods = fighter.ufc_wins_ko + fighter.ufc_wins_sub;
@@ -58,17 +67,24 @@ export async function CareerOverview({ fighter }: CareerOverviewProps) {
   );
   const koBreakdown = ufcWins
     ? unrecordedFinishes > 0
-      ? `KO/TKO ${fighter.ufc_wins_ko} · Sub ${fighter.ufc_wins_sub} · Dec ${fighter.ufc_wins_dec} · Other finish ${unrecordedFinishes}`
-      : `KO/TKO ${fighter.ufc_wins_ko} · Sub ${fighter.ufc_wins_sub} · Dec ${fighter.ufc_wins_dec}`
+      ? t("winBreakdownWithOther", {
+          ko: formatNumber(fighter.ufc_wins_ko),
+          sub: formatNumber(fighter.ufc_wins_sub),
+          dec: formatNumber(fighter.ufc_wins_dec),
+          other: formatNumber(unrecordedFinishes),
+        })
+      : t("winBreakdown", {
+          ko: formatNumber(fighter.ufc_wins_ko),
+          sub: formatNumber(fighter.ufc_wins_sub),
+          dec: formatNumber(fighter.ufc_wins_dec),
+        })
     : null;
 
   const lastFight = fighter.last_fight_date
     ? {
         date: fighter.last_fight_date.slice(0, 10),
         result: fighter.last_fight_result ?? "—",
-        method: fighter.last_fight_method
-          ? METHOD_SHORT[fighter.last_fight_method] ?? fighter.last_fight_method
-          : null,
+        method: methodLabel(fighter.last_fight_method),
       }
     : null;
 

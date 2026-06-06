@@ -1,4 +1,4 @@
-import { getTranslations } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 
 import { Link } from "@/i18n/navigation";
 import { priceToDecimalOdds } from "@/lib/lmsr";
@@ -18,6 +18,8 @@ const METHOD_SHORT = ["KO", "Sub", "Dec"];
 
 export async function MarketCard({ market }: { market: MarketListItem }) {
   const t = await getTranslations("markets");
+  const locale = await getLocale();
+  const dateLocale = locale === "ru" ? "ru-RU" : "en-US";
   const typeLabel = t.has(`type_${market.type}`)
     ? t(`type_${market.type}`)
     : market.type;
@@ -50,7 +52,7 @@ export async function MarketCard({ market }: { market: MarketListItem }) {
           />
           <p className="mt-3 font-mono text-[10px] tabular text-foreground-subtle">
             {t("volTraders", {
-              vol: market.total_volume.toLocaleString(),
+              vol: market.total_volume.toLocaleString(dateLocale),
               count: market.unique_traders,
             })}
           </p>
@@ -114,7 +116,7 @@ function WinnerCell({ name, price }: { name: string; price: number }) {
         {name}
       </p>
       <p className="font-display text-base tabular text-foreground">
-        {(price * 100).toFixed(0)}%
+        {(price * 100).toFixed(1)}%
       </p>
       <p className="font-mono text-[10px] tabular text-foreground-subtle">
         {priceToDecimalOdds(price)}x
@@ -146,7 +148,7 @@ function MethodColumn({
             </span>
             <span className="text-right">
               <span className="font-display text-xs tabular text-foreground">
-                {(o.current_price * 100).toFixed(0)}%
+                {(o.current_price * 100).toFixed(1)}%
               </span>
               <span className="ml-1.5 font-mono text-[9px] tabular text-foreground-subtle">
                 {priceToDecimalOdds(o.current_price)}x
@@ -172,7 +174,7 @@ function BinaryCompact({ outcomes }: { outcomes: MarketCardOutcome[] }) {
             {truncate(o.label, 18)}
           </p>
           <p className="font-display text-base tabular text-foreground">
-            {(o.current_price * 100).toFixed(0)}%
+            {(o.current_price * 100).toFixed(1)}%
           </p>
           <p className="font-mono text-[10px] tabular text-foreground-subtle">
             {priceToDecimalOdds(o.current_price)}x
@@ -202,7 +204,7 @@ function RoundCompact({
         {favoriteLabel} · {top.label}
       </p>
       <p className="font-display text-base tabular text-foreground">
-        {(top.current_price * 100).toFixed(0)}%
+        {(top.current_price * 100).toFixed(1)}%
         <span className="ml-1.5 font-mono text-[10px] tabular text-foreground-subtle">
           {priceToDecimalOdds(top.current_price)}x
         </span>

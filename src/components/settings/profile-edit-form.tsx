@@ -68,7 +68,9 @@ export function ProfileEditForm({
         </p>
       ) : null}
       {saved ? (
-        <p className="font-sans text-sm text-streak-win">{t("saved")}</p>
+        <p className="font-sans text-sm text-streak-win" role="status">
+          {t("saved")}
+        </p>
       ) : null}
       <button
         type="submit"

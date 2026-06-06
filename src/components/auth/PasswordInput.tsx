@@ -30,7 +30,6 @@ export function PasswordInput({ className, ...rest }: PasswordInputProps) {
         onClick={() => setVisible((v) => !v)}
         aria-label={visible ? t("hidePassword") : t("showPassword")}
         aria-pressed={visible}
-        tabIndex={-1}
         className="absolute inset-y-0 right-0 flex items-center px-2.5 text-foreground-muted hover:text-foreground focus-visible:outline-none focus-visible:text-foreground"
       >
         {visible ? (

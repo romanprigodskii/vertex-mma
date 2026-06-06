@@ -1,10 +1,10 @@
 "use client";
 
-import * as React from "react";
 import { useTranslations } from "next-intl";
 import { Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 
+import { useMounted } from "@/hooks/use-mounted";
 import { cn } from "@/lib/utils";
 
 /** Sun ↔ moon button. Renders nothing until mounted so the server output
@@ -12,8 +12,7 @@ import { cn } from "@/lib/utils";
 export function ThemeToggle({ className }: { className?: string }) {
   const t = useTranslations("theme");
   const { resolvedTheme, setTheme } = useTheme();
-  const [mounted, setMounted] = React.useState(false);
-  React.useEffect(() => setMounted(true), []);
+  const mounted = useMounted();
 
   const isLight = resolvedTheme === "light";
   const next = isLight ? "dark" : "light";

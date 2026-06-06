@@ -10,6 +10,10 @@ interface SearchBarProps {
   value: string;
   onChange: (value: string) => void;
   loading?: boolean;
+  /** Total matches for the current query. When a search settles this is
+   *  announced once via a polite live region (instead of re-announcing
+   *  "Searching" on every keystroke). */
+  resultsCount?: number;
   placeholder?: string;
   className?: string;
 }
@@ -18,6 +22,7 @@ export function SearchBar({
   value,
   onChange,
   loading = false,
+  resultsCount,
   placeholder,
   className,
 }: SearchBarProps) {
@@ -25,6 +30,16 @@ export function SearchBar({
   const tSearch = useTranslations("search");
   const effectivePlaceholder = placeholder ?? t("searchPlaceholder");
   const inputRef = React.useRef<HTMLInputElement | null>(null);
+
+  // Announce only the SETTLED result count, derived purely from props so no
+  // effect/state is needed: while a fetch is in flight (or the box is empty)
+  // the region is blank, and it fills with the count once the search resolves.
+  // Polite live regions announce on content *change*, so this fires once per
+  // completed search rather than on each character typed.
+  const announcement =
+    value.trim() !== "" && !loading && resultsCount != null
+      ? tSearch("resultsFound", { n: resultsCount })
+      : "";
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "Escape" && value) {
@@ -70,11 +85,15 @@ export function SearchBar({
         autoComplete="off"
         spellCheck={false}
       />
+      {/* Single, stable polite live region — announces the settled result
+          count, never the transient "Searching" state. */}
+      <span className="sr-only" role="status" aria-live="polite">
+        {announcement}
+      </span>
       <div className="absolute right-2 flex items-center gap-1.5">
         {loading ? (
           <span
-            aria-label={tSearch("searching")}
-            role="status"
+            aria-hidden
             className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary"
           />
         ) : null}

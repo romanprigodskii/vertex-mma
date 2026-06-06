@@ -89,24 +89,48 @@ export function OverlapRadar({
     };
   });
 
+  // Spell out each fighter's six values so assistive tech gets the actual data,
+  // not just the generic "radar comparison" name. (The chart distinguishes the
+  // two series by solid vs dashed stroke as well as hue — see below.)
+  const attrListFor = (f: OverlapRadarProps["fighterA"]): string =>
+    ATTRIBUTE_KEYS.map(
+      (k) => `${t(`attr_${k}` as "attr_striking")} ${Math.round(f.attributes[k])}`,
+    ).join(", ");
+  const radarLabel = `${t("radarAria")}. ${fighterA.name}: ${attrListFor(
+    fighterA,
+  )}. ${fighterB.name}: ${attrListFor(fighterB)}.`;
+
   return (
     <div className="flex flex-col items-center gap-4">
       {/* Legend */}
       <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-1">
         <span className="flex items-center gap-2 font-sans text-sm uppercase tracking-widest text-foreground-muted">
-          <span
-            aria-hidden
-            className="h-3 w-3 rounded-sm"
-            style={{ backgroundColor: COLOR_A }}
-          />
+          <svg aria-hidden width="24" height="8" viewBox="0 0 24 8">
+            <line
+              x1="1"
+              y1="4"
+              x2="23"
+              y2="4"
+              stroke={COLOR_A}
+              strokeWidth={2.5}
+              strokeLinecap="round"
+            />
+          </svg>
           <span className="truncate text-foreground">{fighterA.name}</span>
         </span>
         <span className="flex items-center gap-2 font-sans text-sm uppercase tracking-widest text-foreground-muted">
-          <span
-            aria-hidden
-            className="h-3 w-3 rounded-sm"
-            style={{ backgroundColor: COLOR_B }}
-          />
+          <svg aria-hidden width="24" height="8" viewBox="0 0 24 8">
+            <line
+              x1="1"
+              y1="4"
+              x2="23"
+              y2="4"
+              stroke={COLOR_B}
+              strokeWidth={2.5}
+              strokeLinecap="round"
+              strokeDasharray="5 3"
+            />
+          </svg>
           <span className="truncate text-foreground">{fighterB.name}</span>
         </span>
       </div>
@@ -116,7 +140,7 @@ export function OverlapRadar({
         preserveAspectRatio="xMidYMid meet"
         className={cn("h-auto w-full max-w-[560px]", className)}
         role="img"
-        aria-label={t("radarAria")}
+        aria-label={radarLabel}
       >
         {gridPolys.map((poly, idx) => (
           <polygon
@@ -151,13 +175,15 @@ export function OverlapRadar({
           <circle key={`a-pt-${i}`} cx={x} cy={y} r={2.5} fill={COLOR_A} />
         ))}
 
-        {/* Polygon B */}
+        {/* Polygon B — dashed stroke so the two series stay distinguishable
+            without relying on the gold/red hue difference alone. */}
         <polygon
           points={polygonString(polygonBPoints)}
           fill={COLOR_B_FILL}
           stroke={COLOR_B}
           strokeWidth={1.5}
           strokeLinejoin="round"
+          strokeDasharray="6 4"
         />
         {polygonBPoints.map(([x, y], i) => (
           <circle key={`b-pt-${i}`} cx={x} cy={y} r={2.5} fill={COLOR_B} />

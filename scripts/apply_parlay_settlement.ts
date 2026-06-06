@@ -15,6 +15,17 @@
  * void → refund stake, otherwise won with payout = floor(stake × Π surviving
  * odds) (void legs drop out). The trigger calls both settle fns.
  *
+ * MONEY-PATH TYPES: balance / payout locals are bigint — user_profile.balance_
+ * coins and transaction.balance_after are bigint (Wave 58), so an int4 local
+ * would overflow / `integer out of range` once a balance crosses ~2.1e9 (a
+ * 1M-stake parlay can pay 1e9). unlock_betting_achievements likewise takes
+ * bigint. KEEP IN SYNC with drizzle/migrations/0086_wave59_settlement_bigint.sql.
+ *
+ * NOTIFICATIONS: every settlement notification dual-writes a structured `params`
+ * jsonb ({key,coins}) so the client localizes title/body (the stored English is
+ * only the fallback). Mirrors scripts/apply_notification_params.ts — KEEP THE
+ * params IN SYNC so re-running either script can't regress RU localization.
+ *
  * Idempotent / re-runnable. Usage: npx tsx scripts/apply_parlay_settlement.ts
  */
 import { config } from "dotenv";
@@ -74,9 +85,14 @@ $$;
 // SYNC with that TS function. unlock_achievement is idempotent (no-op if the
 // user already holds it, or the slug doesn't exist), and itself awards the
 // reward, posts a notification, and re-checks tier.
+//
+// p_payout / p_new_balance are BIGINT: balances are bigint (Wave 58) and the
+// balance_*k thresholds compare against them, so an int4 param would overflow.
+// The old int4 signature is DROPped in main() before this runs (CREATE OR
+// REPLACE can't change a parameter's type — it would create a second overload).
 const UNLOCK_ACHIEVEMENTS_FN = `
 CREATE OR REPLACE FUNCTION public.unlock_betting_achievements(
-  p_user_id uuid, p_payout int, p_odds real, p_is_parlay boolean, p_new_balance int
+  p_user_id uuid, p_payout bigint, p_odds real, p_is_parlay boolean, p_new_balance bigint
 ) RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE v_total_wins int;
 BEGIN
@@ -100,7 +116,7 @@ CREATE OR REPLACE FUNCTION public.settle_fixed_odds_bets_for_bout(p_bout_id uuid
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
   v_bout record; v_mb text; v_wd boolean; v_terminal_void boolean;
-  v_bet record; v_outcome text; v_new_balance int;
+  v_bet record; v_outcome text; v_new_balance bigint;
 BEGIN
   SELECT status::text AS status, winner_id, fighter_a_id, fighter_b_id,
          method::text AS method, round_finished
@@ -129,12 +145,13 @@ BEGIN
       INSERT INTO transaction (user_id,type,amount,balance_after,description)
         VALUES (v_bet.user_id,'bet_won',v_bet.potential_payout,v_new_balance,'Sportsbook win on bout '||p_bout_id);
       -- Mirror the LMSR settle side-effects the fixed-odds path was missing:
-      -- a win notification, tier promotion, and achievement unlock.
-      INSERT INTO notification (user_id,type,title,body,link)
+      -- a win notification (with localizable params), tier promotion, unlock.
+      INSERT INTO notification (user_id,type,title,body,link,params)
         VALUES (v_bet.user_id,'bet_settled',
                 'Bet won · +'||v_bet.potential_payout||' coins',
                 'Your sportsbook pick hit — '||v_bet.potential_payout||' coins paid out.',
-                '/me/bets');
+                '/me/bets',
+                jsonb_build_object('key','sportsbook_won','coins',v_bet.potential_payout));
       PERFORM public.check_and_promote_tier(v_bet.user_id);
       PERFORM public.unlock_betting_achievements(
         v_bet.user_id, v_bet.potential_payout, v_bet.decimal_odds, false, v_new_balance);
@@ -145,11 +162,12 @@ BEGIN
         WHERE id=v_bet.user_id RETURNING balance_coins INTO v_new_balance;
       INSERT INTO transaction (user_id,type,amount,balance_after,description)
         VALUES (v_bet.user_id,'bet_refunded',v_bet.stake_coins,v_new_balance,'Sportsbook void refund on bout '||p_bout_id);
-      INSERT INTO notification (user_id,type,title,body,link)
+      INSERT INTO notification (user_id,type,title,body,link,params)
         VALUES (v_bet.user_id,'bet_settled',
                 'Bet voided · '||v_bet.stake_coins||' coins refunded',
                 'Your sportsbook bet was voided and your stake was returned.',
-                '/me/bets');
+                '/me/bets',
+                jsonb_build_object('key','sportsbook_void','coins',v_bet.stake_coins));
     ELSE
       UPDATE fixed_odds_bet SET status='lost', payout=0, settled_at=NOW() WHERE id=v_bet.id;
     END IF;
@@ -165,7 +183,7 @@ DECLARE
   v_bout record; v_mb text; v_wd boolean; v_terminal_void boolean;
   v_leg record; v_outcome text;
   v_p record; v_open int; v_lost int; v_won int;
-  v_combined numeric; v_payout int; v_new_balance int;
+  v_combined numeric; v_payout bigint; v_new_balance bigint;
 BEGIN
   SELECT status::text AS status, winner_id, fighter_a_id, fighter_b_id,
          method::text AS method, round_finished
@@ -213,28 +231,30 @@ BEGIN
           WHERE id=v_p.user_id RETURNING balance_coins INTO v_new_balance;
         INSERT INTO transaction (user_id,type,amount,balance_after,description)
           VALUES (v_p.user_id,'bet_refunded',v_p.stake_coins,v_new_balance,'Parlay void refund');
-        INSERT INTO notification (user_id,type,title,body,link)
+        INSERT INTO notification (user_id,type,title,body,link,params)
           VALUES (v_p.user_id,'bet_settled',
                   'Parlay voided · '||v_p.stake_coins||' coins refunded',
                   'Your parlay was voided and your stake was returned.',
-                  '/me/bets');
+                  '/me/bets',
+                  jsonb_build_object('key','parlay_void','coins',v_p.stake_coins));
       ELSE
         SELECT LEAST(1000, round(exp(sum(ln(decimal_odds)))::numeric, 2))
           INTO v_combined FROM parlay_leg WHERE parlay_id=v_p.id AND status='won';
-        v_payout := floor(v_p.stake_coins * v_combined)::int;
+        v_payout := floor(v_p.stake_coins * v_combined)::bigint;
         UPDATE parlay SET status='won', payout=v_payout, settled_at=NOW() WHERE id=v_p.id;
         UPDATE user_profile SET balance_coins=balance_coins+v_payout,
                total_coins_earned=total_coins_earned+v_payout
           WHERE id=v_p.user_id RETURNING balance_coins INTO v_new_balance;
         INSERT INTO transaction (user_id,type,amount,balance_after,description)
           VALUES (v_p.user_id,'bet_won',v_payout,v_new_balance,'Parlay win');
-        -- Mirror the LMSR settle side-effects: win notification, tier
-        -- promotion, achievement unlock (parlay_win / underdog_win / etc.).
-        INSERT INTO notification (user_id,type,title,body,link)
+        -- Mirror the LMSR settle side-effects: win notification (localizable
+        -- params), tier promotion, achievement unlock (parlay_win / etc.).
+        INSERT INTO notification (user_id,type,title,body,link,params)
           VALUES (v_p.user_id,'bet_settled',
                   'Parlay won · +'||v_payout||' coins',
                   'Every leg of your parlay hit — '||v_payout||' coins paid out.',
-                  '/me/bets');
+                  '/me/bets',
+                  jsonb_build_object('key','parlay_won','coins',v_payout));
         PERFORM public.check_and_promote_tier(v_p.user_id);
         PERFORM public.unlock_betting_achievements(
           v_p.user_id, v_payout, v_combined::real, true, v_new_balance);
@@ -265,6 +285,12 @@ $$;
 async function main() {
   await sql.unsafe(METHOD_BUCKET_FN);
   await sql.unsafe(GRADE_FN);
+  // CREATE OR REPLACE can't change a parameter's type, so the old int4
+  // signature would linger as a second overload (ambiguous resolution). Drop
+  // it first; the callers below resolve to the bigint version (int upcasts).
+  await sql.unsafe(
+    `DROP FUNCTION IF EXISTS public.unlock_betting_achievements(uuid, int, real, boolean, int);`,
+  );
   await sql.unsafe(UNLOCK_ACHIEVEMENTS_FN);
   await sql.unsafe(SETTLE_BETS_FN);
   await sql.unsafe(SETTLE_PARLAY_FN);
@@ -276,7 +302,7 @@ async function main() {
       FOR EACH ROW EXECUTE FUNCTION public.on_bout_settle_fixed_odds();
   `);
   console.log(
-    "Installed grading helpers + unlock_betting_achievements + settle_fixed_odds_bets_for_bout + settle_parlay_legs_for_bout + trigger.",
+    "Installed grading helpers + unlock_betting_achievements (bigint) + settle_fixed_odds_bets_for_bout + settle_parlay_legs_for_bout + trigger.",
   );
   await sql.end();
 }

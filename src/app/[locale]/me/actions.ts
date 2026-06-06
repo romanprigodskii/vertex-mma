@@ -14,6 +14,7 @@ const COOLDOWN_HOURS = 20;
 
 export async function claimDailyBonusAction(): Promise<{
   error?: string;
+  hoursLeft?: number;
   awarded?: number;
   newlyUnlocked?: string[];
 }> {
@@ -21,11 +22,11 @@ export async function claimDailyBonusAction(): Promise<{
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { error: "Not signed in." };
+  if (!user) return { error: "NOT_SIGNED_IN" };
   // The 20h cooldown is enforced below; this just stops a script from pounding
   // the endpoint (and the pooler) far faster than that check can run.
   if (!allowAction(`daily:${user.id}`, COOLDOWN_MS.dailyBonus)) {
-    return { error: "Slow down — try again in a moment." };
+    return { error: "RATE_LIMITED" };
   }
 
   const profileRows = await db
@@ -38,16 +39,14 @@ export async function claimDailyBonusAction(): Promise<{
     .where(eq(userProfile.authUserId, user.id))
     .limit(1);
   const profile = profileRows[0];
-  if (!profile) return { error: "Profile not found." };
+  if (!profile) return { error: "PROFILE_NOT_FOUND" };
 
   if (profile.lastDaily) {
     const lastMs = new Date(profile.lastDaily).getTime();
     const hoursSince = (Date.now() - lastMs) / (1000 * 60 * 60);
     if (hoursSince < COOLDOWN_HOURS) {
       const hoursLeft = Math.ceil(COOLDOWN_HOURS - hoursSince);
-      return {
-        error: `Try again in ${hoursLeft} hour${hoursLeft === 1 ? "" : "s"}.`,
-      };
+      return { error: "COOLDOWN_ACTIVE", hoursLeft };
     }
   }
 
@@ -102,7 +101,7 @@ export async function claimDailyBonusAction(): Promise<{
 
   if (!claimed) {
     // Another concurrent claim won the race (or the cooldown is still active).
-    return { error: "Daily bonus already claimed. Try again later." };
+    return { error: "ALREADY_CLAIMED" };
   }
 
   // After the bonus posts, daily_streak_7 / balance_50k / balance_100k

@@ -140,6 +140,10 @@ export default async function FighterDetailPage({ params }: PageProps) {
 
   const championEntry = CHAMPION_BY_SLUG.get(slug) ?? null;
   const attributes = computeAttributes(fighter);
+  // A 0–2 bout fighter still yields a confident-looking radar from
+  // computeAttributes; flag it so the chart renders a low-confidence treatment
+  // and the caption says so, rather than implying more certainty than exists.
+  const radarLowConfidence = fighter.ufc_total < 3;
   const timelineBouts = buildTimelineBouts(history, boutRounds);
 
   // Wave 14B.2: hero score uses the per-division score when the fighter
@@ -206,41 +210,56 @@ export default async function FighterDetailPage({ params }: PageProps) {
               <Link
                 href={`/fighters/${slug}/score-history?mode=current`}
                 prefetch={false}
-                aria-label={t("openCurrentHistory")}
+                aria-label={t("openCurrentHistoryScore", {
+                  score: heroCurrentScore,
+                })}
                 className="group block rounded-full outline-none ring-offset-2 ring-offset-background-base transition-transform hover:scale-[1.02] focus-visible:ring-2 focus-visible:ring-primary"
               >
-                <OctagonScore
-                  score={heroCurrentScore}
-                  scoreMode="current"
-                  fighter={{
-                    slug: fighter.slug,
-                    // Wave 14B.2: classify the hero tier using the
-                    // divisional score (when available) so the colour
-                    // ring and number always agree. all_time stays global.
-                    vertexScore: heroCurrentScore,
-                    vertexScoreAllTime: fighter.vertex_score_all_time,
-                    ufcBouts: fighter.ufc_total,
-                  }}
-                  label={t("currentVertex")}
-                />
+                {/* Decorative — the link's aria-label already names the control
+                    and its score, so the inner shape is hidden to avoid a
+                    redundant second screen-reader announcement. */}
+                <span aria-hidden className="contents">
+                  <OctagonScore
+                    score={heroCurrentScore}
+                    scoreMode="current"
+                    fighter={{
+                      slug: fighter.slug,
+                      // Wave 14B.2: classify the hero tier using the
+                      // divisional score (when available) so the colour
+                      // ring and number always agree. all_time stays global.
+                      vertexScore: heroCurrentScore,
+                      vertexScoreAllTime: fighter.vertex_score_all_time,
+                      ufcBouts: fighter.ufc_total,
+                    }}
+                    label={t("currentVertex")}
+                  />
+                </span>
               </Link>
               <Link
                 href={`/fighters/${slug}/score-history?mode=all_time`}
                 prefetch={false}
-                aria-label={t("openAllTimeHistory")}
+                aria-label={
+                  fighter.vertex_score_all_time != null
+                    ? t("openAllTimeHistoryScore", {
+                        score: fighter.vertex_score_all_time,
+                      })
+                    : t("openAllTimeHistory")
+                }
                 className="group block rounded-full outline-none ring-offset-2 ring-offset-background-base transition-transform hover:scale-[1.02] focus-visible:ring-2 focus-visible:ring-primary"
               >
-                <CircleScore
-                  score={fighter.vertex_score_all_time}
-                  scoreMode="all_time"
-                  fighter={{
-                    slug: fighter.slug,
-                    vertexScore: fighter.vertex_score,
-                    vertexScoreAllTime: fighter.vertex_score_all_time,
-                    ufcBouts: fighter.ufc_total,
-                  }}
-                  label={t("allTimeVertex")}
-                />
+                <span aria-hidden className="contents">
+                  <CircleScore
+                    score={fighter.vertex_score_all_time}
+                    scoreMode="all_time"
+                    fighter={{
+                      slug: fighter.slug,
+                      vertexScore: fighter.vertex_score,
+                      vertexScoreAllTime: fighter.vertex_score_all_time,
+                      ufcBouts: fighter.ufc_total,
+                    }}
+                    label={t("allTimeVertex")}
+                  />
+                </span>
               </Link>
             </div>
           ) : (
@@ -250,20 +269,28 @@ export default async function FighterDetailPage({ params }: PageProps) {
               <Link
                 href={`/fighters/${slug}/score-history?mode=all_time`}
                 prefetch={false}
-                aria-label={t("openAllTimeHistory")}
+                aria-label={
+                  fighter.vertex_score_all_time != null
+                    ? t("openAllTimeHistoryScore", {
+                        score: fighter.vertex_score_all_time,
+                      })
+                    : t("openAllTimeHistory")
+                }
                 className="group block rounded-full outline-none ring-offset-2 ring-offset-background-base transition-transform hover:scale-[1.02] focus-visible:ring-2 focus-visible:ring-primary"
               >
-                <CircleScore
-                  score={fighter.vertex_score_all_time}
-                  scoreMode="all_time"
-                  fighter={{
-                    slug: fighter.slug,
-                    vertexScore: fighter.vertex_score,
-                    vertexScoreAllTime: fighter.vertex_score_all_time,
-                    ufcBouts: fighter.ufc_total,
-                  }}
-                  label={t("allTimeVertexShort")}
-                />
+                <span aria-hidden className="contents">
+                  <CircleScore
+                    score={fighter.vertex_score_all_time}
+                    scoreMode="all_time"
+                    fighter={{
+                      slug: fighter.slug,
+                      vertexScore: fighter.vertex_score,
+                      vertexScoreAllTime: fighter.vertex_score_all_time,
+                      ufcBouts: fighter.ufc_total,
+                    }}
+                    label={t("allTimeVertexShort")}
+                  />
+                </span>
               </Link>
             </div>
           )}
@@ -347,9 +374,12 @@ export default async function FighterDetailPage({ params }: PageProps) {
                 attributes={attributes}
                 labels={radarLabels}
                 ariaLabel={t("radarAria")}
+                lowConfidence={radarLowConfidence}
               />
               <p className="mt-4 max-w-sm text-center font-sans text-[11px] text-foreground-subtle lg:text-left">
-                {t("keyStatsCaveat")}
+                {radarLowConfidence
+                  ? t("radarLowConfidence")
+                  : t("keyStatsCaveat")}
               </p>
             </div>
             <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">

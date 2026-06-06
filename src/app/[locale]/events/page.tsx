@@ -8,7 +8,7 @@ import {
 import { Container } from "@/components/layout/container";
 import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
-import { Link } from "@/i18n/navigation";
+import { Link, redirect } from "@/i18n/navigation";
 import { type EventListFilter, listEvents } from "@/lib/event-detail";
 import { cn } from "@/lib/utils";
 
@@ -47,6 +47,30 @@ const STATUS_KEY: Record<string, string> = {
   postponed: "statusPostponed",
 };
 
+// Tab-aware empty state: a quiet "Upcoming" period shouldn't read like a
+// broken/empty site, so each tab gets its own copy plus a pointer to a tab
+// that's more likely to have rows. "all" has nowhere else to send people.
+const EMPTY_COPY: Record<
+  EventListFilter,
+  {
+    titleKey: string;
+    hintKey: string;
+    cta: { href: string; labelKey: string } | null;
+  }
+> = {
+  upcoming: {
+    titleKey: "emptyUpcomingTitle",
+    hintKey: "emptyUpcomingHint",
+    cta: { href: "/events?filter=past", labelKey: "emptyCtaPast" },
+  },
+  past: {
+    titleKey: "emptyPastTitle",
+    hintKey: "emptyPastHint",
+    cta: { href: "/events", labelKey: "emptyCtaUpcoming" },
+  },
+  all: { titleKey: "emptyAllTitle", hintKey: "emptyAllHint", cta: null },
+};
+
 export default async function EventsListPage({
   params,
   searchParams,
@@ -56,8 +80,13 @@ export default async function EventsListPage({
   const t = await getTranslations("eventsList");
   const activeLocale = await getLocale();
   const sp = await searchParams;
+  // Canonicalize the default view to bare /events so the Upcoming tab has a
+  // single URL that matches its own href — old ?filter=upcoming shares don't
+  // linger as a non-canonical duplicate of /events.
+  if (sp.filter === "upcoming") redirect({ href: "/events", locale });
   const filter = parseFilter(sp.filter);
   const events = await listEvents(filter, 60);
+  const emptyCopy = EMPTY_COPY[filter];
   const dateFmt = activeLocale === "ru" ? "ru-RU" : "en-US";
 
   return (
@@ -99,9 +128,22 @@ export default async function EventsListPage({
           </nav>
 
           {events.length === 0 ? (
-            <p className="py-12 text-center font-sans text-sm text-foreground-muted">
-              {t("empty")}
-            </p>
+            <div className="rounded-md border border-dashed border-foreground/10 bg-background-elevated/30 px-6 py-16 text-center">
+              <p className="font-display text-lg uppercase tracking-tight text-foreground">
+                {t(emptyCopy.titleKey)}
+              </p>
+              <p className="mx-auto mt-2 max-w-sm font-sans text-sm text-foreground-muted">
+                {t(emptyCopy.hintKey)}
+              </p>
+              {emptyCopy.cta ? (
+                <Link
+                  href={emptyCopy.cta.href}
+                  className="mt-4 inline-block font-sans text-xs uppercase tracking-widest text-primary transition-colors hover:text-primary/80"
+                >
+                  {t(emptyCopy.cta.labelKey)}
+                </Link>
+              ) : null}
+            </div>
           ) : (
             <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {events.map((e) => {

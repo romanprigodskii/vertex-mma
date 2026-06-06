@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { getTranslations } from "next-intl/server";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import { ChevronLeft, Edit3 } from "lucide-react";
 
 import { Container } from "@/components/layout/container";
@@ -24,12 +24,13 @@ export async function generateMetadata({ params }: PageProps) {
     const tNF = await getTranslations({ locale, namespace: "notFound" });
     return { title: tNF("rankingTitle") };
   }
+  const t = await getTranslations({ locale, namespace: "rankings" });
   const desc = r.description
     ? `${r.description.slice(0, 140)}${r.description.length > 140 ? "…" : ""}`
-    : `${r.entry_count} fighter${r.entry_count === 1 ? "" : "s"} ranked by @${r.author_username}.`;
+    : t("metaRankedBy", { count: r.entry_count, username: r.author_username });
   const ogImage = `/api/og/rankings/${r.id}`;
   return {
-    title: `${r.title} · by @${r.author_username}`,
+    title: `${r.title} · ${t("by")} @${r.author_username}`,
     description: desc,
     openGraph: {
       title: `${r.title} · @${r.author_username}`,
@@ -41,7 +42,7 @@ export async function generateMetadata({ params }: PageProps) {
           url: ogImage,
           width: 1200,
           height: 630,
-          alt: `${r.title} — Vertex MMA ranking`,
+          alt: t("ogImageAlt", { title: r.title }),
         },
       ],
     },
@@ -53,7 +54,9 @@ export async function generateMetadata({ params }: PageProps) {
 }
 
 export default async function RankingViewPage({ params }: PageProps) {
-  const { id } = await params;
+  const { id, locale } = await params;
+  setRequestLocale(locale);
+  const t = await getTranslations("rankings");
   const [ranking, currentUser] = await Promise.all([
     getRankingById(id),
     getCurrentUser(),
@@ -68,22 +71,21 @@ export default async function RankingViewPage({ params }: PageProps) {
       <main className="flex-1">
         <div className="border-b border-foreground/[0.06]">
           <Container
-            size="xl"
+            size="lg"
             className="flex items-center justify-between py-3"
           >
             <Link
               href="/rankings"
               className="inline-flex items-center gap-1.5 font-sans text-sm text-foreground-muted hover:text-primary"
             >
-              <ChevronLeft className="h-4 w-4" aria-hidden /> All rankings
+              <ChevronLeft className="h-4 w-4" aria-hidden /> {t("allRankings")}
             </Link>
             <div className="flex items-center gap-3">
               <ShareButton
                 url={`/rankings/${ranking.id}`}
                 ogImageUrl={`/api/og/rankings/${ranking.id}`}
-                title={`${ranking.title} · by @${ranking.author_username}`}
+                title={`${ranking.title} · ${t("by")} @${ranking.author_username}`}
                 filename={`vertexmma-ranking-${ranking.id.slice(0, 8)}`}
-                label="Share"
                 variant="icon"
               />
               {isOwner ? (
@@ -91,7 +93,7 @@ export default async function RankingViewPage({ params }: PageProps) {
                   href={`/rankings/${ranking.id}/edit`}
                   className="inline-flex items-center gap-1.5 font-sans text-sm text-foreground-muted hover:text-primary"
                 >
-                  <Edit3 className="h-4 w-4" aria-hidden /> Edit
+                  <Edit3 className="h-4 w-4" aria-hidden /> {t("editLabel")}
                 </Link>
               ) : null}
             </div>

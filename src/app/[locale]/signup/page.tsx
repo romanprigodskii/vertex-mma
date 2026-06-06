@@ -16,6 +16,11 @@ export async function generateMetadata({
   return { title: t("signUpTitle") };
 }
 
+// SignUpForm uses useSearchParams() (to preserve ?next=); marking the route
+// dynamic avoids the "must be wrapped in Suspense" build failure on the
+// prerendered shell — mirrors the sign-in page.
+export const dynamic = "force-dynamic";
+
 export default function SignUpPage() {
   return (
     <>

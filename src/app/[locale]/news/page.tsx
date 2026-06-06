@@ -59,10 +59,19 @@ export default async function NewsPage({ params, searchParams }: PageProps) {
   setRequestLocale(locale);
   const t = await getTranslations("news");
   const { classification } = await searchParams;
+  // 'unrelated' is the classifier's "not about MMA" bucket — never a public
+  // filter (it's also excluded from the feed query and the chip counts).
   const active =
-    classification && classification in NEWS_CLASSIFICATION_LABELS
+    classification &&
+    classification in NEWS_CLASSIFICATION_LABELS &&
+    classification !== "unrelated"
       ? classification
       : null;
+  const activeLabel = active
+    ? t.has(`class_${active}`)
+      ? t(`class_${active}`)
+      : active
+    : "";
 
   const [items, counts] = await Promise.all([
     listNewsFeed({ classification: active ?? undefined, limit: 200 }),
@@ -108,11 +117,21 @@ export default async function NewsPage({ params, searchParams }: PageProps) {
           {items.length === 0 ? (
             <div className="rounded-md border border-dashed border-foreground/15 bg-background-elevated/20 px-6 py-16 text-center">
               <p className="font-display text-xl uppercase tracking-tight text-foreground break-words sm:text-2xl">
-                {t("emptyTitle")}
+                {active
+                  ? t("emptyFilteredTitle", { category: activeLabel })
+                  : t("emptyTitle")}
               </p>
               <p className="mx-auto mt-3 max-w-md font-sans text-sm text-foreground-muted">
-                {t("emptyLead")}
+                {active ? t("emptyFilteredLead") : t("emptyLead")}
               </p>
+              {active ? (
+                <Link
+                  href="/news"
+                  className="mt-4 inline-block font-mono text-xs uppercase tracking-[0.16em] text-primary hover:underline"
+                >
+                  {t("backToAllNews")}
+                </Link>
+              ) : null}
             </div>
           ) : (
             <ul className="flex flex-col gap-3">

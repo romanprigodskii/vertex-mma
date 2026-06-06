@@ -2,14 +2,17 @@
 
 import * as React from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { Coins, LogOut, Menu, Moon, Sun, X } from "lucide-react";
+import { Coins, LogOut, Menu, Moon, Search, Sun, X } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useTheme } from "next-themes";
 import { useSearchParams } from "next/navigation";
 
+import { openFighterSearch } from "@/components/search/fighter-search-palette";
+import { useMounted } from "@/hooks/use-mounted";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { routing } from "@/i18n/routing";
 import type { CurrentUser } from "@/lib/auth";
+import { formatNumber } from "@/lib/format";
 import { NAV_SECTIONS } from "@/lib/navigation";
 import { cn } from "@/lib/utils";
 
@@ -21,9 +24,9 @@ export function MobileNav({ user }: { user: CurrentUser | null }) {
   const locale = useLocale();
   const t = useTranslations("nav");
   const tUser = useTranslations("userMenu");
+  const tSearch = useTranslations("search");
   const { resolvedTheme, setTheme } = useTheme();
-  const [mounted, setMounted] = React.useState(false);
-  React.useEffect(() => setMounted(true), []);
+  const mounted = useMounted();
 
   // Close the drawer whenever the route changes underneath us.
   React.useEffect(() => {
@@ -65,6 +68,23 @@ export function MobileNav({ user }: { user: CurrentUser | null }) {
           </div>
 
           <nav className="flex-1 overflow-y-auto p-4">
+            <button
+              type="button"
+              onClick={() => {
+                // Close the drawer, then open the global command palette. The
+                // palette listens for this event from anywhere in the app, so
+                // touch users (who can't reach Cmd/Ctrl+K) get search too.
+                setOpen(false);
+                openFighterSearch();
+              }}
+              className="mb-4 flex w-full items-center gap-2.5 rounded-sm border border-foreground/15 bg-background-base/40 px-3 py-2.5 text-left font-sans text-sm text-foreground-muted transition-colors hover:border-foreground/30 hover:bg-foreground/[0.04] hover:text-foreground"
+            >
+              <Search className="h-4 w-4" aria-hidden />
+              <span className="uppercase tracking-widest">
+                {tSearch("title")}
+              </span>
+            </button>
+
             <ul className="flex flex-col gap-1">
               {NAV_SECTIONS.map((s) => {
                 const active =
@@ -135,7 +155,7 @@ export function MobileNav({ user }: { user: CurrentUser | null }) {
                 <div className="mb-3 flex items-center gap-2 rounded-sm bg-background-base/40 px-3 py-2">
                   <Coins className="h-4 w-4 text-gold" aria-hidden />
                   <span className="font-sans text-sm tabular text-foreground">
-                    {user.balanceCoins.toLocaleString()}
+                    {formatNumber(user.balanceCoins)}
                   </span>
                   <span className="ml-auto font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
                     {user.tier}

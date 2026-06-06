@@ -40,7 +40,7 @@ export default async function CreateRankingPage({
       <Navbar />
       <main className="flex-1">
         <div className="border-b border-foreground/[0.06]">
-          <Container size="xl" className="py-3">
+          <Container size="lg" className="py-3">
             <Link
               href="/rankings"
               className="inline-flex items-center gap-1.5 font-sans text-sm text-foreground-muted hover:text-primary"

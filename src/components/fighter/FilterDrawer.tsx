@@ -104,6 +104,7 @@ export function FilterDrawer({
               onClear={onClear}
               countries={countries}
               resultCount={resultCount}
+              showSort
             />
           </div>
 
@@ -122,8 +123,10 @@ export function FilterDrawer({
               onClick={() => setOpen(false)}
               className="flex-1"
             >
+              {/* Total matches, not the loaded page — "Show 48" badly
+                  undersold a 600-fighter result set. */}
               {resultCount
-                ? t("showN", { n: formatNumber(resultCount.shown) })
+                ? t("showN", { n: formatNumber(resultCount.total) })
                 : t("apply")}
             </Button>
           </footer>

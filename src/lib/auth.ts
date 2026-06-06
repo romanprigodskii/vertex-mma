@@ -23,6 +23,10 @@ export type CurrentUser = {
   usernameLastChangedAt: string | null;
   /** Staff/moderator capability, derived from the ADMIN_EMAILS allowlist. */
   isStaff: boolean;
+  /** True when the account has an email/password identity (vs OAuth-only).
+   *  Gates password re-authentication on destructive settings actions so we
+   *  can step up password users without locking out Google-only accounts. */
+  hasPassword: boolean;
 };
 
 /**
@@ -37,6 +41,30 @@ export function isStaffEmail(email: string | null | undefined): boolean {
     .map((e) => e.trim().toLowerCase())
     .filter(Boolean);
   return allow.includes(email.toLowerCase());
+}
+
+type AuthUserLike = {
+  identities?: { provider?: string | null }[] | null;
+  app_metadata?: { provider?: string; providers?: string[] } | null;
+};
+
+/**
+ * True when the user can re-authenticate with an email/password — i.e. has an
+ * "email" identity — as opposed to an OAuth-only account that has no password
+ * to verify. Used to gate password step-up on destructive actions (account
+ * deletion, email change) without permanently locking out Google-only users,
+ * who can never produce a password.
+ */
+export function userHasPassword(user: AuthUserLike | null | undefined): boolean {
+  if (!user) return false;
+  const identities = user.identities ?? [];
+  if (identities.length > 0) {
+    return identities.some((i) => i.provider === "email");
+  }
+  // Fall back to app_metadata when identities aren't expanded on the user.
+  const providers = user.app_metadata?.providers ?? [];
+  if (providers.length > 0) return providers.includes("email");
+  return user.app_metadata?.provider === "email";
 }
 
 export async function getCurrentUser(): Promise<CurrentUser | null> {
@@ -92,6 +120,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
       ? row.usernameLastChangedAt.toISOString()
       : null,
     isStaff: isStaffEmail(user.email),
+    hasPassword: userHasPassword(user),
   };
 }
 

@@ -74,12 +74,13 @@ export async function SimulationBoutCard({ bout }: Props) {
   const tSim = await getTranslations("boutSimulation");
   const tWeight = await getTranslations("weight");
 
+  // Within ±2pp of an even split, crowning one side as "the pick" is
+  // misleading — surface a neutral "too close to call" state instead.
+  const isPickEm = Math.abs(bout.probA - 0.5) <= 0.02;
   const winnerIsA = bout.probA >= 0.5;
   const winnerName = winnerIsA ? bout.fighterAName : bout.fighterBName;
   const winnerProb = winnerIsA ? bout.probA : bout.probB;
-  const winnerSlug = winnerIsA ? bout.fighterASlug : bout.fighterBSlug;
   const loserName = winnerIsA ? bout.fighterBName : bout.fighterAName;
-  const loserProb = winnerIsA ? bout.probB : bout.probA;
   const cs = CONFIDENCE_STYLE[bout.confidenceLabel] ?? CONFIDENCE_STYLE.low;
   const weightLabel = tWeight.has(bout.weightClass)
     ? tWeight(bout.weightClass as "lightweight")
@@ -88,7 +89,11 @@ export async function SimulationBoutCard({ bout }: Props) {
   // Edge for predicted winner — flip sign when model picks B.
   const edge = bout.edgeA;
   const edgeForWinner = edge == null ? null : winnerIsA ? edge : -edge;
-  const showValueChip = edgeForWinner != null && Math.abs(edgeForWinner) >= 0.05;
+  // Suppress the value chip on a coin-flip: it's computed from an arbitrary
+  // side (probA >= 0.5) and the pick row no longer names a favorite, so the
+  // chip would have no fighter to attribute the edge to.
+  const showValueChip =
+    !isPickEm && edgeForWinner != null && Math.abs(edgeForWinner) >= 0.05;
   const valuePositive = edgeForWinner != null && edgeForWinner >= 0.05;
 
   // Headline method from MC.
@@ -98,11 +103,18 @@ export async function SimulationBoutCard({ bout }: Props) {
     <Link
       href={`/bouts/${bout.boutId}`}
       prefetch={false}
-      aria-label={t("cardAria", {
-        winner: winnerName,
-        loser: loserName,
-        pct: pct(winnerProb),
-      })}
+      aria-label={
+        isPickEm
+          ? t("cardAriaPickEm", {
+              a: bout.fighterAName,
+              b: bout.fighterBName,
+            })
+          : t("cardAria", {
+              winner: winnerName,
+              loser: loserName,
+              pct: pct(winnerProb),
+            })
+      }
       className={cn(
         "group flex flex-col gap-3 rounded-md border border-foreground/10 bg-background-elevated/30 px-4 py-4",
         "transition-colors hover:border-primary/30 hover:bg-foreground/[0.04]",
@@ -139,7 +151,9 @@ export async function SimulationBoutCard({ bout }: Props) {
           <span
             className={cn(
               "font-display text-base uppercase tracking-tight leading-tight",
-              winnerIsA ? "text-foreground" : "text-foreground-muted",
+              isPickEm || winnerIsA
+                ? "text-foreground"
+                : "text-foreground-muted",
             )}
           >
             {bout.fighterAName}
@@ -155,7 +169,9 @@ export async function SimulationBoutCard({ bout }: Props) {
           <span
             className={cn(
               "font-display text-base uppercase tracking-tight leading-tight",
-              !winnerIsA ? "text-foreground" : "text-foreground-muted",
+              isPickEm || !winnerIsA
+                ? "text-foreground"
+                : "text-foreground-muted",
             )}
           >
             {bout.fighterBName}
@@ -172,15 +188,24 @@ export async function SimulationBoutCard({ bout }: Props) {
         />
       </div>
 
-      {/* Pick row — big number + winner + confidence + value chip */}
+      {/* Pick row — big number + winner + confidence + value chip. A near-even
+          split shows a neutral "too close to call" instead of crowning a side. */}
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t border-foreground/10 pt-3">
-        <span className="font-display tabular text-3xl leading-none text-foreground">
-          {(winnerProb * 100).toFixed(0)}
-          <span className="text-lg text-foreground-muted">%</span>
-        </span>
-        <span className="font-display text-base uppercase tracking-tight text-foreground">
-          {winnerName}
-        </span>
+        {isPickEm ? (
+          <span className="font-display text-base uppercase tracking-tight text-foreground">
+            {t("pickEm")}
+          </span>
+        ) : (
+          <>
+            <span className="font-display tabular text-3xl leading-none text-foreground">
+              {(winnerProb * 100).toFixed(0)}
+              <span className="text-lg text-foreground-muted">%</span>
+            </span>
+            <span className="font-display text-base uppercase tracking-tight text-foreground">
+              {winnerName}
+            </span>
+          </>
+        )}
         <span className="flex flex-wrap items-center gap-x-2 gap-y-1 font-sans text-[11px] uppercase tracking-widest">
           <span className="flex items-center gap-1">
             <span aria-hidden className={cn("h-2 w-2 rounded-full", cs.dot)} />
@@ -218,8 +243,9 @@ export async function SimulationBoutCard({ bout }: Props) {
           </span>
         ) : (
           <span className="text-foreground-subtle/60">
-            {/* No MC available — render the score-confidence summary instead. */}
-            {t("noMcFallback", { name: loserName, pct: pct(loserProb) })}
+            {/* No Monte Carlo data for this bout — state that plainly rather
+                than dressing the loser's win chance up as a second pick. */}
+            {t("noMcFallback")}
           </span>
         )}
         <span className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-widest text-primary transition-transform group-hover:translate-x-0.5">

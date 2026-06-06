@@ -50,7 +50,11 @@ export function cleanNewsTitle(title: string): string {
     .trim();
 }
 
-/** Decode HTML entities — some feeds leave `&#43;` / `&amp;` in headlines. */
+/** Decode HTML entities — some feeds leave `&#43;` / `&amp;` in headlines.
+ *  SECURITY: the decoded string turns stored `&lt;script&gt;` back into a live
+ *  `<script>` tag, so it MUST only ever be rendered as a React child (which
+ *  auto-escapes). Never pass a decoded title/snippet/body into
+ *  dangerouslySetInnerHTML or any other raw-HTML sink. */
 function decodeEntities(text: string): string {
   return text.replace(/&(#x?[0-9a-f]+|[a-z0-9]+);/gi, (match, ent: string) => {
     if (ent[0] === "#") {
@@ -182,6 +186,7 @@ export async function listNewsFeed(
   const rows = (await db.execute<FeedRow>(sql`
     ${feedSelect(isRu)}
     WHERE ni.status IN ('approved', 'auto_approved')
+      AND ni.classification IS DISTINCT FROM 'unrelated'::news_classification
     ${where}
     ORDER BY ni.published_at DESC
     LIMIT ${limit}
@@ -209,6 +214,7 @@ export async function getNewsClassificationCounts(): Promise<
     FROM news_item
     WHERE status IN ('approved', 'auto_approved')
       AND classification IS NOT NULL
+      AND classification <> 'unrelated'
     GROUP BY classification
     ORDER BY count DESC
   `)) as unknown as NewsClassificationCount[];
@@ -229,6 +235,7 @@ export async function listLatestNewsExcluding(
   const rows = (await db.execute<FeedRow>(sql`
     ${feedSelect(isRu)}
     WHERE ni.status IN ('approved', 'auto_approved')
+      AND ni.classification IS DISTINCT FROM 'unrelated'::news_classification
     ${where}
     ORDER BY ni.published_at DESC
     LIMIT ${Math.min(20, Math.max(1, limit))}
@@ -280,6 +287,7 @@ export async function listRelatedNews(opts: {
     FROM news_item ni
     JOIN news_source ns ON ns.id = ni.source_id
     WHERE ni.status IN ('approved', 'auto_approved')
+      AND ni.classification IS DISTINCT FROM 'unrelated'::news_classification
       AND ni.id != ${opts.excludeId}::uuid
     ORDER BY rank DESC, ni.published_at DESC
     LIMIT ${limit}
@@ -361,6 +369,7 @@ export async function listNewsForFighter(
   const rows = (await db.execute<FeedRow>(sql`
     ${feedSelect(isRu)}
     WHERE ni.status IN ('approved', 'auto_approved')
+      AND ni.classification IS DISTINCT FROM 'unrelated'::news_classification
       AND ${fighterId}::uuid = ANY(ni.related_fighter_ids)
     ORDER BY ni.published_at DESC
     LIMIT ${Math.min(20, Math.max(1, limit))}
@@ -398,6 +407,18 @@ type DetailRow = {
   external_refs: NewsExternalRef[] | null;
 };
 
+/** True only for Postgres "undefined_column" (SQLSTATE 42703) — the expected
+ *  error before the external_refs migration is applied. node-postgres surfaces
+ *  the SQLSTATE on `error.code`; a message match is kept as a belt-and-braces
+ *  fallback. Any OTHER error must propagate, not be masked as "column missing". */
+function isUndefinedColumnError(err: unknown): boolean {
+  const e = err as { code?: string; message?: string } | null;
+  if (e?.code === "42703") return true;
+  return Boolean(
+    e?.message && /external_refs/.test(e.message) && /column|exist/i.test(e.message),
+  );
+}
+
 /** A single approved news item with everything the article page needs. */
 export async function getNewsItemById(
   id: string,
@@ -430,7 +451,12 @@ export async function getNewsItemById(
         AND ni.status IN ('approved', 'auto_approved')
       LIMIT 1
     `)) as unknown as DetailRow[];
-  } catch {
+  } catch (err) {
+    // The new SELECT references external_refs; the ONLY benign failure is that
+    // column not existing yet. Re-throw anything else (timeout, connection
+    // drop, SQL typo) so it surfaces instead of silently double-querying and
+    // dropping every external embed.
+    if (!isUndefinedColumnError(err)) throw err;
     const fallback = (await db.execute<Omit<DetailRow, "external_refs">>(sql`
       SELECT
         ni.id::text AS id,

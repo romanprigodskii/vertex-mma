@@ -2,17 +2,19 @@ import { ChevronRight } from "lucide-react";
 
 import { NewsClassificationBadge } from "@/components/news/news-classification-badge";
 import { NewsTimestamp } from "@/components/news/news-timestamp";
+import { safeHttpUrl } from "@/components/news/safe-url";
 import { Link } from "@/i18n/navigation";
 import type { NewsFeedItem } from "@/lib/news";
 
 export function NewsRow({ item }: { item: NewsFeedItem }) {
+  const imageUrl = safeHttpUrl(item.image_url);
   return (
     // `relative` anchors the stretched title link (after:inset-0) so the WHOLE
     // card navigates to the article — except the fighter chips, which sit above
     // it via z-10 and keep their own links.
     <div className="relative flex gap-4 rounded-md border border-foreground/10 bg-background-elevated/30 p-4 transition-colors hover:border-foreground/20 hover:bg-foreground/[0.04]">
       <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2 font-mono text-[11px] uppercase tracking-widest text-foreground-subtle">
+        <div className="flex flex-wrap items-center gap-2 font-mono text-[11px] uppercase tracking-widest text-foreground-muted">
           <NewsClassificationBadge classification={item.classification} />
           <span className="truncate text-foreground-muted">
             {item.source_name}
@@ -21,7 +23,8 @@ export function NewsRow({ item }: { item: NewsFeedItem }) {
           <NewsTimestamp
             iso={item.published_at}
             variant="short"
-            className="shrink-0 tabular"
+            relative
+            className="shrink-0 tabular-nums"
           />
         </div>
 
@@ -30,7 +33,7 @@ export function NewsRow({ item }: { item: NewsFeedItem }) {
           prefetch={false}
           className="mt-2 flex items-start gap-1.5 font-sans text-base font-medium text-foreground after:absolute after:inset-0 after:z-[1] after:content-[''] hover:text-primary"
         >
-          <span>{item.title}</span>
+          <span className="break-words">{item.title}</span>
           <ChevronRight
             className="mt-1 h-3.5 w-3.5 shrink-0 text-foreground-subtle"
             aria-hidden
@@ -59,10 +62,10 @@ export function NewsRow({ item }: { item: NewsFeedItem }) {
         ) : null}
       </div>
 
-      {item.image_url ? (
+      {imageUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={item.image_url}
+          src={imageUrl}
           alt=""
           loading="lazy"
           // Many outlets (e.g. Sherdog) 403 hotlinked images when a Referer is

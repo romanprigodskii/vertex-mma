@@ -8,6 +8,7 @@ import {
   searchFightersForPicker,
 } from "@/app/[locale]/cards/actions";
 import { formatWeightClass } from "@/lib/card-theme";
+import { cn } from "@/lib/utils";
 
 export type BoutFighter = {
   id: string;
@@ -21,6 +22,9 @@ interface Props {
   onPick: (f: PickerFighter) => void;
   onClear: () => void;
   excludedIds: string[];
+  /** Outline the empty slot in red — set when a submit was blocked because
+   *  this slot has no fighter. */
+  invalid?: boolean;
 }
 
 /** One fighter slot in a bout — a filled chip, or an inline fuzzy search. */
@@ -30,6 +34,7 @@ export function FighterSlotPicker({
   onPick,
   onClear,
   excludedIds,
+  invalid = false,
 }: Props) {
   const t = useTranslations("cards");
   if (fighter) {
@@ -63,7 +68,12 @@ export function FighterSlotPicker({
     );
   }
   return (
-    <SlotSearch label={label} onPick={onPick} excludedIds={excludedIds} />
+    <SlotSearch
+      label={label}
+      onPick={onPick}
+      excludedIds={excludedIds}
+      invalid={invalid}
+    />
   );
 }
 
@@ -71,17 +81,23 @@ function SlotSearch({
   label,
   onPick,
   excludedIds,
+  invalid,
 }: {
   label: string;
   onPick: (f: PickerFighter) => void;
   excludedIds: string[];
+  invalid: boolean;
 }) {
   const t = useTranslations("cards");
   const tSearch = useTranslations("search");
   const tWeight = useTranslations("weight");
   const [query, setQuery] = React.useState("");
   const [results, setResults] = React.useState<PickerFighter[]>([]);
-  const [pending, setPending] = React.useState(false);
+  // The query that `results` currently reflect. Comparing it to the live query
+  // tells us whether the search for what's typed has settled — so we never
+  // flash "no results" mid-debounce, and a cancelled in-flight request can't
+  // strand the "Searching…" indicator.
+  const [resultsQuery, setResultsQuery] = React.useState("");
 
   React.useEffect(() => {
     const trimmed = query.trim();
@@ -89,28 +105,47 @@ function SlotSearch({
     // The cleanup flips `cancelled` on the next keystroke / unmount, so a
     // slow request that resolves after the input moved on is discarded.
     let cancelled = false;
-    const t = setTimeout(async () => {
-      setPending(true);
+    const timer = setTimeout(async () => {
       try {
         const r = await searchFightersForPicker(trimmed);
-        if (!cancelled) setResults(r);
-      } finally {
-        if (!cancelled) setPending(false);
+        if (!cancelled) {
+          setResults(r);
+          setResultsQuery(trimmed);
+        }
+      } catch {
+        // Treat a failed lookup as "no matches" so the box settles to an
+        // empty state instead of spinning forever.
+        if (!cancelled) {
+          setResults([]);
+          setResultsQuery(trimmed);
+        }
       }
     }, 200);
     return () => {
       cancelled = true;
-      clearTimeout(t);
+      clearTimeout(timer);
     };
   }, [query]);
 
+  const trimmedQuery = query.trim();
   const excluded = new Set(excludedIds);
-  const visible = query.trim()
+  const visible = trimmedQuery
     ? results.filter((r) => !excluded.has(r.id))
     : [];
+  // A search has "settled" once `results` reflect exactly what's typed.
+  const settled = resultsQuery === trimmedQuery;
+  const searching = trimmedQuery.length > 0 && !settled;
+  const showEmpty = trimmedQuery.length > 0 && settled && visible.length === 0;
+  // Matches existed but every one is already booked elsewhere on the card.
+  const allAlreadyAdded = showEmpty && results.length > 0;
 
   return (
-    <div className="rounded-md border border-dashed border-foreground/15 bg-background-elevated/20 p-2">
+    <div
+      className={cn(
+        "rounded-md border border-dashed bg-background-elevated/20 p-2",
+        invalid ? "border-streak-loss/60" : "border-foreground/15",
+      )}
+    >
       <input
         type="text"
         value={query}
@@ -118,9 +153,14 @@ function SlotSearch({
         placeholder={t("slotPlaceholder", { label })}
         className="w-full rounded-sm border border-foreground/15 bg-background-base px-2.5 py-1.5 font-sans text-sm text-foreground placeholder:text-foreground-subtle focus:border-primary focus:outline-none"
       />
-      {pending && query.trim() ? (
+      {searching ? (
         <p className="mt-1.5 font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
           {tSearch("searching")}
+        </p>
+      ) : null}
+      {showEmpty ? (
+        <p className="mt-1.5 font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
+          {allAlreadyAdded ? t("slotAllAdded") : t("slotNoResults")}
         </p>
       ) : null}
       {visible.length > 0 ? (

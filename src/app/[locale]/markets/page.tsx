@@ -31,6 +31,7 @@ export default async function MarketsPage({
   const { locale } = await params;
   setRequestLocale(locale);
   const t = await getTranslations("markets");
+  const dateLocale = locale === "ru" ? "ru-RU" : "en-US";
   const [events, board, user] = await Promise.all([
     listOpenMarketsByEvent(20),
     getSportsbookBoard(60),
@@ -41,7 +42,9 @@ export default async function MarketsPage({
     <>
       <Navbar />
       <main className="flex-1">
-        <Container size="xl" className="py-10 md:py-14">
+        {/* Extra bottom padding reserves room for the floating parlay slip
+            (fixed bottom-right) so it can't cover the last rows on mobile. */}
+        <Container size="xl" className="pt-10 pb-24 md:pt-14 md:pb-14">
           <header className="mb-8 flex flex-col items-start gap-4 sm:flex-row sm:flex-wrap sm:items-baseline sm:justify-between sm:gap-3">
             <div className="min-w-0 flex-1">
               <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground-subtle">
@@ -60,7 +63,7 @@ export default async function MarketsPage({
                   {t("yourBalance")}
                 </p>
                 <p className="font-display text-2xl tabular text-foreground">
-                  {user.balanceCoins.toLocaleString()}{" "}
+                  {user.balanceCoins.toLocaleString(dateLocale)}{" "}
                   <span className="text-sm text-foreground-muted">
                     {t("coins")}
                   </span>

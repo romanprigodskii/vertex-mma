@@ -86,8 +86,7 @@ export async function BoutHero({ bout, weightLabel }: BoutHeroProps) {
         <Link
           href={`/events/${bout.event.slug}`}
           prefetch={false}
-          className="mt-4 inline-block font-display uppercase tracking-tight text-foreground leading-[0.95] hover:text-primary transition-colors"
-          style={{ fontSize: "clamp(28px, 4vw, 56px)" }}
+          className="mt-4 inline-block font-display uppercase tracking-tight text-foreground text-h2 hover:text-primary transition-colors"
         >
           {bout.event.short_name || bout.event.name}
         </Link>

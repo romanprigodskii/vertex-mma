@@ -36,6 +36,20 @@ function isMac(): boolean {
   return /Mac|iPod|iPhone|iPad/.test(navigator.platform);
 }
 
+/** Avatar placeholder initials: first letter of the first + last name token,
+ *  uppercased. Skips leading punctuation/quotes (common in nicknames), falls
+ *  back to a single letter for one-word names, and to "?" when there's no
+ *  usable glyph — so we never render a stray space, quote, or half a name. */
+function getInitials(name: string): string {
+  const tokens = name.trim().split(/\s+/).filter(Boolean);
+  const firstLetter = (token: string | undefined): string =>
+    token?.match(/[\p{L}\p{N}]/u)?.[0] ?? "";
+  const first = firstLetter(tokens[0]);
+  const last = firstLetter(tokens[tokens.length - 1]);
+  const initials = tokens.length > 1 ? first + last : first;
+  return (initials || "?").toUpperCase();
+}
+
 const WEIGHT_KEYS = new Set([
   "strawweight",
   "flyweight",
@@ -62,6 +76,7 @@ function useWeightLabel() {
 
 export function FighterSearchPalette() {
   const t = useTranslations("search");
+  const tCommon = useTranslations("common");
   const weightLabel = useWeightLabel();
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
@@ -69,6 +84,11 @@ export function FighterSearchPalette() {
   const [results, setResults] = React.useState<SearchResult[]>([]);
   const [activeIdx, setActiveIdx] = React.useState(0);
   const [loading, setLoading] = React.useState(false);
+  // Distinguish a failed request from a genuinely empty result set so we don't
+  // tell the user "no matches" when the search itself is broken. `reloadKey`
+  // lets the Retry button re-run the effect without changing the query.
+  const [error, setError] = React.useState(false);
+  const [reloadKey, setReloadKey] = React.useState(0);
   const inputRef = React.useRef<HTMLInputElement | null>(null);
   const listRef = React.useRef<HTMLUListElement | null>(null);
 
@@ -99,6 +119,7 @@ export function FighterSearchPalette() {
       setQuery("");
       setResults([]);
       setActiveIdx(0);
+      setError(false);
     }
   }, [open]);
 
@@ -110,9 +131,11 @@ export function FighterSearchPalette() {
       setResults([]);
       setActiveIdx(0);
       setLoading(false);
+      setError(false);
       return;
     }
     setLoading(true);
+    setError(false);
     const ctrl = new AbortController();
     const timer = setTimeout(async () => {
       try {
@@ -122,13 +145,19 @@ export function FighterSearchPalette() {
         );
         if (!res.ok) {
           setResults([]);
+          setError(true);
           return;
         }
         const json = (await res.json()) as { fighters?: SearchResult[] };
         setResults(json.fighters ?? []);
         setActiveIdx(0);
+        setError(false);
       } catch (e) {
-        if ((e as Error).name !== "AbortError") setResults([]);
+        // Abort = a newer keystroke superseded us; not a real failure.
+        if ((e as Error).name !== "AbortError") {
+          setResults([]);
+          setError(true);
+        }
       } finally {
         setLoading(false);
       }
@@ -137,7 +166,7 @@ export function FighterSearchPalette() {
       clearTimeout(timer);
       ctrl.abort();
     };
-  }, [query, open]);
+  }, [query, open, reloadKey]);
 
   function navigateTo(slug: string) {
     setOpen(false);
@@ -221,6 +250,19 @@ export function FighterSearchPalette() {
               <p className="px-4 py-8 text-center font-sans text-sm text-foreground-subtle">
                 {t("searching")}
               </p>
+            ) : error ? (
+              <div className="px-4 py-8 text-center">
+                <p className="font-sans text-sm text-foreground-muted">
+                  {t("unavailable")}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setReloadKey((k) => k + 1)}
+                  className="mt-3 inline-flex items-center rounded-sm border border-foreground/20 px-3 py-1.5 font-sans text-sm text-foreground-muted transition-colors hover:border-foreground/40 hover:bg-foreground/[0.04] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  {tCommon("retry")}
+                </button>
+              </div>
             ) : results.length === 0 ? (
               <p className="px-4 py-8 text-center font-sans text-sm text-foreground-subtle">
                 {t("noMatches", { query: query.trim() })}
@@ -244,7 +286,7 @@ export function FighterSearchPalette() {
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={r.photo_thumbnail_url}
-                        alt=""
+                        alt={r.name_en}
                         className="h-9 w-9 shrink-0 rounded-full border border-foreground/15 object-cover"
                       />
                     ) : (
@@ -252,7 +294,7 @@ export function FighterSearchPalette() {
                         aria-hidden
                         className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-foreground/10 font-mono text-[11px] uppercase text-foreground-subtle"
                       >
-                        {r.name_en.slice(0, 2)}
+                        {getInitials(r.name_en)}
                       </div>
                     )}
                     <div className="min-w-0 flex-1">
