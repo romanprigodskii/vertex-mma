@@ -495,6 +495,7 @@
     "emptyLead": "Поставь на любой открытый маркет — попадёшь в лидерборд сразу после расчёта.",
     "browseMarkets": "К маркетам",
     "achShort": "ачивок",
+    "achCount": "{count, plural, one {# ачивка} few {# ачивки} many {# ачивок} other {# ачивка}}",
     "betCount": "{count, plural, one {# ставка} few {# ставки} many {# ставок} other {# ставки}}"
   },
   "news": {
@@ -898,7 +899,7 @@
     "metaDescription": "Карды мечты от сообщества Vertex MMA.",
     "kicker": "Сообщество",
     "heading": "Карды",
-    "lead": "Карды мечты от пользователей Vertex MMA. Букируй любые бои, тематизируй, делись.",
+    "lead": "Карды мечты от пользователей Vertex MMA. Создавай любые бои, тематизируй, делись.",
     "buildCard": "Собрать кард",
     "signInToBuild": "Войти, чтобы собрать",
     "yourCards": "Твои карды",
@@ -914,7 +915,7 @@
     "viewCount": "{count, plural, one {# просмотр} few {# просмотра} many {# просмотров} other {# просмотра}}",
     "cardDescription": "Кард из {count, plural, one {# боя} few {# боёв} many {# боёв} other {# боёв}} от @{username}.",
     "createMetaTitle": "Собрать кард",
-    "createMetaDescription": "Букируй свой кард UFC мечты.",
+    "createMetaDescription": "Собери свой кард UFC мечты.",
     "createKicker": "Конструктор",
     "createHeading": "Собрать кард",
     "createLead": "Выбери бойцов, назначь главный бой, оформи и поделись.",
@@ -1267,6 +1268,13 @@
     "underdog_win": {
       "name": "Сенсация",
       "description": "Выиграна ставка с коэффициентом 3.00+."
+    },
+    "rarity": {
+      "common": "Обычное",
+      "uncommon": "Необычное",
+      "rare": "Редкое",
+      "epic": "Эпическое",
+      "legendary": "Легендарное"
     }
   },
   "transactions": {
@@ -1364,14 +1372,14 @@
     "totalBouts": "{count, plural, one {запланированный бой} few {запланированных боя} many {запланированных боёв} other {запланированного боя}}",
     "statEvents": "Предстоящие турниры",
     "statHighConfidence": "Уверенные пики",
-    "statWithEdge": "Edge к рынку",
+    "statWithEdge": "Перевес к рынку",
     "statRecentAccuracy": "Точность недавних",
     "statRecentAccuracySub": "по {n} оцен. боям",
     "filterLabel": "Фильтр:",
     "filterAll": "Все бои",
     "filterHighConfidence": "Только уверенные",
     "filterMedOrHigh": "Сред+Выс",
-    "filterValue": "Value к рынку",
+    "filterValue": "С перевесом",
     "filterCount": "показано {shown}/{total}",
     "clearFilters": "Сбросить фильтры",
     "emptyFilteredTitle": "Под фильтр ничего не подходит",
@@ -1392,7 +1400,7 @@
     "emptyTitle": "Пока нет симуляций",
     "emptyLead": "Модель прогоняется по расписанию каждую ночь. Как только следующий кард будет утверждён, предсказания появятся здесь.",
     "emptyCta": "Открыть предстоящие турниры",
-    "disclaimer": "Предсказания делает ансамбль LightGBM + XGBoost + LogReg, обученный на всей истории боёв UFC с изотонической калибровкой, плюс Monte Carlo-симулятор на 10 000 итераций для распределения по раундам. Это статистический baseline — не торговая рекомендация."
+    "disclaimer": "Предсказания делает ансамбль LightGBM + XGBoost + LogReg, обученный на всей истории боёв UFC с изотонической калибровкой, плюс Monte Carlo-симулятор на 10 000 итераций для распределения по раундам. Это статистический ориентир — не торговая рекомендация."
   },
   "boutSimulation": {
     "aria": "Симуляция Vertex MMA",
@@ -1404,7 +1412,7 @@
       "high": "Высокая уверенность"
     },
     "vsMarket": "{edge} к рынку ({market})",
-    "valueChipPositive": "Модель видит value",
+    "valueChipPositive": "Модель видит перевес",
     "valueChipNegative": "Рынок не согласен",
     "whyHeading": "Почему так думает модель",
     "favorsA": "за {name}",
@@ -1423,13 +1431,13 @@
     "verdictHit": "Угадала",
     "verdictMiss": "Не угадала",
     "verdictMeta": "{version} · прогноз от {date}",
-    "disclaimer": "Модель LightGBM на исторических боях UFC с изотонической калибровкой. Только статистический baseline — не торговая рекомендация.",
+    "disclaimer": "Модель LightGBM на исторических боях UFC с изотонической калибровкой. Только статистический ориентир — не торговая рекомендация.",
     "features": {
       "diff_age": "Разница в возрасте",
       "diff_reach": "Разница в охвате",
       "diff_height": "Разница в росте",
       "diff_vertex_score": "Разница Vertex Score",
-      "diff_vertex_score_all_time": "Разница all-time Vertex",
+      "diff_vertex_score_all_time": "Разница Vertex за всю карьеру",
       "diff_prior_win_rate": "Разница в проценте побед",
       "diff_prior_bouts": "Разница в опыте UFC",
       "diff_prior_wins": "Разница в победах UFC",
@@ -1454,11 +1462,11 @@
       "abs_kd_per_fight": "Нокдауны {name} за бой",
       "abs_kd_absorbed_per_fight": "Нокдауны пропускает {name}",
       "age_curve_diff": "Преимущество по возрастной кривой",
-      "stance_asymmetry": "Orthodox vs southpaw",
+      "stance_asymmetry": "Правша против левши",
       "reach_height_ratio_diff": "Преимущество в размахе/росте",
       "abs_age": "Возраст {name}",
       "abs_vertex_score": "Vertex {name}",
-      "abs_vertex_score_all_time": "All-time Vertex {name}",
+      "abs_vertex_score_all_time": "Vertex {name} за всю карьеру",
       "abs_layoff_days": "Простой {name}",
       "abs_prior_bouts": "Бои UFC {name}",
       "market_prob_a": "Линия букмекеров",
@@ -1643,7 +1651,7 @@
     "needMorePicks": "Добавь хотя бы 2 выбора",
     "parlayPlaced": "Экспресс принят — {payout} к выплате при кэфе {odds}",
     "slipAria": "Купон экспресса, выборов: {n}",
-    "valueBadge": "Value +{pp}",
+    "valueBadge": "Перевес +{pp}",
     "valueTooltip": "Наша модель оценивает этот исход выше рынка на столько процентных пунктов. Перевес модели относительно рынка — не гарантия выигрыша.",
     "share": "Поделиться",
     "shareCopied": "Скопировано!",

@@ -48,11 +48,15 @@ export function localizedNameSql(alias: string, isRu: boolean): SQL {
  *  (e.g. "e"). Alias the result as whichever column the consumer reads. */
 export function localizedEventNameSql(alias: string, isRu: boolean): SQL {
   assertIdent(alias);
+  // Treat empty strings as missing (NULLIF) the same way name_ru is guarded, so
+  // a blank name_ru or short_name still falls through to the full name. Keeps
+  // the fallback chain consistent with localizedNameSql / localizedColSql; the
+  // final `name` is NOT NULL, so the result is always non-null.
   return isRu
     ? sql.raw(
-        `COALESCE(NULLIF(${alias}.name_ru, ''), ${alias}.short_name, ${alias}.name)`,
+        `COALESCE(NULLIF(${alias}.name_ru, ''), NULLIF(${alias}.short_name, ''), ${alias}.name)`,
       )
-    : sql.raw(`COALESCE(${alias}.short_name, ${alias}.name)`);
+    : sql.raw(`COALESCE(NULLIF(${alias}.short_name, ''), ${alias}.name)`);
 }
 
 /** Generic locale-aware column: on RU resolve `ruCol` with a fallback to

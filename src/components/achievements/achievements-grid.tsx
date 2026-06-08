@@ -102,7 +102,7 @@ export function AchievementsGrid({
               {aDesc(a)}
             </p>
             <p className="mt-2 font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
-              {a.rarity}
+              {tA.has(`rarity.${a.rarity}`) ? tA(`rarity.${a.rarity}`) : a.rarity}
               {a.reward_coins > 0 ? ` · +${formatNumber(a.reward_coins)}c` : ""}
               {isUnlocked && unlockedRow
                 ? ` · ${new Date(unlockedRow.unlocked_at).toLocaleDateString(dateLocale)}`

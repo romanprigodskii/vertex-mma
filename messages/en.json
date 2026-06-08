@@ -495,6 +495,7 @@
     "emptyLead": "Place a bet on any open market and land on the leaderboard the moment it settles.",
     "browseMarkets": "Browse markets",
     "achShort": "ach",
+    "achCount": "{count, plural, =1 {1 ach} other {# ach}}",
     "betCount": "{count, plural, =1 {1 bet} other {# bets}}"
   },
   "news": {
@@ -1267,6 +1268,13 @@
     "underdog_win": {
       "name": "Upset Special",
       "description": "Won a sportsbook bet at 3.00+ odds."
+    },
+    "rarity": {
+      "common": "Common",
+      "uncommon": "Uncommon",
+      "rare": "Rare",
+      "epic": "Epic",
+      "legendary": "Legendary"
     }
   },
   "transactions": {

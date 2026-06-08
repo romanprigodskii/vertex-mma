@@ -14,8 +14,6 @@ function truncate(s: string, max: number): string {
   return s.length > max ? `${s.slice(0, max - 1)}…` : s;
 }
 
-const METHOD_SHORT = ["KO", "Sub", "Dec"];
-
 export async function MarketCard({ market }: { market: MarketListItem }) {
   const t = await getTranslations("markets");
   const locale = await getLocale();
@@ -125,13 +123,15 @@ function WinnerCell({ name, price }: { name: string; price: number }) {
   );
 }
 
-function MethodColumn({
+async function MethodColumn({
   name,
   outcomes,
 }: {
   name: string;
   outcomes: MarketCardOutcome[];
 }) {
+  const t = await getTranslations("markets");
+  const methodLabels = [t("methodKoTko"), t("methodSub"), t("methodDec")];
   return (
     <div className="rounded-sm bg-foreground/[0.04] px-2 py-1.5">
       <p className="truncate font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
@@ -144,7 +144,7 @@ function MethodColumn({
             className="flex items-baseline justify-between"
           >
             <span className="font-mono text-[9px] uppercase tracking-widest text-foreground-subtle">
-              {METHOD_SHORT[i]}
+              {methodLabels[i]}
             </span>
             <span className="text-right">
               <span className="font-display text-xs tabular text-foreground">
