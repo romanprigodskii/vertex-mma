@@ -19,7 +19,8 @@
  * coins and transaction.balance_after are bigint (Wave 58), so an int4 local
  * would overflow / `integer out of range` once a balance crosses ~2.1e9 (a
  * 1M-stake parlay can pay 1e9). unlock_betting_achievements likewise takes
- * bigint. KEEP IN SYNC with drizzle/migrations/0086_wave59_settlement_bigint.sql.
+ * bigint. KEEP IN SYNC with drizzle/migrations/0089_wave60_settlement_canonical.sql
+ * (the single canonical source of truth for every settlement function).
  *
  * NOTIFICATIONS: every settlement notification dual-writes a structured `params`
  * jsonb ({key,coins}) so the client localizes title/body (the stored English is
@@ -58,19 +59,27 @@ CREATE OR REPLACE FUNCTION public.fixed_odds_grade(
   p_code text, p_winner uuid, p_a uuid, p_b uuid,
   p_mb text, p_went_distance boolean, p_round int
 ) RETURNS text LANGUAGE sql IMMUTABLE AS $$
-  SELECT CASE p_code
-    WHEN 'win_a' THEN CASE WHEN p_winner IS NULL THEN 'void' WHEN p_winner = p_a THEN 'won' ELSE 'lost' END
-    WHEN 'win_b' THEN CASE WHEN p_winner IS NULL THEN 'void' WHEN p_winner = p_b THEN 'won' ELSE 'lost' END
-    WHEN 'a_ko'  THEN CASE WHEN p_winner IS NULL OR p_mb='dq' THEN 'void' WHEN p_winner=p_a AND p_mb='ko'  THEN 'won' ELSE 'lost' END
-    WHEN 'a_sub' THEN CASE WHEN p_winner IS NULL OR p_mb='dq' THEN 'void' WHEN p_winner=p_a AND p_mb='sub' THEN 'won' ELSE 'lost' END
-    WHEN 'a_dec' THEN CASE WHEN p_winner IS NULL OR p_mb='dq' THEN 'void' WHEN p_winner=p_a AND p_mb='dec' THEN 'won' ELSE 'lost' END
-    WHEN 'b_ko'  THEN CASE WHEN p_winner IS NULL OR p_mb='dq' THEN 'void' WHEN p_winner=p_b AND p_mb='ko'  THEN 'won' ELSE 'lost' END
-    WHEN 'b_sub' THEN CASE WHEN p_winner IS NULL OR p_mb='dq' THEN 'void' WHEN p_winner=p_b AND p_mb='sub' THEN 'won' ELSE 'lost' END
-    WHEN 'b_dec' THEN CASE WHEN p_winner IS NULL OR p_mb='dq' THEN 'void' WHEN p_winner=p_b AND p_mb='dec' THEN 'won' ELSE 'lost' END
-    WHEN 'o2_5'  THEN CASE WHEN p_went_distance THEN 'won' WHEN p_round IS NULL THEN 'void' WHEN p_round <= 2 THEN 'lost' ELSE 'won' END
-    WHEN 'u2_5'  THEN CASE WHEN p_went_distance THEN 'lost' WHEN p_round IS NULL THEN 'void' WHEN p_round <= 2 THEN 'won' ELSE 'lost' END
-    WHEN 'dist_yes' THEN CASE WHEN p_went_distance THEN 'won' ELSE 'lost' END
-    WHEN 'dist_no'  THEN CASE WHEN p_went_distance THEN 'lost' ELSE 'won' END
+  SELECT CASE
+    -- Winner market grades off winner_id alone, independent of the method bucket.
+    WHEN p_code = 'win_a' THEN CASE WHEN p_winner IS NULL THEN 'void' WHEN p_winner = p_a THEN 'won' ELSE 'lost' END
+    WHEN p_code = 'win_b' THEN CASE WHEN p_winner IS NULL THEN 'void' WHEN p_winner = p_b THEN 'won' ELSE 'lost' END
+    -- Method not yet known (completed + winner, but method NULL / unrecognised):
+    -- every non-winner prop is ungradeable → VOID/refund, never LOST. Mirrors
+    -- settleSelection in src/lib/sportsbook.ts (mb='unknown' short-circuits all
+    -- but win_a/win_b to void). Without this guard, method/totals/distance
+    -- selections wrongly settle LOST on a completed-but-unmethoded bout —
+    -- irreversibly, even after the method is later re-scraped.
+    WHEN p_mb = 'unknown' THEN 'void'
+    WHEN p_code = 'a_ko'  THEN CASE WHEN p_winner IS NULL OR p_mb='dq' THEN 'void' WHEN p_winner=p_a AND p_mb='ko'  THEN 'won' ELSE 'lost' END
+    WHEN p_code = 'a_sub' THEN CASE WHEN p_winner IS NULL OR p_mb='dq' THEN 'void' WHEN p_winner=p_a AND p_mb='sub' THEN 'won' ELSE 'lost' END
+    WHEN p_code = 'a_dec' THEN CASE WHEN p_winner IS NULL OR p_mb='dq' THEN 'void' WHEN p_winner=p_a AND p_mb='dec' THEN 'won' ELSE 'lost' END
+    WHEN p_code = 'b_ko'  THEN CASE WHEN p_winner IS NULL OR p_mb='dq' THEN 'void' WHEN p_winner=p_b AND p_mb='ko'  THEN 'won' ELSE 'lost' END
+    WHEN p_code = 'b_sub' THEN CASE WHEN p_winner IS NULL OR p_mb='dq' THEN 'void' WHEN p_winner=p_b AND p_mb='sub' THEN 'won' ELSE 'lost' END
+    WHEN p_code = 'b_dec' THEN CASE WHEN p_winner IS NULL OR p_mb='dq' THEN 'void' WHEN p_winner=p_b AND p_mb='dec' THEN 'won' ELSE 'lost' END
+    WHEN p_code = 'o2_5'  THEN CASE WHEN p_went_distance THEN 'won' WHEN p_round IS NULL THEN 'void' WHEN p_round <= 2 THEN 'lost' ELSE 'won' END
+    WHEN p_code = 'u2_5'  THEN CASE WHEN p_went_distance THEN 'lost' WHEN p_round IS NULL THEN 'void' WHEN p_round <= 2 THEN 'won' ELSE 'lost' END
+    WHEN p_code = 'dist_yes' THEN CASE WHEN p_went_distance THEN 'won' ELSE 'lost' END
+    WHEN p_code = 'dist_no'  THEN CASE WHEN p_went_distance THEN 'lost' ELSE 'won' END
     ELSE 'void'
   END
 $$;
@@ -182,7 +191,7 @@ RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
   v_bout record; v_mb text; v_wd boolean; v_terminal_void boolean;
   v_leg record; v_outcome text;
-  v_p record; v_open int; v_lost int; v_won int;
+  v_p record; v_open int; v_lost int; v_won int; v_void int;
   v_combined numeric; v_payout bigint; v_new_balance bigint;
 BEGIN
   SELECT status::text AS status, winner_id, fighter_a_id, fighter_b_id,
@@ -208,7 +217,7 @@ BEGIN
 
   -- 2) finalize each still-open parlay touching this bout
   FOR v_p IN
-    SELECT p.id, p.stake_coins, p.user_id
+    SELECT p.id, p.stake_coins, p.user_id, p.potential_payout, p.combined_odds
     FROM parlay p
     WHERE p.status='open'
       AND EXISTS (SELECT 1 FROM parlay_leg pl WHERE pl.parlay_id=p.id AND pl.bout_id=p_bout_id)
@@ -216,8 +225,9 @@ BEGIN
   LOOP
     SELECT count(*) FILTER (WHERE status='open'),
            count(*) FILTER (WHERE status='lost'),
-           count(*) FILTER (WHERE status='won')
-      INTO v_open, v_lost, v_won
+           count(*) FILTER (WHERE status='won'),
+           count(*) FILTER (WHERE status='void')
+      INTO v_open, v_lost, v_won, v_void
     FROM parlay_leg WHERE parlay_id = v_p.id;
 
     IF v_lost > 0 THEN
@@ -238,9 +248,20 @@ BEGIN
                   '/me/bets',
                   jsonb_build_object('key','parlay_void','coins',v_p.stake_coins));
       ELSE
-        SELECT LEAST(1000, round(exp(sum(ln(decimal_odds)))::numeric, 2))
-          INTO v_combined FROM parlay_leg WHERE parlay_id=v_p.id AND status='won';
-        v_payout := floor(v_p.stake_coins * v_combined)::bigint;
+        -- Every surviving leg won. If NO leg voided, pay the EXACT amount we
+        -- quoted on the slip at placement (potential_payout = floor(stake ×
+        -- combined_odds)). Recomputing it here from the float4 leg odds via
+        -- exp(sum(ln())) drifts a coin or two at the rounding boundary and
+        -- silently underpays vs. the betslip. Only when a leg voided & dropped
+        -- out do we re-price the combined odds across the surviving won legs.
+        IF v_void = 0 THEN
+          v_payout := v_p.potential_payout;
+          v_combined := v_p.combined_odds;
+        ELSE
+          SELECT LEAST(1000, round(exp(sum(ln(decimal_odds)))::numeric, 2))
+            INTO v_combined FROM parlay_leg WHERE parlay_id=v_p.id AND status='won';
+          v_payout := floor(v_p.stake_coins * v_combined)::bigint;
+        END IF;
         UPDATE parlay SET status='won', payout=v_payout, settled_at=NOW() WHERE id=v_p.id;
         UPDATE user_profile SET balance_coins=balance_coins+v_payout,
                total_coins_earned=total_coins_earned+v_payout

@@ -302,6 +302,33 @@ describe("settleSelection — goes the distance", () => {
   });
 });
 
+describe("settleSelection — completed + winner, method NULL (re-scrape gap)", () => {
+  // Parity oracle for the SQL fixed_odds_grade 'unknown' branch
+  // (drizzle/migrations/0089_wave60_settlement_canonical.sql): a bout that
+  // completed WITH a winner but whose method hasn't been scraped yet can grade
+  // ONLY the winner market; every method/totals/distance prop VOIDs (refund),
+  // never LOST — so a later method re-scrape never has to reverse a wrong loss.
+  it("winner market still grades off winner_id", () => {
+    const r = baseResult({ winnerId: A, method: null, roundFinished: 2 });
+    assert.equal(settleSelection("win_a", r), "won");
+    assert.equal(settleSelection("win_b", r), "lost");
+  });
+  it("every non-winner prop VOIDs, never LOST", () => {
+    const r = baseResult({ winnerId: A, method: null, roundFinished: 2 });
+    const props = [
+      "a_ko", "a_sub", "a_dec", "b_ko", "b_sub", "b_dec",
+      "o2_5", "u2_5", "dist_yes", "dist_no",
+    ] as const;
+    for (const code of props) assert.equal(settleSelection(code, r), "void", code);
+  });
+  it("null method + null winner → every selection voids", () => {
+    const r = baseResult({ winnerId: null, method: null, roundFinished: null });
+    for (const code of ["win_a", "win_b", "a_ko", "o2_5", "dist_yes"] as const) {
+      assert.equal(settleSelection(code, r), "void", code);
+    }
+  });
+});
+
 describe("marketProbFromOdds (devig)", () => {
   it("devigs a 2-way moneyline", () => {
     const p = marketProbFromOdds(1.85, 2.15)!;
@@ -464,6 +491,39 @@ describe("resolveParlay", () => {
     );
     assert.equal(r.status, "won");
     assert.equal(r.payout, 150);
+  });
+
+  // Parity oracle for settle_parlay_legs_for_bout's v_void = 0 branch
+  // (0089_wave60): when NO leg voided, a won parlay pays the EXACT amount quoted
+  // on the slip at placement — potential_payout = floor(stake × combined_odds),
+  // both stored via combineParlayOdds. The reverted SQL recomputed combined odds
+  // as round(exp(Σ ln(odds)), 2) off the float4 leg odds, which drifts at the
+  // rounding boundary and underpays (e.g. 1.5³ = 3.375 → 3.38 stored, but the
+  // float path lands on 3.37 → 10 coins short on a 1000 stake). resolveParlay
+  // reuses combineParlayOdds, so it must reproduce the stored payout exactly.
+  it("all-won parlay pays exactly the slip's stored potential_payout (no drift)", () => {
+    // `expected` is an INDEPENDENT literal (the amount the slip showed at
+    // placement), not derived from the functions under test, so this is a real
+    // value oracle for the SQL v_void = 0 branch — which must pay this exact
+    // amount, not a float exp(Σln(odds)) recompute that drifts at the 2dp
+    // rounding boundary (e.g. 1.5³ = 3.375 stores 3.38 → 3380, the float path
+    // lands on 3.37 → 3370, 10 coins short).
+    const cases: { legs: number[]; stake: number; expected: number }[] = [
+      { legs: [1.5, 1.5, 1.5], stake: 1000, expected: 3380 }, // 3.375 → 3.38 → floor(1000×3.38)
+      { legs: [1.85, 2.0], stake: 100, expected: 370 }, //            3.70  → floor(100×3.70)
+      { legs: [1.04, 1.04, 1.04, 1.04], stake: 777, expected: 909 }, // 1.17 → floor(777×1.17)=909.09
+      { legs: [3.33, 2.07, 1.91], stake: 555, expected: 7309 }, //     13.17 → floor(555×13.17)=7309.35
+    ];
+    for (const { legs, stake, expected } of cases) {
+      const settled = resolveParlay(
+        legs.map((o) => ({ status: "won" as const, odds: o })),
+        stake,
+      );
+      assert.equal(settled.status, "won");
+      assert.equal(settled.payout, expected, `legs=${legs} stake=${stake}`);
+      // …and the betslip's placement-time potential_payout equals the same value.
+      assert.equal(potentialPayout(stake, combineParlayOdds(legs)), expected);
+    }
   });
 });
 

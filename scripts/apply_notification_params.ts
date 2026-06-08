@@ -8,8 +8,15 @@
  * and any unmapped variant, so nothing breaks if the i18n key is missing.
  *
  * The money-path logic in each function is COPIED VERBATIM from the live prod
- * definition (pg_get_functiondef) — only the `INSERT INTO notification` gains a
- * `params` column. Nothing about balances, settlement, or status changes.
+ * definition (pg_get_functiondef) — the `INSERT INTO notification` gains a
+ * `params` column. Two settlement-correctness changes are folded in to keep this
+ * script consistent with the canonical Wave-60 definitions (otherwise re-running
+ * it would regress them): (1) the balance/payout/earned locals are bigint, not
+ * int4 — balances are bigint since Wave 58, so an int4 local overflows / raises
+ * `integer out of range` once a balance crosses ~2.1e9 and rolls back the whole
+ * settlement; (2) a fully-won parlay (no voided leg) pays the stored
+ * potential_payout rather than recomputing it from the float4 leg odds.
+ * KEEP IN SYNC with drizzle/migrations/0089_wave60_settlement_canonical.sql.
  *
  * Targeted idempotent DDL (not `drizzle-kit push`, which can drop drift/RLS).
  * Re-runnable. Usage: npx tsx scripts/apply_notification_params.ts
@@ -35,7 +42,7 @@ const STATEMENTS: string[] = [
  SET search_path TO 'public'
 AS $function$
 DECLARE
-  v_total_earned int;
+  v_total_earned bigint;
   v_current_tier text;
   v_new_tier text;
   v_username text;
@@ -84,7 +91,7 @@ $function$`,
 AS $function$
 DECLARE
   v_bet record;
-  v_new_balance int;
+  v_new_balance bigint;
 BEGIN
   IF EXISTS (
     SELECT 1 FROM market
@@ -139,6 +146,35 @@ BEGIN
 END;
 $function$`,
 
+  // 2b) unlock_betting_achievements (bigint). settle_fixed_odds_bets_for_bout
+  // and settle_parlay_legs_for_bout below PERFORM this with bigint args (Wave 60),
+  // which resolve ONLY to the bigint overload — int8→int4 is an assignment-only
+  // cast, not implicit, so the call can't fall back to the old int4 signature.
+  // Install it here FIRST (before the settle fns that call it) so this script is
+  // self-contained and doesn't silently depend on 0089 / apply_parlay_settlement.ts
+  // having run; otherwise re-running only this script against a pre-Wave-59 DB
+  // would fail to create/resolve those settle fns. The old int4 overload is dropped
+  // first (its arg types are part of its identity, so CREATE OR REPLACE alone would
+  // leave a second, ambiguous overload). KEEP IN SYNC with 0089_wave60.
+  `DROP FUNCTION IF EXISTS public.unlock_betting_achievements(uuid, int, real, boolean, int);`,
+  `CREATE OR REPLACE FUNCTION public.unlock_betting_achievements(
+  p_user_id uuid, p_payout bigint, p_odds real, p_is_parlay boolean, p_new_balance bigint
+) RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE v_total_wins int;
+BEGIN
+  IF p_payout >= 5000 THEN PERFORM public.unlock_achievement(p_user_id, 'big_win'); END IF;
+  IF p_is_parlay   THEN PERFORM public.unlock_achievement(p_user_id, 'parlay_win'); END IF;
+  IF p_odds >= 3.0 THEN PERFORM public.unlock_achievement(p_user_id, 'underdog_win'); END IF;
+  IF p_new_balance >= 100000 THEN PERFORM public.unlock_achievement(p_user_id, 'balance_100k'); END IF;
+  IF p_new_balance >= 50000  THEN PERFORM public.unlock_achievement(p_user_id, 'balance_50k'); END IF;
+  SELECT (SELECT count(*) FROM bet WHERE user_id = p_user_id AND payout > 0 AND resolved_at IS NOT NULL)
+       + (SELECT count(*) FROM fixed_odds_bet WHERE user_id = p_user_id AND status = 'won')
+       + (SELECT count(*) FROM parlay WHERE user_id = p_user_id AND status = 'won')
+    INTO v_total_wins;
+  IF v_total_wins >= 10 THEN PERFORM public.unlock_achievement(p_user_id, 'bet_10_wins'); END IF;
+END;
+$$`,
+
   // 3) settle_fixed_odds_bets_for_bout (won + void notifications)
   `CREATE OR REPLACE FUNCTION public.settle_fixed_odds_bets_for_bout(p_bout_id uuid)
  RETURNS void
@@ -148,7 +184,7 @@ $function$`,
 AS $function$
 DECLARE
   v_bout record; v_mb text; v_wd boolean; v_terminal_void boolean;
-  v_bet record; v_outcome text; v_new_balance int;
+  v_bet record; v_outcome text; v_new_balance bigint;
 BEGIN
   SELECT status::text AS status, winner_id, fighter_a_id, fighter_b_id,
          method::text AS method, round_finished
@@ -218,7 +254,7 @@ DECLARE
   v_winning_label text;
   v_bet record;
   v_payout int;
-  v_new_balance int;
+  v_new_balance bigint;
 BEGIN
   IF p_winner_offset NOT IN (0, 3) THEN
     RAISE EXCEPTION 'winner_offset must be 0 or 3, got %', p_winner_offset;
@@ -320,7 +356,7 @@ DECLARE
   v_winning_label text;
   v_bet record;
   v_payout int;
-  v_new_balance int;
+  v_new_balance bigint;
 BEGIN
   IF p_winning_idx < 0 THEN
     RAISE EXCEPTION 'winning_idx must be >= 0, got %', p_winning_idx;
@@ -418,7 +454,7 @@ DECLARE
   v_winning_label text;
   v_bet record;
   v_payout int;
-  v_new_balance int;
+  v_new_balance bigint;
 BEGIN
   IF p_winning_idx NOT IN (0, 1) THEN
     RAISE EXCEPTION 'winning_idx must be 0 or 1, got %', p_winning_idx;
@@ -516,8 +552,8 @@ AS $function$
 DECLARE
   v_bout record; v_mb text; v_wd boolean; v_terminal_void boolean;
   v_leg record; v_outcome text;
-  v_p record; v_open int; v_lost int; v_won int;
-  v_combined numeric; v_payout int; v_new_balance int;
+  v_p record; v_open int; v_lost int; v_won int; v_void int;
+  v_combined numeric; v_payout bigint; v_new_balance bigint;
 BEGIN
   SELECT status::text AS status, winner_id, fighter_a_id, fighter_b_id,
          method::text AS method, round_finished
@@ -540,7 +576,7 @@ BEGIN
   END LOOP;
 
   FOR v_p IN
-    SELECT p.id, p.stake_coins, p.user_id
+    SELECT p.id, p.stake_coins, p.user_id, p.potential_payout, p.combined_odds
     FROM parlay p
     WHERE p.status='open'
       AND EXISTS (SELECT 1 FROM parlay_leg pl WHERE pl.parlay_id=p.id AND pl.bout_id=p_bout_id)
@@ -548,8 +584,9 @@ BEGIN
   LOOP
     SELECT count(*) FILTER (WHERE status='open'),
            count(*) FILTER (WHERE status='lost'),
-           count(*) FILTER (WHERE status='won')
-      INTO v_open, v_lost, v_won
+           count(*) FILTER (WHERE status='won'),
+           count(*) FILTER (WHERE status='void')
+      INTO v_open, v_lost, v_won, v_void
     FROM parlay_leg WHERE parlay_id = v_p.id;
 
     IF v_lost > 0 THEN
@@ -569,9 +606,20 @@ BEGIN
                   '/me/bets',
                   jsonb_build_object('key','parlay_void','coins',v_p.stake_coins));
       ELSE
-        SELECT LEAST(1000, round(exp(sum(ln(decimal_odds)))::numeric, 2))
-          INTO v_combined FROM parlay_leg WHERE parlay_id=v_p.id AND status='won';
-        v_payout := floor(v_p.stake_coins * v_combined)::int;
+        -- Every surviving leg won. If NO leg voided, pay the EXACT amount we
+        -- quoted on the slip at placement (potential_payout = floor(stake ×
+        -- combined_odds)). Recomputing it here from the float4 leg odds via
+        -- exp(sum(ln())) drifts a coin or two at the rounding boundary and
+        -- silently underpays vs. the betslip. Only when a leg voided & dropped
+        -- out do we re-price the combined odds across the surviving won legs.
+        IF v_void = 0 THEN
+          v_payout := v_p.potential_payout;
+          v_combined := v_p.combined_odds;
+        ELSE
+          SELECT LEAST(1000, round(exp(sum(ln(decimal_odds)))::numeric, 2))
+            INTO v_combined FROM parlay_leg WHERE parlay_id=v_p.id AND status='won';
+          v_payout := floor(v_p.stake_coins * v_combined)::bigint;
+        END IF;
         UPDATE parlay SET status='won', payout=v_payout, settled_at=NOW() WHERE id=v_p.id;
         UPDATE user_profile SET balance_coins=balance_coins+v_payout,
                total_coins_earned=total_coins_earned+v_payout
@@ -603,7 +651,7 @@ AS $function$
 DECLARE
   v_achievement_id uuid;
   v_reward int;
-  v_new_balance int;
+  v_new_balance bigint;
   v_name text;
   v_description text;
   v_username text;
