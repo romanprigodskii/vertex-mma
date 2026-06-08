@@ -19,9 +19,19 @@ const connectionString = serverEnv().DATABASE_URL;
 // keep us under the session-pooler 15-slot cap when Turbopack HMR
 // creates fresh module instances (each leaks its old pool until GC),
 // and when several scripts run concurrently against the same project.
+//
+// max is env-driven (DB_POOL_MAX): force-dynamic pages fan out ~8 queries per
+// hit, so a hardcoded 3-slot pool queues requests and inflates p95 under load.
+// Dev keeps the safe default of 3; prod single-instance should set 8-10 — never
+// letting the sum across instances exceed the session-pooler's 15 slots.
+const DB_POOL_MAX = (() => {
+  const parsed = Number.parseInt(process.env.DB_POOL_MAX ?? "", 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 3;
+})();
+
 const queryClient = postgres(connectionString, {
   prepare: false,
-  max: 3,
+  max: DB_POOL_MAX,
   idle_timeout: 20,
 });
 export const db = drizzle(queryClient, { schema });
