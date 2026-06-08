@@ -219,6 +219,30 @@ describe("settleSelection — winner", () => {
   });
 });
 
+describe("settleSelection — unknown / missing method (refund path)", () => {
+  // A completed bout whose result never fully landed (winner + method null)
+  // can't be graded, so every selection voids → the settle trigger refunds the
+  // stake (payout = coins_spent). Those refunds must never count as wins — see
+  // unlock_betting_achievements / checkAndUnlockAchievements, which gate on
+  // payout > coins_spent precisely so a refund isn't scored as a win.
+  it("completed with winner=null + method=null voids every selection", () => {
+    const r = baseResult({ winnerId: null, method: null, roundFinished: null });
+    assert.equal(settleSelection("win_a", r), "void");
+    assert.equal(settleSelection("win_b", r), "void");
+    assert.equal(settleSelection("a_ko", r), "void");
+    assert.equal(settleSelection("o2_5", r), "void");
+    assert.equal(settleSelection("dist_yes", r), "void");
+  });
+  it("completed with a winner but null method grades winner-only, voids the rest", () => {
+    const r = baseResult({ winnerId: A, method: null, roundFinished: null });
+    assert.equal(settleSelection("win_a", r), "won");
+    assert.equal(settleSelection("win_b", r), "lost");
+    assert.equal(settleSelection("a_ko", r), "void");
+    assert.equal(settleSelection("o2_5", r), "void");
+    assert.equal(settleSelection("dist_yes", r), "void");
+  });
+});
+
 describe("settleSelection — method", () => {
   it("A by KO hits a_ko, misses a_sub/a_dec/b_*", () => {
     const r = baseResult({ winnerId: A, method: "tko", roundFinished: 2 });

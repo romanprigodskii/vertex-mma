@@ -30,6 +30,11 @@ const MIN_COINS_PER_BET = 1;
 // accumulation can't overflow. The CHECK(balance_coins >= 0) constraint +
 // FOR UPDATE lock cap the rest.
 const MAX_COINS_PER_BET = 1_000_000;
+// Slippage guard for the fixed-odds book + parlays: if the server-recomputed
+// odds drift more than this (relative) from what the client displayed, reject
+// the bet so the user re-confirms rather than being silently debited at
+// materially different odds. The board sends the odds it rendered; we compare.
+const ODDS_CHANGE_TOLERANCE = 0.01; // 1%
 
 /**
  * Stable machine error codes. Server actions NEVER return human-readable
@@ -59,6 +64,7 @@ type BetError =
   | "PARLAY_DUP_BOUT"
   | "PARLAY_LEG_CLOSED"
   | "PARLAY_NO_ODDS"
+  | "ODDS_CHANGED"
   | "BET_FAILED";
 
 const KNOWN_CODES = new Set<string>([
@@ -81,6 +87,7 @@ const KNOWN_CODES = new Set<string>([
   "PARLAY_DUP_BOUT",
   "PARLAY_LEG_CLOSED",
   "PARLAY_NO_ODDS",
+  "ODDS_CHANGED",
   "BET_FAILED",
 ]);
 
@@ -331,6 +338,13 @@ export async function previewBetCost(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "NOT_SIGNED_IN" };
+  // Soft rate-limit: this runs a 60-iteration LMSR bisection (+ two DB reads)
+  // on caller-supplied numbers. It's a read-only preview, so a short cooldown
+  // is enough to stop an authenticated client hammering it for CPU/DB load —
+  // placeBetAction keeps the real COOLDOWN_MS.bet gate for actual bets.
+  if (!allowAction(`preview:${user.id}`, 250)) {
+    return { error: "RATE_LIMITED" };
+  }
 
   if (!Number.isFinite(coins) || coins <= 0) {
     return { error: "INVALID_AMOUNT" };
@@ -426,6 +440,7 @@ export async function placeFixedOddsBetAction(
   boutId: string,
   selectionCode: string,
   stake: number,
+  expectedOdds?: number,
 ): Promise<{
   error?: string;
   decimalOdds?: number;
@@ -521,6 +536,19 @@ export async function placeFixedOddsBetAction(
   if (!offered) return { error: "MARKET_NOT_OFFERED" };
 
   const decimalOdds = offered.decimalOdds;
+  // Slippage guard: the model may have regenerated (or external odds moved)
+  // between the board render and this click, so the recomputed odds can differ
+  // from what the user saw. Reject — returning the fresh odds — so the client
+  // shows the change and the user re-confirms, instead of being silently
+  // debited at materially worse odds.
+  if (
+    typeof expectedOdds === "number" &&
+    Number.isFinite(expectedOdds) &&
+    expectedOdds > 0 &&
+    Math.abs(decimalOdds - expectedOdds) > ODDS_CHANGE_TOLERANCE * expectedOdds
+  ) {
+    return { error: "ODDS_CHANGED", decimalOdds };
+  }
   const payout = potentialPayout(stakeInt, decimalOdds);
   const side = selectionSide(code);
   const selectedFighterId =
@@ -684,6 +712,7 @@ async function priceParlayLeg(
 export async function placeParlayAction(
   legs: Array<{ boutId: string; code: string }>,
   stake: number,
+  expectedCombinedOdds?: number,
 ): Promise<{
   error?: string;
   parlayId?: string;
@@ -738,6 +767,18 @@ export async function placeParlayAction(
   const pricedLegs = priced as PricedLeg[];
 
   const combinedOdds = combineParlayOdds(pricedLegs.map((p) => p.decimalOdds));
+  // Slippage guard (see placeFixedOddsBetAction): reject if the re-priced
+  // combined odds drifted from what the slip displayed, returning the fresh
+  // combined odds so the client can re-confirm.
+  if (
+    typeof expectedCombinedOdds === "number" &&
+    Number.isFinite(expectedCombinedOdds) &&
+    expectedCombinedOdds > 0 &&
+    Math.abs(combinedOdds - expectedCombinedOdds) >
+      ODDS_CHANGE_TOLERANCE * expectedCombinedOdds
+  ) {
+    return { error: "ODDS_CHANGED", combinedOdds };
+  }
   const payout = potentialPayout(stakeInt, combinedOdds);
 
   let createdParlayId: string | null = null;

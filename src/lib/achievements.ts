@@ -149,19 +149,30 @@ export async function checkAndUnlockAchievements(
     parlayWinRows,
   ] = await Promise.all([
     db.execute<{ c: number }>(sql`
-      SELECT COUNT(*)::int AS c FROM bet
-      WHERE user_id = ${userProfileId}::uuid
-        AND payout > 0
-        AND resolved_at IS NOT NULL
+      -- A genuine LMSR win is a winning bet (payout > 0) on a RESOLVED market.
+      -- A refund (refund_market) leaves the market status = 'cancelled', so the
+      -- resolved-market join excludes refunds that would otherwise count as
+      -- phantom wins toward bet_10_wins. Joining on status (vs a
+      -- payout > coins_spent heuristic) also still counts a genuine break-even
+      -- win, e.g. a 1-coin bet whose payout rounds back to the stake.
+      SELECT COUNT(*)::int AS c FROM bet b
+      JOIN market m ON m.id = b.market_id
+      WHERE b.user_id = ${userProfileId}::uuid
+        AND b.payout > 0
+        AND m.status = 'resolved'
     `),
     db.execute<{ c: number }>(sql`
       SELECT COUNT(*)::int AS c FROM custom_ranking
       WHERE user_id = ${userProfileId}::uuid
     `),
     db.execute<{ c: number }>(sql`
-      SELECT COUNT(*)::int AS c FROM bet
-      WHERE user_id = ${userProfileId}::uuid
-        AND payout >= 5000
+      -- Same refund guard via the resolved-market join: a 5000+ stake that
+      -- gets refunded leaves its market 'cancelled' and must not unlock big_win.
+      SELECT COUNT(*)::int AS c FROM bet b
+      JOIN market m ON m.id = b.market_id
+      WHERE b.user_id = ${userProfileId}::uuid
+        AND b.payout >= 5000
+        AND m.status = 'resolved'
     `),
     db.execute<{ streak: number }>(sql`
       -- Longest run of CONSECUTIVE daily-bonus claim days (gaps-and-islands).
@@ -189,14 +200,14 @@ export async function checkAndUnlockAchievements(
     db.execute<SbAgg>(sql`
       SELECT
         COUNT(*) FILTER (WHERE status = 'won')::int AS won,
-        COUNT(*) FILTER (WHERE payout >= 5000)::int AS big,
+        COUNT(*) FILTER (WHERE status = 'won' AND payout >= 5000)::int AS big,
         COUNT(*) FILTER (WHERE status = 'won' AND decimal_odds >= 3.0)::int AS underdog
       FROM fixed_odds_bet WHERE user_id = ${userProfileId}::uuid
     `),
     db.execute<SbAgg>(sql`
       SELECT
         COUNT(*) FILTER (WHERE status = 'won')::int AS won,
-        COUNT(*) FILTER (WHERE payout >= 5000)::int AS big,
+        COUNT(*) FILTER (WHERE status = 'won' AND payout >= 5000)::int AS big,
         COUNT(*) FILTER (WHERE status = 'won' AND combined_odds >= 3.0)::int AS underdog
       FROM parlay WHERE user_id = ${userProfileId}::uuid
     `),

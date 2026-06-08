@@ -70,6 +70,8 @@ export function BetSlipWidget() {
         return t("errParlayNoOdds");
       case "MARKET_NOT_OFFERED":
         return t("errMarketNotOffered");
+      case "ODDS_CHANGED":
+        return t("errOddsChanged");
       default:
         return t("errGeneric");
     }
@@ -100,6 +102,7 @@ export function BetSlipWidget() {
     const res = await placeParlayAction(
       legs.map((l) => ({ boutId: l.boutId, code: l.code })),
       parsedStake,
+      combined,
     );
     setPending(false);
     if (res.error) {
@@ -107,6 +110,9 @@ export function BetSlipWidget() {
       // regex-matching the human text broke the moment errors were localized.
       if (res.error === "NOT_SIGNED_IN") setNeedAuth(true);
       setError(translateError(res.error));
+      // Odds moved under the user — refresh the board so the re-confirm
+      // reflects the new combined price.
+      if (res.error === "ODDS_CHANGED") router.refresh();
       return;
     }
     setPlaced({

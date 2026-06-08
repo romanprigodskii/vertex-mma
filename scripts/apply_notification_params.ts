@@ -217,8 +217,8 @@ DECLARE
   v_winning_id uuid;
   v_winning_label text;
   v_bet record;
-  v_payout int;
-  v_new_balance int;
+  v_payout bigint;
+  v_new_balance bigint;
 BEGIN
   IF p_winner_offset NOT IN (0, 3) THEN
     RAISE EXCEPTION 'winner_offset must be 0 or 3, got %', p_winner_offset;
@@ -261,7 +261,7 @@ BEGIN
       AND outcome_id = v_winning_id
       AND resolved_at IS NULL
   LOOP
-    v_payout := ROUND(v_bet.shares_bought)::int;
+    v_payout := ROUND(v_bet.shares_bought)::bigint;
 
     UPDATE bet
       SET payout = v_payout, resolved_at = NOW()
@@ -298,6 +298,12 @@ BEGIN
     );
 
     PERFORM public.check_and_promote_tier(v_bet.user_id);
+    -- Unlock settlement-time betting achievements (big_win / balance_*k /
+    -- bet_10_wins) the moment the LMSR payout credits, mirroring the
+    -- fixed-odds path (settle_fixed_odds_bets_for_bout). p_odds = 1.0 so an
+    -- LMSR win never trips the sportsbook-only underdog_win.
+    PERFORM public.unlock_betting_achievements(
+      v_bet.user_id, v_payout, 1.0, false, v_new_balance);
   END LOOP;
 
   UPDATE bet
@@ -319,8 +325,8 @@ DECLARE
   v_winning_id uuid;
   v_winning_label text;
   v_bet record;
-  v_payout int;
-  v_new_balance int;
+  v_payout bigint;
+  v_new_balance bigint;
 BEGIN
   IF p_winning_idx < 0 THEN
     RAISE EXCEPTION 'winning_idx must be >= 0, got %', p_winning_idx;
@@ -358,7 +364,7 @@ BEGIN
       AND outcome_id = v_winning_id
       AND resolved_at IS NULL
   LOOP
-    v_payout := ROUND(v_bet.shares_bought)::int;
+    v_payout := ROUND(v_bet.shares_bought)::bigint;
 
     UPDATE bet
       SET payout = v_payout, resolved_at = NOW()
@@ -395,6 +401,12 @@ BEGIN
     );
 
     PERFORM public.check_and_promote_tier(v_bet.user_id);
+    -- Unlock settlement-time betting achievements (big_win / balance_*k /
+    -- bet_10_wins) the moment the LMSR payout credits, mirroring the
+    -- fixed-odds path (settle_fixed_odds_bets_for_bout). p_odds = 1.0 so an
+    -- LMSR win never trips the sportsbook-only underdog_win.
+    PERFORM public.unlock_betting_achievements(
+      v_bet.user_id, v_payout, 1.0, false, v_new_balance);
   END LOOP;
 
   UPDATE bet
@@ -417,8 +429,8 @@ DECLARE
   v_losing_id uuid;
   v_winning_label text;
   v_bet record;
-  v_payout int;
-  v_new_balance int;
+  v_payout bigint;
+  v_new_balance bigint;
 BEGIN
   IF p_winning_idx NOT IN (0, 1) THEN
     RAISE EXCEPTION 'winning_idx must be 0 or 1, got %', p_winning_idx;
@@ -459,7 +471,7 @@ BEGIN
       AND outcome_id = v_winning_id
       AND resolved_at IS NULL
   LOOP
-    v_payout := ROUND(v_bet.shares_bought)::int;
+    v_payout := ROUND(v_bet.shares_bought)::bigint;
 
     UPDATE bet
       SET payout = v_payout, resolved_at = NOW()
@@ -496,6 +508,12 @@ BEGIN
     );
 
     PERFORM public.check_and_promote_tier(v_bet.user_id);
+    -- Unlock settlement-time betting achievements (big_win / balance_*k /
+    -- bet_10_wins) the moment the LMSR payout credits, mirroring the
+    -- fixed-odds path (settle_fixed_odds_bets_for_bout). p_odds = 1.0 so an
+    -- LMSR win never trips the sportsbook-only underdog_win.
+    PERFORM public.unlock_betting_achievements(
+      v_bet.user_id, v_payout, 1.0, false, v_new_balance);
   END LOOP;
 
   UPDATE bet
@@ -517,7 +535,7 @@ DECLARE
   v_bout record; v_mb text; v_wd boolean; v_terminal_void boolean;
   v_leg record; v_outcome text;
   v_p record; v_open int; v_lost int; v_won int;
-  v_combined numeric; v_payout int; v_new_balance int;
+  v_combined numeric; v_payout bigint; v_new_balance bigint;
 BEGIN
   SELECT status::text AS status, winner_id, fighter_a_id, fighter_b_id,
          method::text AS method, round_finished
@@ -571,7 +589,7 @@ BEGIN
       ELSE
         SELECT LEAST(1000, round(exp(sum(ln(decimal_odds)))::numeric, 2))
           INTO v_combined FROM parlay_leg WHERE parlay_id=v_p.id AND status='won';
-        v_payout := floor(v_p.stake_coins * v_combined)::int;
+        v_payout := floor(v_p.stake_coins * v_combined)::bigint;
         UPDATE parlay SET status='won', payout=v_payout, settled_at=NOW() WHERE id=v_p.id;
         UPDATE user_profile SET balance_coins=balance_coins+v_payout,
                total_coins_earned=total_coins_earned+v_payout

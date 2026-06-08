@@ -90,6 +90,8 @@ export function SportsbookPanel({
         return t("errNoModelOdds");
       case "MARKET_NOT_OFFERED":
         return t("errMarketNotOffered");
+      case "ODDS_CHANGED":
+        return t("errOddsChanged");
       default:
         return t("errGeneric");
     }
@@ -143,10 +145,18 @@ export function SportsbookPanel({
       return;
     }
     setPending(true);
-    const res = await placeFixedOddsBetAction(boutId, selected.code, parsedStake);
+    const res = await placeFixedOddsBetAction(
+      boutId,
+      selected.code,
+      parsedStake,
+      selected.decimalOdds,
+    );
     setPending(false);
     if (res.error) {
       setError(translateError(res.error));
+      // Odds moved under the user — pull fresh prices onto the board so the
+      // re-confirm shows the new odds.
+      if (res.error === "ODDS_CHANGED") router.refresh();
       return;
     }
     setSuccess(

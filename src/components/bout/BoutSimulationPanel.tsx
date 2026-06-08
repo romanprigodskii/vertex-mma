@@ -15,10 +15,6 @@ interface Props {
   sim: BoutSimulationRow;
 }
 
-function pct(p: number, digits = 1): string {
-  return `${(p * 100).toFixed(digits)}%`;
-}
-
 const CONFIDENCE_STYLE: Record<
   BoutSimulationRow["confidenceLabel"],
   { dot: string; text: string }
@@ -65,16 +61,32 @@ export async function BoutSimulationPanel({ bout, sim }: Props) {
   const winnerName = winnerIsA ? bout.fighter_a.name_en : bout.fighter_b.name_en;
   const winnerProb = winnerIsA ? sim.probA : sim.probB;
   const loserName = winnerIsA ? bout.fighter_b.name_en : bout.fighter_a.name_en;
-  const loserProb = winnerIsA ? sim.probB : sim.probA;
   const cs = CONFIDENCE_STYLE[sim.confidenceLabel] ?? CONFIDENCE_STYLE.low;
 
-  // Edge interpretation: edgeA = model_prob_a - market_prob_a. We want a
-  // "model agrees / disagrees" signal for the PREDICTED winner — so flip
-  // sign when the model picks fighter B. Threshold 5pp to keep noise out.
-  const edge = sim.edgeA;
-  const edgeForWinner = edge == null ? null : winnerIsA ? edge : -edge;
-  const showValueChip = edgeForWinner != null && Math.abs(edgeForWinner) >= 0.05;
-  const valueChipPositive = edgeForWinner != null && edgeForWinner >= 0.05;
+  // Round the winner's model prob once and show the loser as its complement,
+  // so the two sides always read as a clean two-way split summing to 100%.
+  const winnerPctNum = Math.round(winnerProb * 100);
+  const loserPctNum = 100 - winnerPctNum;
+
+  // "vs market" edge for the PREDICTED winner. Derive it from the SAME numbers
+  // the user reads — the rounded model % and the 1-dp market % — so model,
+  // market and edge reconcile exactly (model − market = edge), and gate the
+  // value chip on that same displayed edge. marketProbA is the market's prob
+  // for fighter A; flip for a B winner. (edge_a ≈ probA − marketProbA.)
+  const marketWinnerProb =
+    sim.marketProbA == null
+      ? null
+      : winnerIsA
+        ? sim.marketProbA
+        : 1 - sim.marketProbA;
+  const marketPct =
+    marketWinnerProb == null
+      ? null
+      : Number((marketWinnerProb * 100).toFixed(1));
+  const edgePct =
+    marketPct == null ? null : Number((winnerPctNum - marketPct).toFixed(1));
+  const showValueChip = edgePct != null && Math.abs(edgePct) >= 5;
+  const valueChipPositive = edgePct != null && edgePct >= 5;
 
   // Top 5 features by |SHAP|. Normalize bar widths so the biggest is 100%.
   const features = selectDisplayFeatures(sim.features, 5);
@@ -98,7 +110,7 @@ export async function BoutSimulationPanel({ bout, sim }: Props) {
       <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
         <div className="flex items-baseline gap-3">
           <span className="font-display tabular text-5xl leading-none text-foreground">
-            {(winnerProb * 100).toFixed(0)}
+            {winnerPctNum}
             <span className="text-2xl text-foreground-muted">%</span>
           </span>
           <div className="flex flex-col">
@@ -108,7 +120,7 @@ export async function BoutSimulationPanel({ bout, sim }: Props) {
             <span className="font-sans text-xs text-foreground-muted">
               {t("vs")}{" "}
               <span className="text-foreground-subtle">
-                {loserName} · {pct(loserProb)}
+                {loserName} · {loserPctNum}%
               </span>
             </span>
           </div>
@@ -138,13 +150,11 @@ export async function BoutSimulationPanel({ bout, sim }: Props) {
               </span>
             ) : null}
           </div>
-          {edgeForWinner != null && sim.marketProbA != null ? (
+          {edgePct != null && marketPct != null ? (
             <div className="text-[11px] uppercase tracking-widest text-foreground-subtle">
               {t("vsMarket", {
-                edge: `${edgeForWinner >= 0 ? "+" : ""}${(edgeForWinner * 100).toFixed(1)}%`,
-                market: pct(
-                  winnerIsA ? sim.marketProbA : 1 - sim.marketProbA,
-                ),
+                edge: `${edgePct >= 0 ? "+" : ""}${edgePct.toFixed(1)}%`,
+                market: `${marketPct.toFixed(1)}%`,
               })}
             </div>
           ) : null}
@@ -249,46 +259,58 @@ async function MonteCarloBlock({
   // panel — see reconcileMcMethodProbs).
   const m = reconcileMcMethodProbs(rounds, ensembleProbA);
 
-  // Find the most likely (method, round) cell — used for the headline
-  // sentence. Decision sits at "round = scheduled_rounds + 1" so it
-  // sorts after all round-finish cells.
   const finishByRound = rounds.finishByRound.filter(
     (v): v is number => v != null,
   );
   const scheduledRounds = finishByRound.length;
-  type Cell = { kind: "ko" | "sub" | "dec"; round: number; prob: number };
-  const cells: Cell[] = [];
-  for (let i = 0; i < scheduledRounds; i += 1) {
-    cells.push({ kind: "ko", round: i + 1, prob: finishByRound[i] });
-  }
-  const decisionProb = m.probDecisionA + m.probDecisionB;
-  cells.push({ kind: "dec", round: scheduledRounds + 1, prob: decisionProb });
-  cells.sort((x, y) => y.prob - x.prob);
-  const top = cells[0];
 
   // Method totals strip — reconciled, so the KO/Sub/Dec totals
   // numerically sum to the same 100% the headline winner prob is
   // drawn from.
+  const decisionProb = m.probDecisionA + m.probDecisionB;
   const totalKo = m.probKoA + m.probKoB;
   const totalSub = m.probSubA + m.probSubB;
   const totalDec = decisionProb;
   const reconciledRounds = { ...rounds, ...m };
 
+  // The raw per-round finish probs sum to the MC's standalone finish prob,
+  // which drifts from the reconciled finish share (1 − decisionProb) whenever
+  // MC and the ensemble disagree on the winner. Rescale them onto the same
+  // reconciled basis so the round cells, the decision cell and the method
+  // totals all read as one consistent 100%.
+  const reconciledFinishShare = totalKo + totalSub;
+  const rawFinishShare = finishByRound.reduce((acc, v) => acc + v, 0);
+  const finishScale =
+    rawFinishShare > 1e-9 ? reconciledFinishShare / rawFinishShare : 0;
+  const finishByRoundReconciled = finishByRound.map((v) => v * finishScale);
+
+  // Find the most likely cell — used for the headline sentence. Each round
+  // cell is "a finish IN that round" (any method, either fighter — the data
+  // carries no per-method-per-round split, so it is NOT necessarily a KO).
+  // Decision sits at "round = scheduled_rounds + 1" so it sorts after all
+  // round-finish cells.
+  type Cell = { kind: "finish" | "dec"; round: number; prob: number };
+  const cells: Cell[] = [];
+  for (let i = 0; i < scheduledRounds; i += 1) {
+    cells.push({
+      kind: "finish",
+      round: i + 1,
+      prob: finishByRoundReconciled[i],
+    });
+  }
+  cells.push({ kind: "dec", round: scheduledRounds + 1, prob: decisionProb });
+  cells.sort((x, y) => y.prob - x.prob);
+  const top = cells[0];
+
   // Per-round bars + decision bar.
   const maxRoundProb = Math.max(
     decisionProb,
-    ...finishByRound,
+    ...finishByRoundReconciled,
     0.05,
   );
 
   const fighterAName = bout.fighter_a.name_en;
   const fighterBName = bout.fighter_b.name_en;
-  const topMethodLabel =
-    top.kind === "ko"
-      ? t("mcMethodKo")
-      : top.kind === "sub"
-        ? t("mcMethodSub")
-        : t("mcMethodDec");
 
   return (
     <div className="mt-5 border-t border-foreground/10 pt-4">
@@ -308,13 +330,10 @@ async function MonteCarloBlock({
       {/* Headline sentence */}
       <p className="mb-3 font-sans text-sm text-foreground">
         {top.kind === "dec"
-          ? t("mcMostLikely", {
-              method: topMethodLabel,
-              round: "—",
+          ? t("mcMostLikelyDecision", {
               pct: `${(top.prob * 100).toFixed(0)}%`,
             })
           : t("mcMostLikely", {
-              method: topMethodLabel,
               round: top.round,
               pct: `${(top.prob * 100).toFixed(0)}%`,
             })}
@@ -381,7 +400,7 @@ async function MonteCarloBlock({
 
       {/* Per-round finish probability strip */}
       <ul className="grid grid-cols-1 gap-1.5">
-        {finishByRound.map((prob, idx) => {
+        {finishByRoundReconciled.map((prob, idx) => {
           const widthPct = Math.max(4, Math.round((prob / maxRoundProb) * 100));
           return (
             <li

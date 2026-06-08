@@ -102,7 +102,12 @@ BEGIN
   IF p_new_balance >= 100000 THEN PERFORM public.unlock_achievement(p_user_id, 'balance_100k'); END IF;
   IF p_new_balance >= 50000  THEN PERFORM public.unlock_achievement(p_user_id, 'balance_50k'); END IF;
   -- bet_10_wins: total settled wins across the LMSR market, fixed-odds and parlays.
-  SELECT (SELECT count(*) FROM bet WHERE user_id = p_user_id AND payout > 0 AND resolved_at IS NOT NULL)
+  -- A genuine LMSR win is a winning bet (payout > 0) on a RESOLVED market;
+  -- refund_market leaves the market 'cancelled', so the resolved-market join
+  -- keeps refunds from counting as phantom wins (and still counts a genuine
+  -- break-even win). KEEP IN SYNC with src/lib/achievements.ts.
+  SELECT (SELECT count(*) FROM bet b JOIN market m ON m.id = b.market_id
+            WHERE b.user_id = p_user_id AND b.payout > 0 AND m.status = 'resolved')
        + (SELECT count(*) FROM fixed_odds_bet WHERE user_id = p_user_id AND status = 'won')
        + (SELECT count(*) FROM parlay WHERE user_id = p_user_id AND status = 'won')
     INTO v_total_wins;
