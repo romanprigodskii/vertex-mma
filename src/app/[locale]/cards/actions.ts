@@ -56,6 +56,14 @@ export type PickerFighter = {
 export async function searchFightersForPicker(
   query: string,
 ): Promise<PickerFighter[]> {
+  // 'use server' exports are public POST endpoints. The picker only renders
+  // inside the logged-in card editor, so gate on auth and throttle per user:
+  // otherwise an anonymous loop hammers the expensive pg_trgm catalog scan in
+  // searchFighters() and saturates the connection pool. Anonymous callers
+  // never reach the DB query below.
+  const myId = await getMyProfileId();
+  if (!myId) return [];
+  if (!allowAction(`picker:${myId}`, 300)) return [];
   if (!query.trim()) return [];
   const results = await searchFighters(query, 8);
   return results.map((r) => ({

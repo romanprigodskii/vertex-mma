@@ -34,7 +34,11 @@ export async function searchFighters(
   limit = 20,
 ): Promise<FighterSearchResult[]> {
   const trimmed = query.trim();
-  if (!trimmed) return [];
+  // A 1-char query forces a full pg_trgm similarity scan over the ~4k-row
+  // catalog (plus the fighter_alias subquery) to return results no caller can
+  // meaningfully use. Require >= 2 chars so "a"/"j" don't trigger the scan;
+  // this subsumes the empty-query guard and leaves 2+ char queries unchanged.
+  if (trimmed.length < 2) return [];
 
   const isRu = await isRuLocale();
   // DISTINCT ON requires f.id to be the leftmost ORDER BY key, so the LIMIT
