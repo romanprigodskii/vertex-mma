@@ -21,11 +21,13 @@ export type LeaderboardRow = {
  * Pulls top N for the requested sort.
  *
  *   profit       — net (total_coins_earned − total_coins_lost), descending.
- *                   Hides accounts that never engaged (no bets and untouched
- *                   default balance of 10,000) so the board doesn't fill
- *                   with zero-activity profiles.
- *   volume       — total_coins_lost descending. Same activity filter as
- *                   profit since high-volume players will have moved money.
+ *                   Only accounts that have actually placed a bet qualify
+ *                   (bet_count > 0). The board is framed as "top bettors", so
+ *                   a signup/referral bonus nudging the balance off the 10,000
+ *                   default must NOT let a never-bet account outrank a real
+ *                   bettor — gating on bet_count, not balance, prevents that.
+ *   volume       — total_coins_lost descending. Same bet_count > 0 filter as
+ *                   profit since the board only ranks people who have bet.
  *   achievements — unlocked-achievement count descending. No activity
  *                   filter — any user with at least one achievement
  *                   qualifies (and the descending sort hides empties).
@@ -53,7 +55,7 @@ export async function getLeaderboard(
         up.bet_count::float8 AS bet_count,
         (SELECT COUNT(*)::int FROM user_achievement WHERE user_id = up.id) AS achievement_count
       FROM user_profile up
-      WHERE up.bet_count > 0 OR up.balance_coins <> 10000
+      WHERE up.bet_count > 0
       ORDER BY up.total_coins_lost DESC
       LIMIT ${limit}
     `);
@@ -95,7 +97,7 @@ export async function getLeaderboard(
         up.bet_count::float8 AS bet_count,
         (SELECT COUNT(*)::int FROM user_achievement WHERE user_id = up.id) AS achievement_count
       FROM user_profile up
-      WHERE up.bet_count > 0 OR up.balance_coins <> 10000
+      WHERE up.bet_count > 0
       ORDER BY (up.total_coins_earned - up.total_coins_lost) DESC
       LIMIT ${limit}
     `);

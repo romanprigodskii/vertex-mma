@@ -62,12 +62,21 @@ export function useLocalizedNotification(): (n: NotificationRow) => {
       const titleKey = `title_${key}`;
       if (!t.has(titleKey)) return { title: n.title, body: n.body };
 
+      // Refund reasons are written as raw English by the SQL settlement
+      // functions, so on /ru the body would render in English. Prefer a
+      // localized string when the emitter supplies a `reasonKey` code
+      // (resolved via reason_<code>), falling back to the legacy raw `reason`.
+      const reasonKey =
+        p && typeof p.reasonKey === "string" ? p.reasonKey : null;
       const args = {
         coins: num(p!.coins),
         total: num(p!.total),
         shares: num(p!.shares),
         label: str(p!.label),
-        reason: str(p!.reason),
+        reason:
+          reasonKey && t.has(`reason_${reasonKey}`)
+            ? t(`reason_${reasonKey}`)
+            : str(p!.reason),
         tier: str(p!.tier).toUpperCase(),
       };
       const title = t(titleKey, args);

@@ -50,21 +50,34 @@ export const metadata: Metadata = {
     process.env.NEXT_PUBLIC_SITE_URL ?? "https://vertexmma.com",
   ),
   title: {
-    default: "Vertex MMA — AI-powered Fight Simulator",
+    default: "Vertex MMA — UFC scores, rankings, betting",
     template: "%s | Vertex MMA",
   },
   description:
-    "AI-powered MMA fight simulator. Run any matchup, predict any fight.",
+    "Vertex score for every active UFC fighter, community rankings, and virtual coin betting markets.",
   openGraph: {
     title: "Vertex MMA",
-    description: "AI-powered MMA fight simulator",
+    description:
+      "Vertex score for every active UFC fighter, community rankings, and virtual coin betting markets.",
     siteName: "Vertex MMA",
     type: "website",
+    // Default share card for the home + static pages (entity pages set their
+    // own). Without it the summary_large_image card below renders imageless.
+    images: [
+      {
+        url: "/api/og/default",
+        width: 1200,
+        height: 630,
+        alt: "Vertex MMA — UFC scores, rankings, betting",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "Vertex MMA",
-    description: "AI-powered MMA fight simulator",
+    description:
+      "Vertex score for every active UFC fighter, community rankings, and virtual coin betting markets.",
+    images: ["/api/og/default"],
   },
 };
 
