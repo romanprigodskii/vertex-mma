@@ -261,7 +261,9 @@ export async function getRecentForm(
     END
     WHERE b.status = 'completed'
       AND (b.fighter_a_id = ${fighterId}::uuid OR b.fighter_b_id = ${fighterId}::uuid)
-    ORDER BY e.date DESC, b.id DESC
+    -- Break same-date ties by card position, like getFightHistory: b.id is a
+    -- UUID (effectively random), which would order two bouts on one date wrong.
+    ORDER BY e.date DESC, b.bout_order DESC NULLS LAST, b.id DESC
     LIMIT ${limit}
   `);
   return [...(result as unknown as RecentFormEntry[])];

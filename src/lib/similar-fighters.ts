@@ -6,9 +6,8 @@ import type { FighterDetail } from "@/lib/fighter-detail";
 
 /**
  * 7-dim style vector. Each axis is normalized to an empirical UFC max so the
- * vector lies roughly in [0,1]^7. Cosine similarity itself is magnitude-
- * invariant, but normalizing prevents one wide-range axis (e.g. td_avg) from
- * dominating relative angles.
+ * vector lies roughly in [0,1]^7. Normalizing keeps one wide-range axis (e.g.
+ * td_avg) from dominating the Euclidean distance the similarity below measures.
  */
 const AXIS_MAX = {
   slpm: 10,
@@ -80,9 +79,11 @@ export type SimilarFighter = {
 type Candidate = SimilarFighter & StatsRow;
 
 /**
- * Cosine-similar fighters in the same weight class. Returns up to `limit`
- * fighters ordered by descending similarity. Returns an empty array if the
- * source fighter has no stats or no weight class to match against.
+ * Inverse-Euclidean-similar fighters in the same weight class (see
+ * `similarity` for why not cosine). Returns up to `limit` fighters ordered by
+ * descending similarity. Returns an empty array when the source has no weight
+ * class to match against, or no slpm — the axis every candidate is required to
+ * have (see the `f.slpm IS NOT NULL` filter below).
  */
 export async function getSimilarFighters(
   current: FighterDetail,
@@ -90,9 +91,11 @@ export async function getSimilarFighters(
 ): Promise<SimilarFighter[]> {
   if (!current.weight_class_primary) return [];
 
-  const sourceHasStats =
-    current.slpm != null || current.td_avg != null || current.sub_avg != null;
-  if (!sourceHasStats) return [];
+  // Align the source with the candidate filter: candidates all have a real
+  // slpm and styleVector reads (slpm ?? 0), so a source with null slpm would
+  // be pinned to the 0 striking-volume corner and compared against fighters
+  // that all have one — systematically distorting the ranking. Require it.
+  if (current.slpm == null) return [];
 
   const isRu = await isRuLocale();
   const result = await db.execute<Candidate>(sql`

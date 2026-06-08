@@ -39,7 +39,7 @@ import {
 import { listNewsForFighter } from "@/lib/news";
 import { getPeakVertex } from "@/lib/score-history";
 import { getSimilarFighters } from "@/lib/similar-fighters";
-import { headlineScore } from "@/lib/vertex-tier";
+import { clampHeadline, headlineScore } from "@/lib/vertex-tier";
 
 export const dynamic = "force-dynamic";
 
@@ -211,7 +211,9 @@ export default async function FighterDetailPage({ params }: PageProps) {
                 href={`/fighters/${slug}/score-history?mode=current`}
                 prefetch={false}
                 aria-label={t("openCurrentHistoryScore", {
-                  score: heroCurrentScore,
+                  // Announce the same clamped 0–100 number the octagon shows —
+                  // raw all-time scores can exceed 100 (kept for sort order).
+                  score: clampHeadline(heroCurrentScore) ?? heroCurrentScore,
                 })}
                 className="group block rounded-full outline-none ring-offset-2 ring-offset-background-base transition-transform hover:scale-[1.02] focus-visible:ring-2 focus-visible:ring-primary"
               >
@@ -241,7 +243,9 @@ export default async function FighterDetailPage({ params }: PageProps) {
                 aria-label={
                   fighter.vertex_score_all_time != null
                     ? t("openAllTimeHistoryScore", {
-                        score: fighter.vertex_score_all_time,
+                        score:
+                          clampHeadline(fighter.vertex_score_all_time) ??
+                          fighter.vertex_score_all_time,
                       })
                     : t("openAllTimeHistory")
                 }
@@ -272,7 +276,9 @@ export default async function FighterDetailPage({ params }: PageProps) {
                 aria-label={
                   fighter.vertex_score_all_time != null
                     ? t("openAllTimeHistoryScore", {
-                        score: fighter.vertex_score_all_time,
+                        score:
+                          clampHeadline(fighter.vertex_score_all_time) ??
+                          fighter.vertex_score_all_time,
                       })
                     : t("openAllTimeHistory")
                 }

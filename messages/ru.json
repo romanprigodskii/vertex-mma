@@ -251,6 +251,8 @@
     "scoreBreakdownView": "Режим разбора счёта",
     "tabCurrent": "Текущий",
     "tabAllTime": "За всё время",
+    "tooltipTier": "Уровень {tier} · {mode}",
+    "tooltipUnranked": "Без рейтинга · {mode}",
     "sourceLabel": "Источник",
     "sourceGlobal": "Глобально",
     "sourceDivisional": "Дивизион · {division}{statusSuffix}",

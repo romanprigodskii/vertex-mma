@@ -836,7 +836,12 @@ export async function getFightHistory(
         WHEN b.round_finished IS NOT NULL
           AND b.scheduled_rounds IS NOT NULL
           AND b.round_finished >= b.scheduled_rounds
-          AND COALESCE(b.time_finished_seconds, 0) >= 280
+          -- Only a bout that ran (essentially) the full final round went the
+          -- distance. The old >= 280 swallowed a 4:40 finishing-round KO/sub as
+          -- a decision, preempting the knockdown/sub branches below; require
+          -- the round to reach its 5:00 (300s) length so late stoppages fall
+          -- through and get classified by their finish signals.
+          AND COALESCE(b.time_finished_seconds, 0) >= 299
         THEN 'decision_unanimous'
         WHEN COALESCE(brs_win.knockdowns, 0) > 0 THEN 'ko'
         WHEN COALESCE(brs_win.sub_attempts, 0) > 0 THEN 'submission'

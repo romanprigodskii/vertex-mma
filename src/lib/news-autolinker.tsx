@@ -88,6 +88,23 @@ function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+/**
+ * Case-insensitive, first-occurrence matcher with Unicode-aware word edges.
+ *
+ * JS `\b` is ASCII-only: between two Cyrillic characters (or a Cyrillic char
+ * and a space) it never marks a boundary, so on the RU site — where fighter /
+ * event names and the article body are Cyrillic — `\b…\b` matched almost
+ * nothing and RU readers lost the in-article links EN readers get. Lookarounds
+ * on `\p{L}\p{N}` (with the `u` flag) give real word edges for Latin and
+ * Cyrillic alike while still refusing mid-word matches.
+ */
+function boundaryMatcher(text: string): RegExp {
+  return new RegExp(
+    `(?<![\\p{L}\\p{N}])${escapeRegex(text)}(?![\\p{L}\\p{N}])`,
+    "iu",
+  );
+}
+
 type Span = {
   start: number;
   end: number;
@@ -111,7 +128,7 @@ function findSpans(text: string, aliases: Alias[]): Span[] {
   for (const alias of aliases) {
     const targetKey = `${alias.targetType}:${alias.targetId}`;
     if (linkedTargets.has(targetKey)) continue;
-    const re = new RegExp(`\\b${escapeRegex(alias.text)}\\b`, "i");
+    const re = boundaryMatcher(alias.text);
     const m = re.exec(text);
     if (!m) continue;
     const start = m.index;
@@ -157,7 +174,7 @@ function findRefSpans(
   for (const ref of sorted) {
     if (usedRefs.has(ref.url)) continue;
     if (!ref.anchor) continue;
-    const re = new RegExp(`\\b${escapeRegex(ref.anchor)}\\b`, "i");
+    const re = boundaryMatcher(ref.anchor);
     const m = re.exec(text);
     if (!m) continue;
     const start = m.index;
@@ -285,7 +302,7 @@ export function featuredEmbedParagraphIndex(
   ref: NewsExternalRef,
 ): number {
   if (!ref.anchor) return -1;
-  const re = new RegExp(`\\b${escapeRegex(ref.anchor)}\\b`, "i");
+  const re = boundaryMatcher(ref.anchor);
   for (let i = 0; i < paragraphs.length; i++) {
     if (re.test(paragraphs[i])) return i;
   }

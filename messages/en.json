@@ -251,6 +251,8 @@
     "scoreBreakdownView": "Score breakdown view",
     "tabCurrent": "Current",
     "tabAllTime": "All-Time",
+    "tooltipTier": "{tier} tier · {mode}",
+    "tooltipUnranked": "Unranked · {mode}",
     "sourceLabel": "Source",
     "sourceGlobal": "Global",
     "sourceDivisional": "Divisional · {division}{statusSuffix}",

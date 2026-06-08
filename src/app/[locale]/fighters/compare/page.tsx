@@ -151,14 +151,6 @@ export default async function ComparePage({ params, searchParams }: PageProps) {
   const attributesA = computeAttributes(fighterA);
   const attributesB = computeAttributes(fighterB);
 
-  // Free, lightweight win-probability teaser from the Vertex Score gap. The
-  // full AI simulation (method / rounds / Monte-Carlo / "why") stays the paid
-  // Simulation feature — this only answers "who's favoured, by how much".
-  const forecast = estimateWinProbability(
-    { allTime: fighterA.vertex_score_all_time, current: fighterA.vertex_score },
-    { allTime: fighterB.vertex_score_all_time, current: fighterB.vertex_score },
-  );
-
   const [
     common,
     headToHead,
@@ -205,6 +197,31 @@ export default async function ComparePage({ params, searchParams }: PageProps) {
     vertexScore: fighterB.vertex_score,
     vertexScoreAllTime: fighterB.vertex_score_all_time,
   });
+
+  // Free, lightweight win-probability teaser. It MUST read the same resolved
+  // headline numbers the hero / ScoreCompare display — headlineScore returns
+  // the active-division current score for active fighters and all-time for
+  // retired, so feeding the raw global columns let the teaser favour the
+  // fighter the panel right below shows as weaker. Pass the headline values
+  // directly so the forecast and the displayed scores can never diverge. The
+  // full AI simulation (method / rounds / Monte-Carlo / "why") stays paid.
+  const rawForecast = estimateWinProbability(
+    { allTime: headlineA.value, current: headlineA.value },
+    { allTime: headlineB.value, current: headlineB.value },
+  );
+  const forecast = rawForecast
+    ? {
+        ...rawForecast,
+        // estimateWinProbability defaults basis to "all_time" when both slots
+        // are set; relabel it from the headline modes so the footnote matches
+        // (both retired → all-time, otherwise current).
+        basis:
+          headlineA.scoreMode === "all_time" &&
+          headlineB.scoreMode === "all_time"
+            ? ("all_time" as const)
+            : ("current" as const),
+      }
+    : null;
 
   const breakdownA = buildScoreBreakdown(
     headlineA.basis === "divisional" ? activeDivA : null,

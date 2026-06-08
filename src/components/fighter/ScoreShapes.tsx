@@ -69,11 +69,10 @@ function ScoreShape({
     : `color-mix(in oklch, ${tierStyle.scoreColor} 12%, transparent)`;
   const textColor = isUnranked ? UNRANKED_STROKE : tierStyle.scoreColor;
   const showCrown = championStyle.hasCrown && !isUnranked;
+  const modeWord = scoreMode === "all_time" ? t("tabAllTime") : t("tabCurrent");
   const tooltip = isUnranked
-    ? `Unranked · ${scoreMode === "all_time" ? "all-time" : "current"}`
-    : `${tierStyle.label} tier · ${
-        scoreMode === "all_time" ? "all-time" : "current"
-      }`;
+    ? t("tooltipUnranked", { mode: modeWord })
+    : t("tooltipTier", { tier: tierStyle.label, mode: modeWord });
 
   return (
     <div

@@ -125,10 +125,15 @@ export async function getPendingNewsCount(): Promise<number> {
 export type ModerationResult = { ok: boolean; error?: string };
 
 /**
- * Staff decision on a pending news item. 'approve' publishes it (the rephrase
- * + RU-translate cron pick it up on the next run, the same path auto-approved
- * items take); 'reject' hides it permanently. Idempotent: only transitions
- * rows still in 'pending', so a double-click is a harmless no-op.
+ * Staff decision on a news item. 'approve' publishes a pending item (the
+ * rephrase + RU-translate cron pick it up on the next run, the same path
+ * auto-approved items take). 'reject' both declines a pending item AND doubles
+ * as a takedown for an already-live one: high-confidence items are published
+ * straight to 'auto_approved' with no human review, so a mis-classified or
+ * low-quality article needs a path back down — reject pulls 'pending',
+ * 'approved' and 'auto_approved' rows to 'rejected'. Idempotent: 'rejected'
+ * rows (and, for approve, non-'pending' rows) don't match, so a double-click
+ * is a harmless no-op.
  */
 export async function moderateNewsItem(
   id: string,
@@ -140,17 +145,79 @@ export async function moderateNewsItem(
   if (!user.isStaff) return { ok: false, error: "Staff only" };
 
   const status = decision === "approve" ? "approved" : "rejected";
+  // approve only promotes a pending item; reject can also take a published
+  // (approved / auto_approved) item back down.
+  const allowedSource =
+    decision === "approve"
+      ? sql`status = 'pending'`
+      : sql`status IN ('pending', 'approved', 'auto_approved')`;
   try {
     await db.execute(sql`
       UPDATE news_item
       SET status = ${status}::news_status
-      WHERE id = ${id}::uuid AND status = 'pending'
+      WHERE id = ${id}::uuid AND ${allowedSource}
     `);
   } catch {
     return { ok: false, error: "Update failed" };
   }
 
   revalidatePath("/admin/news");
-  if (decision === "approve") revalidatePath("/news");
+  // A takedown changes the public feed just as much as an approval does.
+  revalidatePath("/news");
   return { ok: true };
+}
+
+export type PublishedNewsItem = PendingNewsItem & {
+  /** 'auto_approved' items never passed through the pending queue. */
+  status: "approved" | "auto_approved";
+};
+
+/**
+ * Already-published news (approved + auto_approved), newest first, so the
+ * admin view can list live items and take down a mis-classified one via
+ * moderateNewsItem(id, 'reject'). Staff-only; returns empty for non-staff so
+ * the moderation surface never leaks. Mirrors getPendingNewsItems' shape, plus
+ * the `status` so the UI can flag never-reviewed auto_approved items.
+ */
+export async function getPublishedNewsItems(
+  limit = 100,
+  offset = 0,
+): Promise<PublishedNewsItem[]> {
+  const user = await getCurrentUser();
+  if (!user?.isStaff) return [];
+
+  const rows = (await db.execute<PendingRow & { status: string }>(sql`
+    SELECT
+      ni.id::text AS id,
+      ni.url,
+      ni.title,
+      COALESCE(ni.body_rephrased, ni.body) AS body,
+      ni.published_at::text AS published_at,
+      ni.classification::text AS classification,
+      ni.confidence,
+      ns.name AS source_name,
+      ns.is_trusted,
+      ni.image_url,
+      ni.status::text AS status
+    FROM news_item ni
+    JOIN news_source ns ON ns.id = ni.source_id
+    WHERE ni.status IN ('approved', 'auto_approved')
+    ORDER BY ni.published_at DESC
+    LIMIT ${Math.min(300, Math.max(1, limit))}
+    OFFSET ${Math.max(0, offset)}
+  `)) as unknown as Array<PendingRow & { status: string }>;
+
+  return rows.map((r) => ({
+    id: r.id,
+    url: r.url,
+    title: cleanNewsTitle(decodeEntities(r.title)),
+    snippet: moderationSnippet(r.body),
+    published_at: r.published_at,
+    classification: r.classification ?? "general_news",
+    confidence: r.confidence,
+    source_name: r.source_name,
+    is_trusted: r.is_trusted,
+    image_url: r.image_url ?? null,
+    status: r.status === "auto_approved" ? "auto_approved" : "approved",
+  }));
 }
