@@ -212,18 +212,28 @@ export async function createFightCardAction(
   if ("error" in parsed) return { error: parsed.error };
   const f = parsed.fields;
 
-  const slug = await uniqueSlug(f.title);
-  await db.insert(fightCard).values({
-    userId: myId,
-    slug,
-    title: f.title,
-    subtitle: f.subtitle,
-    themeColor: f.themeColor,
-    titleFont: f.titleFont,
-    backgroundId: f.backgroundId,
-    isPublic: f.isPublic,
-    bouts: f.bouts,
-  });
+  // Slug generation (a SELECT) and the INSERT both touch the DB. On any
+  // driver/constraint failure, return the machine code DB_ERROR instead of
+  // letting the exception escape: the client maps unrecognized codes to
+  // t("errGeneric") via the default branch of actionErrorMessage, so the form
+  // clears its pending state and shows a message rather than spinning forever.
+  let slug: string;
+  try {
+    slug = await uniqueSlug(f.title);
+    await db.insert(fightCard).values({
+      userId: myId,
+      slug,
+      title: f.title,
+      subtitle: f.subtitle,
+      themeColor: f.themeColor,
+      titleFont: f.titleFont,
+      backgroundId: f.backgroundId,
+      isPublic: f.isPublic,
+      bouts: f.bouts,
+    });
+  } catch {
+    return { error: "DB_ERROR" };
+  }
 
   revalidatePath("/cards");
   return { slug };
@@ -255,19 +265,24 @@ export async function updateFightCardAction(
 
   // The slug is generated once at creation and never changes, so links
   // already shared keep resolving.
-  await db
-    .update(fightCard)
-    .set({
-      title: f.title,
-      subtitle: f.subtitle,
-      themeColor: f.themeColor,
-      titleFont: f.titleFont,
-      backgroundId: f.backgroundId,
-      isPublic: f.isPublic,
-      bouts: f.bouts,
-      updatedAt: new Date(),
-    })
-    .where(eq(fightCard.id, cardId));
+  try {
+    await db
+      .update(fightCard)
+      .set({
+        title: f.title,
+        subtitle: f.subtitle,
+        themeColor: f.themeColor,
+        titleFont: f.titleFont,
+        backgroundId: f.backgroundId,
+        isPublic: f.isPublic,
+        bouts: f.bouts,
+        updatedAt: new Date(),
+      })
+      .where(eq(fightCard.id, cardId));
+  } catch {
+    // Same contract as createFightCardAction: DB_ERROR → t("errGeneric").
+    return { error: "DB_ERROR" };
+  }
 
   revalidatePath("/cards");
   revalidatePath(`/cards/${existing[0].slug}`);
@@ -341,17 +356,19 @@ export async function toggleLikeAction(
       );
   }
 
-  // Recompute the denormalized counter from the join table — race-safe.
-  const countRows = (await db.execute<{ c: number }>(sql`
-    SELECT COUNT(*)::int AS c
-    FROM fight_card_like
-    WHERE fight_card_id = ${cardId}::uuid
-  `)) as unknown as Array<{ c: number }>;
-  const likeCount = countRows[0]?.c ?? 0;
-  await db
-    .update(fightCard)
-    .set({ likeCount })
-    .where(eq(fightCard.id, cardId));
+  // Recompute the denormalized counter from the join table in a single
+  // statement — race-safe and one round-trip instead of count-then-update.
+  const updated = (await db.execute<{ like_count: number }>(sql`
+    UPDATE fight_card
+    SET like_count = (
+      SELECT COUNT(*)::int
+      FROM fight_card_like
+      WHERE fight_card_id = ${cardId}::uuid
+    )
+    WHERE id = ${cardId}::uuid
+    RETURNING like_count
+  `)) as unknown as Array<{ like_count: number }>;
+  const likeCount = updated[0]?.like_count ?? 0;
 
   revalidatePath("/cards");
   revalidatePath(`/cards/${card[0].slug}`);
