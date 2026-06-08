@@ -21,6 +21,11 @@
  * 1M-stake parlay can pay 1e9). unlock_betting_achievements likewise takes
  * bigint. KEEP IN SYNC with drizzle/migrations/0086_wave59_settlement_bigint.sql.
  *
+ * WAVE 60: the 'won' branches of both settle fns now also reverse the optimistic
+ * total_coins_lost bump made at placement (a won stake is not a loss; mirrors
+ * the existing void/refund reversal) — fixes double-counted leaderboard "Coins
+ * lost". KEEP IN SYNC with drizzle/migrations/0088_wave60_settlement_bigint_lock_stats.sql.
+ *
  * NOTIFICATIONS: every settlement notification dual-writes a structured `params`
  * jsonb ({key,coins}) so the client localizes title/body (the stored English is
  * only the fallback). Mirrors scripts/apply_notification_params.ts — KEEP THE
@@ -139,8 +144,11 @@ BEGIN
 
     IF v_outcome = 'won' THEN
       UPDATE fixed_odds_bet SET status='won', payout=v_bet.potential_payout, settled_at=NOW() WHERE id=v_bet.id;
+      -- Wave 60: reverse the optimistic total_coins_lost bump made at placement
+      -- (a won stake is not a loss) — mirrors the void branch below.
       UPDATE user_profile SET balance_coins=balance_coins+v_bet.potential_payout,
-             total_coins_earned=total_coins_earned+v_bet.potential_payout
+             total_coins_earned=total_coins_earned+v_bet.potential_payout,
+             total_coins_lost=GREATEST(0,total_coins_lost-v_bet.stake_coins)
         WHERE id=v_bet.user_id RETURNING balance_coins INTO v_new_balance;
       INSERT INTO transaction (user_id,type,amount,balance_after,description)
         VALUES (v_bet.user_id,'bet_won',v_bet.potential_payout,v_new_balance,'Sportsbook win on bout '||p_bout_id);
@@ -242,8 +250,11 @@ BEGIN
           INTO v_combined FROM parlay_leg WHERE parlay_id=v_p.id AND status='won';
         v_payout := floor(v_p.stake_coins * v_combined)::bigint;
         UPDATE parlay SET status='won', payout=v_payout, settled_at=NOW() WHERE id=v_p.id;
+        -- Wave 60: reverse the optimistic total_coins_lost bump made at
+        -- placement (a won stake is not a loss) — mirrors the void branch above.
         UPDATE user_profile SET balance_coins=balance_coins+v_payout,
-               total_coins_earned=total_coins_earned+v_payout
+               total_coins_earned=total_coins_earned+v_payout,
+               total_coins_lost=GREATEST(0,total_coins_lost-v_p.stake_coins)
           WHERE id=v_p.user_id RETURNING balance_coins INTO v_new_balance;
         INSERT INTO transaction (user_id,type,amount,balance_after,description)
           VALUES (v_p.user_id,'bet_won',v_payout,v_new_balance,'Parlay win');

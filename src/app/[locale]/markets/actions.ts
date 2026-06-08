@@ -31,6 +31,12 @@ const MIN_COINS_PER_BET = 1;
 // FOR UPDATE lock cap the rest.
 const MAX_COINS_PER_BET = 1_000_000;
 
+// Guard ids before they're interpolated into `${...}::uuid` (mirrors
+// cards/rankings actions). A malformed id otherwise hits Postgres as an invalid
+// uuid cast, surfacing as a generic BET_FAILED instead of a precise code.
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /**
  * Stable machine error codes. Server actions NEVER return human-readable
  * English — a Russian user must not see English in an otherwise-localized UI.
@@ -134,6 +140,9 @@ export async function placeBetAction(
     return { error: "INVALID_AMOUNT" };
   }
   const coinsInt = Math.floor(coinsToSpend);
+
+  if (!UUID_RE.test(marketId)) return { error: "MARKET_NOT_FOUND" };
+  if (!UUID_RE.test(outcomeId)) return { error: "OUTCOME_NOT_FOUND" };
 
   const profileRows = await db
     .select({ id: userProfile.id, balance: userProfile.balanceCoins })
@@ -338,6 +347,9 @@ export async function previewBetCost(
   // Clamp to the same ceiling placeBetAction enforces so the solver can never
   // be fed an arbitrarily large amount.
   const coinsInt = Math.min(Math.floor(coins), MAX_COINS_PER_BET);
+
+  if (!UUID_RE.test(marketId)) return { error: "MARKET_NOT_FOUND" };
+  if (!UUID_RE.test(outcomeId)) return { error: "OUTCOME_NOT_FOUND" };
 
   const marketRows = await db.execute<{ b_parameter: number }>(sql`
     SELECT b_parameter FROM market WHERE id = ${marketId}::uuid LIMIT 1

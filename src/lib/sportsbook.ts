@@ -377,6 +377,15 @@ export function methodBucket(method: string | null): MethodBucket {
 }
 
 /**
+ * SOURCE OF TRUTH IS SQL — not this function. Live settlement runs entirely in
+ * PL/pgSQL: the bout trigger grades fixed-odds bets + parlay legs via the
+ * `fixed_odds_grade` SQL function (a verbatim port of the switch below) inside
+ * `settle_fixed_odds_bets_for_bout` / `settle_parlay_legs_for_bout` (defined in
+ * scripts/apply_parlay_settlement.ts + drizzle/migrations). This TS grader is
+ * the reference oracle the SQL is ported from and is exercised by the unit
+ * tests (sportsbook.test.ts) — it is NOT called on any live code path. Keep the
+ * two in sync if you change grading rules.
+ *
  * Grade one selection against a resolved bout. Returns:
  *   • "won"  — the selection hit → credit floor(stake × odds)
  *   • "lost" — the selection missed → no payout (stake already debited)
@@ -502,6 +511,10 @@ export interface ParlayResolution {
  *   • else (≥1 won, rest void) → won; payout = floor(stake × Π won-leg odds)
  *     — void legs drop out and the combined odds recompute over survivors,
  *     standard sportsbook behaviour.
+ *
+ * SOURCE OF TRUTH IS SQL (see settleSelection): live parlays settle in
+ * `settle_parlay_legs_for_bout`. This is the reference oracle for the unit
+ * tests, not a live code path.
  *
  * Caller MUST ensure every leg is resolved (no 'open') before calling.
  */

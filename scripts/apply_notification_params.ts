@@ -7,9 +7,23 @@
  * (type, params); the stored title/body remain as the fallback for old rows
  * and any unmapped variant, so nothing breaks if the i18n key is missing.
  *
- * The money-path logic in each function is COPIED VERBATIM from the live prod
- * definition (pg_get_functiondef) — only the `INSERT INTO notification` gains a
- * `params` column. Nothing about balances, settlement, or status changes.
+ * The money-path logic in each function was originally COPIED VERBATIM from the
+ * live prod definition (pg_get_functiondef) — Wave 49 only added the `params`
+ * column to each `INSERT INTO notification`.
+ *
+ * WAVE 60 amended the four LMSR settle helpers here (settle_market_winner /
+ * settle_market_method / settle_market_outcome / refund_market) so re-running
+ * this script can't regress them: balance/payout locals + payout casts are now
+ * bigint (int4 overflowed past ~2.1e9; the LMSR analogue of Wave 59), each takes
+ * an explicit `market FOR UPDATE` lock first, and the win branches reverse the
+ * optimistic total_coins_lost bump made at placement (a won stake is not a
+ * loss). Wave 60 also widened the two coin-earning helpers reached during
+ * settlement — check_and_promote_tier.v_total_earned (PERFORM'd in every win
+ * branch) and unlock_achievement.v_new_balance — to bigint for the same reason
+ * (an int4 SELECT/RETURNING INTO would raise `integer out of range` past ~2.1e9
+ * and roll back the whole settlement). The two embedded copies of the fixed-
+ * odds / parlay settle fns were also re-synced to bigint + the win reversal.
+ * KEEP IN SYNC with drizzle/migrations/0088_wave60_settlement_bigint_lock_stats.sql.
  *
  * Targeted idempotent DDL (not `drizzle-kit push`, which can drop drift/RLS).
  * Re-runnable. Usage: npx tsx scripts/apply_notification_params.ts
@@ -35,7 +49,7 @@ const STATEMENTS: string[] = [
  SET search_path TO 'public'
 AS $function$
 DECLARE
-  v_total_earned int;
+  v_total_earned bigint;
   v_current_tier text;
   v_new_tier text;
   v_username text;
@@ -84,8 +98,11 @@ $function$`,
 AS $function$
 DECLARE
   v_bet record;
-  v_new_balance int;
+  v_new_balance bigint;
 BEGIN
+  -- Wave 60: serialize concurrent settlement of this market FIRST.
+  PERFORM 1 FROM market WHERE id = p_market_id FOR UPDATE;
+
   IF EXISTS (
     SELECT 1 FROM market
     WHERE id = p_market_id AND status IN ('resolved', 'cancelled')
@@ -148,7 +165,7 @@ $function$`,
 AS $function$
 DECLARE
   v_bout record; v_mb text; v_wd boolean; v_terminal_void boolean;
-  v_bet record; v_outcome text; v_new_balance int;
+  v_bet record; v_outcome text; v_new_balance bigint;
 BEGIN
   SELECT status::text AS status, winner_id, fighter_a_id, fighter_b_id,
          method::text AS method, round_finished
@@ -171,8 +188,10 @@ BEGIN
 
     IF v_outcome = 'won' THEN
       UPDATE fixed_odds_bet SET status='won', payout=v_bet.potential_payout, settled_at=NOW() WHERE id=v_bet.id;
+      -- Wave 60: reverse the optimistic total_coins_lost bump from placement.
       UPDATE user_profile SET balance_coins=balance_coins+v_bet.potential_payout,
-             total_coins_earned=total_coins_earned+v_bet.potential_payout
+             total_coins_earned=total_coins_earned+v_bet.potential_payout,
+             total_coins_lost=GREATEST(0,total_coins_lost-v_bet.stake_coins)
         WHERE id=v_bet.user_id RETURNING balance_coins INTO v_new_balance;
       INSERT INTO transaction (user_id,type,amount,balance_after,description)
         VALUES (v_bet.user_id,'bet_won',v_bet.potential_payout,v_new_balance,'Sportsbook win on bout '||p_bout_id);
@@ -217,9 +236,11 @@ DECLARE
   v_winning_id uuid;
   v_winning_label text;
   v_bet record;
-  v_payout int;
-  v_new_balance int;
+  v_payout bigint;
+  v_new_balance bigint;
 BEGIN
+  PERFORM 1 FROM market WHERE id = p_market_id FOR UPDATE;
+
   IF p_winner_offset NOT IN (0, 3) THEN
     RAISE EXCEPTION 'winner_offset must be 0 or 3, got %', p_winner_offset;
   END IF;
@@ -255,21 +276,24 @@ BEGIN
     WHERE id = p_market_id;
 
   FOR v_bet IN
-    SELECT id, user_id, shares_bought
+    SELECT id, user_id, shares_bought, coins_spent
     FROM bet
     WHERE market_id = p_market_id
       AND outcome_id = v_winning_id
       AND resolved_at IS NULL
   LOOP
-    v_payout := ROUND(v_bet.shares_bought)::int;
+    v_payout := ROUND(v_bet.shares_bought)::bigint;
 
     UPDATE bet
       SET payout = v_payout, resolved_at = NOW()
       WHERE id = v_bet.id;
 
+    -- Wave 60: a winning bet's stake is no longer a loss — reverse the
+    -- optimistic total_coins_lost bump made at placement (mirrors refund/void).
     UPDATE user_profile
       SET balance_coins = balance_coins + v_payout,
-          total_coins_earned = total_coins_earned + v_payout
+          total_coins_earned = total_coins_earned + v_payout,
+          total_coins_lost = GREATEST(0, total_coins_lost - v_bet.coins_spent)
       WHERE id = v_bet.user_id
       RETURNING balance_coins INTO v_new_balance;
 
@@ -319,9 +343,11 @@ DECLARE
   v_winning_id uuid;
   v_winning_label text;
   v_bet record;
-  v_payout int;
-  v_new_balance int;
+  v_payout bigint;
+  v_new_balance bigint;
 BEGIN
+  PERFORM 1 FROM market WHERE id = p_market_id FOR UPDATE;
+
   IF p_winning_idx < 0 THEN
     RAISE EXCEPTION 'winning_idx must be >= 0, got %', p_winning_idx;
   END IF;
@@ -358,15 +384,18 @@ BEGIN
       AND outcome_id = v_winning_id
       AND resolved_at IS NULL
   LOOP
-    v_payout := ROUND(v_bet.shares_bought)::int;
+    v_payout := ROUND(v_bet.shares_bought)::bigint;
 
     UPDATE bet
       SET payout = v_payout, resolved_at = NOW()
       WHERE id = v_bet.id;
 
+    -- Wave 60: a winning bet's stake is no longer a loss — reverse the
+    -- optimistic total_coins_lost bump made at placement (mirrors refund/void).
     UPDATE user_profile
       SET balance_coins = balance_coins + v_payout,
-          total_coins_earned = total_coins_earned + v_payout
+          total_coins_earned = total_coins_earned + v_payout,
+          total_coins_lost = GREATEST(0, total_coins_lost - v_bet.coins_spent)
       WHERE id = v_bet.user_id
       RETURNING balance_coins INTO v_new_balance;
 
@@ -417,9 +446,11 @@ DECLARE
   v_losing_id uuid;
   v_winning_label text;
   v_bet record;
-  v_payout int;
-  v_new_balance int;
+  v_payout bigint;
+  v_new_balance bigint;
 BEGIN
+  PERFORM 1 FROM market WHERE id = p_market_id FOR UPDATE;
+
   IF p_winning_idx NOT IN (0, 1) THEN
     RAISE EXCEPTION 'winning_idx must be 0 or 1, got %', p_winning_idx;
   END IF;
@@ -459,15 +490,18 @@ BEGIN
       AND outcome_id = v_winning_id
       AND resolved_at IS NULL
   LOOP
-    v_payout := ROUND(v_bet.shares_bought)::int;
+    v_payout := ROUND(v_bet.shares_bought)::bigint;
 
     UPDATE bet
       SET payout = v_payout, resolved_at = NOW()
       WHERE id = v_bet.id;
 
+    -- Wave 60: a winning bet's stake is no longer a loss — reverse the
+    -- optimistic total_coins_lost bump made at placement (mirrors refund/void).
     UPDATE user_profile
       SET balance_coins = balance_coins + v_payout,
-          total_coins_earned = total_coins_earned + v_payout
+          total_coins_earned = total_coins_earned + v_payout,
+          total_coins_lost = GREATEST(0, total_coins_lost - v_bet.coins_spent)
       WHERE id = v_bet.user_id
       RETURNING balance_coins INTO v_new_balance;
 
@@ -517,7 +551,7 @@ DECLARE
   v_bout record; v_mb text; v_wd boolean; v_terminal_void boolean;
   v_leg record; v_outcome text;
   v_p record; v_open int; v_lost int; v_won int;
-  v_combined numeric; v_payout int; v_new_balance int;
+  v_combined numeric; v_payout bigint; v_new_balance bigint;
 BEGIN
   SELECT status::text AS status, winner_id, fighter_a_id, fighter_b_id,
          method::text AS method, round_finished
@@ -571,10 +605,12 @@ BEGIN
       ELSE
         SELECT LEAST(1000, round(exp(sum(ln(decimal_odds)))::numeric, 2))
           INTO v_combined FROM parlay_leg WHERE parlay_id=v_p.id AND status='won';
-        v_payout := floor(v_p.stake_coins * v_combined)::int;
+        v_payout := floor(v_p.stake_coins * v_combined)::bigint;
         UPDATE parlay SET status='won', payout=v_payout, settled_at=NOW() WHERE id=v_p.id;
+        -- Wave 60: reverse the optimistic total_coins_lost bump from placement.
         UPDATE user_profile SET balance_coins=balance_coins+v_payout,
-               total_coins_earned=total_coins_earned+v_payout
+               total_coins_earned=total_coins_earned+v_payout,
+               total_coins_lost=GREATEST(0,total_coins_lost-v_p.stake_coins)
           WHERE id=v_p.user_id RETURNING balance_coins INTO v_new_balance;
         INSERT INTO transaction (user_id,type,amount,balance_after,description)
           VALUES (v_p.user_id,'bet_won',v_payout,v_new_balance,'Parlay win');
@@ -603,7 +639,7 @@ AS $function$
 DECLARE
   v_achievement_id uuid;
   v_reward int;
-  v_new_balance int;
+  v_new_balance bigint;
   v_name text;
   v_description text;
   v_username text;
