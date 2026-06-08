@@ -14,7 +14,9 @@
 
 // A real consensus is virtually never EXACTLY uniform, while the cold-start is.
 // A small epsilon keeps a genuine ~even synced line (e.g. 0.52/0.48) visible
-// while hiding the 0.5000 / 0.2500 / 0.1667 defaults.
+// while hiding the 0.5000 / 0.2500 / 0.1667 defaults. The spread comparison is
+// INCLUSIVE (>=) so a real line that happens to land exactly on the epsilon
+// boundary (a barely-split 0.505/0.495) is still treated as priced.
 const UNIFORM_EPSILON = 0.01;
 
 export function marketHasOdds(
@@ -29,5 +31,5 @@ export function marketHasOdds(
     if (o.current_price < min) min = o.current_price;
     if (o.current_price > max) max = o.current_price;
   }
-  return max - min > UNIFORM_EPSILON;
+  return max - min >= UNIFORM_EPSILON;
 }

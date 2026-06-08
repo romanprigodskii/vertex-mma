@@ -7,6 +7,7 @@ import { useTranslations } from "next-intl";
 import { placeBetAction, previewBetCost } from "@/app/[locale]/markets/actions";
 import { formatNumber } from "@/lib/format";
 import { priceToDecimalOdds } from "@/lib/lmsr";
+import { marketHasOdds } from "@/lib/market-odds";
 import type { MarketDetail } from "@/lib/markets";
 
 const INPUT_CLASS =
@@ -42,6 +43,12 @@ export function BetForm({ market, userBalance }: Props) {
     const n = parseInt(coins, 10);
     return Number.isFinite(n) && n > 0 ? n : 0;
   })();
+
+  // A freshly generated market sits at the uniform LMSR cold-start (50/50,
+  // ~16.7% each, …). Those are placeholders, not a real line, and must never
+  // render as odds in the picker — show only the label until the market is
+  // seeded or traded (matches every other surface that gates on marketHasOdds).
+  const hasOdds = marketHasOdds(market.outcomes, market.total_volume);
 
   // Will typing `amount` for `outcome` kick off a debounced cost-preview fetch?
   // Used to flip the "Calculating…" hint from the event handlers (not the
@@ -152,8 +159,9 @@ export function BetForm({ market, userBalance }: Props) {
         >
           {market.outcomes.map((o) => (
             <option key={o.id} value={o.id}>
-              {o.label} · {(o.current_price * 100).toFixed(1)}% ·{" "}
-              {priceToDecimalOdds(o.current_price)}x
+              {hasOdds
+                ? `${o.label} · ${(o.current_price * 100).toFixed(1)}% · ${priceToDecimalOdds(o.current_price)}x`
+                : o.label}
             </option>
           ))}
         </select>

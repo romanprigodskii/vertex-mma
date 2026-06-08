@@ -92,6 +92,19 @@ function errorCode(err: unknown, fallback: BetError): BetError {
   return (KNOWN_CODES.has(msg) ? msg : fallback) as BetError;
 }
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Guard a caller-supplied id BEFORE it reaches a `${id}::uuid` cast. A
+ *  malformed string makes Postgres throw "invalid input syntax for type uuid";
+ *  in the pre-transaction reads that error isn't wrapped in our try/catch and
+ *  would surface as a raw 500 instead of a clean machine code. Stored ids are
+ *  always canonical, so a non-canonical value can never match a row — treating
+ *  it as not-found is the right semantics, not just a crash guard. */
+function isUuid(v: unknown): v is string {
+  return typeof v === "string" && UUID_RE.test(v);
+}
+
 /**
  * Unlock achievements as a POST-COMMIT, best-effort side effect. The bet (or
  * parlay) is already durably committed by the time we get here, so a failure
@@ -339,12 +352,33 @@ export async function previewBetCost(
   // be fed an arbitrarily large amount.
   const coinsInt = Math.min(Math.floor(coins), MAX_COINS_PER_BET);
 
-  const marketRows = await db.execute<{ b_parameter: number }>(sql`
-    SELECT b_parameter FROM market WHERE id = ${marketId}::uuid LIMIT 1
+  // A malformed marketId would crash the raw `::uuid` cast below — this read
+  // isn't inside a try/catch, so it would surface as a 500 instead of a code.
+  if (!isUuid(marketId)) return { error: "MARKET_NOT_FOUND" };
+
+  const marketRows = await db.execute<{
+    b_parameter: number;
+    status: string;
+    closes_at: string;
+  }>(sql`
+    SELECT b_parameter, status::text AS status, closes_at::text AS closes_at
+    FROM market WHERE id = ${marketId}::uuid LIMIT 1
   `);
-  const mArr = marketRows as unknown as Array<{ b_parameter: number }>;
+  const mArr = marketRows as unknown as Array<{
+    b_parameter: number;
+    status: string;
+    closes_at: string;
+  }>;
   if (mArr.length === 0) return { error: "MARKET_NOT_FOUND" };
-  const b = mArr[0].b_parameter;
+  const mRow = mArr[0];
+  // Mirror placeBetAction's open/closes_at gate: don't run the LMSR bisection
+  // or surface a preview for a market that's closed or already past its close
+  // time — placing the bet would just bounce with MARKET_CLOSED anyway.
+  if (mRow.status !== "open") return { error: "MARKET_CLOSED" };
+  if (new Date(mRow.closes_at).getTime() <= Date.now()) {
+    return { error: "MARKET_CLOSED" };
+  }
+  const b = mRow.b_parameter;
 
   const outcomeRows = await db.execute<{
     id: string;
@@ -461,6 +495,10 @@ export async function placeFixedOddsBetAction(
   const profile = profileRows[0];
   if (!profile) return { error: "PROFILE_NOT_FOUND" };
   if (profile.balance < stakeInt) return { error: "NOT_ENOUGH_COINS" };
+
+  // A malformed boutId would crash the raw `::uuid` cast in the pre-tx read
+  // below (it runs before the try/catch); reject it as a clean not-found.
+  if (!isUuid(boutId)) return { error: "BOUT_NOT_FOUND" };
 
   // Bout context + bettability gate (status scheduled + event in the future).
   // This is a cheap early-reject; the authoritative re-check happens under a
@@ -596,35 +634,51 @@ type PricedLeg = {
   selectedFighterId: string | null;
 };
 
-/** Re-price one leg server-side (same odds + edge-guard as a single bet).
- *  Returns the priced leg or an error code the caller surfaces. */
-async function priceParlayLeg(
-  boutId: string,
-  rawCode: string,
-): Promise<PricedLeg | { error: BetError }> {
-  if (!isSelectionCode(rawCode)) return { error: "UNKNOWN_SELECTION" };
-  const code = rawCode as SportsbookSelectionCode;
+type BoutContext = {
+  status: string;
+  fighter_a_id: string;
+  fighter_b_id: string;
+  event_date: string;
+};
 
-  const boutRows = (await db.execute<{
-    status: string;
-    fighter_a_id: string;
-    fighter_b_id: string;
-    event_date: string;
-  }>(sql`
-    SELECT b.status::text AS status,
+/** Batch-fetch bout context (+ event date) for many legs in ONE round-trip,
+ *  keyed by bout id. Replaces the previous one-SELECT-per-leg pattern (N
+ *  ungrouped round-trips). Malformed ids are dropped up front — a canonical
+ *  stored id never collides with them — so a bad leg id resolves to a missing
+ *  map entry, which the caller maps to BOUT_NOT_FOUND (no `::uuid` cast crash). */
+async function fetchBoutContexts(
+  boutIds: string[],
+): Promise<Map<string, BoutContext>> {
+  const valid = boutIds.filter(isUuid);
+  if (valid.length === 0) return new Map();
+  const idList = sql.join(
+    valid.map((id) => sql`${id}::uuid`),
+    sql`, `,
+  );
+  const rows = (await db.execute<BoutContext & { id: string }>(sql`
+    SELECT b.id::text AS id,
+           b.status::text AS status,
            b.fighter_a_id::text AS fighter_a_id,
            b.fighter_b_id::text AS fighter_b_id,
            e.date::text AS event_date
     FROM bout b JOIN event e ON e.id = b.event_id
-    WHERE b.id = ${boutId}::uuid
-    LIMIT 1
-  `)) as unknown as Array<{
-    status: string;
-    fighter_a_id: string;
-    fighter_b_id: string;
-    event_date: string;
-  }>;
-  const boutRow = boutRows[0];
+    WHERE b.id IN (${idList})
+  `)) as unknown as Array<BoutContext & { id: string }>;
+  return new Map(rows.map((r) => [r.id, r]));
+}
+
+/** Re-price one leg server-side (same odds + edge-guard as a single bet). The
+ *  bout row is pre-fetched by the caller in one batched query
+ *  (fetchBoutContexts); this only does the per-bout simulation/odds lookups
+ *  that can't be batched. Returns the priced leg or an error code. */
+async function priceParlayLeg(
+  boutId: string,
+  rawCode: string,
+  boutRow: BoutContext | undefined,
+): Promise<PricedLeg | { error: BetError }> {
+  if (!isSelectionCode(rawCode)) return { error: "UNKNOWN_SELECTION" };
+  const code = rawCode as SportsbookSelectionCode;
+
   if (!boutRow) return { error: "BOUT_NOT_FOUND" };
   if (!isBoutBettable(boutRow.status, boutRow.event_date)) {
     return { error: "PARLAY_LEG_CLOSED" };
@@ -729,9 +783,12 @@ export async function placeParlayAction(
   if (!profile) return { error: "PROFILE_NOT_FOUND" };
   if (profile.balance < stakeInt) return { error: "NOT_ENOUGH_COINS" };
 
-  // Price every leg server-side (authoritative odds + edge-guard).
+  // Price every leg server-side (authoritative odds + edge-guard). Bout rows
+  // are fetched once in a single batched query (not one SELECT per leg); the
+  // per-bout simulation/odds lookups stay per-leg (not batchable here).
+  const boutCtx = await fetchBoutContexts(boutIds);
   const priced = await Promise.all(
-    legs.map((l) => priceParlayLeg(l.boutId, l.code)),
+    legs.map((l) => priceParlayLeg(l.boutId, l.code, boutCtx.get(l.boutId))),
   );
   const bad = priced.find((p): p is { error: BetError } => "error" in p);
   if (bad) return { error: bad.error };
