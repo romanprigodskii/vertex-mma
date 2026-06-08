@@ -28,7 +28,7 @@ import {
   getHeadToHeadBouts,
   getRecentForm,
 } from "@/lib/compare-fighters";
-import { estimateWinProbability } from "@/lib/compare-prediction";
+import { estimateWinProbabilityFromHeadline } from "@/lib/compare-prediction";
 import { computeAttributes } from "@/lib/fighter-attributes";
 import {
   buildScoreBreakdown,
@@ -151,14 +151,6 @@ export default async function ComparePage({ params, searchParams }: PageProps) {
   const attributesA = computeAttributes(fighterA);
   const attributesB = computeAttributes(fighterB);
 
-  // Free, lightweight win-probability teaser from the Vertex Score gap. The
-  // full AI simulation (method / rounds / Monte-Carlo / "why") stays the paid
-  // Simulation feature — this only answers "who's favoured, by how much".
-  const forecast = estimateWinProbability(
-    { allTime: fighterA.vertex_score_all_time, current: fighterA.vertex_score },
-    { allTime: fighterB.vertex_score_all_time, current: fighterB.vertex_score },
-  );
-
   const [
     common,
     headToHead,
@@ -205,6 +197,17 @@ export default async function ComparePage({ params, searchParams }: PageProps) {
     vertexScore: fighterB.vertex_score,
     vertexScoreAllTime: fighterB.vertex_score_all_time,
   });
+
+  // Free, lightweight win-probability teaser. Computed from the SAME headline
+  // numbers the hero (ScoreCompare) renders below — for an active fighter that's
+  // the divisional score, not the raw global one — so the forecast bar, its
+  // caption (scoreA/scoreB), and the hero never show two different "Vertex
+  // Scores". The full AI simulation (method / rounds / Monte-Carlo / "why")
+  // stays the paid Simulation feature; this only answers "who's favoured".
+  const forecast = estimateWinProbabilityFromHeadline(
+    { value: headlineA.value, mode: headlineA.scoreMode },
+    { value: headlineB.value, mode: headlineB.scoreMode },
+  );
 
   const breakdownA = buildScoreBreakdown(
     headlineA.basis === "divisional" ? activeDivA : null,

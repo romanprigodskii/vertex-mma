@@ -124,11 +124,23 @@ function FighterIdentity({ fighter, champion, align }: IdentityProps) {
   const t = useTranslations("compare");
   const tWeight = useTranslations("weight");
   const flag = getCountryFlag(fighter.country_code);
+  // A current champion's belt (title) division is authoritative — derive the
+  // weight label from it so the identity line never contradicts the
+  // "{divisionShort} · Champion" badge above. Otherwise a stale
+  // weight_class_primary can read e.g. "Lightweight" beneath a "WW · Champion"
+  // badge. The weight namespace is gender-neutral, so a leading "Women's "
+  // prefix is stripped to reach the shared key; both the slug form
+  // ("light-heavyweight") and the title form ("Light Heavyweight") normalize
+  // identically.
   const weightLabel = (() => {
-    if (!fighter.weight_class_primary) return null;
-    const key = fighter.weight_class_primary.replace(/-/g, "_");
+    const source = champion?.division ?? fighter.weight_class_primary;
+    if (!source) return null;
+    const key = source
+      .toLowerCase()
+      .replace(/^women['’]s\s+/, "")
+      .replace(/[\s-]+/g, "_");
     if (tWeight.has(key)) return tWeight(key as "lightweight");
-    return fighter.weight_class_primary;
+    return source;
   })();
   const denom = fighter.wins_total + fighter.losses_total;
   const wr = denom > 0 ? Math.round((fighter.wins_total / denom) * 100) : null;

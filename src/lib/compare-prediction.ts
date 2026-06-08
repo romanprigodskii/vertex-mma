@@ -29,6 +29,18 @@ export type CompareForecast = {
 
 type ScorePair = { allTime: number | null; current: number | null };
 
+/** Shared logistic core — both public entry points resolve their two scores
+ *  first, then hand off here so the probability curve lives in exactly one
+ *  place. */
+function logistic(
+  scoreA: number,
+  scoreB: number,
+  basis: "all_time" | "current",
+): NonNullable<CompareForecast> {
+  const probA = 1 / (1 + Math.exp(-(scoreA - scoreB) / SCORE_SCALE));
+  return { probA, probB: 1 - probA, scoreA, scoreB, basis };
+}
+
 /**
  * Estimate P(A beats B) from Vertex Scores. Prefers all-time (fair for
  * cross-era / retired-legend fantasy matchups), falls back to current.
@@ -45,7 +57,36 @@ export function estimateWinProbability(a: ScorePair, b: ScorePair): CompareForec
     basis = "current";
   }
   if (scoreA == null || scoreB == null) return null;
+  return logistic(scoreA, scoreB, basis);
+}
 
-  const probA = 1 / (1 + Math.exp(-(scoreA - scoreB) / SCORE_SCALE));
-  return { probA, probB: 1 - probA, scoreA, scoreB, basis };
+/** Per-fighter headline input — the single resolved number plus which mode it
+ *  represents, taken straight off `headlineScore` ({ value, scoreMode }). */
+export type HeadlineScorePair = {
+  value: number | null;
+  mode: "current" | "all_time";
+};
+
+/**
+ * Win-probability from the canonical HEADLINE scores — the SAME numbers the
+ * Compare hero (ScoreCompare) and every card / profile / search surface
+ * render. Use this instead of {@link estimateWinProbability} so the forecast
+ * bar, its caption, and the hero never disagree: an active fighter's headline
+ * is their *divisional* score, which the raw all-time/current scores fed to
+ * estimateWinProbability never reflect.
+ *
+ * Each fighter carries its own headline mode, but the single caption can only
+ * say one thing — so it reports "all-time" only when BOTH sides are all-time
+ * (e.g. two retired legends) and "current" otherwise, matching the
+ * live-by-default framing of any matchup involving an active fighter. Returns
+ * null when either fighter has no usable headline value.
+ */
+export function estimateWinProbabilityFromHeadline(
+  a: HeadlineScorePair,
+  b: HeadlineScorePair,
+): CompareForecast {
+  if (a.value == null || b.value == null) return null;
+  const basis: "all_time" | "current" =
+    a.mode === "all_time" && b.mode === "all_time" ? "all_time" : "current";
+  return logistic(a.value, b.value, basis);
 }
