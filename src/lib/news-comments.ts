@@ -83,7 +83,14 @@ export async function listCommentsForNews(
         ),
       )
       .orderBy(desc(newsComment.createdAt));
-  } catch {
+  } catch (err) {
+    // A real DB failure here is otherwise indistinguishable from the expected
+    // "news_comment not pushed yet" case — log before degrading to an empty
+    // thread so a genuine outage is visible in server logs.
+    console.error(
+      "[news-comments] listCommentsForNews: comment query failed",
+      err,
+    );
     return { comments: [], total: 0 };
   }
 
@@ -106,8 +113,13 @@ export async function listCommentsForNews(
           ),
         );
       for (const v of votes) voteMap.set(v.commentId, v.dir);
-    } catch {
-      // Votes table not pushed yet → treat as no votes.
+    } catch (err) {
+      // Votes table not pushed yet → treat as no votes. Log so a genuine query
+      // failure isn't silently indistinguishable from the not-pushed case.
+      console.error(
+        "[news-comments] listCommentsForNews: vote lookup failed",
+        err,
+      );
     }
   }
 
@@ -312,9 +324,11 @@ export async function flagComment(
       .onConflictDoNothing({
         target: [newsCommentFlag.commentId, newsCommentFlag.userProfileId],
       });
-  } catch {
+  } catch (err) {
     // Table not pushed yet, or transient — treat as a soft success so the UI
-    // still acknowledges the report rather than erroring at the reader.
+    // still acknowledges the report rather than erroring at the reader. Log so
+    // a real insert failure is observable instead of masked as "not pushed yet".
+    console.error("[news-comments] flagComment: flag insert failed", err);
     return { ok: true };
   }
   return { ok: true };
@@ -410,7 +424,10 @@ export async function voteComment(
       downvotes: result.down,
       userVote: result.userVote,
     };
-  } catch {
+  } catch (err) {
+    // Same observability gap as the read paths: log the underlying failure
+    // before returning the generic vote error to the client.
+    console.error("[news-comments] voteComment: vote transaction failed", err);
     return { ok: false, error: "Vote failed" };
   }
 }
