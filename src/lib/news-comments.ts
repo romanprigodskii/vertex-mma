@@ -113,6 +113,7 @@ export async function listCommentsForNews(
 
   const byId = new Map<string, CommentNode>();
   const tops: CommentNode[] = [];
+  const topIds = new Set<string>();
   const replyBuckets = new Map<string, CommentNode[]>();
 
   for (const r of rows) {
@@ -139,20 +140,39 @@ export async function listCommentsForNews(
       replyBuckets.set(r.parentId, bucket);
     } else {
       tops.push(node);
+      topIds.add(node.id);
     }
   }
 
-  for (const top of tops) {
-    const replies = replyBuckets.get(top.id) ?? [];
+  const byOldest = (a: CommentNode, b: CommentNode) =>
+    new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+
+  for (const [parentId, bucket] of replyBuckets) {
     // Replies oldest-first so the conversation reads top → bottom.
-    replies.sort(
-      (a, b) =>
-        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
-    );
-    top.replies = replies;
+    bucket.sort(byOldest);
+    const parent = topIds.has(parentId) ? byId.get(parentId) : undefined;
+    if (parent) {
+      parent.replies = bucket;
+    } else {
+      // The parent was soft-deleted (filtered out of `rows` by the isNull
+      // guard above), so these still-live replies would otherwise vanish
+      // silently — their bucket was keyed on a comment that never made it into
+      // `tops`. Re-parent them to top level instead: the comments stay visible
+      // and the thread stays flat at depth 1.
+      tops.push(...bucket);
+    }
   }
 
-  return { comments: tops, total: rows.length };
+  // Promoting orphans may have appended them out of order; restore newest-first
+  // to match the descending order the query produced for the original tops.
+  tops.sort((a, b) => byOldest(b, a));
+
+  // Count what's actually rendered rather than raw `rows`: with the orphan
+  // re-parenting above the two now agree, but deriving the total from the tree
+  // keeps the "Comments · N" header honest if that ever drifts again.
+  const total = tops.reduce((sum, t) => sum + 1 + t.replies.length, 0);
+
+  return { comments: tops, total };
 }
 
 const RATE_LIMIT_SECONDS = 10;
@@ -224,11 +244,19 @@ export async function addNewsComment(opts: {
   let parentId = opts.parentId;
   if (parentId) {
     const parent = await db
-      .select({ parentId: newsComment.parentId })
+      .select({
+        parentId: newsComment.parentId,
+        deletedAt: newsComment.deletedAt,
+      })
       .from(newsComment)
       .where(eq(newsComment.id, parentId))
       .limit(1);
     if (parent.length === 0) return { ok: false, error: "REPLY_MISSING" };
+    // Don't let a reply attach to a soft-deleted comment: it would be hidden
+    // from the thread (or re-parented to top level) on the next render, so the
+    // reply reads as lost. REPLY_MISSING already maps to the client's "the
+    // comment you're replying to was deleted" copy.
+    if (parent[0].deletedAt) return { ok: false, error: "REPLY_MISSING" };
     if (parent[0].parentId) parentId = parent[0].parentId;
   }
 
@@ -273,6 +301,21 @@ export async function getCommentAuthor(): Promise<CommentAuthorSnapshot | null> 
 
 export type FlagCommentResult = { ok: boolean; error?: string };
 
+/** True only for Postgres "undefined_table" (SQLSTATE 42P01) — the expected
+ *  error before the news_comment_flag table has been pushed. node-postgres
+ *  surfaces the SQLSTATE on `error.code`; a message match is kept as a
+ *  belt-and-braces fallback. Any OTHER error (FK violation, connection drop,
+ *  constraint bug) must propagate, not be masked as a successful report. */
+function isUndefinedTableError(err: unknown): boolean {
+  const e = err as { code?: string; message?: string } | null;
+  if (e?.code === "42P01") return true;
+  return Boolean(
+    e?.message &&
+      /news_comment_flag/.test(e.message) &&
+      /relation|table|exist/i.test(e.message),
+  );
+}
+
 /**
  * Reader report on a comment. Idempotent per reporter (the unique index makes
  * a repeat report a no-op success). Requires sign-in. Degrades gracefully if
@@ -285,11 +328,11 @@ export async function flagComment(
   if (!UUID_RE.test(commentId)) return { ok: false, error: "Bad id" };
   const user = await getCurrentUser();
   if (!user) return { ok: false, error: "Sign in" };
-  if (!allowAction(`flag:${user.userProfileId}`, FLAG_COOLDOWN_MS)) {
-    return { ok: false, error: "Slow down" };
-  }
 
-  // Can't report your own comment.
+  // Validate the target BEFORE consuming the rate limiter. A self-report, or a
+  // report of a since-deleted / non-existent comment, is a benign no-op and
+  // shouldn't burn the reporter's cooldown — otherwise their next legitimate
+  // report gets a spurious "Slow down".
   const rows = await db
     .select({ userProfileId: newsComment.userProfileId })
     .from(newsComment)
@@ -298,6 +341,10 @@ export async function flagComment(
   if (rows.length === 0) return { ok: false, error: "Not found" };
   if (rows[0].userProfileId === user.userProfileId) {
     return { ok: false, error: "Can't report your own comment" };
+  }
+
+  if (!allowAction(`flag:${user.userProfileId}`, FLAG_COOLDOWN_MS)) {
+    return { ok: false, error: "Slow down" };
   }
 
   const trimmed = reason?.trim().slice(0, 200) || null;
@@ -312,9 +359,14 @@ export async function flagComment(
       .onConflictDoNothing({
         target: [newsCommentFlag.commentId, newsCommentFlag.userProfileId],
       });
-  } catch {
-    // Table not pushed yet, or transient — treat as a soft success so the UI
-    // still acknowledges the report rather than erroring at the reader.
+  } catch (err) {
+    // The ONLY benign failure is the flag table not being pushed yet — mask
+    // just that as a soft success so the UI still acknowledges the report. A
+    // genuine failure (FK violation, connection drop) must surface instead of
+    // telling the reader "Reported" on a report that never landed.
+    if (!isUndefinedTableError(err)) {
+      return { ok: false, error: "Report failed" };
+    }
     return { ok: true };
   }
   return { ok: true };

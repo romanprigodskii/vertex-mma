@@ -1,11 +1,27 @@
 import { ImageResponse } from "next/og";
 
 import { getBoutOgData } from "@/lib/bout-detail";
+import { isRuLocale } from "@/lib/i18n-name";
 import { OG_CACHE_HEADERS, OG_COLORS, OG_FONTS, OG_SIZE } from "@/lib/og";
 
 export const runtime = "nodejs";
 export const contentType = "image/png";
 export const revalidate = 3600;
+
+/** Canonical result labels for the share card — mirrors the bout page's display
+ *  layer (bout-detail.ts DECISION_LABEL) so the image agrees with the page
+ *  instead of dumping the raw enum ("by decision unanimous", "by no contest"). */
+const METHOD_LABEL: Record<string, string> = {
+  ko: "KO",
+  tko: "TKO",
+  submission: "Submission",
+  decision_unanimous: "Unanimous Decision",
+  decision_split: "Split Decision",
+  decision_majority: "Majority Decision",
+  draw: "Draw",
+  no_contest: "No Contest",
+  dq: "DQ",
+};
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -33,9 +49,14 @@ export async function GET(_req: Request, ctx: RouteContext) {
           Bout not found
         </div>
       ),
-      OG_SIZE,
+      // Cache misses too: a shared link to a deleted/non-existent bout would
+      // otherwise re-run the loader against the session pooler on every crawler
+      // refetch — exactly the cold-origin stampede OG_CACHE_HEADERS guards.
+      { ...OG_SIZE, headers: OG_CACHE_HEADERS },
     );
   }
+
+  const isRu = await isRuLocale();
 
   const winnerName =
     b.winner_id === b.fighter_a_id
@@ -44,10 +65,17 @@ export async function GET(_req: Request, ctx: RouteContext) {
         ? b.fighter_b_name
         : null;
 
-  const dateLabel = new Date(b.event_date).toLocaleDateString("en-US", {
+  // event_date is timestamptz::text ("2026-06-06 00:00:00+00"). Pin it to UTC
+  // (matching isBoutBettable) before parsing so the rendered day doesn't drift
+  // a day on hosts behind UTC, and format it in the share's locale so the month
+  // label matches the localized fighter/event names beside it.
+  const dateLabel = new Date(
+    b.event_date.slice(0, 19).replace(" ", "T") + "Z",
+  ).toLocaleDateString(isRu ? "ru-RU" : "en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
+    timeZone: "UTC",
   });
 
   return new ImageResponse(
@@ -147,7 +175,9 @@ export async function GET(_req: Request, ctx: RouteContext) {
             }}
           >
             {winnerName ? `${winnerName} ` : ""}
-            {b.method ? `by ${b.method.replace(/_/g, " ")}` : ""}
+            {b.method
+              ? `by ${METHOD_LABEL[b.method] ?? b.method.replace(/_/g, " ")}`
+              : ""}
             {b.round_finished ? ` · R${b.round_finished}` : ""}
           </div>
         ) : null}
