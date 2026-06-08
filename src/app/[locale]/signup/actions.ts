@@ -8,6 +8,7 @@ import { isEmailAlreadyRegisteredError, mapAuthError } from "@/lib/auth-errors";
 import { db } from "@/lib/db";
 import { userProfile } from "@/lib/db/schema/users";
 import { safeNext } from "@/lib/safe-redirect";
+import { siteOrigin } from "@/lib/site-origin";
 import { createClient } from "@/lib/supabase/server";
 
 const USERNAME_RE = /^[a-zA-Z0-9_]{3,30}$/;
@@ -48,9 +49,7 @@ export async function signUpAction(
   const supabase = await createClient();
 
   const h = await headers();
-  const origin =
-    h.get("origin") ??
-    `${h.get("x-forwarded-proto") ?? "http"}://${h.get("host") ?? "localhost:3000"}`;
+  const origin = siteOrigin(h);
 
   const { error } = await supabase.auth.signUp({
     email,

@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { routing } from "@/i18n/routing";
 import { safeNext } from "@/lib/safe-redirect";
+import { siteOrigin } from "@/lib/site-origin";
 import { createClient } from "@/lib/supabase/server";
 
 // Collapse a raw Supabase error string into one of a small set of stable,
@@ -23,16 +24,6 @@ function callbackErrorCode(description: string): string {
   return "auth_failed";
 }
 
-function siteOrigin(request: NextRequest): string {
-  // Behind Traefik/Coolify the request URL may resolve to the internal
-  // container origin (http://10.0.1.8:3000), which then ends up in the
-  // browser's redirect chain. Prefer the canonical site URL so the user
-  // lands back on https://vertexmma.com.
-  const fromEnv = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "");
-  if (fromEnv) return fromEnv;
-  return new URL(request.url).origin;
-}
-
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get("code");
@@ -43,7 +34,7 @@ export async function GET(request: NextRequest) {
   // (e.g. next=@evil.com -> https://host@evil.com). safeNext rejects anything
   // that isn't a same-origin relative path.
   const next = safeNext(searchParams.get("next"));
-  const origin = siteOrigin(request);
+  const origin = siteOrigin(request.headers);
   // Carry the user's locale across the email round-trip (e.g. a password-reset
   // link opened on another device, which has no NEXT_LOCALE cookie yet). When
   // present and valid, persist it as the cookie the /auth layout reads so the
