@@ -6,6 +6,7 @@ import { getTranslations } from "next-intl/server";
 
 import { checkAndUnlockAchievements } from "@/lib/achievements";
 import { userHasPassword } from "@/lib/auth";
+import { mapAuthError } from "@/lib/auth-errors";
 import { db } from "@/lib/db";
 import { userProfile } from "@/lib/db/schema/users";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -124,7 +125,7 @@ export async function uploadAvatarAction(
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { error: "Not signed in." };
+  if (!user) return { error: t("notSignedIn") };
 
   const file = formData.get("file");
   // Re-validate server-side; never trust the client's size/type checks.
@@ -150,7 +151,9 @@ export async function uploadAvatarAction(
   const { error: uploadError } = await admin.storage
     .from("avatars")
     .upload(path, bytes, { upsert: true, contentType: kind.mime });
-  if (uploadError) return { error: uploadError.message };
+  // Never surface the raw storage error to the UI — collapse it to the same
+  // localized, generic "upload failed" copy the rest of this action uses.
+  if (uploadError) return { error: t("uploadFailed") };
 
   const {
     data: { publicUrl },
@@ -203,7 +206,11 @@ export async function changePasswordAction(
   if (verifyError) return { error: t("currentPasswordWrong") };
 
   const { error } = await supabase.auth.updateUser({ password: newPassword });
-  if (error) return { error: error.message };
+  if (error) {
+    // Localize + sanitize: never surface the raw English Supabase message.
+    const tAuth = await getTranslations("auth");
+    return { error: mapAuthError(error, tAuth) };
+  }
   return { success: true };
 }
 
@@ -246,7 +253,11 @@ export async function changeEmailAction(
   // sent to the current address AND a "Confirm new address" link is sent
   // to the new one. The change only takes effect once both are clicked.
   const { error } = await supabase.auth.updateUser({ email: newEmail });
-  if (error) return { error: error.message };
+  if (error) {
+    // Localize + sanitize: never surface the raw English Supabase message.
+    const tAuth = await getTranslations("auth");
+    return { error: mapAuthError(error, tAuth) };
+  }
   return { success: true };
 }
 
@@ -287,7 +298,11 @@ export async function deleteAccountAction(formData?: FormData): Promise<{
   // (Wave 34) cascades into user_profile and its FK-dependent rows.
   const admin = createAdminClient();
   const { error } = await admin.auth.admin.deleteUser(userId);
-  if (error) return { error: error.message };
+  if (error) {
+    // Localize + sanitize: never surface the raw English Supabase message.
+    const tAuth = await getTranslations("auth");
+    return { error: mapAuthError(error, tAuth) };
+  }
 
   return { success: true };
 }

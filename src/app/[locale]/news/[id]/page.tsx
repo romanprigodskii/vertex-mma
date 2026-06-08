@@ -198,7 +198,7 @@ export default async function NewsArticlePage({ params }: PageProps) {
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={heroImage}
-                    alt=""
+                    alt={item.title}
                     loading="lazy"
                     referrerPolicy="no-referrer"
                     className="max-h-[440px] w-full object-cover"

@@ -7,6 +7,7 @@ import { getTranslations } from "next-intl/server";
 import { isEmailAlreadyRegisteredError, mapAuthError } from "@/lib/auth-errors";
 import { db } from "@/lib/db";
 import { userProfile } from "@/lib/db/schema/users";
+import { allowAction } from "@/lib/rate-limit";
 import { safeNext } from "@/lib/safe-redirect";
 import { createClient } from "@/lib/supabase/server";
 
@@ -16,6 +17,21 @@ export async function signUpAction(
   formData: FormData,
 ): Promise<{ error?: string; success?: boolean }> {
   const t = await getTranslations("auth");
+
+  // Per-IP throttle. Signup is unauthenticated and does a public username
+  // existence pre-check below — usernames are public (via /profile/[username]),
+  // so availability is intentionally disclosed, but without a throttle that
+  // pre-check is an unbounded enumeration oracle and the endpoint invites
+  // scripted spam. Best-effort + process-local (see rate-limit.ts); the
+  // load-bearing guarantees remain Supabase's own send limits and the
+  // user_profile.username unique constraint.
+  const h = await headers();
+  const ip = (h.get("x-forwarded-for") ?? "").split(",")[0]?.trim() || "unknown";
+  const SIGNUP_COOLDOWN_MS = 2_000;
+  if (!allowAction(`signup:${ip}`, SIGNUP_COOLDOWN_MS)) {
+    return { error: t("errRateLimit") };
+  }
+
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
   const username = String(formData.get("username") ?? "").trim();
@@ -47,10 +63,17 @@ export async function signUpAction(
 
   const supabase = await createClient();
 
-  const h = await headers();
+  // Canonical origin for the email-confirmation link. The request Host is
+  // forwardable behind the proxy, so prefer the configured site URL and only
+  // fall back to request-derived headers in development; never trust the Host
+  // in production (mirrors siteOrigin() in /auth/callback).
+  const fromEnv = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "");
   const origin =
-    h.get("origin") ??
-    `${h.get("x-forwarded-proto") ?? "http"}://${h.get("host") ?? "localhost:3000"}`;
+    fromEnv ??
+    (process.env.NODE_ENV !== "production"
+      ? (h.get("origin") ??
+        `${h.get("x-forwarded-proto") ?? "http"}://${h.get("host") ?? "localhost:3000"}`)
+      : "https://vertexmma.com");
 
   const { error } = await supabase.auth.signUp({
     email,

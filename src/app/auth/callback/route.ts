@@ -30,7 +30,16 @@ function siteOrigin(request: NextRequest): string {
   // lands back on https://vertexmma.com.
   const fromEnv = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "");
   if (fromEnv) return fromEnv;
-  return new URL(request.url).origin;
+  // No canonical configured. The request Host is forwardable behind the proxy,
+  // so a spoofed Host could redirect a freshly-authenticated user to an
+  // attacker origin — NEVER trust it in production. In dev the request origin
+  // is just the local dev server, so it's the convenient (and safe) choice;
+  // everywhere else fall back to the hard-coded canonical (mirrors sitemap.ts /
+  // layout.tsx), not the request.
+  if (process.env.NODE_ENV !== "production") {
+    return new URL(request.url).origin;
+  }
+  return "https://vertexmma.com";
 }
 
 export async function GET(request: NextRequest) {

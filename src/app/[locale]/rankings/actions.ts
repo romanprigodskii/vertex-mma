@@ -193,6 +193,10 @@ export async function updateRankingAction(
 ): Promise<{ error?: string }> {
   const myId = await getMyProfileId();
   if (!myId) return { error: RankingError.NOT_SIGNED_IN };
+  // customRanking.id is uuid — a non-UUID id would otherwise throw a raw 500
+  // (invalid uuid syntax) instead of a clean NOT_FOUND. Server actions are
+  // public POST endpoints, so guard regardless of what the UI sends.
+  if (!UUID_RE.test(rankingId)) return { error: RankingError.RANKING_NOT_FOUND };
 
   const existing = await db
     .select({ id: customRanking.id, userId: customRanking.userId })
@@ -255,6 +259,10 @@ export async function deleteRankingAction(
 ): Promise<{ error?: string; success?: boolean }> {
   const myId = await getMyProfileId();
   if (!myId) return { error: RankingError.NOT_SIGNED_IN };
+  // customRanking.id is uuid — a non-UUID id would otherwise throw a raw 500
+  // (invalid uuid syntax) instead of a clean NOT_FOUND. Server actions are
+  // public POST endpoints, so guard regardless of what the UI sends.
+  if (!UUID_RE.test(rankingId)) return { error: RankingError.RANKING_NOT_FOUND };
 
   const existing = await db
     .select({ id: customRanking.id, userId: customRanking.userId })

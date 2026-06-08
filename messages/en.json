@@ -1319,7 +1319,11 @@
     "rankingKicker": "404 · No such ranking",
     "rankingTitle": "Ranking not found",
     "rankingLead": "We could not find a ranking with that id. It might have been removed by its owner.",
-    "backToRankings": "Back to rankings"
+    "backToRankings": "Back to rankings",
+    "newsKicker": "404 · No such article",
+    "newsTitle": "Article not found",
+    "newsLead": "We could not find that article — it may have been removed, expired, or the link is mistyped.",
+    "backToNews": "Back to news"
   },
   "loading": {
     "rosterKicker": "The roster",

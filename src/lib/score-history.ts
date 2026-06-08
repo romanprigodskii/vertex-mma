@@ -94,6 +94,12 @@ export async function getPeakVertex(
   };
   const combinedResult = await db.execute<CombinedRow>(sql`
     WITH peak_score AS (
+      -- True historical max across ALL rows (bout + monthly). Intentionally NOT
+      -- filtered to kind='bout': the streak CTEs below are bout-only so the
+      -- count/list/dates stay coherent, but the headline peak number is the
+      -- real all-time high. If a layoff-inflated monthly snapshot is the global
+      -- max and no bout matched it, the bout-only first_peak comes back empty
+      -- and the panel is hidden — same as before this filter was added.
       SELECT MAX(vertex_score) AS peak
       FROM fighter_score_history
       WHERE fighter_id = ${fighterId}::uuid
@@ -103,6 +109,7 @@ export async function getPeakVertex(
       FROM fighter_score_history h
       JOIN peak_score p ON h.vertex_score = p.peak
       WHERE h.fighter_id = ${fighterId}::uuid
+        AND h.kind = 'bout'
       ORDER BY h.as_of_date ASC, h.as_of_bout_id ASC
       LIMIT 1
     ),
@@ -115,6 +122,7 @@ export async function getPeakVertex(
       CROSS JOIN first_peak fp
       CROSS JOIN peak_score ps
       WHERE h.fighter_id = ${fighterId}::uuid
+        AND h.kind = 'bout'
         AND h.as_of_date > fp.as_of_date
         AND h.vertex_score < ps.peak
       ORDER BY h.as_of_date ASC, h.as_of_bout_id ASC
@@ -128,6 +136,7 @@ export async function getPeakVertex(
       JOIN peak_score p ON h.vertex_score = p.peak
       LEFT JOIN first_dip fd ON true
       WHERE h.fighter_id = ${fighterId}::uuid
+        AND h.kind = 'bout'
         AND (fd.as_of_date IS NULL OR h.as_of_date < fd.as_of_date)
       ORDER BY h.as_of_date DESC, h.as_of_bout_id DESC
       LIMIT 1
@@ -139,6 +148,7 @@ export async function getPeakVertex(
       JOIN first_peak fp ON true
       LEFT JOIN first_dip fd ON true
       WHERE h.fighter_id = ${fighterId}::uuid
+        AND h.kind = 'bout'
         AND h.as_of_date >= fp.as_of_date
         AND (fd.as_of_date IS NULL OR h.as_of_date < fd.as_of_date)
     ),
@@ -163,6 +173,7 @@ export async function getPeakVertex(
         SELECT array_agg(h.as_of_bout_id::text ORDER BY h.as_of_date ASC, h.as_of_bout_id ASC)
         FROM fighter_score_history h
         WHERE h.fighter_id = ${fighterId}::uuid
+          AND h.kind = 'bout'
           AND h.vertex_score = ps.peak
           AND h.as_of_date >= fp.as_of_date
           AND (fd.as_of_date IS NULL OR h.as_of_date < fd.as_of_date)

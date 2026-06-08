@@ -13,14 +13,19 @@ export async function middleware(request: NextRequest) {
   // rewrite info lives on the response object, so we MUST keep using this
   // response downstream instead of creating a fresh NextResponse.next().
   const intlResponse = intlMiddleware(request);
-  if (intlResponse.headers.get("location")) {
-    return intlResponse;
-  }
 
+  // Run the Supabase refresh on EVERY matched request, including the ones where
+  // next-intl emits a locale redirect (Location header). Returning early on a
+  // redirect would skip token rotation, so the refreshed cookies would never be
+  // written on that response — leaving an expiring session un-refreshed until
+  // the next non-redirecting request (which surfaces as an intermittent
+  // logged-in user appearing logged-out). A 3xx response carries Set-Cookie
+  // fine, so we write the rotated cookies onto intlResponse either way.
+  //
   // Chain Supabase session refresh on the SAME response. Supabase's
   // createServerClient writes refresh cookies via setAll — we just point
-  // those writes at intlResponse.cookies, preserving the rewrite headers
-  // it set.
+  // those writes at intlResponse.cookies, preserving the rewrite/redirect
+  // headers it set.
   const supabase = createServerClient(
     publicEnv.NEXT_PUBLIC_SUPABASE_URL,
     publicEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY,
