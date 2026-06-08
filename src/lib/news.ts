@@ -171,10 +171,11 @@ function feedSelect(isRu: boolean) {
 
 /** Approved news, newest first, optionally filtered to one classification. */
 export async function listNewsFeed(
-  opts: { classification?: string; limit?: number } = {},
+  opts: { classification?: string; limit?: number; offset?: number } = {},
 ): Promise<NewsFeedItem[]> {
   const isRu = await isRuLocale();
   const limit = Math.min(300, Math.max(1, opts.limit ?? 200));
+  const offset = Math.max(0, Math.trunc(opts.offset ?? 0));
   const cls =
     opts.classification && opts.classification in NEWS_CLASSIFICATION_LABELS
       ? opts.classification
@@ -190,6 +191,7 @@ export async function listNewsFeed(
     ${where}
     ORDER BY ni.published_at DESC
     LIMIT ${limit}
+    OFFSET ${offset}
   `)) as unknown as FeedRow[];
 
   const fighters = await resolveNewsFighters(

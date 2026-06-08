@@ -82,7 +82,7 @@ export function FighterAvatar({
       >
         <Image
           src={photoUrl}
-          alt=""
+          alt={name}
           fill
           sizes={imageSizes ?? `${dimension}px`}
           priority={priority}

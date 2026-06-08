@@ -13,6 +13,20 @@ function parsePgTimestamp(s: string): Date {
   return new Date(iso);
 }
 
+/** Event dates are stored as a calendar date at midnight UTC (no real start
+ *  time), unlike article timestamps which carry a genuine time-of-day. For
+ *  those, rendering a "12:00 AM" clock is meaningless — and re-localizing it to
+ *  a western viewer's zone even rolls the day backwards. Detect the midnight-UTC
+ *  sentinel so we can show the date alone, pinned to UTC. */
+function isDateOnly(s: string): boolean {
+  const d = parsePgTimestamp(s);
+  return (
+    d.getUTCHours() === 0 &&
+    d.getUTCMinutes() === 0 &&
+    d.getUTCSeconds() === 0
+  );
+}
+
 const DATE_OPTS: Record<Variant, Intl.DateTimeFormatOptions> = {
   full: { day: "numeric", month: "long", year: "numeric" },
   short: { day: "numeric", month: "short", year: "numeric" },
@@ -63,14 +77,18 @@ export function NewsTimestamp({
   const locale = useLocale();
   const t = useTranslations("news");
   const [text, setText] = useState(() =>
-    relative
+    relative || isDateOnly(iso)
       ? formatDateOnly(iso, locale, variant, "UTC")
       : formatAbsolute(iso, locale, variant, "UTC"),
   );
 
   useEffect(() => {
     let next: string;
-    if (!relative) {
+    if (!relative && isDateOnly(iso)) {
+      // Calendar-date value (e.g. an event date) — keep it date-only and
+      // pinned to UTC so the day never shifts under the viewer's timezone.
+      next = formatDateOnly(iso, locale, variant, "UTC");
+    } else if (!relative) {
       next = formatAbsolute(iso, locale, variant);
     } else {
       const then = parsePgTimestamp(iso).getTime();

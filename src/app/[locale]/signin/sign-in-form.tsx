@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import NextLink from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 
@@ -89,12 +90,16 @@ export function SignInForm() {
             <span className="font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
               {t("password")}
             </span>
-            <Link
+            {/* The reset flow lives outside the [locale] segment (the auth
+                layout derives locale from the NEXT_LOCALE cookie), so use a
+                plain next/link here — the locale-aware Link would prefix /ru
+                and 404, leaving RU users with no path to password recovery. */}
+            <NextLink
               href="/auth/forgot-password"
               className="font-sans text-[11px] text-primary hover:underline"
             >
               {t("forgotPassword")}
-            </Link>
+            </NextLink>
           </div>
           <PasswordInput
             name="password"

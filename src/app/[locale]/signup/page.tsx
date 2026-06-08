@@ -13,7 +13,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: "auth" });
-  return { title: t("signUpTitle") };
+  return { title: t("signUpTitle"), description: t("signUpDescription") };
 }
 
 // SignUpForm uses useSearchParams() (to preserve ?next=); marking the route

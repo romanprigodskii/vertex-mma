@@ -27,7 +27,7 @@ export async function generateMetadata({
 
 interface PageProps {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ classification?: string }>;
+  searchParams: Promise<{ classification?: string; page?: string }>;
 }
 
 function FilterChip({
@@ -58,7 +58,7 @@ export default async function NewsPage({ params, searchParams }: PageProps) {
   const { locale } = await params;
   setRequestLocale(locale);
   const t = await getTranslations("news");
-  const { classification } = await searchParams;
+  const { classification, page: pageParam } = await searchParams;
   // 'unrelated' is the classifier's "not about MMA" bucket — never a public
   // filter (it's also excluded from the feed query and the chip counts).
   const active =
@@ -73,11 +73,34 @@ export default async function NewsPage({ params, searchParams }: PageProps) {
       : active
     : "";
 
-  const [items, counts] = await Promise.all([
-    listNewsFeed({ classification: active ?? undefined, limit: 200 }),
+  // Paginate so older articles stay reachable instead of falling off the
+  // (capped) single-fetch list as the daily ingest grows the feed. We fetch one
+  // extra row to detect a next page from the feed query itself — the chip counts
+  // can't gate this (they exclude NULL-classification rows the feed still shows
+  // via `IS DISTINCT FROM`), so a count-derived total would strand that tail.
+  const PAGE_SIZE = 50;
+  const requestedPage = Math.max(1, Number.parseInt(pageParam ?? "1", 10) || 1);
+
+  const [feed, counts] = await Promise.all([
+    listNewsFeed({
+      classification: active ?? undefined,
+      limit: PAGE_SIZE + 1,
+      offset: (requestedPage - 1) * PAGE_SIZE,
+    }),
     getNewsClassificationCounts(),
   ]);
+  const hasNextPage = feed.length > PAGE_SIZE;
+  const items = hasNextPage ? feed.slice(0, PAGE_SIZE) : feed;
   const total = counts.reduce((sum, c) => sum + c.count, 0);
+
+  // Filter-preserving href for the pager (drop page=1 to keep page-one URLs clean).
+  const pageHref = (p: number) => {
+    const sp = new URLSearchParams();
+    if (active) sp.set("classification", active);
+    if (p > 1) sp.set("page", String(p));
+    const qs = sp.toString();
+    return qs ? `/news?${qs}` : "/news";
+  };
 
   return (
     <>
@@ -142,6 +165,37 @@ export default async function NewsPage({ params, searchParams }: PageProps) {
               ))}
             </ul>
           )}
+
+          {requestedPage > 1 || hasNextPage ? (
+            <nav
+              aria-label={t("pagerLabel")}
+              className="mt-8 flex items-center justify-between gap-3 border-t border-foreground/10 pt-5"
+            >
+              {requestedPage > 1 ? (
+                <Link
+                  href={pageHref(requestedPage - 1)}
+                  className="rounded-sm border border-foreground/15 px-3 py-1.5 font-mono text-xs uppercase tracking-[0.14em] text-foreground-muted transition-colors hover:bg-foreground/[0.05] hover:text-foreground"
+                >
+                  {t("pagerPrev")}
+                </Link>
+              ) : (
+                <span />
+              )}
+              <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-foreground-subtle">
+                {t("pagerStatus", { page: requestedPage })}
+              </span>
+              {hasNextPage ? (
+                <Link
+                  href={pageHref(requestedPage + 1)}
+                  className="rounded-sm border border-foreground/15 px-3 py-1.5 font-mono text-xs uppercase tracking-[0.14em] text-foreground-muted transition-colors hover:bg-foreground/[0.05] hover:text-foreground"
+                >
+                  {t("pagerNext")}
+                </Link>
+              ) : (
+                <span />
+              )}
+            </nav>
+          ) : null}
         </Container>
       </main>
       <Footer />

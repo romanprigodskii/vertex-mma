@@ -13,7 +13,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: "auth" });
-  return { title: t("signInTitle") };
+  return { title: t("signInTitle"), description: t("signInDescription") };
 }
 
 // SignInForm uses useSearchParams(); marking the route dynamic avoids the

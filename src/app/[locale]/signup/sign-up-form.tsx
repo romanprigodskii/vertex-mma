@@ -135,6 +135,27 @@ export function SignUpForm() {
           {pending ? t("creatingAccount") : t("createAccount")}
         </button>
 
+        <p className="text-center font-sans text-[11px] leading-relaxed text-foreground-subtle">
+          {t.rich("agreeToTerms", {
+            terms: (chunks) => (
+              <Link
+                href="/terms"
+                className="text-foreground-muted underline hover:text-foreground"
+              >
+                {chunks}
+              </Link>
+            ),
+            privacy: (chunks) => (
+              <Link
+                href="/privacy"
+                className="text-foreground-muted underline hover:text-foreground"
+              >
+                {chunks}
+              </Link>
+            ),
+          })}
+        </p>
+
         <p className="text-center font-sans text-sm text-foreground-muted">
           {t("haveAccount")}{" "}
           <Link href="/signin" className="text-primary hover:underline">
