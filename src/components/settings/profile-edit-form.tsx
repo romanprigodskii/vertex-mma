@@ -24,6 +24,15 @@ export function ProfileEditForm({
   const [error, setError] = React.useState<string | null>(null);
   const [saved, setSaved] = React.useState(false);
 
+  // Auto-dismiss the "Saved." confirmation so it doesn't linger as stale
+  // state. A fresh submit calls setSaved(false) first, which tears down any
+  // in-flight timer via the cleanup before the next success re-arms it.
+  React.useEffect(() => {
+    if (!saved) return;
+    const timer = setTimeout(() => setSaved(false), 3000);
+    return () => clearTimeout(timer);
+  }, [saved]);
+
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);

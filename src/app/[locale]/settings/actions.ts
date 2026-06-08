@@ -124,7 +124,7 @@ export async function uploadAvatarAction(
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { error: "Not signed in." };
+  if (!user) return { error: t("notSignedIn") };
 
   const file = formData.get("file");
   // Re-validate server-side; never trust the client's size/type checks.
@@ -135,7 +135,12 @@ export async function uploadAvatarAction(
     return { error: t("avatarTooLarge") };
   }
 
-  const bytes = Buffer.from(await file.arrayBuffer());
+  let bytes: Buffer;
+  try {
+    bytes = Buffer.from(await file.arrayBuffer());
+  } catch {
+    return { error: t("uploadFailed") };
+  }
   // Content sniff is the real type gate — covers both a wrong declared type
   // and bytes that don't match any allowed image format.
   const kind = sniffAvatar(bytes);
@@ -150,7 +155,7 @@ export async function uploadAvatarAction(
   const { error: uploadError } = await admin.storage
     .from("avatars")
     .upload(path, bytes, { upsert: true, contentType: kind.mime });
-  if (uploadError) return { error: uploadError.message };
+  if (uploadError) return { error: t("uploadFailed") };
 
   const {
     data: { publicUrl },
