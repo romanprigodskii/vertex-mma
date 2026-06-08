@@ -24,6 +24,7 @@ export async function RankingView({ ranking }: Props) {
   const locale = await getLocale();
   const t = await getTranslations("rankings");
   const tWeight = await getTranslations("weight");
+  const tStatic = await getTranslations("static");
   const date = new Date(ranking.created_at);
   const dateLabel = date.toLocaleDateString(
     locale === "ru" ? "ru-RU" : "en-US",
@@ -45,7 +46,7 @@ export async function RankingView({ ranking }: Props) {
       <section className="border-b border-foreground/[0.06]">
         <Container size="lg" className="py-10 md:py-14">
           <p className="font-display text-xs uppercase tracking-[0.3em] text-primary">
-            VERTEX&nbsp;MMA · {t("viewKicker")}
+            {tStatic("brand")} · {t("viewKicker")}
           </p>
           <h1
             className="mt-3 break-words font-display uppercase tracking-tight text-foreground leading-[0.95] line-clamp-3"
