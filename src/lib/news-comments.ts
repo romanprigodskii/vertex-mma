@@ -187,6 +187,18 @@ export async function addNewsComment(opts: {
   const user = await getCurrentUser();
   if (!user) return { ok: false, error: "SIGN_IN" };
 
+  // Synchronous, per-instance gate taken BEFORE the async DB cooldown read
+  // below. The DB read-then-insert has a race window: two near-simultaneous
+  // requests from one user both see no recent row and both insert duplicates.
+  // allowAction settles in a single event-loop tick, so the second request is
+  // rejected before it can issue its own read (prod is single-instance — see
+  // rate-limit.ts). The DB read still enforces the full window across restarts.
+  if (
+    !allowAction(`comment:${user.userProfileId}`, RATE_LIMIT_SECONDS * 1000)
+  ) {
+    return { ok: false, error: "RATE_LIMITED" };
+  }
+
   const recent = await db
     .select({ id: newsComment.id })
     .from(newsComment)

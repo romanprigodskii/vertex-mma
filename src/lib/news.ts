@@ -62,7 +62,12 @@ function decodeEntities(text: string): string {
         ent[1] === "x" || ent[1] === "X"
           ? parseInt(ent.slice(2), 16)
           : parseInt(ent.slice(1), 10);
-      return Number.isFinite(code) ? String.fromCodePoint(code) : match;
+      // fromCodePoint throws RangeError on code > 0x10FFFF (e.g. &#x110000;);
+      // a single such entity in any feed title would 500 the SSR /news render.
+      // The range check also subsumes the old Number.isFinite (NaN fails it).
+      return code >= 0 && code <= 0x10ffff
+        ? String.fromCodePoint(code)
+        : match;
     }
     return NAMED_ENTITIES[ent.toLowerCase()] ?? match;
   });
@@ -188,7 +193,7 @@ export async function listNewsFeed(
     WHERE ni.status IN ('approved', 'auto_approved')
       AND ni.classification IS DISTINCT FROM 'unrelated'::news_classification
     ${where}
-    ORDER BY ni.published_at DESC
+    ORDER BY ni.published_at DESC, ni.id DESC
     LIMIT ${limit}
   `)) as unknown as FeedRow[];
 
@@ -237,7 +242,7 @@ export async function listLatestNewsExcluding(
     WHERE ni.status IN ('approved', 'auto_approved')
       AND ni.classification IS DISTINCT FROM 'unrelated'::news_classification
     ${where}
-    ORDER BY ni.published_at DESC
+    ORDER BY ni.published_at DESC, ni.id DESC
     LIMIT ${Math.min(20, Math.max(1, limit))}
   `)) as unknown as FeedRow[];
   return rows.map((r) => toFeedItem(r, []));
@@ -371,7 +376,7 @@ export async function listNewsForFighter(
     WHERE ni.status IN ('approved', 'auto_approved')
       AND ni.classification IS DISTINCT FROM 'unrelated'::news_classification
       AND ${fighterId}::uuid = ANY(ni.related_fighter_ids)
-    ORDER BY ni.published_at DESC
+    ORDER BY ni.published_at DESC, ni.id DESC
     LIMIT ${Math.min(20, Math.max(1, limit))}
   `)) as unknown as FeedRow[];
   return rows.map((r) => toFeedItem(r, []));

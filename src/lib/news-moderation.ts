@@ -27,7 +27,9 @@ function decodeEntities(text: string): string {
     .replace(/&#x?[0-9a-f]+;/gi, (m) => {
       const isHex = /&#x/i.test(m);
       const code = parseInt(m.replace(/&#x?|;/gi, ""), isHex ? 16 : 10);
-      return Number.isFinite(code) ? String.fromCodePoint(code) : m;
+      // fromCodePoint throws RangeError on code > 0x10FFFF; reject out-of-range
+      // (NaN also fails this check) so one bad entity can't crash moderation.
+      return code >= 0 && code <= 0x10ffff ? String.fromCodePoint(code) : m;
     });
 }
 

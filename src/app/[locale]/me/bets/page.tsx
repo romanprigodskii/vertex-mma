@@ -57,8 +57,11 @@ export default async function MyBetsPage({
     listMyBets(user.userProfileId),
     listMyFixedOddsBets(user.userProfileId),
     listMyParlays(user.userProfileId),
-    checkAndUnlockAchievements(user.userProfileId),
   ]);
+  // Fire-and-forget the WRITE: it must never share the page's await — a failed
+  // achievement upsert would otherwise 500 the entire bets page even though the
+  // reads above (what the page renders) all succeeded. Mirrors cards/[slug].
+  void checkAndUnlockAchievements(user.userProfileId).catch(() => {});
 
   // Localised label for a sportsbook selection (mirrors SportsbookPanel).
   function selectionLabel(code: string, aName: string, bName: string): string {
