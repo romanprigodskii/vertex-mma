@@ -23,14 +23,11 @@ const nextConfig: NextConfig = {
   },
   images: {
     remotePatterns: [
+      // Only our own Supabase project, not any *.supabase.co tenant. The broad
+      // public-storage path covers both fighter-photos and avatars.
       {
         protocol: "https",
         hostname: "ctixvxfmgrthnspfofsc.supabase.co",
-        pathname: "/storage/v1/object/public/fighter-photos/**",
-      },
-      {
-        protocol: "https",
-        hostname: "*.supabase.co",
         pathname: "/storage/v1/object/public/**",
       },
       {

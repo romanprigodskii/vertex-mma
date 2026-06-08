@@ -29,7 +29,16 @@ export function mapAuthError(error: AuthErrorLike, t: Translator): string {
   const code = (error.code ?? "").toLowerCase();
   const msg = (error.message ?? "").toLowerCase();
 
-  if (code === "invalid_credentials" || msg.includes("invalid login")) {
+  if (
+    code === "invalid_credentials" ||
+    msg.includes("invalid login") ||
+    // Collapse "email not confirmed" into the same generic wrong-credentials
+    // message. Surfacing it separately lets an attacker enumerate which emails
+    // have registered (but unconfirmed) accounts. The signup screen already
+    // tells genuine users to check their inbox.
+    code === "email_not_confirmed" ||
+    msg.includes("not confirmed")
+  ) {
     return t("errInvalidCredentials");
   }
   if (isEmailAlreadyRegisteredError(error)) {
@@ -49,9 +58,6 @@ export function mapAuthError(error: AuthErrorLike, t: Translator): string {
     msg.includes("at least 6")
   ) {
     return t("errWeakPassword");
-  }
-  if (code === "email_not_confirmed" || msg.includes("not confirmed")) {
-    return t("errEmailNotConfirmed");
   }
   if (code === "same_password" || msg.includes("should be different")) {
     return t("errSamePassword");

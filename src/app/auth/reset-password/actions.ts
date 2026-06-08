@@ -23,6 +23,30 @@ export async function resetPasswordAction(
   } = await supabase.auth.getUser();
   if (!user) return { error: t("resetInvalid") };
 
+  // Step-up gate: only a GENUINE recovery session (minted from the emailed
+  // reset link by /auth/callback) may set a new password without proving the
+  // old one. A normal — or hijacked / shared — credential session must NOT be
+  // able to silently reset the password here; that flow lives in /settings,
+  // where changePasswordAction re-verifies the current password.
+  //
+  // We read the session's AMR claim. A recovery session authenticates via the
+  // one-time recovery token, so its methods NEVER include "password"/"oauth",
+  // whereas a normal login always does. We gate on the ABSENCE of a credential
+  // method rather than the exact "recovery" label so this stays correct even if
+  // GoTrue records a recovery sign-in as "otp"/"magiclink" on some versions; an
+  // empty/unknown AMR fails closed.
+  const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  const methods = (
+    (aal?.currentAuthenticationMethods ?? []) as Array<
+      string | { method?: string | null }
+    >
+  ).map((m) => (typeof m === "string" ? m : (m?.method ?? "")));
+  const isCredentialLogin =
+    methods.includes("password") || methods.includes("oauth");
+  if (methods.length === 0 || isCredentialLogin) {
+    return { error: t("resetInvalid") };
+  }
+
   const { error } = await supabase.auth.updateUser({ password: newPassword });
   if (error) return { error: mapAuthError(error, t) };
   return { success: true };

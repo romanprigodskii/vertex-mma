@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 import { getTranslations } from "next-intl/server";
 
 import { isEmailAlreadyRegisteredError, mapAuthError } from "@/lib/auth-errors";
+import { allowAction, AUTH_COOLDOWN_MS, clientIp } from "@/lib/rate-limit";
 import { db } from "@/lib/db";
 import { userProfile } from "@/lib/db/schema/users";
 import { safeNext } from "@/lib/safe-redirect";
@@ -34,6 +35,18 @@ export async function signUpAction(
     return { error: t("passwordTooShort") };
   }
 
+  const h = await headers();
+  // Throttle signups before any DB / Supabase work: per-IP (mass account
+  // creation, confirm-email spam) and per-email (repeat attempts for one
+  // address). IP check first so an IP-blocked request doesn't burn the email
+  // slot. Defence-in-depth on top of GoTrue's own send limits.
+  if (
+    !allowAction(`signup-ip:${clientIp(h)}`, AUTH_COOLDOWN_MS.signUpIp) ||
+    !allowAction(`signup:${email}`, AUTH_COOLDOWN_MS.signUp)
+  ) {
+    return { error: t("errRateLimit") };
+  }
+
   // Pre-check username uniqueness; the trigger has a final safety net
   // (numeric suffix on collision) but we want to surface a clean error.
   const existing = await db
@@ -47,9 +60,12 @@ export async function signUpAction(
 
   const supabase = await createClient();
 
-  const h = await headers();
+  // Build the confirmation link from the canonical site origin (not request
+  // headers, which carry attacker-influenceable Host/X-Forwarded-* values) so a
+  // spoofed Host can't point the emailed link at another domain.
   const origin =
-    h.get("origin") ??
+    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ||
+    h.get("origin") ||
     `${h.get("x-forwarded-proto") ?? "http"}://${h.get("host") ?? "localhost:3000"}`;
 
   const { error } = await supabase.auth.signUp({
