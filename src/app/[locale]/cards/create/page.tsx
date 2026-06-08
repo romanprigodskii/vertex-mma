@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { ChevronLeft } from "lucide-react";
 
@@ -7,7 +6,7 @@ import { FightCardForm } from "@/components/cards/fight-card-form";
 import { Container } from "@/components/layout/container";
 import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
-import { Link } from "@/i18n/navigation";
+import { Link, redirect } from "@/i18n/navigation";
 import { getCurrentUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -35,7 +34,7 @@ export default async function CreateCardPage({
   const t = await getTranslations("cards");
   const user = await getCurrentUser();
   if (!user) {
-    redirect(`/${locale === "en" ? "" : `${locale}/`}signin?next=/cards/create`);
+    redirect({ href: "/signin?next=/cards/create", locale });
   }
 
   return (
