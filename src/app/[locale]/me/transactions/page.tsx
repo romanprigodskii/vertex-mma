@@ -97,7 +97,13 @@ export default async function TransactionsPage({
                           hour: "numeric",
                           minute: "2-digit",
                         })}
-                        {r.description ? ` · ${r.description}` : ""}
+                        {/* The localized type label already conveys the event.
+                            r.description is raw English (often a bare UUID), so
+                            it must not reach the RU ledger — keep it only as a
+                            fallback for any unmapped type. */}
+                        {!KNOWN_TYPES.has(r.type) && r.description
+                          ? ` · ${r.description}`
+                          : ""}
                       </p>
                     </div>
                     <div className="shrink-0 text-right">

@@ -42,6 +42,15 @@ const METHOD_SHORT: Record<string, string> = {
   dq: "DQ",
 };
 
+// Bout/event status enum → localized `event` namespace key. Anything not mapped
+// (in_progress, cancelled, …) falls back to a generic label rather than leaking
+// the raw English enum token onto the page (and onto the RU site).
+const STATUS_KEY: Record<string, string> = {
+  scheduled: "scheduled",
+  upcoming: "upcoming",
+  completed: "completed",
+};
+
 function formatRoundTime(sec: number | null): string {
   if (sec == null) return "";
   const m = Math.floor(sec / 60);
@@ -49,13 +58,25 @@ function formatRoundTime(sec: number | null): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
+// UFC announces and schedules its cards in US Eastern time, and event.date is a
+// full timestamptz. Pin a deterministic display zone instead of formatting in
+// the server process's locale: a late US card whose start instant rolls past
+// midnight UTC would otherwise render the wrong calendar day, and that day would
+// drift with wherever the server happens to run. Showing the time + zone also
+// closes the "date only, no start time" gap for a fight-card product.
+const EVENT_DISPLAY_TZ = "America/New_York";
+
 function formatEventDate(iso: string, locale: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso.slice(0, 10);
-  return d.toLocaleDateString(locale === "ru" ? "ru-RU" : "en-US", {
+  return d.toLocaleString(locale === "ru" ? "ru-RU" : "en-US", {
     year: "numeric",
     month: "long",
     day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: EVENT_DISPLAY_TZ,
+    timeZoneName: "short",
   });
 }
 
@@ -109,6 +130,7 @@ interface BoutCardTranslations {
   viewDetails: string;
   decision: string;
   finish: string;
+  status: (status: string) => string;
   modelPick: (name: string, pct: number) => string;
 }
 
@@ -116,10 +138,12 @@ function BoutCard({
   bout,
   tr,
   pick,
+  isCoMain,
 }: {
   bout: EventBout;
   tr: BoutCardTranslations;
   pick: BoutSimulationPick | null;
+  isCoMain: boolean;
 }) {
   // Model's pick to surface inline on upcoming bouts (the AI prediction was
   // otherwise invisible until you opened /bouts).
@@ -140,7 +164,10 @@ function BoutCard({
   const wentFullDistance =
     bout.round_finished != null &&
     bout.round_finished >= bout.scheduled_rounds &&
-    (bout.time_finished_seconds ?? 0) >= 280;
+    // A UFC round is 5:00 (300s); only a finish in the last ~2s counts as having
+    // gone the full distance. The old 280s threshold misread a late finish
+    // (e.g. R3 TKO at 4:45 = 285s of a 3-round bout) as a "Decision".
+    (bout.time_finished_seconds ?? 0) >= 298;
   const inferredFromTime: string | null =
     bout.status === "completed"
       ? wentFullDistance
@@ -158,9 +185,11 @@ function BoutCard({
       ? `R${bout.round_finished}${time ? ` · ${time}` : ""}`
       : null;
 
+  // An event has exactly one co-main; `isCoMain` is resolved once at the page
+  // level so duplicate is_co_main_event flags in the data can't print two badges.
   const placement = bout.is_main_event
     ? tr.mainEvent
-    : bout.is_co_main_event
+    : isCoMain
       ? tr.coMain
       : null;
 
@@ -231,7 +260,7 @@ function BoutCard({
             </p>
           ) : (
             <p className="mt-0.5 font-sans text-[11px] uppercase tracking-widest text-foreground-subtle">
-              {bout.status}
+              {tr.status(bout.status)}
             </p>
           )}
           <Link
@@ -332,6 +361,10 @@ export default async function EventDetailPage({ params }: PageProps) {
   if (!event) notFound();
 
   const bouts = await getEventBouts(event.id);
+  // Exactly one co-main per event: pick the first bout flagged co-main (bouts
+  // arrive ordered main → co-main → undercard) so bad data with multiple
+  // is_co_main_event rows can't render the badge twice.
+  const coMainBoutId = bouts.find((b) => b.is_co_main_event)?.id ?? null;
   // Model picks for the not-yet-fought bouts, surfaced inline on each card.
   const simPicks = await getBoutSimulationPicks(
     bouts.filter((b) => b.status !== "completed").map((b) => b.id),
@@ -354,6 +387,10 @@ export default async function EventDetailPage({ params }: PageProps) {
     viewDetails: t("viewDetails"),
     decision: t("decision"),
     finish: t("finish"),
+    status: (status: string) => {
+      const key = STATUS_KEY[status];
+      return key && t.has(key) ? t(key) : t("scheduled");
+    },
     modelPick: (name: string, pct: number) => t("modelPick", { name, pct }),
   };
 
@@ -417,6 +454,7 @@ export default async function EventDetailPage({ params }: PageProps) {
                         bout={b}
                         tr={boutCardTranslations}
                         pick={simPicks.get(b.id) ?? null}
+                        isCoMain={b.id === coMainBoutId}
                       />
                     </li>
                   ))}

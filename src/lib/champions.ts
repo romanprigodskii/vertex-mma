@@ -1,17 +1,25 @@
 /**
- * Current UFC champions as of 2026-05-13.
+ * Current UFC champions — DERIVED from championship-history.ts.
  *
- * The roster reality is intentionally in flux — Islam vacated LW after moving
- * to WW, Topuria has been bouncing between LW and FW, and the strawweight
- * picture is contested. Where the DB's `weight_class_primary` and the latest
- * news disagree, we keep the DB slug authoritative and label the strip
- * division per the user's spec, with `// TODO verify` for the user to resolve
- * manually post-build. Don't silently overwrite — the misalignment is real.
+ * This strip used to be a hand-maintained list and drifted out of sync with the
+ * authoritative reign data (it listed Pereira/Chimaev/Zhang as champions after
+ * they'd lost or vacated, and mislabeled Dern). It's now generated from the
+ * single source of truth: a fighter is a current champion iff they hold an open
+ * reign (`endDate === null`) — the exact same predicate vertex-tier.ts uses for
+ * the "active champion" crown, so the profile-hero trophy badge and the card
+ * crown can no longer disagree.
  *
- * `slug` must match `fighter.slug` exactly. If a fighter row is missing at
- * runtime, the strip renders a "TBD" placeholder for that slot instead of
- * crashing.
+ * championship-history.ts reuses the men's `WeightClass` enum for the women's
+ * divisions (women's bantamweight → `bantamweight`, etc.), so the display label
+ * and the men's/women's distinction can't be recovered from `weightClass`
+ * alone. Men's labels are mapped per weight class below; the women's champions
+ * are resolved by slug via an explicit override.
+ *
+ * `slug` matches `fighter.slug`. If a fighter row is missing at runtime, the
+ * strip renders a "TBD" placeholder for that slot instead of crashing.
  */
+
+import { CHAMPIONSHIP_HISTORY, type WeightClass } from "./championship-history";
 
 export interface ChampionEntry {
   slug: string;
@@ -20,69 +28,59 @@ export interface ChampionEntry {
   isInterim?: boolean;
 }
 
-export const CURRENT_CHAMPIONS: readonly ChampionEntry[] = [
-  { slug: "tom-aspinall-399afb", division: "Heavyweight", divisionShort: "HW" },
-  {
-    slug: "alex-pereira-e5549c",
-    division: "Light Heavyweight",
-    divisionShort: "LHW",
-  },
-  {
-    slug: "khamzat-chimaev-767755",
-    division: "Middleweight",
-    divisionShort: "MW",
-  },
-  // TODO verify: spec says Islam moved up to WW; DB still has him at LW.
-  {
-    slug: "islam-makhachev-275aca",
-    division: "Welterweight",
-    divisionShort: "WW",
-  },
-  // TODO verify: spec said Topuria vacated LW; if he's still active LW champ
-  // delete this entry and Gaethje's interim status. If he moved back to FW,
-  // swap with Volk below.
-  {
-    slug: "ilia-topuria-54f64b",
-    division: "Lightweight",
-    divisionShort: "LW",
-  },
-  // Interim per spec (Islam vacated LW).
-  {
-    slug: "justin-gaethje-9e8f6c",
-    division: "Lightweight",
-    divisionShort: "LW",
-    isInterim: true,
-  },
-  // TODO verify: spec said Volk reclaimed FW after Topuria vacated. DB has
-  // both Volk and Topuria at FW — keeping Volk at FW since user said
-  // "if both are listed, pick the most recent" and Volk reclaimed.
-  {
-    slug: "alexander-volkanovski-e12489",
-    division: "Featherweight",
-    divisionShort: "FW",
-  },
-  { slug: "petr-yan-d661ce", division: "Bantamweight", divisionShort: "BW" },
-  { slug: "joshua-van-17e976", division: "Flyweight", divisionShort: "FLW" },
-  // Women's
-  {
-    slug: "zhang-weili-1ebe20",
-    division: "Women's Strawweight",
-    divisionShort: "W-SW",
-  },
-  {
-    slug: "valentina-shevchenko-132deb",
-    division: "Women's Flyweight",
-    divisionShort: "W-FLW",
-  },
-  // TODO verify: DB has Dern at SW (same as Zhang Weili). If Dern is the
-  // W-BW champion instead, edit divisionShort to W-BW. If she shouldn't be
-  // in this list at all, remove the entry.
-  {
-    slug: "mackenzie-dern-7447e9",
+interface DivisionLabel {
+  division: string;
+  divisionShort: string;
+}
+
+// Men's division labels keyed by the championship-history WeightClass enum.
+const MENS_DIVISION: Record<WeightClass, DivisionLabel> = {
+  heavyweight: { division: "Heavyweight", divisionShort: "HW" },
+  light_heavyweight: { division: "Light Heavyweight", divisionShort: "LHW" },
+  middleweight: { division: "Middleweight", divisionShort: "MW" },
+  welterweight: { division: "Welterweight", divisionShort: "WW" },
+  lightweight: { division: "Lightweight", divisionShort: "LW" },
+  featherweight: { division: "Featherweight", divisionShort: "FW" },
+  bantamweight: { division: "Bantamweight", divisionShort: "BW" },
+  flyweight: { division: "Flyweight", divisionShort: "FLW" },
+  strawweight: { division: "Strawweight", divisionShort: "SW" },
+};
+
+// Women's champions share the men's WeightClass enum, so their gendered label is
+// resolved by slug. Keep in sync with the women's open reigns in
+// championship-history.ts (W-BW / W-FLW / W-SW).
+const WOMENS_DIVISION: Record<string, DivisionLabel | undefined> = {
+  "kayla-harrison-1af117": {
     division: "Women's Bantamweight",
     divisionShort: "W-BW",
   },
-];
+  "valentina-shevchenko-132deb": {
+    division: "Women's Flyweight",
+    divisionShort: "W-FLW",
+  },
+  "mackenzie-dern-7447e9": {
+    division: "Women's Strawweight",
+    divisionShort: "W-SW",
+  },
+};
+
+/**
+ * Every fighter holding an open reign (`endDate === null`), in
+ * championship-history.ts order (heaviest men's division first, then women's).
+ * Derived — do not hand-edit; fix the reign data in championship-history.ts.
+ */
+export const CURRENT_CHAMPIONS: readonly ChampionEntry[] = CHAMPIONSHIP_HISTORY
+  .filter((reign) => reign.endDate === null)
+  .map((reign): ChampionEntry => {
+    const label = WOMENS_DIVISION[reign.slug] ?? MENS_DIVISION[reign.weightClass];
+    const entry: ChampionEntry = {
+      slug: reign.slug,
+      division: label.division,
+      divisionShort: label.divisionShort,
+    };
+    if (reign.isInterim) entry.isInterim = true;
+    return entry;
+  });
 
 export const CHAMPION_SLUGS: readonly string[] = CURRENT_CHAMPIONS.map(
   (c) => c.slug,
