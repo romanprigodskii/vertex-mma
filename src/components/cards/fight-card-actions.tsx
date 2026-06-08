@@ -1,12 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { Heart } from "lucide-react";
 
 import { toggleLikeAction } from "@/app/[locale]/cards/actions";
 import { ShareButton } from "@/components/share/share-button";
-import { Link } from "@/i18n/navigation";
+import { Link, getPathname } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -30,6 +30,7 @@ export function FightCardActions({
   isSignedIn,
 }: Props) {
   const t = useTranslations("cards");
+  const locale = useLocale();
   const [liked, setLiked] = React.useState(initialLiked);
   const [count, setCount] = React.useState(initialLikeCount);
   const [pending, setPending] = React.useState(false);
@@ -91,7 +92,7 @@ export function FightCardActions({
       )}
 
       <ShareButton
-        url={`/cards/${slug}`}
+        url={getPathname({ href: `/cards/${slug}`, locale })}
         ogImageUrl={`/api/og/cards/${slug}`}
         title={title}
         filename={`vertexmma-card-${slug}`}

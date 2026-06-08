@@ -28,14 +28,18 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const p = await getParlayById(id);
   const t = await getTranslations({ locale, namespace: "parlay" });
   if (!p) return { title: t("notFound") };
+  // Both title and description (and the OG image route) count live, join-
+  // filtered legs via p.legs.length. p.num_legs is the value frozen at
+  // placement and can drift if a leg's bout is later cascade-deleted, which
+  // would make the title and description disagree on the same share card.
   const title = t("metaTitle", { n: p.legs.length });
   const og = `/api/og/parlay/${p.id}`;
   return {
     title,
-    description: t("metaDescription", { n: p.num_legs, odds: formatOdds(p.combined_odds) }),
+    description: t("metaDescription", { n: p.legs.length, odds: formatOdds(p.combined_odds) }),
     openGraph: {
       title,
-      description: t("metaDescription", { n: p.num_legs, odds: formatOdds(p.combined_odds) }),
+      description: t("metaDescription", { n: p.legs.length, odds: formatOdds(p.combined_odds) }),
       siteName: "Vertex MMA",
       type: "website",
       images: [{ url: og, width: 1200, height: 630, alt: title }],

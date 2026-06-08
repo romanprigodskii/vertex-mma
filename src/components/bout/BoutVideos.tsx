@@ -33,14 +33,23 @@ function thumbnailUrl(videoId: string): string {
   return `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
 }
 
+/** Free fights sort before highlights — mirrors the server's kind-first
+ *  ordering (bout-detail.ts) so a long highlights clip never floats above a
+ *  full fight just because it runs longer. */
+function kindRank(kind: BoutVideo["kind"]): number {
+  return kind === "free_fight" ? 0 : 1;
+}
+
 export function BoutVideos({ videos }: BoutVideosProps) {
   const t = useTranslations("bout");
 
-  // Longer-running uploads float to the top — they're closer to the real
-  // unedited fight than the short condensed clips.
+  // Free fights first, then the longest uploads — the real unedited bout
+  // ranks above the short condensed clips regardless of raw duration.
   const sorted = React.useMemo(() => {
     return [...videos].sort(
-      (a, b) => (b.duration_seconds ?? 0) - (a.duration_seconds ?? 0),
+      (a, b) =>
+        kindRank(a.kind) - kindRank(b.kind) ||
+        (b.duration_seconds ?? 0) - (a.duration_seconds ?? 0),
     );
   }, [videos]);
 
@@ -73,7 +82,7 @@ export function BoutVideos({ videos }: BoutVideosProps) {
               key={v.id}
               video={v}
               priority={i === 0}
-              fullFightLabel={t("fullFight")}
+              label={v.kind === "free_fight" ? t("fullFight") : t("highlights")}
             />
           ))}
         </div>
@@ -85,11 +94,11 @@ export function BoutVideos({ videos }: BoutVideosProps) {
 function VideoCard({
   video,
   priority,
-  fullFightLabel,
+  label,
 }: {
   video: BoutVideo;
   priority: boolean;
-  fullFightLabel: string;
+  label: string;
 }) {
   const [playing, setPlaying] = React.useState(false);
   const thumb = thumbnailUrl(video.youtube_video_id);
@@ -129,7 +138,7 @@ function VideoCard({
               </span>
             </span>
             <span className="absolute left-3 top-3 inline-flex items-center rounded-[4px] bg-black/70 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-white">
-              {fullFightLabel}
+              {label}
             </span>
             {duration ? (
               <span className="absolute bottom-3 right-3 inline-flex items-center rounded-[4px] bg-black/80 px-1.5 py-0.5 font-mono text-[11px] tracking-wide text-white">

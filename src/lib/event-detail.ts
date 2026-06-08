@@ -144,21 +144,22 @@ export type EventDetail = {
 };
 
 export async function getEventBySlug(slug: string): Promise<EventDetail | null> {
+  const isRu = await isRuLocale();
   const result = await db.execute<EventDetail>(sql`
     SELECT
-      id::text AS id,
-      slug,
-      name,
-      short_name,
-      promotion::text AS promotion,
-      date::text AS date,
-      location_city,
-      location_country,
-      venue,
-      poster_url,
-      status::text AS status
-    FROM event
-    WHERE slug = ${slug}
+      e.id::text AS id,
+      e.slug,
+      ${localizedColSql("e.name", "e.name_ru", isRu)} AS name,
+      ${localizedEventNameSql("e", isRu)} AS short_name,
+      e.promotion::text AS promotion,
+      e.date::text AS date,
+      e.location_city,
+      e.location_country,
+      e.venue,
+      e.poster_url,
+      e.status::text AS status
+    FROM event e
+    WHERE e.slug = ${slug}
     LIMIT 1
   `);
   const rows = result as unknown as EventDetail[];

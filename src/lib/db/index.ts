@@ -19,11 +19,18 @@ const connectionString = serverEnv().DATABASE_URL;
 // keep us under the session-pooler 15-slot cap when Turbopack HMR
 // creates fresh module instances (each leaks its old pool until GC),
 // and when several scripts run concurrently against the same project.
-const queryClient = postgres(connectionString, {
-  prepare: false,
-  max: 3,
-  idle_timeout: 20,
-});
+// In dev we also cache the client on globalThis so HMR reuses one pool
+// instead of accumulating a leaked pool per reload; production always opens
+// a fresh pool (no global state across the serverless boundary).
+const globalForDb = globalThis as { __queryClient?: ReturnType<typeof postgres> };
+const queryClient =
+  globalForDb.__queryClient ??
+  postgres(connectionString, {
+    prepare: false,
+    max: 3,
+    idle_timeout: 20,
+  });
+if (process.env.NODE_ENV !== "production") globalForDb.__queryClient = queryClient;
 export const db = drizzle(queryClient, { schema });
 
 export type Db = typeof db;

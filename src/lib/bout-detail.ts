@@ -477,6 +477,15 @@ export function groupRoundsByNumber(
     const entry = map.get(r.round) ?? { a: null, b: null };
     if (r.fighter_id === fighterAId) entry.a = r;
     else if (r.fighter_id === fighterBId) entry.b = r;
+    else {
+      // A stale/merged fighter id (FK is to fighter, not to this bout's
+      // corners) would otherwise vanish silently and quietly undercount the
+      // totals. Surface it instead of dropping it without a trace.
+      console.warn(
+        `groupRoundsByNumber: round ${r.round} stats row fighter_id ${r.fighter_id} matches neither corner (a=${fighterAId}, b=${fighterBId}); skipping`,
+      );
+      continue;
+    }
     map.set(r.round, entry);
   }
   return Array.from(map.entries())

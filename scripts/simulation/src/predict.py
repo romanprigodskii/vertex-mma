@@ -13,6 +13,7 @@ cron can be invoked multiple times safely (idempotent)."""
 
 from __future__ import annotations
 
+import hashlib
 import json
 
 import numpy as np
@@ -157,7 +158,16 @@ def predict_upcoming(*, force_version: str | None = None) -> int:
         a = FighterMC.from_snapshot(snap_a)
         b = FighterMC.from_snapshot(snap_b)
         scheduled_rounds = int(row["scheduled_rounds"])
-        mc = simulate_bout(a, b, scheduled_rounds, seed=hash(m.bout_id) & 0xFFFFFFFF)
+        # Stable, cross-run seed: builtin hash() of a str is salted per process
+        # (PYTHONHASHSEED), so it would break the bout-stable determinism the
+        # docstrings promise. sha256 of the bout_id is process-independent;
+        # the first 8 hex chars give the same 32-bit range as the old mask.
+        mc = simulate_bout(
+            a,
+            b,
+            scheduled_rounds,
+            seed=int(hashlib.sha256(str(m.bout_id).encode()).hexdigest()[:8], 16),
+        )
         mc_rows.append(
             (
                 m.bout_id,
