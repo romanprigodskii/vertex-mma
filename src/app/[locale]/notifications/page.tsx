@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 
 import { Container } from "@/components/layout/container";
@@ -7,6 +6,7 @@ import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
 import { MarkAllReadButton } from "@/components/notifications/mark-all-read-button";
 import { NotificationRow } from "@/components/notifications/notification-row";
+import { redirect } from "@/i18n/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { listNotifications } from "@/lib/notifications";
 
@@ -31,7 +31,7 @@ export default async function NotificationsPage({
   setRequestLocale(locale);
   const t = await getTranslations("notifications");
   const user = await getCurrentUser();
-  if (!user) redirect("/signin?next=/notifications");
+  if (!user) return redirect({ href: "/signin?next=/notifications", locale });
 
   const LIMIT = 100;
   // Fetch one extra to detect (without a second query) whether older

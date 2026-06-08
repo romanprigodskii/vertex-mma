@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { ChevronLeft } from "lucide-react";
 
@@ -12,7 +11,7 @@ import { ChangePasswordForm } from "@/components/settings/change-password-form";
 import { ChangeUsernameForm } from "@/components/settings/change-username-form";
 import { DeleteAccountSection } from "@/components/settings/delete-account-section";
 import { ProfileEditForm } from "@/components/settings/profile-edit-form";
-import { Link } from "@/i18n/navigation";
+import { Link, redirect } from "@/i18n/navigation";
 import { getCurrentUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -36,7 +35,7 @@ export default async function SettingsPage({
   setRequestLocale(locale);
   const t = await getTranslations("settings");
   const user = await getCurrentUser();
-  if (!user) redirect("/signin?next=/settings");
+  if (!user) return redirect({ href: "/signin?next=/settings", locale });
 
   return (
     <>

@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 
 import { PendingNewsCard } from "@/components/admin/pending-news-card";
 import { Container } from "@/components/layout/container";
 import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
+import { redirect } from "@/i18n/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { getPendingNewsItems } from "@/lib/news-moderation";
 
@@ -31,7 +32,7 @@ export default async function AdminNewsPage({
   const t = await getTranslations("admin");
 
   const user = await getCurrentUser();
-  if (!user) redirect("/signin?next=/admin/news");
+  if (!user) return redirect({ href: "/signin?next=/admin/news", locale });
   // Hide the route entirely from non-staff rather than disclosing it exists.
   if (!user.isStaff) notFound();
 
