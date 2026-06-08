@@ -9,7 +9,10 @@
 export function abbreviateMethod(method: string | null | undefined): string {
   if (!method) return "—";
   const m = method.toLowerCase().trim();
-  if (m.startsWith("tko")) return "TKO";
+  // "KO/TKO" is UFCStats' single combined knockout category — show it as TKO
+  // (the broader stoppage class) instead of letting the bare "ko" prefix below
+  // collapse it to a clean "KO". A standalone "ko"/"tko" still maps as before.
+  if (m.startsWith("tko") || m.startsWith("ko/tko")) return "TKO";
   if (m.startsWith("ko")) return "KO";
   if (m.startsWith("sub")) return "Sub";
   if (m.includes("unanimous")) return "U-Dec";
@@ -46,7 +49,9 @@ export function methodAbbrevKey(
 ): MethodAbbrevKey | null {
   if (!method) return null;
   const m = method.toLowerCase().trim();
-  if (m.startsWith("tko")) return "tko";
+  // Mirror abbreviateMethod: the combined "ko/tko" category resolves to the
+  // localized "tko" key, while a bare "ko" keeps its own key.
+  if (m.startsWith("tko") || m.startsWith("ko/tko")) return "tko";
   if (m.startsWith("ko")) return "ko";
   if (m.startsWith("sub")) return "sub";
   if (m.includes("unanimous")) return "udec";

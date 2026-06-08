@@ -39,7 +39,10 @@ export interface AccuracySummary {
     "low" | "medium" | "high",
     { hits: number; total: number }
   >;
-  /** Latest model version that has graded data (NULL if no graded data). */
+  /** Model version(s) behind these graded picks: the lone version when the
+   *  window is uniform, every contributing version joined when it spans more
+   *  than one (hitRate aggregates across all of them), or NULL when there's no
+   *  graded data. Never a single version standing in for a mixed window. */
   modelVersion: string | null;
 }
 
@@ -154,15 +157,24 @@ export function summarizeAccuracy(picks: GradedSimulationPick[]): AccuracySummar
     high: { hits: 0, total: 0 },
   };
   let hits = 0;
-  let modelVersion: string | null = null;
+  const versions = new Set<string>();
   for (const p of picks) {
     if (p.correct) hits += 1;
     const bucket = perConfidence[p.confidenceLabel] ?? perConfidence.low;
     bucket.total += 1;
     if (p.correct) bucket.hits += 1;
-    modelVersion ??= p.modelVersion;
+    if (p.modelVersion) versions.add(p.modelVersion);
   }
   const total = picks.length;
+  // The graded window keeps the newest simulation PER BOUT, so different bouts
+  // can carry different model versions while hitRate pools them all. Reporting
+  // one version would imply a single model scored the whole window — a lie when
+  // it didn't. Emit the lone version when uniform, else join every contributing
+  // version so the label can't overclaim. ([...].join collapses to the single
+  // string for a one-element set, and yields null only when there are none.)
+  const sortedVersions = [...versions].sort();
+  const modelVersion =
+    sortedVersions.length > 0 ? sortedVersions.join(" · ") : null;
   return {
     total,
     hitRate: total > 0 ? hits / total : Number.NaN,

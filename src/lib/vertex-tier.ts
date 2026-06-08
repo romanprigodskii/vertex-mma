@@ -150,11 +150,23 @@ export interface HeadlineScore {
 export function headlineScore(input: HeadlineScoreInput): HeadlineScore {
   const status = (input.rosterStatus ?? "unknown") as RosterStatus;
   if (RETIRED_ROSTER_STATUSES.has(status)) {
-    return {
-      value: input.vertexScoreAllTime,
-      scoreMode: "all_time",
-      basis: "all_time",
-    };
+    // Retired/released/inactive headline their ALL-TIME legacy rating, never a
+    // decayed current value (see the rule note above). But when a retired
+    // fighter has NO all-time score at all (short careers, fresh imports), a
+    // bare "—" is strictly worse than their stale current score — fall back to
+    // it so the surface still shows a number. scoreMode/basis follow the source
+    // so the tier colour keeps agreeing with the displayed value.
+    if (input.vertexScoreAllTime != null) {
+      return {
+        value: input.vertexScoreAllTime,
+        scoreMode: "all_time",
+        basis: "all_time",
+      };
+    }
+    if (input.vertexScore != null) {
+      return { value: input.vertexScore, scoreMode: "current", basis: "global" };
+    }
+    return { value: null, scoreMode: "all_time", basis: "all_time" };
   }
   if (input.divisionalScore != null) {
     return {
