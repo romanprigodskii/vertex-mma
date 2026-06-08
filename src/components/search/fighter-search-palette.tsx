@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { clampHeadline, headlineScore } from "@/lib/vertex-tier";
 
 const OPEN_EVENT = "fighter-search:open";
+const LISTBOX_ID = "fighter-search-listbox";
 
 /** Imperative trigger any client component can call to open the palette. */
 export function openFighterSearch(): void {
@@ -240,6 +241,13 @@ export function FighterSearchPalette() {
               autoComplete="off"
               spellCheck={false}
               aria-label={t("triggerAria")}
+              role="combobox"
+              aria-autocomplete="list"
+              aria-expanded={results.length > 0}
+              aria-controls={results.length > 0 ? LISTBOX_ID : undefined}
+              aria-activedescendant={
+                results.length > 0 ? `${LISTBOX_ID}-opt-${activeIdx}` : undefined
+              }
             />
           </div>
 
@@ -268,11 +276,20 @@ export function FighterSearchPalette() {
                 {t("noMatches", { query: query.trim() })}
               </p>
             ) : (
-              <ul ref={listRef} className="py-1">
+              <ul
+                ref={listRef}
+                id={LISTBOX_ID}
+                role="listbox"
+                aria-label={t("title")}
+                className="py-1"
+              >
                 {results.map((r, i) => (
                   <li
                     key={r.id}
+                    id={`${LISTBOX_ID}-opt-${i}`}
                     data-idx={i}
+                    role="option"
+                    aria-selected={i === activeIdx}
                     className={cn(
                       "flex cursor-pointer items-center gap-3 px-4 py-2.5 transition-colors",
                       i === activeIdx

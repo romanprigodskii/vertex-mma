@@ -54,32 +54,62 @@ export function encodeSlip(legs: SlipLeg[]): string {
   );
 }
 
+/** Validate one raw object into a SlipLeg, or null if malformed. Reads the
+ *  persisted full-shape keys ({ boutId, code, odds, … }); the share-link path
+ *  remaps its compact keys onto this shape so both flow through one validator. */
+function sanitizeLeg(raw: unknown): SlipLeg | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  const boutId = String(o.boutId ?? "");
+  const code = String(o.code ?? "");
+  if (!UUID_RE.test(boutId) || !isSelectionCode(code)) return null;
+  const odds = Number(o.odds);
+  if (!Number.isFinite(odds) || odds <= 1) return null;
+  return {
+    boutId,
+    code: code as SportsbookSelectionCode,
+    odds,
+    boutLabel: String(o.boutLabel ?? "").slice(0, 120),
+    pickLabel: String(o.pickLabel ?? "").slice(0, 120),
+  };
+}
+
+/** Validate + dedupe (one leg per bout) + cap a list of raw legs. Returns null
+ *  when nothing survives, so both load paths can fall through cleanly. */
+function sanitizeLegs(items: unknown): SlipLeg[] | null {
+  if (!Array.isArray(items)) return null;
+  const seen = new Set<string>();
+  const legs: SlipLeg[] = [];
+  for (const item of items) {
+    const leg = sanitizeLeg(item);
+    if (!leg || seen.has(leg.boutId)) continue; // one leg per bout
+    seen.add(leg.boutId);
+    legs.push(leg);
+    if (legs.length >= MAX_PARLAY_LEGS) break;
+  }
+  return legs.length > 0 ? legs : null;
+}
+
 /** Parse + sanitise a shared slip param. Returns null on anything malformed. */
 export function decodeSlip(raw: string): SlipLeg[] | null {
   try {
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return null;
-    const seen = new Set<string>();
-    const legs: SlipLeg[] = [];
-    for (const item of parsed) {
-      if (!item || typeof item !== "object") continue;
-      const boutId = String(item.b ?? "");
-      const code = String(item.c ?? "");
-      if (!UUID_RE.test(boutId) || !isSelectionCode(code)) continue;
-      if (seen.has(boutId)) continue; // one leg per bout
-      const odds = Number(item.o);
-      if (!Number.isFinite(odds) || odds <= 1) continue;
-      seen.add(boutId);
-      legs.push({
-        boutId,
-        code: code as SportsbookSelectionCode,
-        odds,
-        boutLabel: String(item.bl ?? "").slice(0, 120),
-        pickLabel: String(item.pl ?? "").slice(0, 120),
-      });
-      if (legs.length >= MAX_PARLAY_LEGS) break;
-    }
-    return legs.length > 0 ? legs : null;
+    // Share links use compact keys; remap to the persisted shape, then run the
+    // exact same validation as a localStorage restore.
+    return sanitizeLegs(
+      parsed.map((item) => {
+        if (!item || typeof item !== "object") return null;
+        const o = item as Record<string, unknown>;
+        return {
+          boutId: o.b,
+          code: o.c,
+          odds: o.o,
+          boutLabel: o.bl,
+          pickLabel: o.pl,
+        };
+      }),
+    );
   } catch {
     return null;
   }
@@ -110,10 +140,7 @@ export function BetSlipProvider({ children }: { children: React.ReactNode }) {
       }
       if (!loaded) {
         const raw = localStorage.getItem(STORAGE_KEY);
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed)) loaded = parsed as SlipLeg[];
-        }
+        if (raw) loaded = sanitizeLegs(JSON.parse(raw));
       }
     } catch {
       // ignore malformed storage / url

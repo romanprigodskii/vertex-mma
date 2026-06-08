@@ -75,6 +75,7 @@ export async function listRankingsByUser(
     JOIN user_profile up ON up.id = r.user_id
     WHERE r.user_id = ${userProfileId}::uuid
     ORDER BY r.created_at DESC
+    LIMIT 100
   `);
   return rows as unknown as RankingListItem[];
 }

@@ -75,6 +75,31 @@ function filtersKey(filters: CatalogFilterState): string {
   return serializeFilters(filters).toString();
 }
 
+/** Strict structural inverse of serializeFilters: rebuild filter state from the
+ *  URL on back/forward. Kept defaulting-free (no "broaden status" logic) so a
+ *  round-trip through serialize→deserialize is stable and can't ping-pong with
+ *  the state→URL effect. */
+function deserializeFilters(params: URLSearchParams): CatalogFilterState {
+  const csv = (key: string): string[] => {
+    const v = params.get(key);
+    return v ? v.split(",").filter(Boolean) : [];
+  };
+  return {
+    q: params.get("q") ?? "",
+    weight: csv("weight"),
+    country: csv("country"),
+    stance: csv("stance"),
+    status: (params.get("status") as CatalogFilterState["status"]) ?? "active",
+    hasPhoto: params.get("has_photo") === "1",
+    hallOfFame: params.get("hof") === "1",
+    sort: (params.get("sort") as CatalogFilterState["sort"]) ?? "vertex_current",
+    tier: (params.get("tier") as CatalogFilterState["tier"]) ?? "all",
+    champion:
+      (params.get("champion") as CatalogFilterState["champion"]) ?? "all",
+    gender: (params.get("gender") as CatalogFilterState["gender"]) ?? "all",
+  };
+}
+
 interface FighterCatalogClientProps {
   initialFighters: FighterCatalogRow[];
   initialTotal: number;
@@ -110,7 +135,12 @@ export function FighterCatalogClient({
   const [error, setError] = React.useState<string | null>(null);
 
   const inflightKeyRef = React.useRef<string>(filtersKey(initialFilters));
-  const initialKeyRef = React.useRef<string>(filtersKey(initialFilters));
+  // Nullable: cleared the first time the URL→state sync restores filters, so the
+  // initial-fetch skip below no longer suppresses fetches once the user has
+  // navigated away from the SSR'd page.
+  const initialKeyRef = React.useRef<string | null>(filtersKey(initialFilters));
+  const firstUrlSync = React.useRef(true);
+  const firstUrlWrite = React.useRef(true);
 
   // ---------- Search input → filters (debounced 250ms) ----------
   React.useEffect(() => {
@@ -121,15 +151,46 @@ export function FighterCatalogClient({
     return () => window.clearTimeout(timer);
   }, [searchInput, filters.q]);
 
-  // ---------- URL sync ----------
+  // ---------- URL sync (state → URL) ----------
+  // User-initiated filter changes push so the browser back/forward buttons step
+  // through prior filter states. The first run only canonicalises a hand-typed/
+  // non-canonical URL, which should replace so it leaves no phantom entry.
   const urlFilterKey = filtersKey(filters);
   React.useEffect(() => {
+    const firstRun = firstUrlWrite.current;
+    firstUrlWrite.current = false;
     const next = urlFilterKey;
     const current = searchParams.toString();
     if (next === current) return;
-    router.replace(next ? `/fighters?${next}` : "/fighters", { scroll: false });
+    const href = next ? `/fighters?${next}` : "/fighters";
+    if (firstRun) {
+      router.replace(href, { scroll: false });
+    } else {
+      router.push(href, { scroll: false });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlFilterKey]);
+
+  // ---------- URL sync (URL → state) ----------
+  // Restore filters when the URL changes underneath us (back/forward). Skipped
+  // on first render: the server already parsed the URL into initialFilters, and
+  // re-parsing here would drop its status/sort defaulting. The first-render
+  // guard plus the key check keep this from looping with the effect above (a
+  // self-initiated push lands here with searchParamsKey === urlFilterKey).
+  const searchParamsKey = searchParams.toString();
+  React.useEffect(() => {
+    if (firstUrlSync.current) {
+      firstUrlSync.current = false;
+      return;
+    }
+    if (searchParamsKey === urlFilterKey) return;
+    initialKeyRef.current = null;
+    const restored = deserializeFilters(searchParams);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing React state from an external system (browser history) on back/forward
+    setFilters(restored);
+    setSearchInput(restored.q);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParamsKey]);
 
   // ---------- Filter-change fetch ----------
   // Extracted so the error banner's "Retry" button can re-run the exact same

@@ -42,7 +42,7 @@ export async function getLeaderboard(
   if (sort === "volume") {
     rows = await db.execute<LeaderboardRow>(sql`
       SELECT
-        ROW_NUMBER() OVER (ORDER BY up.total_coins_lost DESC)::int AS rank,
+        ROW_NUMBER() OVER (ORDER BY up.total_coins_lost DESC, up.bet_count DESC, up.id ASC)::int AS rank,
         up.id::text AS user_id,
         up.username,
         up.display_name,
@@ -54,7 +54,7 @@ export async function getLeaderboard(
         (SELECT COUNT(*)::int FROM user_achievement WHERE user_id = up.id) AS achievement_count
       FROM user_profile up
       WHERE up.bet_count > 0 OR up.balance_coins <> 10000
-      ORDER BY up.total_coins_lost DESC
+      ORDER BY up.total_coins_lost DESC, up.bet_count DESC, up.id ASC
       LIMIT ${limit}
     `);
   } else if (sort === "achievements") {
@@ -65,7 +65,7 @@ export async function getLeaderboard(
         GROUP BY user_id
       )
       SELECT
-        ROW_NUMBER() OVER (ORDER BY COALESCE(ach.c, 0) DESC, up.bet_count DESC)::int AS rank,
+        ROW_NUMBER() OVER (ORDER BY COALESCE(ach.c, 0) DESC, up.bet_count DESC, up.id ASC)::int AS rank,
         up.id::text AS user_id,
         up.username,
         up.display_name,
@@ -78,13 +78,13 @@ export async function getLeaderboard(
       FROM user_profile up
       LEFT JOIN ach ON ach.user_id = up.id
       WHERE COALESCE(ach.c, 0) > 0
-      ORDER BY COALESCE(ach.c, 0) DESC, up.bet_count DESC
+      ORDER BY COALESCE(ach.c, 0) DESC, up.bet_count DESC, up.id ASC
       LIMIT ${limit}
     `);
   } else {
     rows = await db.execute<LeaderboardRow>(sql`
       SELECT
-        ROW_NUMBER() OVER (ORDER BY (up.total_coins_earned - up.total_coins_lost) DESC)::int AS rank,
+        ROW_NUMBER() OVER (ORDER BY (up.total_coins_earned - up.total_coins_lost) DESC, up.bet_count DESC, up.id ASC)::int AS rank,
         up.id::text AS user_id,
         up.username,
         up.display_name,
@@ -96,7 +96,7 @@ export async function getLeaderboard(
         (SELECT COUNT(*)::int FROM user_achievement WHERE user_id = up.id) AS achievement_count
       FROM user_profile up
       WHERE up.bet_count > 0 OR up.balance_coins <> 10000
-      ORDER BY (up.total_coins_earned - up.total_coins_lost) DESC
+      ORDER BY (up.total_coins_earned - up.total_coins_lost) DESC, up.bet_count DESC, up.id ASC
       LIMIT ${limit}
     `);
   }
