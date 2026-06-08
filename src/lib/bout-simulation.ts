@@ -2,6 +2,12 @@ import { sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 
+/** Canonical 8-4-4-4-12 UUID shape. The looser `[0-9a-f-]{36}` predicate let
+ *  through 36-char junk (e.g. all hyphens), which then blew up the `::uuid`
+ *  cast (Postgres 22P02) and 500'd the caller. */
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export interface BoutSimulationFeature {
   featureName: string;
   shapValue: number;
@@ -255,9 +261,7 @@ export interface BoutSimulationPick {
 export async function getBoutSimulationPicks(
   boutIds: string[],
 ): Promise<Map<string, BoutSimulationPick>> {
-  const ids = [...new Set(boutIds)].filter((id) =>
-    /^[0-9a-f-]{36}$/i.test(id),
-  );
+  const ids = [...new Set(boutIds)].filter((id) => UUID_RE.test(id));
   if (ids.length === 0) return new Map();
   const values = sql.join(
     ids.map((id) => sql`${id}::uuid`),

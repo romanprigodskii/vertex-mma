@@ -249,6 +249,15 @@ async function MonteCarloBlock({
   // panel — see reconcileMcMethodProbs).
   const m = reconcileMcMethodProbs(rounds, ensembleProbA);
 
+  // The per-round strip only carries an any-method finish probability, so a
+  // round-finish headline can't name its own method. Label it with the bout's
+  // DOMINANT finish method (KO/TKO vs submission) from the reconciled totals —
+  // otherwise a grappling-heavy matchup reads "most likely KO in round N"
+  // while the KO/Sub/Dec strip right below says submission is the likelier
+  // finish.
+  const dominantFinishKind: "ko" | "sub" =
+    m.probKoA + m.probKoB >= m.probSubA + m.probSubB ? "ko" : "sub";
+
   // Find the most likely (method, round) cell — used for the headline
   // sentence. Decision sits at "round = scheduled_rounds + 1" so it
   // sorts after all round-finish cells.
@@ -259,7 +268,7 @@ async function MonteCarloBlock({
   type Cell = { kind: "ko" | "sub" | "dec"; round: number; prob: number };
   const cells: Cell[] = [];
   for (let i = 0; i < scheduledRounds; i += 1) {
-    cells.push({ kind: "ko", round: i + 1, prob: finishByRound[i] });
+    cells.push({ kind: dominantFinishKind, round: i + 1, prob: finishByRound[i] });
   }
   const decisionProb = m.probDecisionA + m.probDecisionB;
   cells.push({ kind: "dec", round: scheduledRounds + 1, prob: decisionProb });

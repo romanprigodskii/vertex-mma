@@ -407,7 +407,7 @@ function buildWhere(filters: FighterCatalogFilters): SQL {
   return sql`WHERE ${sql.join(conditions, sql` AND `)}`;
 }
 
-function buildOrderBy(filters: FighterCatalogFilters): SQL {
+function buildOrderBy(filters: FighterCatalogFilters, isRu: boolean): SQL {
   const hasQuery = Boolean(filters.q?.trim());
   // Sort by the canonical divisional score (`divisional_sort_score` =
   // COALESCE(divisional, global)) for both the single-weight catalog
@@ -434,9 +434,17 @@ function buildOrderBy(filters: FighterCatalogFilters): SQL {
         ? sql`match_tier DESC, f.vertex_score_all_time DESC NULLS LAST, f.bout_count DESC, match_score DESC`
         : sql`f.vertex_score_all_time DESC NULLS LAST, f.bout_count DESC`;
     case "name_asc":
-      return sql`f.name_en ASC`;
+      // Alphabetical by the *displayed* name: on RU sort by name_ru (falling
+      // back to name_en where the translation is missing) so the Cyrillic
+      // catalog reads А→Я, matching localizedNameSql in the SELECT. Match /
+      // search ranking stays on name_en — this only affects explicit name sorts.
+      return isRu
+        ? sql`COALESCE(NULLIF(f.name_ru, ''), f.name_en) ASC`
+        : sql`f.name_en ASC`;
     case "name_desc":
-      return sql`f.name_en DESC`;
+      return isRu
+        ? sql`COALESCE(NULLIF(f.name_ru, ''), f.name_en) DESC`
+        : sql`f.name_en DESC`;
     case "wins":
       // UFC-only wins so regional-circuit pioneers like Travis Fulton or
       // Dan Severn (career career_wins=300+/100+ from pre-UFC bouts)
@@ -545,7 +553,7 @@ export async function searchFightersWithFilters(
   const trimmedQ = filters.q?.trim();
   const isRu = await isRuLocale();
   const where = buildWhere(filters);
-  const orderBy = buildOrderBy(filters);
+  const orderBy = buildOrderBy(filters, isRu);
 
   const matchScoreSelect = trimmedQ
     ? sql`,

@@ -3,6 +3,7 @@ import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import type { HeadToHeadBout } from "@/lib/compare-fighters";
 import { abbreviateMethod, methodAbbrevKey } from "@/lib/method";
+import { isCuratedTitleFight } from "@/lib/title-fights";
 
 interface HeadToHeadProps {
   bouts: HeadToHeadBout[];
@@ -76,7 +77,7 @@ export function HeadToHead({
                       {t("noContestLabel")}
                     </span>
                   )}
-                  {bout.is_title_fight ? (
+                  {isCuratedTitleFight(bout.bout_id) ? (
                     <span className="ml-2 rounded-sm border border-primary/35 bg-primary/10 px-1.5 py-0.5 font-sans text-[9px] uppercase tracking-widest text-primary">
                       {t("titleBadge")}
                     </span>

@@ -13,7 +13,9 @@ const UUID_RE =
  * bout that triggered it, and the bout (if any) where the score first
  * dropped below that peak. Used by the Peak Vertex profile section.
  *
- * If the fighter has < 3 anchor rows (sub-3-bout careers), returns null.
+ * Returns null when the fighter has no score-history rows to anchor a peak —
+ * sub-3-bout careers carry no Vertex rating, so nothing is written to
+ * fighter_score_history for them.
  */
 
 interface PeakBout {
@@ -415,9 +417,20 @@ export async function getScoreHistory(
     `)) as unknown as Array<{ cur: number | null; at: number | null }>;
     const live = liveRows[0];
     if (live) {
-      const last = points[points.length - 1];
-      if (live.cur != null) last.currentScore = live.cur;
-      if (live.at != null) last.allTimeScore = live.at;
+      // Override the latest BOUT anchor, not the array tail — a trailing
+      // 'monthly' decay snapshot can sort after the last bout, and pinning the
+      // live hero number onto that synthetic point would leave the last *bout*
+      // row diverging from the score the user just clicked. Fall back to the
+      // tail only when there are no bout rows at all.
+      let target = points[points.length - 1];
+      for (let i = points.length - 1; i >= 0; i -= 1) {
+        if (points[i].kind === "bout") {
+          target = points[i];
+          break;
+        }
+      }
+      if (live.cur != null) target.currentScore = live.cur;
+      if (live.at != null) target.allTimeScore = live.at;
     }
   }
 

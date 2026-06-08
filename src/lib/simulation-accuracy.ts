@@ -79,47 +79,52 @@ export async function getGradedSimulations(
   // the newest model_version's prediction per bout, drop stale older
   // versions from accuracy stats so a v0.5.0 backtest doesn't get
   // polluted by v0.1.0 picks.
+  // DISTINCT ON (b.id) needs b.id as the leading ORDER BY key, so we can't
+  // also order by date in the same SELECT. Wrap it: dedupe to the freshest
+  // model_version per bout in the subquery, then order the deduped set by the
+  // real event timestamp (not a lexical compare of timestamptz::text) and cap
+  // at `limit` in SQL — so we never pull the entire graded history into JS.
   const result = await db.execute<Row>(sql`
-    SELECT DISTINCT ON (b.id)
-      b.id::text AS bout_id,
-      e.id::text AS event_id,
-      e.slug AS event_slug,
-      ${localizedEventNameSql("e", isRu)} AS event_name,
-      e.date::text AS event_date,
-      bs.model_version,
-      bs.confidence_label,
-      bs.prob_a,
-      bs.prob_b,
-      bs.predicted_winner_id::text AS predicted_winner_id,
-      ${localizedNameSql("pf", isRu)} AS predicted_winner_name,
-      pf.slug AS predicted_winner_slug,
-      b.winner_id::text AS actual_winner_id,
-      ${localizedNameSql("wf", isRu)} AS actual_winner_name,
-      wf.slug AS actual_winner_slug,
-      b.method::text AS method
-    FROM bout b
-    JOIN event e ON e.id = b.event_id
-    JOIN bout_simulation bs ON bs.bout_id = b.id
-    JOIN fighter wf ON wf.id = b.winner_id
-    -- INNER join: only grade picks where the model actually named a winner we
-    -- can resolve. A NULL/orphaned predicted_winner_id (e.g. a fighter
-    -- re-import) isn't an honest "miss" — it's ungradeable, so drop it.
-    JOIN fighter pf ON pf.id = bs.predicted_winner_id
-    WHERE e.promotion = 'ufc'
-      AND b.status = 'completed'
-      AND b.winner_id IS NOT NULL
-      AND (b.method IS NULL OR b.method::text != 'no_contest')
-    ORDER BY b.id, bs.generated_at DESC
+    SELECT * FROM (
+      SELECT DISTINCT ON (b.id)
+        b.id::text AS bout_id,
+        e.id::text AS event_id,
+        e.slug AS event_slug,
+        ${localizedEventNameSql("e", isRu)} AS event_name,
+        e.date::text AS event_date,
+        e.date AS event_date_ord,
+        bs.model_version,
+        bs.confidence_label,
+        bs.prob_a,
+        bs.prob_b,
+        bs.predicted_winner_id::text AS predicted_winner_id,
+        ${localizedNameSql("pf", isRu)} AS predicted_winner_name,
+        pf.slug AS predicted_winner_slug,
+        b.winner_id::text AS actual_winner_id,
+        ${localizedNameSql("wf", isRu)} AS actual_winner_name,
+        wf.slug AS actual_winner_slug,
+        b.method::text AS method
+      FROM bout b
+      JOIN event e ON e.id = b.event_id
+      JOIN bout_simulation bs ON bs.bout_id = b.id
+      JOIN fighter wf ON wf.id = b.winner_id
+      -- INNER join: only grade picks where the model actually named a winner we
+      -- can resolve. A NULL/orphaned predicted_winner_id (e.g. a fighter
+      -- re-import) isn't an honest "miss" — it's ungradeable, so drop it.
+      JOIN fighter pf ON pf.id = bs.predicted_winner_id
+      WHERE e.promotion = 'ufc'
+        AND b.status = 'completed'
+        AND b.winner_id IS NOT NULL
+        AND (b.method IS NULL OR b.method::text != 'no_contest')
+      ORDER BY b.id, bs.generated_at DESC
+    ) d
+    ORDER BY d.event_date_ord DESC
+    LIMIT ${limit}
   `);
 
-  // Pull up to a healthy buffer so we can sort and slice; the
-  // ORDER BY above is by bout_id (needed for DISTINCT ON), so we
-  // re-sort by event_date in JS.
   const rows = result as unknown as Row[];
-  rows.sort((a, b) => b.event_date.localeCompare(a.event_date));
-  const sliced = rows.slice(0, limit);
 
-  return sliced.map((r) => {
+  return rows.map((r) => {
     const predictedIsA = r.prob_a >= 0.5;
     const predProb = predictedIsA ? r.prob_a : r.prob_b;
     const correct = r.predicted_winner_id === r.actual_winner_id;

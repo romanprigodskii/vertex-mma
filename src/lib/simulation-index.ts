@@ -65,6 +65,7 @@ export async function getUpcomingSimulationIndex(): Promise<SimulationIndexEvent
     event_slug: string;
     event_name: string;
     event_date: string;
+    event_epoch: number;
     fighter_a_id: string;
     fighter_a_name: string;
     fighter_a_slug: string;
@@ -104,6 +105,7 @@ export async function getUpcomingSimulationIndex(): Promise<SimulationIndexEvent
       e.slug AS event_slug,
       ${localizedEventNameSql("e", isRu)} AS event_name,
       e.date::text AS event_date,
+      EXTRACT(EPOCH FROM e.date)::float8 AS event_epoch,
       fa.id::text AS fighter_a_id,
       ${localizedNameSql("fa", isRu)} AS fighter_a_name,
       fa.slug AS fighter_a_slug,
@@ -144,6 +146,7 @@ export async function getUpcomingSimulationIndex(): Promise<SimulationIndexEvent
   const rows = result as unknown as Row[];
 
   const byEvent = new Map<string, SimulationIndexEvent>();
+  const eventEpoch = new Map<string, number>();
   for (const r of rows) {
     const bout: SimulationIndexBout = {
       boutId: r.bout_id,
@@ -182,6 +185,7 @@ export async function getUpcomingSimulationIndex(): Promise<SimulationIndexEvent
     if (ev) {
       ev.bouts.push(bout);
     } else {
+      eventEpoch.set(r.event_id, r.event_epoch);
       byEvent.set(r.event_id, {
         eventId: r.event_id,
         eventSlug: r.event_slug,
@@ -197,7 +201,11 @@ export async function getUpcomingSimulationIndex(): Promise<SimulationIndexEvent
   // bout_order in this query — use confidence as a soft proxy so the
   // most actionable card lands first).
   const events = Array.from(byEvent.values());
-  events.sort((a, b) => a.eventDate.localeCompare(b.eventDate));
+  // Sort by the real event timestamp (epoch seconds) rather than a lexical
+  // compare of the timestamptz text rendering.
+  events.sort(
+    (a, b) => (eventEpoch.get(a.eventId) ?? 0) - (eventEpoch.get(b.eventId) ?? 0),
+  );
   for (const ev of events) {
     ev.bouts.sort((a, b) => {
       if (a.isMainEvent !== b.isMainEvent) return a.isMainEvent ? -1 : 1;

@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 
 import type { FighterBoutRound } from "@/lib/fighter-detail";
 import { proRateToFullRound } from "@/lib/round-stats";
+import { isCuratedTitleFight } from "@/lib/title-fights";
 import { cn } from "@/lib/utils";
 
 interface RoundByRoundChartProps {
@@ -158,7 +159,8 @@ function applyFilter(
   if (mode === "all") return entries;
   if (mode === "wins") return entries.filter((e) => e.result === "W");
   if (mode === "losses") return entries.filter((e) => e.result === "L");
-  if (mode === "title") return entries.filter((e) => e.is_title_fight);
+  if (mode === "title")
+    return entries.filter((e) => isCuratedTitleFight(e.bout_id));
   // last5 — most recent 5 distinct bouts. `entries` is already date-DESC.
   const seen = new Set<string>();
   const keep = new Set<string>();
