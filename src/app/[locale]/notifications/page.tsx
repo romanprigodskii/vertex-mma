@@ -30,8 +30,10 @@ export default async function NotificationsPage({
   const { locale } = await params;
   setRequestLocale(locale);
   const t = await getTranslations("notifications");
+  const localePrefix = locale === "en" ? "" : `/${locale}`;
   const user = await getCurrentUser();
-  if (!user) redirect("/signin?next=/notifications");
+  if (!user)
+    redirect(`${localePrefix}/signin?next=${localePrefix}/notifications`);
 
   const LIMIT = 100;
   // Fetch one extra to detect (without a second query) whether older

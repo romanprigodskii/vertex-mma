@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import NextLink from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 
@@ -89,12 +90,16 @@ export function SignInForm() {
             <span className="font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
               {t("password")}
             </span>
-            <Link
+            {/* /auth/* lives OUTSIDE the [locale] tree (middleware excludes
+                it), so the locale-aware Link would wrongly prefix it to
+                /ru/auth/... → 404. Use the plain next/link Link so the path
+                stays bare on every locale. */}
+            <NextLink
               href="/auth/forgot-password"
               className="font-sans text-[11px] text-primary hover:underline"
             >
               {t("forgotPassword")}
-            </Link>
+            </NextLink>
           </div>
           <PasswordInput
             name="password"

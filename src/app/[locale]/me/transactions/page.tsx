@@ -40,8 +40,10 @@ export default async function TransactionsPage({
   const { locale } = await params;
   setRequestLocale(locale);
   const t = await getTranslations("transactions");
+  const localePrefix = locale === "en" ? "" : `/${locale}`;
   const user = await getCurrentUser();
-  if (!user) redirect("/signin?next=/me/transactions");
+  if (!user)
+    redirect(`${localePrefix}/signin?next=${localePrefix}/me/transactions`);
 
   const rows = await listTransactionsForUser(user.userProfileId, 200);
   const dateLocale = locale === "ru" ? "ru-RU" : "en-US";

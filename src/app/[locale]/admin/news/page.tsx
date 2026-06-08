@@ -29,9 +29,10 @@ export default async function AdminNewsPage({
   const { locale } = await params;
   setRequestLocale(locale);
   const t = await getTranslations("admin");
+  const localePrefix = locale === "en" ? "" : `/${locale}`;
 
   const user = await getCurrentUser();
-  if (!user) redirect("/signin?next=/admin/news");
+  if (!user) redirect(`${localePrefix}/signin?next=${localePrefix}/admin/news`);
   // Hide the route entirely from non-staff rather than disclosing it exists.
   if (!user.isStaff) notFound();
 

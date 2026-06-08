@@ -7,8 +7,14 @@ import { getCurrentUser } from "@/lib/auth";
 // for the owner; we don't need a second copy.
 export const dynamic = "force-dynamic";
 
-export default async function MePage() {
+export default async function MePage({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
+  const localePrefix = locale === "en" ? "" : `/${locale}`;
   const user = await getCurrentUser();
-  if (!user) redirect("/signin?next=/me");
-  redirect(`/profile/${user.username}`);
+  if (!user) redirect(`${localePrefix}/signin?next=${localePrefix}/me`);
+  redirect(`${localePrefix}/profile/${user.username}`);
 }

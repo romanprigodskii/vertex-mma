@@ -43,12 +43,13 @@ export default async function MyBetsPage({
   const { locale } = await params;
   setRequestLocale(locale);
   const dateLocale = locale === "ru" ? "ru-RU" : "en-US";
+  const localePrefix = locale === "en" ? "" : `/${locale}`;
   const t = await getTranslations("me");
   const tMarkets = await getTranslations("markets");
   const tSb = await getTranslations("sportsbook");
   const tParlay = await getTranslations("parlay");
   const user = await getCurrentUser();
-  if (!user) redirect("/signin?next=/me/bets");
+  if (!user) redirect(`${localePrefix}/signin?next=${localePrefix}/me/bets`);
   // Settlement runs DB-side (trigger), which can't call the TS achievement
   // evaluator — so re-evaluate here when the user views their bets, catching
   // win-based achievements (bet_10_wins, big_win, parlay_win, …) shortly after

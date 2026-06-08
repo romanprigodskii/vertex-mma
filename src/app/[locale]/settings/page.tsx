@@ -35,8 +35,9 @@ export default async function SettingsPage({
   const { locale } = await params;
   setRequestLocale(locale);
   const t = await getTranslations("settings");
+  const localePrefix = locale === "en" ? "" : `/${locale}`;
   const user = await getCurrentUser();
-  if (!user) redirect("/signin?next=/settings");
+  if (!user) redirect(`${localePrefix}/signin?next=${localePrefix}/settings`);
 
   return (
     <>
