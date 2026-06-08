@@ -21,6 +21,9 @@ export async function listTransactionsForUser(
   limit = 100,
 ): Promise<TransactionRow[]> {
   if (!UUID_RE.test(userProfileId)) return [];
+  // Callers derive `limit` from a user-controlled ?limit= param, so clamp it
+  // here too rather than trust every caller to bound the ledger scan.
+  const safeLimit = Math.min(Math.max(1, Math.floor(limit)), 1000);
   const rows = await db
     .select({
       id: transaction.id,
@@ -33,7 +36,7 @@ export async function listTransactionsForUser(
     .from(transaction)
     .where(eq(transaction.userId, userProfileId))
     .orderBy(desc(transaction.createdAt))
-    .limit(limit);
+    .limit(safeLimit);
   return rows.map((r) => ({
     id: r.id,
     type: r.type,

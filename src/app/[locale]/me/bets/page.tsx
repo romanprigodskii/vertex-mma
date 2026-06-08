@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { ChevronLeft } from "lucide-react";
 
@@ -7,7 +6,7 @@ import { Container } from "@/components/layout/container";
 import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
 import { ShareButton } from "@/components/share/share-button";
-import { Link, getPathname } from "@/i18n/navigation";
+import { Link, getPathname, redirect } from "@/i18n/navigation";
 import { checkAndUnlockAchievements } from "@/lib/achievements";
 import { getCurrentUser } from "@/lib/auth";
 import { listMyBets } from "@/lib/markets";
@@ -48,7 +47,9 @@ export default async function MyBetsPage({
   const tSb = await getTranslations("sportsbook");
   const tParlay = await getTranslations("parlay");
   const user = await getCurrentUser();
-  if (!user) redirect("/signin?next=/me/bets");
+  // `return` the redirect: next-intl's redirect() returns `never` but isn't
+  // treated as a control-flow terminator, so this is needed to narrow `user`.
+  if (!user) return redirect({ href: "/signin?next=/me/bets", locale });
   // Settlement runs DB-side (trigger), which can't call the TS achievement
   // evaluator — so re-evaluate here when the user views their bets, catching
   // win-based achievements (bet_10_wins, big_win, parlay_win, …) shortly after

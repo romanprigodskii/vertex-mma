@@ -1,12 +1,11 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { ChevronLeft } from "lucide-react";
 
 import { Container } from "@/components/layout/container";
 import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
-import { Link } from "@/i18n/navigation";
+import { Link, redirect } from "@/i18n/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { listTransactionsForUser } from "@/lib/transactions";
 
@@ -32,18 +31,42 @@ const KNOWN_TYPES = new Set([
   "admin_adjustment",
 ]);
 
+// Ledger paging: show DEFAULT_LIMIT rows and let `?limit=` widen the window up
+// to MAX_LIMIT via a "load more" link, instead of a silent hard cap.
+const DEFAULT_LIMIT = 200;
+const MAX_LIMIT = 1000;
+
+function parseLimit(raw: string | undefined): number {
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return DEFAULT_LIMIT;
+  return Math.min(Math.floor(n), MAX_LIMIT);
+}
+
 export default async function TransactionsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ locale: string }>;
+  searchParams: Promise<{ limit?: string }>;
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
   const t = await getTranslations("transactions");
+  // "Load more" reuses catalog's generic pagination string — messages/*.json is
+  // owned by another change, and transactions has no loadMore key of its own.
+  const tCatalog = await getTranslations("catalog");
   const user = await getCurrentUser();
-  if (!user) redirect("/signin?next=/me/transactions");
+  // `return` the redirect: next-intl's redirect() returns `never` but isn't
+  // treated as a control-flow terminator, so this is needed to narrow `user`.
+  if (!user) return redirect({ href: "/signin?next=/me/transactions", locale });
 
-  const rows = await listTransactionsForUser(user.userProfileId, 200);
+  const limit = parseLimit((await searchParams).limit);
+  // Probe one extra row to know whether older history exists without a second
+  // COUNT query; render only `limit`, treat the surplus as a "more" flag.
+  const fetched = await listTransactionsForUser(user.userProfileId, limit + 1);
+  const hasMore = fetched.length > limit && limit < MAX_LIMIT;
+  const rows = hasMore ? fetched.slice(0, limit) : fetched;
+  const nextLimit = Math.min(limit + DEFAULT_LIMIT, MAX_LIMIT);
   const dateLocale = locale === "ru" ? "ru-RU" : "en-US";
 
   return (
@@ -122,6 +145,17 @@ export default async function TransactionsPage({
               })}
             </ul>
           )}
+
+          {hasMore ? (
+            <div className="mt-6 text-center">
+              <Link
+                href={`/me/transactions?limit=${nextLimit}`}
+                className="inline-block font-sans text-xs uppercase tracking-widest text-primary transition-colors hover:text-primary/80"
+              >
+                {tCatalog("loadMore")}
+              </Link>
+            </div>
+          ) : null}
         </Container>
       </main>
       <Footer />
