@@ -370,7 +370,7 @@ export async function listNewsForFighter(
     ${feedSelect(isRu)}
     WHERE ni.status IN ('approved', 'auto_approved')
       AND ni.classification IS DISTINCT FROM 'unrelated'::news_classification
-      AND ${fighterId}::uuid = ANY(ni.related_fighter_ids)
+      AND ni.related_fighter_ids @> ARRAY[${fighterId}::uuid]
     ORDER BY ni.published_at DESC
     LIMIT ${Math.min(20, Math.max(1, limit))}
   `)) as unknown as FeedRow[];

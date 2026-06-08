@@ -118,22 +118,51 @@ def upsert_news_items(
     counts = UpsertCounts()
     with conn.cursor() as cur:
         for e in entries:
-            # Skip near-duplicate stories (the same booking re-reported across
-            # outlets, or a re-post) via pg_trgm title similarity within a
-            # recent window — otherwise the feed fills with the same headline.
-            # Exact-URL dupes are still caught by ON CONFLICT below. Same-batch
-            # dupes are caught too: an earlier insert is visible to this SELECT
-            # within the open transaction.
+            # Skip near-duplicate stories via pg_trgm title similarity within a
+            # SHORT, source-aware window — otherwise the feed fills with the same
+            # headline. Two tiers keep this from being both too blunt and too
+            # leaky (it used to be a single global similarity>0.85 over 7 days,
+            # which simultaneously dropped distinct templated stories like
+            # "UFC 330 weigh-in results" vs "UFC 331 ..." AND let cross-outlet
+            # rewrites through):
+            #   - same outlet, sim > 0.82  → a repost/edit of its own story
+            #   - any outlet,  sim > 0.90  → near-identical syndication
+            # The window is only 3 days so two different cards that share a
+            # templated headline (usually a week+ apart) don't collide. Exact-URL
+            # dupes are still caught by ON CONFLICT below; same-batch dupes too
+            # (an earlier insert is visible to this SELECT in the open txn).
+            # Every skip is logged with the matched id so swallowed stories are
+            # auditable.
+            # The WHERE encodes the full skip predicate (same-source>0.82 OR
+            # any-source>0.90) so a row comes back ONLY when this entry really is
+            # a duplicate — picking the single globally-highest match would
+            # otherwise miss a same-source repost that sits just under a higher
+            # but sub-0.90 cross-source title.
             cur.execute(
                 """
-                SELECT 1 FROM news_item
-                WHERE similarity(title, %s) > 0.85
-                  AND published_at > now() - interval '7 days'
+                SELECT id::text, title, source_id::text,
+                       similarity(title, %s) AS sim
+                FROM news_item
+                WHERE published_at > now() - interval '3 days'
+                  AND (
+                    (source_id = %s::uuid AND similarity(title, %s) > 0.82)
+                    OR similarity(title, %s) > 0.90
+                  )
+                ORDER BY sim DESC
                 LIMIT 1
                 """,
-                (e.title,),
+                (e.title, source_id, e.title, e.title),
             )
-            if cur.fetchone() is not None:
+            match = cur.fetchone()
+            if match is not None:
+                m_id, m_title, m_source_id, m_sim = match
+                same_source = m_source_id == source_id
+                log.info(
+                    f"  dedup skip: {e.title!r} ~ {m_title!r} "
+                    f"(sim={m_sim:.2f}, "
+                    f"{'same' if same_source else 'cross'}-source, "
+                    f"matched {m_id})"
+                )
                 counts.skipped += 1
                 continue
             cur.execute(
@@ -399,10 +428,15 @@ def auto_create_bout(
     fighter_b_id: str,
     event_id: str,
     weight_class: str,
-) -> tuple[str, bool]:
+) -> tuple[str | None, bool]:
     """Insert a scheduled bout between two fighters at an event, or return
     the existing one if a row already links the same pair to the same event.
-    Returns (bout_id, created). Idempotent on (event_id, fighter pair)."""
+    Returns (bout_id, created). Idempotent on (event_id, fighter pair).
+
+    Returns (None, False) when either fighter is already booked in a DIFFERENT
+    (non-cancelled) bout on this event: one fighter in two bouts on one card is
+    corrupt data (a real card never lists it), so we refuse the second booking
+    rather than create a phantom matchup."""
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -423,6 +457,38 @@ def auto_create_bout(
         row = cur.fetchone()
         if row:
             return row[0], False
+
+        # Guard against booking a fighter into TWO bouts on the same card. The
+        # pair-check above is idempotent on the exact (a, b) matchup, but a
+        # garbled / mis-extracted news announcement can name the same fighter
+        # against a different opponent on the same event — physically impossible
+        # for a real card. Since no exact-pair row exists here, any non-cancelled
+        # bout on this event that already contains fighter_a or fighter_b is a
+        # conflicting matchup, so refuse to create a phantom second booking.
+        cur.execute(
+            """
+            SELECT id::text FROM bout
+            WHERE event_id = %s::uuid
+              AND status <> 'cancelled'::bout_status
+              AND (
+                fighter_a_id IN (%s::uuid, %s::uuid)
+                OR fighter_b_id IN (%s::uuid, %s::uuid)
+              )
+            LIMIT 1
+            """,
+            (
+                event_id,
+                fighter_a_id, fighter_b_id,
+                fighter_a_id, fighter_b_id,
+            ),
+        )
+        conflict = cur.fetchone()
+        if conflict:
+            log.warning(
+                f"  auto-bout skipped — a fighter is already booked in another "
+                f"bout ({conflict[0]}) on event {event_id}; refusing duplicate"
+            )
+            return None, False
 
         cur.execute(
             """

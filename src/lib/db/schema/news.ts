@@ -92,7 +92,14 @@ export const newsItem = pgTable(
     classification: newsClassificationEnum("classification"),
     confidence: real("confidence"),
 
-    relatedBoutId: uuid("related_bout_id").references(() => bout.id),
+    // ON DELETE SET NULL: news auto-creates provisional bouts that the UFCStats
+    // scrape later reconciles by DELETEing the provisional row. Without this,
+    // the default RESTRICT blocks any bout delete that a news item still points
+    // at (the scraper only works because it manually repoints first); a news
+    // item simply keeps its body when its provisional bout is reconciled away.
+    relatedBoutId: uuid("related_bout_id").references(() => bout.id, {
+      onDelete: "set null",
+    }),
     relatedFighterIds: uuid("related_fighter_ids")
       .array()
       .default(sql`'{}'::uuid[]`),
@@ -111,6 +118,13 @@ export const newsItem = pgTable(
     index("news_item_status_idx").on(table.status),
     index("news_item_classification_idx").on(table.classification),
     index("news_item_related_bout_idx").on(table.relatedBoutId),
+    // GIN index on the uuid[] of tagged fighters: the per-fighter feed lookup
+    // (listNewsForFighter) filters with `related_fighter_ids @> ARRAY[id]`,
+    // which uses this index instead of a full scan that grows with the table.
+    index("news_item_related_fighters_gin").using(
+      "gin",
+      table.relatedFighterIds,
+    ),
   ],
 );
 

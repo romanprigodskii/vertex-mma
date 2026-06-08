@@ -27,6 +27,13 @@ const SUBTITLE_MAX = 120;
 const MIN_BOUTS = 1;
 const MAX_BOUTS = 15;
 
+// Card create/update isn't one of the centralized engagement taps in
+// COOLDOWN_MS (bet/vote/like); a card mutation is heavier (writes a row +
+// revalidates), so it gets its own, larger cooldown to throttle scripted
+// flooding of the community grid. Kept local to avoid touching the shared
+// rate-limit module. Invisible to a human filling out the form.
+const CARD_COOLDOWN_MS = 5_000;
+
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const WEIGHT_SET = new Set<string>(WEIGHT_CLASSES);
@@ -207,23 +214,35 @@ export async function createFightCardAction(
 ): Promise<{ error?: string; slug?: string }> {
   const myId = await getMyProfileId();
   if (!myId) return { error: "NOT_SIGNED_IN" };
+  if (!allowAction(`card:${myId}`, CARD_COOLDOWN_MS)) {
+    return { error: "RATE_LIMITED" };
+  }
 
   const parsed = readCardForm(formData);
   if ("error" in parsed) return { error: parsed.error };
   const f = parsed.fields;
 
   const slug = await uniqueSlug(f.title);
-  await db.insert(fightCard).values({
-    userId: myId,
-    slug,
-    title: f.title,
-    subtitle: f.subtitle,
-    themeColor: f.themeColor,
-    titleFont: f.titleFont,
-    backgroundId: f.backgroundId,
-    isPublic: f.isPublic,
-    bouts: f.bouts,
-  });
+  try {
+    await db.insert(fightCard).values({
+      userId: myId,
+      slug,
+      title: f.title,
+      subtitle: f.subtitle,
+      themeColor: f.themeColor,
+      titleFont: f.titleFont,
+      backgroundId: f.backgroundId,
+      isPublic: f.isPublic,
+      bouts: f.bouts,
+    });
+  } catch {
+    // uniqueSlug does a check-then-insert with no transaction, so a concurrent
+    // create landing the same random tail (or any transient write failure) can
+    // reject on the slug UNIQUE constraint. Return a stable code instead of
+    // letting the rejection surface as an unhandled server-action crash; the
+    // client maps unknown codes to a friendly generic message.
+    return { error: "COULD_NOT_CREATE" };
+  }
 
   revalidatePath("/cards");
   return { slug };
@@ -235,6 +254,9 @@ export async function updateFightCardAction(
 ): Promise<{ error?: string; slug?: string }> {
   const myId = await getMyProfileId();
   if (!myId) return { error: "NOT_SIGNED_IN" };
+  if (!allowAction(`card:${myId}`, CARD_COOLDOWN_MS)) {
+    return { error: "RATE_LIMITED" };
+  }
   if (!UUID_RE.test(cardId)) return { error: "CARD_NOT_FOUND" };
 
   const existing = await db
@@ -307,11 +329,22 @@ export async function toggleLikeAction(
   if (!UUID_RE.test(cardId)) return { error: "CARD_NOT_FOUND" };
 
   const card = await db
-    .select({ id: fightCard.id, slug: fightCard.slug })
+    .select({
+      id: fightCard.id,
+      slug: fightCard.slug,
+      userId: fightCard.userId,
+      isPublic: fightCard.isPublic,
+    })
     .from(fightCard)
     .where(eq(fightCard.id, cardId))
     .limit(1);
   if (card.length === 0) return { error: "CARD_NOT_FOUND" };
+  // A private card is likeable only by its owner — the detail page 404s it for
+  // everyone else, so liking it (and bumping like_count) must be blocked too.
+  // Mirror that 404 with CARD_NOT_FOUND rather than confirming the id exists.
+  if (!card[0].isPublic && card[0].userId !== myId) {
+    return { error: "CARD_NOT_FOUND" };
+  }
 
   const existing = await db
     .select({ userId: fightCardLike.userId })
