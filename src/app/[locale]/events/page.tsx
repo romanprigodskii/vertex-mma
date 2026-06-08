@@ -85,7 +85,12 @@ export default async function EventsListPage({
   // linger as a non-canonical duplicate of /events.
   if (sp.filter === "upcoming") redirect({ href: "/events", locale });
   const filter = parseFilter(sp.filter);
-  const events = await listEvents(filter, 60);
+  // Provisional events auto-created from news (no bouts yet) otherwise render
+  // as a broken "0 bouts" card. There's no "card TBA" message key, so drop
+  // them here — the list only shows events that have a real bout card.
+  // Filtering before the empty check keeps the tab-aware empty state correct
+  // when every row gets dropped.
+  const events = (await listEvents(filter, 60)).filter((e) => e.bout_count > 0);
   const emptyCopy = EMPTY_COPY[filter];
   const dateFmt = activeLocale === "ru" ? "ru-RU" : "en-US";
 
@@ -171,7 +176,10 @@ export default async function EventsListPage({
                         {e.short_name || e.name}
                       </h3>
                       {sub ? (
-                        <p className="mt-1 truncate font-sans text-xs text-foreground-muted">
+                        <p
+                          title={sub}
+                          className="mt-1 truncate font-sans text-xs text-foreground-muted"
+                        >
                           {sub}
                         </p>
                       ) : null}
