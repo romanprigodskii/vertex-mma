@@ -1,0 +1,46 @@
+name: CI
+
+# Lint + type-check gate. `next build` does not run ESLint and there was no
+# workflow here, so nothing enforced types/lint before a Coolify deploy off
+# main. This runs on every push and pull request.
+on:
+  push:
+  pull_request:
+
+# Supersede in-flight runs for the same ref so only the latest commit is gated.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  type-check-and-lint:
+    name: type-check + lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # pnpm must be installed before setup-node so its pnpm cache can resolve.
+      # Pinned to the dev/lockfile version (lockfileVersion 9.0) for a
+      # deterministic --frozen-lockfile install.
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.1.0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Type-check
+        run: pnpm type-check
+
+      # Run even if type-check failed, so one CI run surfaces every problem.
+      - name: Lint
+        if: ${{ !cancelled() }}
+        run: pnpm lint
