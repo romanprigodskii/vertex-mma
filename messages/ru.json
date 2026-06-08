@@ -121,7 +121,7 @@
     "unanimousDecision": "Единогласное решение",
     "majorityDecision": "Решение большинства",
     "draw": "Ничья",
-    "noContest": "No Contest",
+    "noContest": "Без результата",
     "roundByRound": "По раундам",
     "totals": "Итого",
     "judgesScorecards": "Карточки судей",
@@ -275,7 +275,7 @@
     "result_W": "Победа",
     "result_L": "Поражение",
     "result_D": "Ничья",
-    "result_NC": "No contest",
+    "result_NC": "Без результата",
     "tipSigStr": "Знач. удары",
     "tipTakedowns": "Тейкдауны",
     "tipControl": "Контроль",
@@ -382,7 +382,7 @@
     "titleAria": "Титульный бой",
     "rounds": "{count, plural, one {# раунд} few {# раунда} many {# раундов} other {# раунда}}",
     "winner": "Победитель",
-    "noContest": "No Contest",
+    "noContest": "Без результата",
     "draw": "Ничья",
     "resultPending": "Результат —",
     "viewDetails": "Подробнее",
@@ -728,7 +728,10 @@
     "usernameCooldown": "Изменить никнейм можно будет снова через {count, plural, one {# день} few {# дня} many {# дней} other {# дня}}.",
     "profileNotFound": "Профиль не найден.",
     "typeDeleteHint": "Введите DELETE, чтобы активировать кнопку.",
-    "confirmWithPassword": "В целях безопасности подтвердите текущий пароль, чтобы продолжить."
+    "confirmWithPassword": "В целях безопасности подтвердите текущий пароль, чтобы продолжить.",
+    "uploadFailedGeneric": "Не удалось загрузить изображение. Попробуйте ещё раз.",
+    "passwordChangeFailed": "Не удалось сменить пароль.",
+    "emailChangeFailed": "Не удалось сменить почту."
   },
   "profile": {
     "notFound": "Пользователь не найден",
@@ -1108,10 +1111,10 @@
     "men": "Мужчины",
     "women": "Женщины",
     "tierAll": "Все тиры",
-    "tierApex": "Apex",
-    "tierElite": "Elite",
-    "tierSeasoned": "Seasoned",
-    "tierEstablished": "Established",
+    "tierApex": "Вершина",
+    "tierElite": "Элита",
+    "tierSeasoned": "Бывалые",
+    "tierEstablished": "Признанные",
     "tierUnranked": "Без рейтинга",
     "championAll": "Все",
     "championCurrent": "Действующие",
@@ -1768,5 +1771,19 @@
     "heavyweight": "Тяжёлый",
     "catchweight": "Промежуточный",
     "openweight": "Без ограничений"
+  },
+  "metadata": {
+    "titleDefault": "Vertex MMA — симулятор боёв на основе ИИ",
+    "titleTemplate": "%s | Vertex MMA",
+    "description": "Симулятор боёв ММА на основе ИИ. Смоделируй любой матчап, предскажи любой бой.",
+    "ogTitle": "Vertex MMA",
+    "ogDescription": "Симулятор боёв ММА на основе ИИ",
+    "ogSiteName": "Vertex MMA",
+    "fightersTitle": "Бойцы",
+    "fightersDescription": "Бойцы UFC с подробной статистикой карьеры, историей боёв и анализом на основе ИИ.",
+    "fightersOgTitle": "Vertex MMA — база бойцов",
+    "fightersOgDescription": "Симулятор боёв ММА на основе ИИ с подробной аналитикой по бойцам.",
+    "forgotPasswordTitle": "Восстановление пароля",
+    "resetPasswordTitle": "Сброс пароля"
   }
 }

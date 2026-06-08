@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Bebas_Neue, Inter, JetBrains_Mono, Oswald } from "next/font/google";
 import { notFound } from "next/navigation";
 import { hasLocale, NextIntlClientProvider } from "next-intl";
-import { setRequestLocale } from "next-intl/server";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 
 import "../globals.css";
 
@@ -43,30 +43,37 @@ const jetbrainsMono = JetBrains_Mono({
   display: "swap",
 });
 
-export const metadata: Metadata = {
-  // Without this, every relative og:image (/api/og/...) resolves against
-  // localhost:3000 in production, so social crawlers can't fetch the cards.
-  metadataBase: new URL(
-    process.env.NEXT_PUBLIC_SITE_URL ?? "https://vertexmma.com",
-  ),
-  title: {
-    default: "Vertex MMA — AI-powered Fight Simulator",
-    template: "%s | Vertex MMA",
-  },
-  description:
-    "AI-powered MMA fight simulator. Run any matchup, predict any fight.",
-  openGraph: {
-    title: "Vertex MMA",
-    description: "AI-powered MMA fight simulator",
-    siteName: "Vertex MMA",
-    type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Vertex MMA",
-    description: "AI-powered MMA fight simulator",
-  },
-};
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "metadata" });
+  return {
+    // Without this, every relative og:image (/api/og/...) resolves against
+    // localhost:3000 in production, so social crawlers can't fetch the cards.
+    metadataBase: new URL(
+      process.env.NEXT_PUBLIC_SITE_URL ?? "https://vertexmma.com",
+    ),
+    title: {
+      default: t("titleDefault"),
+      template: t("titleTemplate"),
+    },
+    description: t("description"),
+    openGraph: {
+      title: t("ogTitle"),
+      description: t("ogDescription"),
+      siteName: t("ogSiteName"),
+      type: "website",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: t("ogTitle"),
+      description: t("ogDescription"),
+    },
+  };
+}
 
 export function generateStaticParams() {
   return routing.locales.map((locale) => ({ locale }));

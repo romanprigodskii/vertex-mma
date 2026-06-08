@@ -1,12 +1,29 @@
+import type { Metadata } from "next";
+import { cookies } from "next/headers";
+import { hasLocale } from "next-intl";
+import { getTranslations } from "next-intl/server";
+
 import { ResetPasswordForm } from "@/app/auth/reset-password/reset-password-form";
 import { Container } from "@/components/layout/container";
 import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
+import { routing } from "@/i18n/routing";
 import { createClient } from "@/lib/supabase/server";
 
-export const metadata = {
-  title: "Reset password",
-};
+// Mirrors auth/layout: resolve locale from the NEXT_LOCALE cookie so the
+// <title> matches the language the user picked (the reset flow lives outside
+// the [locale] segment). Falls back to the base locale when absent/invalid.
+export async function generateMetadata(): Promise<Metadata> {
+  const cookieStore = await cookies();
+  const cookieLocale = cookieStore.get("NEXT_LOCALE")?.value;
+  const locale = hasLocale(routing.locales, cookieLocale)
+    ? cookieLocale
+    : routing.defaultLocale;
+  const t = await getTranslations({ locale, namespace: "metadata" });
+  return {
+    title: t("resetPasswordTitle"),
+  };
+}
 
 // /auth/callback exchanges the recovery code for a session before redirecting
 // here, so a valid link always arrives with one. When there's no session

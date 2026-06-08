@@ -18,17 +18,23 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
-  title: "Fighters",
-  description:
-    "Explore UFC fighters with detailed career stats, fight history, and AI-powered analysis.",
-  openGraph: {
-    title: "Vertex MMA — Fighter Database",
-    description:
-      "AI-powered MMA fight simulator with detailed fighter analytics.",
-    type: "website",
-  },
-};
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "metadata" });
+  return {
+    title: t("fightersTitle"),
+    description: t("fightersDescription"),
+    openGraph: {
+      title: t("fightersOgTitle"),
+      description: t("fightersOgDescription"),
+      type: "website",
+    },
+  };
+}
 
 function toClientFilters(parsed: FighterCatalogFilters): CatalogFilterState {
   return {

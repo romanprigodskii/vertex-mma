@@ -728,7 +728,10 @@
     "usernameCooldown": "You can change your username again in {count, plural, =1 {1 day} other {# days}}.",
     "profileNotFound": "Profile not found.",
     "typeDeleteHint": "Type DELETE to enable the button.",
-    "confirmWithPassword": "For your security, confirm your current password to continue."
+    "confirmWithPassword": "For your security, confirm your current password to continue.",
+    "uploadFailedGeneric": "Couldn't upload the image. Try again.",
+    "passwordChangeFailed": "Couldn't change the password.",
+    "emailChangeFailed": "Couldn't change the email."
   },
   "profile": {
     "notFound": "User not found",
@@ -1768,5 +1771,19 @@
     "heavyweight": "Heavyweight",
     "catchweight": "Catchweight",
     "openweight": "Openweight"
+  },
+  "metadata": {
+    "titleDefault": "Vertex MMA — AI-powered Fight Simulator",
+    "titleTemplate": "%s | Vertex MMA",
+    "description": "AI-powered MMA fight simulator. Run any matchup, predict any fight.",
+    "ogTitle": "Vertex MMA",
+    "ogDescription": "AI-powered MMA fight simulator",
+    "ogSiteName": "Vertex MMA",
+    "fightersTitle": "Fighters",
+    "fightersDescription": "Explore UFC fighters with detailed career stats, fight history, and AI-powered analysis.",
+    "fightersOgTitle": "Vertex MMA — Fighter Database",
+    "fightersOgDescription": "AI-powered MMA fight simulator with detailed fighter analytics.",
+    "forgotPasswordTitle": "Forgot password",
+    "resetPasswordTitle": "Reset password"
   }
 }
