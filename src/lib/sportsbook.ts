@@ -613,8 +613,37 @@ export function formatOdds(decimalOdds: number): string {
   return decimalOdds.toFixed(2);
 }
 
+/** Parse a Postgres `timestamptz` rendered via `::text` into a UTC epoch (ms),
+ *  or NaN if unparseable. Postgres renders the value in the DB SESSION's
+ *  timezone with an offset suffix — "2026-06-20 14:00:00+00" under a UTC
+ *  session, but "2026-06-20 09:00:00-05" under a non-UTC one. We therefore
+ *  parse the offset that's actually present instead of slicing it off and
+ *  force-appending "Z" (which would silently reinterpret a non-UTC wall-clock
+ *  as UTC and shift the betting cutoff by the offset). A bare offset like
+ *  "+00"/"-05" is also something `new Date()` itself rejects, so we compute
+ *  the instant from the components directly. A value with no offset at all
+ *  (e.g. a plain `timestamp`) is treated as UTC, matching the prior behaviour. */
+function parseEventInstantMs(raw: string): number {
+  const m = raw
+    .trim()
+    .match(
+      /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(Z|[+-]\d{2}(?::?\d{2}){0,2})?$/,
+    );
+  if (!m) return NaN;
+  const [, y, mo, d, h, mi, s, tz] = m;
+  let offsetMin = 0;
+  if (tz && tz !== "Z") {
+    const sign = tz[0] === "-" ? -1 : 1;
+    const digits = tz.slice(1).replace(/:/g, "");
+    const oh = Number(digits.slice(0, 2));
+    const om = Number(digits.slice(2, 4) || "0");
+    offsetMin = sign * (oh * 60 + om);
+  }
+  return Date.UTC(+y, +mo - 1, +d, +h, +mi, +s) - offsetMin * 60_000;
+}
+
 /** True when a bout is open for sportsbook betting: still scheduled and the
- *  event hasn't started. `eventDate` is the event's ISO date string. */
+ *  event hasn't started. `eventDate` is the event's `date::text` string. */
 export function isBoutBettable(
   status: string,
   eventDate: string | null,
@@ -622,7 +651,7 @@ export function isBoutBettable(
 ): boolean {
   if (status !== "scheduled") return false;
   if (!eventDate) return false;
-  const start = new Date(eventDate.slice(0, 19).replace(" ", "T") + "Z");
-  if (Number.isNaN(start.getTime())) return false;
-  return start.getTime() > now.getTime();
+  const startMs = parseEventInstantMs(eventDate);
+  if (Number.isNaN(startMs)) return false;
+  return startMs > now.getTime();
 }

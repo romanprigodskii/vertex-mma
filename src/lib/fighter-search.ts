@@ -4,6 +4,19 @@ import { CHAMPION_SLUGS } from "@/lib/champions";
 import { db } from "@/lib/db";
 import { isRuLocale, localizedNameSql } from "@/lib/i18n-name";
 
+/**
+ * Escape LIKE/ILIKE metacharacters (`%`, `_`, `\`) so a user-typed term is
+ * matched literally rather than as a wildcard. Without this, a query of a lone
+ * `%` becomes `ILIKE '%%%'` and matches every fighter — a full-table similarity
+ * scan dressed up as a search. Postgres's default LIKE escape character is
+ * backslash, so the escaped pattern needs no explicit `ESCAPE` clause. The
+ * escaped form is for ILIKE patterns ONLY — `similarity()` and `lower() =`
+ * comparisons must keep the raw term, since `\` isn't special to them.
+ */
+function escapeLike(term: string): string {
+  return term.replace(/[\\%_]/g, (m) => `\\${m}`);
+}
+
 export type FighterSearchResult = {
   id: string;
   slug: string;
@@ -35,6 +48,9 @@ export async function searchFighters(
 ): Promise<FighterSearchResult[]> {
   const trimmed = query.trim();
   if (!trimmed) return [];
+  // ILIKE patterns use the escaped term so `%`/`_` are literal; similarity()
+  // and the lower()-equality below keep the raw `trimmed`.
+  const likeQ = escapeLike(trimmed);
 
   const isRu = await isRuLocale();
   // DISTINCT ON requires f.id to be the leftmost ORDER BY key, so the LIMIT
@@ -71,15 +87,15 @@ export async function searchFighters(
           (CASE
             WHEN lower(f.name_en) = lower(${trimmed})
               OR lower(COALESCE(f.name_ru, '')) = lower(${trimmed}) THEN 4
-            WHEN f.name_en ILIKE ${trimmed + "%"}
-              OR f.name_en ILIKE ${"% " + trimmed + "%"}
-              OR COALESCE(f.name_ru, '') ILIKE ${trimmed + "%"}
-              OR COALESCE(f.name_ru, '') ILIKE ${"% " + trimmed + "%"} THEN 3
-            WHEN COALESCE(f.nickname, '') ILIKE ${trimmed + "%"}
-              OR COALESCE(f.nickname, '') ILIKE ${"% " + trimmed + "%"} THEN 2
-            WHEN f.name_en ILIKE ${"%" + trimmed + "%"}
-              OR COALESCE(f.name_ru, '') ILIKE ${"%" + trimmed + "%"}
-              OR COALESCE(f.nickname, '') ILIKE ${"%" + trimmed + "%"} THEN 1
+            WHEN f.name_en ILIKE ${likeQ + "%"}
+              OR f.name_en ILIKE ${"% " + likeQ + "%"}
+              OR COALESCE(f.name_ru, '') ILIKE ${likeQ + "%"}
+              OR COALESCE(f.name_ru, '') ILIKE ${"% " + likeQ + "%"} THEN 3
+            WHEN COALESCE(f.nickname, '') ILIKE ${likeQ + "%"}
+              OR COALESCE(f.nickname, '') ILIKE ${"% " + likeQ + "%"} THEN 2
+            WHEN f.name_en ILIKE ${"%" + likeQ + "%"}
+              OR COALESCE(f.name_ru, '') ILIKE ${"%" + likeQ + "%"}
+              OR COALESCE(f.nickname, '') ILIKE ${"%" + likeQ + "%"} THEN 1
             ELSE 0
           END) * 1000
           + GREATEST(COALESCE(f.vertex_score, 0), COALESCE(f.vertex_score_all_time, 0))
@@ -87,9 +103,9 @@ export async function searchFighters(
       FROM fighter f
       LEFT JOIN fighter_stats_aggregate fsa ON fsa.fighter_id = f.id
       WHERE
-        f.name_en ILIKE ${"%" + trimmed + "%"}
-        OR COALESCE(f.name_ru, '') ILIKE ${"%" + trimmed + "%"}
-        OR f.nickname ILIKE ${"%" + trimmed + "%"}
+        f.name_en ILIKE ${"%" + likeQ + "%"}
+        OR COALESCE(f.name_ru, '') ILIKE ${"%" + likeQ + "%"}
+        OR f.nickname ILIKE ${"%" + likeQ + "%"}
         OR similarity(f.name_en, ${trimmed}) > 0.3
         OR similarity(COALESCE(f.name_ru, ''), ${trimmed}) > 0.3
         OR similarity(COALESCE(f.nickname, ''), ${trimmed}) > 0.3
@@ -247,7 +263,8 @@ function buildWhere(filters: FighterCatalogFilters): SQL {
 
   const trimmedQ = filters.q?.trim();
   if (trimmedQ) {
-    const like = `%${trimmedQ}%`;
+    // Escaped for the ILIKE patterns; similarity() below keeps raw `trimmedQ`.
+    const like = `%${escapeLike(trimmedQ)}%`;
     conditions.push(sql`(
       f.name_en ILIKE ${like}
       OR COALESCE(f.name_ru, '') ILIKE ${like}
@@ -407,7 +424,7 @@ function buildWhere(filters: FighterCatalogFilters): SQL {
   return sql`WHERE ${sql.join(conditions, sql` AND `)}`;
 }
 
-function buildOrderBy(filters: FighterCatalogFilters): SQL {
+function buildOrderBy(filters: FighterCatalogFilters, isRu: boolean): SQL {
   const hasQuery = Boolean(filters.q?.trim());
   // Sort by the canonical divisional score (`divisional_sort_score` =
   // COALESCE(divisional, global)) for both the single-weight catalog
@@ -434,9 +451,12 @@ function buildOrderBy(filters: FighterCatalogFilters): SQL {
         ? sql`match_tier DESC, f.vertex_score_all_time DESC NULLS LAST, f.bout_count DESC, match_score DESC`
         : sql`f.vertex_score_all_time DESC NULLS LAST, f.bout_count DESC`;
     case "name_asc":
-      return sql`f.name_en ASC`;
+      // The RU catalog labels this "По имени А–Я", so order by the displayed
+      // (Russian) name, not the Latin name_en. EN keeps name_en (localizedNameSql
+      // returns exactly that off-RU, so no behaviour change there).
+      return sql`${localizedNameSql("f", isRu)} ASC`;
     case "name_desc":
-      return sql`f.name_en DESC`;
+      return sql`${localizedNameSql("f", isRu)} DESC`;
     case "wins":
       // UFC-only wins so regional-circuit pioneers like Travis Fulton or
       // Dan Severn (career career_wins=300+/100+ from pre-UFC bouts)
@@ -543,9 +563,13 @@ export async function searchFightersWithFilters(
   );
 
   const trimmedQ = filters.q?.trim();
+  // Escaped term for the ILIKE patterns in matchTierSelect; similarity() and
+  // the lower()-equality keep the raw `trimmedQ`. Empty when there's no query
+  // (matchTierSelect collapses to an empty fragment then anyway).
+  const likeQ = escapeLike(trimmedQ ?? "");
   const isRu = await isRuLocale();
   const where = buildWhere(filters);
-  const orderBy = buildOrderBy(filters);
+  const orderBy = buildOrderBy(filters, isRu);
 
   const matchScoreSelect = trimmedQ
     ? sql`,
@@ -565,15 +589,15 @@ export async function searchFightersWithFilters(
       (CASE
         WHEN lower(f.name_en) = lower(${trimmedQ})
           OR lower(COALESCE(f.name_ru, '')) = lower(${trimmedQ}) THEN 4
-        WHEN f.name_en ILIKE ${trimmedQ + "%"}
-          OR f.name_en ILIKE ${"% " + trimmedQ + "%"}
-          OR COALESCE(f.name_ru, '') ILIKE ${trimmedQ + "%"}
-          OR COALESCE(f.name_ru, '') ILIKE ${"% " + trimmedQ + "%"} THEN 3
-        WHEN COALESCE(f.nickname, '') ILIKE ${trimmedQ + "%"}
-          OR COALESCE(f.nickname, '') ILIKE ${"% " + trimmedQ + "%"} THEN 2
-        WHEN f.name_en ILIKE ${"%" + trimmedQ + "%"}
-          OR COALESCE(f.name_ru, '') ILIKE ${"%" + trimmedQ + "%"}
-          OR COALESCE(f.nickname, '') ILIKE ${"%" + trimmedQ + "%"} THEN 1
+        WHEN f.name_en ILIKE ${likeQ + "%"}
+          OR f.name_en ILIKE ${"% " + likeQ + "%"}
+          OR COALESCE(f.name_ru, '') ILIKE ${likeQ + "%"}
+          OR COALESCE(f.name_ru, '') ILIKE ${"% " + likeQ + "%"} THEN 3
+        WHEN COALESCE(f.nickname, '') ILIKE ${likeQ + "%"}
+          OR COALESCE(f.nickname, '') ILIKE ${"% " + likeQ + "%"} THEN 2
+        WHEN f.name_en ILIKE ${"%" + likeQ + "%"}
+          OR COALESCE(f.name_ru, '') ILIKE ${"%" + likeQ + "%"}
+          OR COALESCE(f.nickname, '') ILIKE ${"%" + likeQ + "%"} THEN 1
         ELSE 0
       END)::int AS match_tier`
     : sql``;

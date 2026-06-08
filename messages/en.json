@@ -624,6 +624,7 @@
     "updatePassword": "Update password",
     "updating": "Updating...",
     "resetInvalid": "This reset link is invalid or expired.",
+    "resetNotRecovery": "You're already signed in. To change your password, open Settings → Change password.",
     "errGeneric": "Something went wrong. Please try again.",
     "errInvalidCredentials": "Wrong email or password.",
     "errEmailTaken": "That email is already registered.",

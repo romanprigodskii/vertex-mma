@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useTranslations } from "next-intl";
 
+import { mapAuthError } from "@/lib/auth-errors";
 import { createClient } from "@/lib/supabase/client";
 
 function GoogleG() {
@@ -51,7 +52,10 @@ export function GoogleAuthButton({ next = "/" }: { next?: string }) {
       },
     });
     if (oauthError) {
-      setError(oauthError.message);
+      // Map to a localized message instead of echoing the raw English
+      // Supabase error — same discipline as the auth server actions, so RU
+      // users don't get an untranslated provider string.
+      setError(mapAuthError(oauthError, t));
       setPending(false);
     }
     // On success the browser is redirected to Google's consent screen.

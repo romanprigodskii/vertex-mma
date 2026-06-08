@@ -480,4 +480,26 @@ describe("potentialPayout + isBoutBettable", () => {
     assert.equal(isBoutBettable("completed", future), false);
     assert.equal(isBoutBettable("scheduled", null), false);
   });
+  it("honours the actual timezone offset, never forcing UTC", () => {
+    // The same instant rendered by Postgres `::text` under different DB
+    // session timezones: 14:00Z == 09:00-05 == 19:30+05:30. The cutoff must
+    // be identical regardless of how the offset is rendered — the old
+    // slice(0,19)+"Z" parse misread the two non-UTC forms by their offset.
+    const before = new Date("2026-06-20T13:00:00Z"); // 1h before the bout
+    for (const d of [
+      "2026-06-20 14:00:00+00",
+      "2026-06-20 09:00:00-05",
+      "2026-06-20 19:30:00+05:30",
+    ]) {
+      assert.equal(isBoutBettable("scheduled", d, before), true, `open: ${d}`);
+    }
+    const after = new Date("2026-06-20T14:01:00Z"); // 1min after real start
+    for (const d of [
+      "2026-06-20 14:00:00+00",
+      "2026-06-20 09:00:00-05",
+      "2026-06-20 19:30:00+05:30",
+    ]) {
+      assert.equal(isBoutBettable("scheduled", d, after), false, `closed: ${d}`);
+    }
+  });
 });

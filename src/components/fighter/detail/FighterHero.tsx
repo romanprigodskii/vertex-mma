@@ -111,11 +111,27 @@ export async function FighterHero({ fighter, championEntry }: FighterHeroProps) 
   const age = computeAge(fighter.dob);
   const flag = getCountryFlag(fighter.country_code);
   const countryLabel = countryName(fighter.country_code, locale);
-  const weightLabel = fighter.weight_class_primary
-    ? tWeight.has(fighter.weight_class_primary)
+  // When a fighter holds a belt, the hero subtitle MUST agree with the belt
+  // badge: championEntry.division (the current belt division) wins over
+  // weight_class_primary (most-fought division). The two disagree for a
+  // fighter who has moved up (e.g. a FW-most-fought lightweight champion), and
+  // rendering both on the same hero contradicts itself. Map the belt's English
+  // division name to the weight enum key so the label stays localized; fall
+  // back to the raw name if it's ever unmapped.
+  let weightLabel: string | null = null;
+  if (championEntry) {
+    const beltKey = championEntry.division
+      .toLowerCase()
+      .replace(/^women's\s+/, "")
+      .replace(/\s+/g, "_");
+    weightLabel = tWeight.has(beltKey)
+      ? tWeight(beltKey)
+      : championEntry.division;
+  } else if (fighter.weight_class_primary) {
+    weightLabel = tWeight.has(fighter.weight_class_primary)
       ? tWeight(fighter.weight_class_primary)
-      : fighter.weight_class_primary
-    : null;
+      : fighter.weight_class_primary;
+  }
   const statusLabel =
     fighter.status && tFighter.has(`status.${fighter.status}`)
       ? tFighter(`status.${fighter.status}`)
@@ -137,11 +153,13 @@ export async function FighterHero({ fighter, championEntry }: FighterHeroProps) 
         ? tFighter("noDecisiveResults")
         : tFighter("recordPending");
 
-  const tierBits: string[] = [];
-  if (fighter.country_code) tierBits.push(fighter.country_code);
-  if (weightLabel) tierBits.push(weightLabel);
-  if (statusLabel) tierBits.push(statusLabel);
-  if (age != null) tierBits.push(tFighter("age", { n: age }));
+  // Country is rendered separately (with the flag), so it must NOT live in the
+  // array we map over — otherwise a fighter with no country_code silently loses
+  // their first meta bit (the weight class). Keep these tier bits country-free.
+  const metaBits: string[] = [];
+  if (weightLabel) metaBits.push(weightLabel);
+  if (statusLabel) metaBits.push(statusLabel);
+  if (age != null) metaBits.push(tFighter("age", { n: age }));
 
   return (
     <section className="border-b border-foreground/10">
@@ -195,12 +213,22 @@ export async function FighterHero({ fighter, championEntry }: FighterHeroProps) 
                 <span>{countryLabel ?? fighter.country_code}</span>
               </>
             ) : null}
-            {tierBits.slice(1).map((bit, i) => (
-              <span key={`${bit}-${i}`} className="flex items-center gap-1.5">
-                <span aria-hidden className="text-foreground-subtle/50">·</span>
-                <span>{bit}</span>
-              </span>
-            ))}
+            {metaBits.map((bit, i) => {
+              // Leading separator only when something precedes this bit — the
+              // country block, or an earlier meta bit. Without this, a
+              // countryless fighter would render a dangling "· …".
+              const showSep = fighter.country_code != null || i > 0;
+              return (
+                <span key={`${bit}-${i}`} className="flex items-center gap-1.5">
+                  {showSep ? (
+                    <span aria-hidden className="text-foreground-subtle/50">
+                      ·
+                    </span>
+                  ) : null}
+                  <span>{bit}</span>
+                </span>
+              );
+            })}
           </p>
 
           <div className="mt-6 md:mt-8">
