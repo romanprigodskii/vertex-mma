@@ -33,11 +33,15 @@ export async function markNotificationReadAction(
   const myId = await getMyProfileId();
   if (!myId) return { error: "NOT_SIGNED_IN" };
 
-  await db.execute(sql`
-    UPDATE notification
-    SET is_read = TRUE
-    WHERE id = ${notificationId}::uuid AND user_id = ${myId}::uuid
-  `);
+  try {
+    await db.execute(sql`
+      UPDATE notification
+      SET is_read = TRUE
+      WHERE id = ${notificationId}::uuid AND user_id = ${myId}::uuid
+    `);
+  } catch {
+    return { error: "UPDATE_FAILED" };
+  }
   revalidatePath("/notifications");
   return {};
 }
@@ -46,11 +50,15 @@ export async function markAllReadAction(): Promise<{ error?: string }> {
   const myId = await getMyProfileId();
   if (!myId) return { error: "NOT_SIGNED_IN" };
 
-  await db.execute(sql`
-    UPDATE notification
-    SET is_read = TRUE
-    WHERE user_id = ${myId}::uuid AND is_read = FALSE
-  `);
+  try {
+    await db.execute(sql`
+      UPDATE notification
+      SET is_read = TRUE
+      WHERE user_id = ${myId}::uuid AND is_read = FALSE
+    `);
+  } catch {
+    return { error: "UPDATE_FAILED" };
+  }
   revalidatePath("/notifications");
   return {};
 }
