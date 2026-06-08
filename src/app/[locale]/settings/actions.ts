@@ -18,6 +18,26 @@ const COUNTRY_RE = /^[A-Z]{2}$/;
 const USERNAME_RE = /^[a-zA-Z0-9_]{3,30}$/;
 const USERNAME_CHANGE_COOLDOWN_DAYS = 30;
 
+/** Postgres unique-violation (SQLSTATE 23505). postgres-js exposes `.code`. */
+function isUniqueViolation(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    (err as { code?: unknown }).code === "23505"
+  );
+}
+
+/** Achievement unlocks are a post-commit side effect — a failure here must
+ *  never fail the profile/avatar update the user already completed. Mirrors
+ *  unlockAchievementsBestEffort in markets/actions.ts. */
+async function unlockBestEffort(profileId: string): Promise<void> {
+  try {
+    await checkAndUnlockAchievements(profileId);
+  } catch {
+    // Swallow: best-effort, the next user action retries.
+  }
+}
+
 export async function updateProfileAction(
   formData: FormData,
 ): Promise<{ error?: string; success?: boolean }> {
@@ -53,7 +73,7 @@ export async function updateProfileAction(
 
   // profile_complete may unlock now that display name / bio / country are set.
   if (updated[0]?.id) {
-    await checkAndUnlockAchievements(updated[0].id);
+    await unlockBestEffort(updated[0].id);
   }
 
   revalidatePath("/me");
@@ -166,7 +186,7 @@ export async function uploadAvatarAction(
 
   // profile_complete may unlock once an avatar lands.
   if (updated[0]?.id) {
-    await checkAndUnlockAchievements(updated[0].id);
+    await unlockBestEffort(updated[0].id);
   }
 
   revalidatePath("/me");
@@ -351,13 +371,21 @@ export async function changeUsernameAction(
     return { error: t("usernameTaken") };
   }
 
-  await db
-    .update(userProfile)
-    .set({
-      username: newUsername,
-      usernameLastChangedAt: new Date(),
-    })
-    .where(eq(userProfile.id, profile.id));
+  // The pre-check above can lose a race; the unique constraint on
+  // user_profile.username is the real guard. Translate its violation into the
+  // same friendly "taken" message instead of letting it bubble as a 500.
+  try {
+    await db
+      .update(userProfile)
+      .set({
+        username: newUsername,
+        usernameLastChangedAt: new Date(),
+      })
+      .where(eq(userProfile.id, profile.id));
+  } catch (err) {
+    if (isUniqueViolation(err)) return { error: t("usernameTaken") };
+    throw err;
+  }
 
   revalidatePath("/settings");
   revalidatePath(`/profile/${profile.currentUsername}`);

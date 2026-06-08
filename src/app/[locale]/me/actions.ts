@@ -12,6 +12,18 @@ import { dailyBonusAmount } from "@/lib/tier";
 
 const COOLDOWN_HOURS = 20;
 
+/** Achievement unlocks are a post-commit side effect — the bonus is already
+ *  durably credited by the time we get here, so a failure unlocking must never
+ *  bubble up and make the user think the claim failed. Mirrors
+ *  unlockAchievementsBestEffort in markets/actions.ts. */
+async function unlockBestEffort(profileId: string): Promise<string[]> {
+  try {
+    return await checkAndUnlockAchievements(profileId);
+  } catch {
+    return [];
+  }
+}
+
 export async function claimDailyBonusAction(): Promise<{
   error?: string;
   hoursLeft?: number;
@@ -106,7 +118,7 @@ export async function claimDailyBonusAction(): Promise<{
 
   // After the bonus posts, daily_streak_7 / balance_50k / balance_100k
   // may unlock.
-  const newlyUnlocked = await checkAndUnlockAchievements(profile.id);
+  const newlyUnlocked = await unlockBestEffort(profile.id);
 
   revalidatePath("/me");
   // Invalidate every /profile/[username] page so the owner's view picks up

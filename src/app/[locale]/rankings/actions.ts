@@ -1,6 +1,6 @@
 "use server";
 
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 import { checkAndUnlockAchievements } from "@/lib/achievements";
@@ -12,12 +12,19 @@ import {
 } from "@/lib/db/schema/rankings";
 import { userProfile } from "@/lib/db/schema/users";
 import { searchFighters } from "@/lib/fighter-search";
+import { allowAction } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 
 import { RANKING_LIMITS, RankingError } from "./ranking-constants";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Per-account creation caps so one user can't flood the table: the rate-limit
+// blocks scripted bursts, the count cap bounds lifetime rows. Both surface as
+// stable codes that fall back to the form's generic error message.
+const CREATE_COOLDOWN_MS = 5_000;
+const MAX_RANKINGS_PER_USER = 100;
 
 const { TITLE_MIN, TITLE_MAX, DESC_MAX, NOTE_MAX, MIN_ENTRIES, MAX_ENTRIES } =
   RANKING_LIMITS;
@@ -73,6 +80,9 @@ export type PickerFighter = {
 export async function searchFightersForPicker(
   query: string,
 ): Promise<PickerFighter[]> {
+  // Authoring-only helper — gate behind sign-in so it isn't an open,
+  // unauthenticated fighter-search endpoint.
+  if (!(await getMyProfileId())) return [];
   if (!query.trim()) return [];
   const results = await searchFighters(query, 8);
   return results.map((r) => ({
@@ -142,6 +152,18 @@ export async function createRankingAction(
   const myId = await getMyProfileId();
   if (!myId) return { error: RankingError.NOT_SIGNED_IN };
 
+  if (!allowAction(`ranking-create:${myId}`, CREATE_COOLDOWN_MS)) {
+    // TODO(audit i18n: errorRateLimited) — generic fallback for now.
+    return { error: "RATE_LIMITED" };
+  }
+  const countRows = (await db.execute<{ c: number }>(sql`
+    SELECT COUNT(*)::int AS c FROM custom_ranking WHERE user_id = ${myId}::uuid
+  `)) as unknown as Array<{ c: number }>;
+  if ((countRows[0]?.c ?? 0) >= MAX_RANKINGS_PER_USER) {
+    // TODO(audit i18n: errorTooManyRankings) — generic fallback for now.
+    return { error: "TOO_MANY_RANKINGS" };
+  }
+
   const title = String(formData.get("title") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
   const entriesRaw = String(formData.get("entries") ?? "");
@@ -193,6 +215,9 @@ export async function updateRankingAction(
 ): Promise<{ error?: string }> {
   const myId = await getMyProfileId();
   if (!myId) return { error: RankingError.NOT_SIGNED_IN };
+  // Guard the uuid column: a malformed id would otherwise reach the query as
+  // invalid uuid syntax and surface as a raw 500 instead of a clean code.
+  if (!UUID_RE.test(rankingId)) return { error: RankingError.RANKING_NOT_FOUND };
 
   const existing = await db
     .select({ id: customRanking.id, userId: customRanking.userId })
@@ -255,6 +280,9 @@ export async function deleteRankingAction(
 ): Promise<{ error?: string; success?: boolean }> {
   const myId = await getMyProfileId();
   if (!myId) return { error: RankingError.NOT_SIGNED_IN };
+  // Guard the uuid column: a malformed id would otherwise reach the query as
+  // invalid uuid syntax and surface as a raw 500 instead of a clean code.
+  if (!UUID_RE.test(rankingId)) return { error: RankingError.RANKING_NOT_FOUND };
 
   const existing = await db
     .select({ id: customRanking.id, userId: customRanking.userId })

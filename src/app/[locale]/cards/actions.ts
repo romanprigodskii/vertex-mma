@@ -27,9 +27,24 @@ const SUBTITLE_MAX = 120;
 const MIN_BOUTS = 1;
 const MAX_BOUTS = 15;
 
+// Per-account creation caps so one user can't flood the table: the rate-limit
+// blocks scripted bursts, the count cap bounds lifetime rows. Both surface as
+// stable codes that fall back to the form's generic error message.
+const CREATE_COOLDOWN_MS = 5_000;
+const MAX_CARDS_PER_USER = 100;
+
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const WEIGHT_SET = new Set<string>(WEIGHT_CLASSES);
+
+/** Postgres unique-violation (SQLSTATE 23505). postgres-js exposes `.code`. */
+function isUniqueViolation(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    (err as { code?: unknown }).code === "23505"
+  );
+}
 
 async function getMyProfileId(): Promise<string | null> {
   const supabase = await createClient();
@@ -56,6 +71,9 @@ export type PickerFighter = {
 export async function searchFightersForPicker(
   query: string,
 ): Promise<PickerFighter[]> {
+  // Authoring-only helper — gate behind sign-in so it isn't an open,
+  // unauthenticated fighter-search endpoint.
+  if (!(await getMyProfileId())) return [];
   if (!query.trim()) return [];
   const results = await searchFighters(query, 8);
   return results.map((r) => ({
@@ -208,25 +226,53 @@ export async function createFightCardAction(
   const myId = await getMyProfileId();
   if (!myId) return { error: "NOT_SIGNED_IN" };
 
+  if (!allowAction(`card-create:${myId}`, CREATE_COOLDOWN_MS)) {
+    // TODO(audit i18n: errRateLimited) — generic fallback for now.
+    return { error: "RATE_LIMITED" };
+  }
+  const countRows = (await db.execute<{ c: number }>(sql`
+    SELECT COUNT(*)::int AS c FROM fight_card WHERE user_id = ${myId}::uuid
+  `)) as unknown as Array<{ c: number }>;
+  if ((countRows[0]?.c ?? 0) >= MAX_CARDS_PER_USER) {
+    // TODO(audit i18n: errTooManyCards) — generic fallback for now.
+    return { error: "TOO_MANY_CARDS" };
+  }
+
   const parsed = readCardForm(formData);
   if ("error" in parsed) return { error: parsed.error };
   const f = parsed.fields;
 
-  const slug = await uniqueSlug(f.title);
-  await db.insert(fightCard).values({
-    userId: myId,
-    slug,
-    title: f.title,
-    subtitle: f.subtitle,
-    themeColor: f.themeColor,
-    titleFont: f.titleFont,
-    backgroundId: f.backgroundId,
-    isPublic: f.isPublic,
-    bouts: f.bouts,
-  });
-
-  revalidatePath("/cards");
-  return { slug };
+  // uniqueSlug pre-checks for a free slug, but a concurrent insert can still
+  // claim the same candidate between that check and our INSERT. Retry on a slug
+  // unique-violation with a freshly generated slug rather than surfacing a 500;
+  // give up with a clean code if it somehow never settles.
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const slug = await uniqueSlug(f.title);
+    try {
+      await db.insert(fightCard).values({
+        userId: myId,
+        slug,
+        title: f.title,
+        subtitle: f.subtitle,
+        themeColor: f.themeColor,
+        titleFont: f.titleFont,
+        backgroundId: f.backgroundId,
+        isPublic: f.isPublic,
+        bouts: f.bouts,
+      });
+      revalidatePath("/cards");
+      return { slug };
+    } catch (err) {
+      if (isUniqueViolation(err) && attempt < 4) continue;
+      if (isUniqueViolation(err)) {
+        // TODO(audit i18n: errSlugCollision) — generic fallback for now.
+        return { error: "SLUG_COLLISION" };
+      }
+      throw err;
+    }
+  }
+  // TODO(audit i18n: errSlugCollision) — generic fallback for now.
+  return { error: "SLUG_COLLISION" };
 }
 
 export async function updateFightCardAction(

@@ -1,7 +1,7 @@
 import "server-only";
 
 import { revalidatePath } from "next/cache";
-import { and, asc, desc, eq, inArray, isNull, gt, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -142,6 +142,11 @@ export async function listCommentsForNews(
     }
   }
 
+  // Count only what actually renders: top-level comments plus the replies we
+  // attach to a surviving parent. A reply whose parent was soft-deleted (and so
+  // dropped from `rows`) is orphaned — it renders nowhere, so counting it would
+  // push the header tally above the visible thread.
+  let total = tops.length;
   for (const top of tops) {
     const replies = replyBuckets.get(top.id) ?? [];
     // Replies oldest-first so the conversation reads top → bottom.
@@ -150,9 +155,10 @@ export async function listCommentsForNews(
         new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
     );
     top.replies = replies;
+    total += replies.length;
   }
 
-  return { comments: tops, total: rows.length };
+  return { comments: tops, total };
 }
 
 const RATE_LIMIT_SECONDS = 10;
@@ -187,20 +193,11 @@ export async function addNewsComment(opts: {
   const user = await getCurrentUser();
   if (!user) return { ok: false, error: "SIGN_IN" };
 
-  const recent = await db
-    .select({ id: newsComment.id })
-    .from(newsComment)
-    .where(
-      and(
-        eq(newsComment.userProfileId, user.userProfileId),
-        gt(
-          newsComment.createdAt,
-          new Date(Date.now() - RATE_LIMIT_SECONDS * 1000),
-        ),
-      ),
-    )
-    .limit(1);
-  if (recent.length > 0) {
+  // Atomic rate-limit. The old guard SELECTed for a recent comment and only
+  // then inserted — a TOCTOU window where two concurrent posts both read "none
+  // recent" and both wrote. allowAction is a compare-and-set on a process-local
+  // map, so concurrent posts from one account can't both pass.
+  if (!allowAction(`comment:${user.userProfileId}`, RATE_LIMIT_SECONDS * 1000)) {
     return { ok: false, error: "RATE_LIMITED" };
   }
 
@@ -224,11 +221,23 @@ export async function addNewsComment(opts: {
   let parentId = opts.parentId;
   if (parentId) {
     const parent = await db
-      .select({ parentId: newsComment.parentId })
+      .select({
+        parentId: newsComment.parentId,
+        newsItemId: newsComment.newsItemId,
+        deletedAt: newsComment.deletedAt,
+      })
       .from(newsComment)
       .where(eq(newsComment.id, parentId))
       .limit(1);
-    if (parent.length === 0) return { ok: false, error: "REPLY_MISSING" };
+    if (parent.length === 0 || parent[0].deletedAt) {
+      return { ok: false, error: "REPLY_MISSING" };
+    }
+    // The parent must belong to THIS article. Without this a crafted request
+    // could reply to a comment on a different article, creating a reply that
+    // orphans — its parent never appears in this article's thread.
+    if (parent[0].newsItemId !== opts.newsItemId) {
+      return { ok: false, error: "BAD_REPLY" };
+    }
     if (parent[0].parentId) parentId = parent[0].parentId;
   }
 
@@ -435,10 +444,24 @@ export async function softDeleteComment(commentId: string): Promise<{
     return { ok: false, error: "Not your comment" };
   }
 
+  // Cascade the soft-delete to direct replies. A reply's parent is always a
+  // top-level comment (reply-of-reply is flattened on insert), so retiring a
+  // top-level comment must also retire its replies — otherwise they survive
+  // with a now-hidden parent and render nowhere (orphaned), while still
+  // inflating the count. For a reply (which has no children) the parentId match
+  // selects nothing, so only it is removed.
   await db
     .update(newsComment)
     .set({ deletedAt: new Date() })
-    .where(eq(newsComment.id, commentId));
+    .where(
+      and(
+        isNull(newsComment.deletedAt),
+        or(
+          eq(newsComment.id, commentId),
+          eq(newsComment.parentId, commentId),
+        ),
+      ),
+    );
 
   revalidatePath(`/news/${rows[0].newsItemId}`);
   return { ok: true };
