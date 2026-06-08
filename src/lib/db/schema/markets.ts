@@ -98,9 +98,17 @@ export const bet = pgTable(
     marketId: uuid("market_id")
       .notNull()
       .references(() => market.id, { onDelete: "cascade" }),
+    // Bets die with their outcome. A market_outcome is only ever removed when
+    // its parent market is deleted, which already cascades bets via market_id;
+    // cascading here too makes the outcome→bet lifecycle explicit and uniform
+    // with the market→bet / market→market_outcome cascades. (cascade, not
+    // restrict: ON DELETE RESTRICT is checked immediately and would break the
+    // market-delete cascade — Postgres can delete the referenced
+    // market_outcome before the referencing bet rows. NO ACTION/cascade defer
+    // / cascade the check, so the diamond delete stays valid.)
     outcomeId: uuid("outcome_id")
       .notNull()
-      .references(() => marketOutcome.id),
+      .references(() => marketOutcome.id, { onDelete: "cascade" }),
 
     // double precision: this is the payout basis via ROUND(shares_bought).
     sharesBought: doublePrecision("shares_bought").notNull(),
@@ -169,6 +177,11 @@ export const fixedOddsBet = pgTable(
     index("fixed_odds_bet_user_idx").on(table.userId),
     index("fixed_odds_bet_bout_idx").on(table.boutId),
     index("fixed_odds_bet_status_idx").on(table.status),
+    // Settlement grades a resolved bout's still-open bets: WHERE bout_id = X
+    // AND status = 'open' (settle_fixed_odds_bets_for_bout). The composite
+    // serves that predicate directly instead of scanning the bout index and
+    // filtering status row-by-row on a popular bout's already-settled bets.
+    index("fixed_odds_bet_bout_status_idx").on(table.boutId, table.status),
   ],
 );
 
@@ -240,6 +253,10 @@ export const parlayLeg = pgTable(
     index("parlay_leg_parlay_idx").on(table.parlayId),
     index("parlay_leg_bout_idx").on(table.boutId),
     index("parlay_leg_status_idx").on(table.status),
+    // Settlement grades a resolved bout's still-open legs: WHERE bout_id = X
+    // AND status = 'open' (settle_parlay_legs_for_bout). Composite serves it
+    // directly, mirroring fixed_odds_bet_bout_status_idx.
+    index("parlay_leg_bout_status_idx").on(table.boutId, table.status),
     // One leg per bout per parlay — no correlated same-bout legs.
     unique("parlay_leg_unique_bout").on(table.parlayId, table.boutId),
   ],

@@ -10,6 +10,13 @@
 --   gold      200,000 → 1,000
 --   diamond   500,000 → 1,500
 --   champion  1,000,000 → 2,000
+--
+-- Balance/payout locals are declared bigint here: balance_coins /
+-- total_coins_earned / transaction.balance_after were widened to bigint
+-- (Wave 58), so `RETURNING balance_coins INTO v_new_balance` (and ROUND(shares)
+-- → v_payout) overflows / raises `integer out of range` on an int4 local once a
+-- balance crosses ~2.1e9. Mirrors the Wave-59 widening of the fixed-odds/parlay
+-- path (0086_wave59) for the LMSR + tier/achievement functions.
 
 ALTER TABLE user_profile
   ADD COLUMN IF NOT EXISTS username_last_changed_at timestamptz;
@@ -25,7 +32,7 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-  v_total_earned int;
+  v_total_earned bigint;
   v_current_tier text;
   v_new_tier text;
   v_username text;
@@ -80,7 +87,7 @@ AS $$
 DECLARE
   v_achievement_id uuid;
   v_reward int;
-  v_new_balance int;
+  v_new_balance bigint;
   v_name text;
   v_description text;
   v_username text;
@@ -157,8 +164,8 @@ DECLARE
   v_losing_id uuid;
   v_winning_label text;
   v_bet record;
-  v_payout int;
-  v_new_balance int;
+  v_payout bigint;
+  v_new_balance bigint;
 BEGIN
   IF p_winning_idx NOT IN (0, 1) THEN
     RAISE EXCEPTION 'winning_idx must be 0 or 1, got %', p_winning_idx;
@@ -199,7 +206,7 @@ BEGIN
       AND outcome_id = v_winning_id
       AND resolved_at IS NULL
   LOOP
-    v_payout := ROUND(v_bet.shares_bought)::int;
+    v_payout := ROUND(v_bet.shares_bought)::bigint;
 
     UPDATE bet
       SET payout = v_payout, resolved_at = NOW()
@@ -265,8 +272,8 @@ DECLARE
   v_winning_id uuid;
   v_winning_label text;
   v_bet record;
-  v_payout int;
-  v_new_balance int;
+  v_payout bigint;
+  v_new_balance bigint;
 BEGIN
   IF p_winner_offset NOT IN (0, 3) THEN
     RAISE EXCEPTION 'winner_offset must be 0 or 3, got %', p_winner_offset;
@@ -309,7 +316,7 @@ BEGIN
       AND outcome_id = v_winning_id
       AND resolved_at IS NULL
   LOOP
-    v_payout := ROUND(v_bet.shares_bought)::int;
+    v_payout := ROUND(v_bet.shares_bought)::bigint;
 
     UPDATE bet
       SET payout = v_payout, resolved_at = NOW()

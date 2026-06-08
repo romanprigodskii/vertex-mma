@@ -302,6 +302,33 @@ describe("settleSelection — goes the distance", () => {
   });
 });
 
+describe("settleSelection — completed, winner set, method not yet scraped", () => {
+  // The result (winner + status='completed') is often recorded before the
+  // method. Until the method lands, only the winner market can be graded;
+  // method/totals/distance must VOID (refund), not be guessed off a false
+  // "didn't go the distance" / the raw round. The production SQL grader
+  // (fixed_odds_grade) mirrors this exactly — see
+  // drizzle/migrations/0088_wave60_settlement_balance_bigint.sql.
+  it("grades the winner off winner_id, voids everything that needs the method", () => {
+    const r = baseResult({ status: "completed", winnerId: A, method: null, roundFinished: 1 });
+    assert.equal(settleSelection("win_a", r), "won");
+    assert.equal(settleSelection("win_b", r), "lost");
+    assert.equal(settleSelection("a_ko", r), "void");
+    assert.equal(settleSelection("b_dec", r), "void");
+    assert.equal(settleSelection("o2_5", r), "void");
+    assert.equal(settleSelection("u2_5", r), "void");
+    assert.equal(settleSelection("dist_yes", r), "void");
+    assert.equal(settleSelection("dist_no", r), "void");
+  });
+  it("voids even the winner when neither winner nor method is known yet", () => {
+    const r = baseResult({ status: "completed", winnerId: null, method: null, roundFinished: null });
+    assert.equal(settleSelection("win_a", r), "void");
+    assert.equal(settleSelection("win_b", r), "void");
+    assert.equal(settleSelection("a_ko", r), "void");
+    assert.equal(settleSelection("o2_5", r), "void");
+  });
+});
+
 describe("marketProbFromOdds (devig)", () => {
   it("devigs a 2-way moneyline", () => {
     const p = marketProbFromOdds(1.85, 2.15)!;

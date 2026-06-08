@@ -112,6 +112,7 @@ DECLARE
   raw_username text;
   unique_username text;
   counter int := 0;
+  v_profile_id uuid;
 BEGIN
   raw_username := COALESCE(
     NEW.raw_user_meta_data->>'username',
@@ -138,7 +139,18 @@ BEGIN
   END LOOP;
 
   INSERT INTO public.user_profile (auth_user_id, username, display_name)
-  VALUES (NEW.id, unique_username, raw_username);
+  VALUES (NEW.id, unique_username, raw_username)
+  RETURNING id INTO v_profile_id;
+
+  -- Ledger consistency: record the opening signup grant as a transaction so the
+  -- coin ledger reconciles with the balance from account creation. The
+  -- user_profile DEFAULTs seed balance_coins / total_coins_earned = 10000 (the
+  -- balance is NOT re-bumped here — this only mirrors that grant into the
+  -- ledger). Keep the amount in sync with those defaults
+  -- (src/lib/db/schema/users.ts). Runs as SECURITY DEFINER, so it bypasses the
+  -- transaction RLS that has no INSERT policy.
+  INSERT INTO public.transaction (user_id, type, amount, balance_after, description)
+  VALUES (v_profile_id, 'signup_bonus', 10000, 10000, 'Signup bonus');
 
   RETURN NEW;
 END;

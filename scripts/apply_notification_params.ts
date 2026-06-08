@@ -35,7 +35,7 @@ const STATEMENTS: string[] = [
  SET search_path TO 'public'
 AS $function$
 DECLARE
-  v_total_earned int;
+  v_total_earned bigint;
   v_current_tier text;
   v_new_tier text;
   v_username text;
@@ -84,7 +84,7 @@ $function$`,
 AS $function$
 DECLARE
   v_bet record;
-  v_new_balance int;
+  v_new_balance bigint;
 BEGIN
   IF EXISTS (
     SELECT 1 FROM market
@@ -148,7 +148,7 @@ $function$`,
 AS $function$
 DECLARE
   v_bout record; v_mb text; v_wd boolean; v_terminal_void boolean;
-  v_bet record; v_outcome text; v_new_balance int;
+  v_bet record; v_outcome text; v_new_balance bigint;
 BEGIN
   SELECT status::text AS status, winner_id, fighter_a_id, fighter_b_id,
          method::text AS method, round_finished
@@ -217,8 +217,8 @@ DECLARE
   v_winning_id uuid;
   v_winning_label text;
   v_bet record;
-  v_payout int;
-  v_new_balance int;
+  v_payout bigint;
+  v_new_balance bigint;
 BEGIN
   IF p_winner_offset NOT IN (0, 3) THEN
     RAISE EXCEPTION 'winner_offset must be 0 or 3, got %', p_winner_offset;
@@ -261,7 +261,7 @@ BEGIN
       AND outcome_id = v_winning_id
       AND resolved_at IS NULL
   LOOP
-    v_payout := ROUND(v_bet.shares_bought)::int;
+    v_payout := ROUND(v_bet.shares_bought)::bigint;
 
     UPDATE bet
       SET payout = v_payout, resolved_at = NOW()
@@ -319,8 +319,8 @@ DECLARE
   v_winning_id uuid;
   v_winning_label text;
   v_bet record;
-  v_payout int;
-  v_new_balance int;
+  v_payout bigint;
+  v_new_balance bigint;
 BEGIN
   IF p_winning_idx < 0 THEN
     RAISE EXCEPTION 'winning_idx must be >= 0, got %', p_winning_idx;
@@ -358,7 +358,7 @@ BEGIN
       AND outcome_id = v_winning_id
       AND resolved_at IS NULL
   LOOP
-    v_payout := ROUND(v_bet.shares_bought)::int;
+    v_payout := ROUND(v_bet.shares_bought)::bigint;
 
     UPDATE bet
       SET payout = v_payout, resolved_at = NOW()
@@ -417,8 +417,8 @@ DECLARE
   v_losing_id uuid;
   v_winning_label text;
   v_bet record;
-  v_payout int;
-  v_new_balance int;
+  v_payout bigint;
+  v_new_balance bigint;
 BEGIN
   IF p_winning_idx NOT IN (0, 1) THEN
     RAISE EXCEPTION 'winning_idx must be 0 or 1, got %', p_winning_idx;
@@ -459,7 +459,7 @@ BEGIN
       AND outcome_id = v_winning_id
       AND resolved_at IS NULL
   LOOP
-    v_payout := ROUND(v_bet.shares_bought)::int;
+    v_payout := ROUND(v_bet.shares_bought)::bigint;
 
     UPDATE bet
       SET payout = v_payout, resolved_at = NOW()
@@ -516,8 +516,8 @@ AS $function$
 DECLARE
   v_bout record; v_mb text; v_wd boolean; v_terminal_void boolean;
   v_leg record; v_outcome text;
-  v_p record; v_open int; v_lost int; v_won int;
-  v_combined numeric; v_payout int; v_new_balance int;
+  v_p record; v_open int; v_lost int; v_won int; v_void int;
+  v_combined numeric; v_payout bigint; v_new_balance bigint;
 BEGIN
   SELECT status::text AS status, winner_id, fighter_a_id, fighter_b_id,
          method::text AS method, round_finished
@@ -540,7 +540,7 @@ BEGIN
   END LOOP;
 
   FOR v_p IN
-    SELECT p.id, p.stake_coins, p.user_id
+    SELECT p.id, p.stake_coins, p.user_id, p.potential_payout, p.combined_odds
     FROM parlay p
     WHERE p.status='open'
       AND EXISTS (SELECT 1 FROM parlay_leg pl WHERE pl.parlay_id=p.id AND pl.bout_id=p_bout_id)
@@ -548,8 +548,9 @@ BEGIN
   LOOP
     SELECT count(*) FILTER (WHERE status='open'),
            count(*) FILTER (WHERE status='lost'),
-           count(*) FILTER (WHERE status='won')
-      INTO v_open, v_lost, v_won
+           count(*) FILTER (WHERE status='won'),
+           count(*) FILTER (WHERE status='void')
+      INTO v_open, v_lost, v_won, v_void
     FROM parlay_leg WHERE parlay_id = v_p.id;
 
     IF v_lost > 0 THEN
@@ -569,9 +570,19 @@ BEGIN
                   '/me/bets',
                   jsonb_build_object('key','parlay_void','coins',v_p.stake_coins));
       ELSE
-        SELECT LEAST(1000, round(exp(sum(ln(decimal_odds)))::numeric, 2))
-          INTO v_combined FROM parlay_leg WHERE parlay_id=v_p.id AND status='won';
-        v_payout := floor(v_p.stake_coins * v_combined)::int;
+        -- Every surviving leg won. With NO void leg, pay the EXACT amount the
+        -- slip quoted at placement (potential_payout) — recomputing it here via
+        -- exp(sum(ln(decimal_odds))) over the float4 leg odds drifts a coin or
+        -- two at the rounding boundary and underpays vs. what the user was shown.
+        -- Only when a leg voided & dropped out do we re-price over the won legs.
+        IF v_void = 0 THEN
+          v_payout := v_p.potential_payout;
+          v_combined := v_p.combined_odds;
+        ELSE
+          SELECT LEAST(1000, round(exp(sum(ln(decimal_odds)))::numeric, 2))
+            INTO v_combined FROM parlay_leg WHERE parlay_id=v_p.id AND status='won';
+          v_payout := floor(v_p.stake_coins * v_combined)::bigint;
+        END IF;
         UPDATE parlay SET status='won', payout=v_payout, settled_at=NOW() WHERE id=v_p.id;
         UPDATE user_profile SET balance_coins=balance_coins+v_payout,
                total_coins_earned=total_coins_earned+v_payout
@@ -603,7 +614,7 @@ AS $function$
 DECLARE
   v_achievement_id uuid;
   v_reward int;
-  v_new_balance int;
+  v_new_balance bigint;
   v_name text;
   v_description text;
   v_username text;
