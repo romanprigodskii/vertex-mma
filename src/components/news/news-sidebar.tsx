@@ -1,7 +1,9 @@
 import { getLocale, getTranslations } from "next-intl/server";
 import { ArrowRight } from "lucide-react";
 
+import { NewsEventCountdown } from "@/components/news/news-event-countdown";
 import { NewsSidebarSearch } from "@/components/news/news-sidebar-search";
+import { NewsTimestamp } from "@/components/news/news-timestamp";
 import { safeHttpUrl } from "@/components/news/safe-url";
 import { Link } from "@/i18n/navigation";
 import type { UpcomingEventSidebar } from "@/lib/event-detail";
@@ -9,18 +11,17 @@ import type { NewsFeedItem } from "@/lib/news";
 
 function formatEventDate(iso: string, locale: string): string {
   const d = new Date(iso);
+  // Pin UTC so this server-rendered absolute date is deterministic and reads the
+  // same for every viewer regardless of timezone (the sidebar is a server
+  // component whose output is baked into cacheable HTML).
   return d.toLocaleDateString(locale === "ru" ? "ru-RU" : "en-US", {
     month: "short",
     day: "numeric",
+    timeZone: "UTC",
   });
 }
 
 interface NewsSidebarLabels {
-  short: { min: (n: number) => string; hr: (n: number) => string; day: (n: number) => string };
-  justNow: string;
-  today: string;
-  tomorrow: string;
-  daysOut: (n: number) => string;
   mainEventLabel: string;
   fightCount: (n: number) => string;
   viewCard: string;
@@ -28,29 +29,6 @@ interface NewsSidebarLabels {
   nextEventLabel: string;
   latestNewsLabel: string;
   findFighter: string;
-}
-
-function formatRelative(iso: string, labels: NewsSidebarLabels, locale: string): string {
-  const then = new Date(iso).getTime();
-  const now = Date.now();
-  const diffSec = Math.max(0, Math.round((now - then) / 1000));
-  if (diffSec < 60) return labels.justNow;
-  const diffMin = Math.round(diffSec / 60);
-  if (diffMin < 60) return labels.short.min(diffMin);
-  const diffHr = Math.round(diffMin / 60);
-  if (diffHr < 24) return labels.short.hr(diffHr);
-  const diffDay = Math.round(diffHr / 24);
-  if (diffDay < 7) return labels.short.day(diffDay);
-  return formatEventDate(iso, locale);
-}
-
-function daysUntil(iso: string, labels: NewsSidebarLabels): string {
-  const then = new Date(iso).getTime();
-  const now = Date.now();
-  const diffDay = Math.round((then - now) / 86_400_000);
-  if (diffDay <= 0) return labels.today;
-  if (diffDay === 1) return labels.tomorrow;
-  return labels.daysOut(diffDay);
 }
 
 function Widget({
@@ -111,7 +89,7 @@ function NextEventWidget({
       <div className="mt-3 flex items-center gap-2 font-mono text-[11px] tabular-nums text-foreground-muted">
         <span>{labels.fightCount(event.bout_count)}</span>
         <span aria-hidden>·</span>
-        <span>{daysUntil(event.date, labels)}</span>
+        <NewsEventCountdown iso={event.date} />
       </div>
       <span className="mt-3 inline-flex items-center gap-1 text-sm text-primary group-hover:underline">
         {labels.viewCard} <ArrowRight className="h-3.5 w-3.5" aria-hidden />
@@ -123,11 +101,9 @@ function NextEventWidget({
 function LatestNewsWidget({
   items,
   labels,
-  locale,
 }: {
   items: NewsFeedItem[];
   labels: NewsSidebarLabels;
-  locale: string;
 }) {
   if (items.length === 0) {
     return (
@@ -170,7 +146,12 @@ function LatestNewsWidget({
             ) : null}
             <div className="min-w-0 flex-1">
               <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-foreground-muted">
-                {item.source_name} · {formatRelative(item.published_at, labels, locale)}
+                {item.source_name} ·{" "}
+                <NewsTimestamp
+                  iso={item.published_at}
+                  variant="compact"
+                  relative
+                />
               </span>
               <Link
                 href={`/news/${item.id}`}
@@ -198,15 +179,6 @@ export async function NewsSidebar({
   const t = await getTranslations("news");
   const locale = await getLocale();
   const labels: NewsSidebarLabels = {
-    short: {
-      min: (n) => t("shortMinutes", { n }),
-      hr: (n) => t("shortHours", { n }),
-      day: (n) => t("shortDays", { n }),
-    },
-    justNow: t("justNow"),
-    today: t("today"),
-    tomorrow: t("tomorrow"),
-    daysOut: (n) => t("daysOut", { n }),
     mainEventLabel: t("mainEventLabel"),
     fightCount: (n) => t("fightCountSidebar", { count: n }),
     viewCard: t("viewCard"),
@@ -228,7 +200,7 @@ export async function NewsSidebar({
         </div>
       ) : null}
       <Widget label={labels.latestNewsLabel}>
-        <LatestNewsWidget items={latestNews} labels={labels} locale={locale} />
+        <LatestNewsWidget items={latestNews} labels={labels} />
       </Widget>
       <Widget label={labels.findFighter}>
         <NewsSidebarSearch />

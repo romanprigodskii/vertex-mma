@@ -813,6 +813,11 @@
     "daysAgo": "{n}d ago",
     "title_tier_upgrade": "Tier upgrade · {tier}",
     "body_tier_upgrade": "You crossed {total} lifetime coins earned. Daily bonus boosted!",
+    "tier_bronze": "Bronze",
+    "tier_silver": "Silver",
+    "tier_gold": "Gold",
+    "tier_diamond": "Diamond",
+    "tier_champion": "Champion",
     "title_bet_refunded": "Bet refunded · +{coins} coins returned",
     "body_bet_refunded": "{reason}",
     "title_sportsbook_won": "Bet won · +{coins} coins",
@@ -1264,7 +1269,12 @@
     "underdog_win": {
       "name": "Upset Special",
       "description": "Won a sportsbook bet at 3.00+ odds."
-    }
+    },
+    "rarity_common": "Common",
+    "rarity_uncommon": "Uncommon",
+    "rarity_rare": "Rare",
+    "rarity_epic": "Epic",
+    "rarity_legendary": "Legendary"
   },
   "transactions": {
     "metaTitle": "Coin activity",

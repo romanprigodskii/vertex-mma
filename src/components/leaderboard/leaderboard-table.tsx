@@ -96,7 +96,7 @@ export async function LeaderboardTable({ rows, activeSort }: Props) {
                   />
                 ) : (
                   <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/15 font-display text-xs uppercase text-primary">
-                    {r.username.slice(0, 2)}
+                    {[...r.username].slice(0, 2).join("")}
                   </span>
                 )}
                 <div className="min-w-0">

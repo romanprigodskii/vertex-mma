@@ -40,17 +40,6 @@ function formatPostedDate(iso: string, locale: string): string {
     .toUpperCase();
 }
 
-function authorInitials(author: string | null | undefined): string {
-  if (!author) return "";
-  return author
-    .split(/\s+/)
-    .map((s) => s[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-}
-
 /** Self-rendered social card. We never load Instagram embed.js, X widgets.js,
  *  or YouTube iframe_api.js — privacy-friendly, fast, consistently themed.
  *  YouTube thumbnails are pre-fetched at ingest and stored on the row. */
@@ -94,7 +83,7 @@ export async function SocialEmbed({
             </span>
           ) : (
             <span className="text-sm font-semibold text-foreground">
-              {authorInitials(embed.author) || platformDisplayName(embed.platform)}
+              {platformDisplayName(embed.platform)}
             </span>
           )}
           {embed.handle ? (

@@ -1,6 +1,7 @@
 import { ImageResponse } from "next/og";
 
 import { formatNumber } from "@/lib/format";
+import { marketHasOdds } from "@/lib/market-odds";
 import { getMarketById } from "@/lib/markets";
 import { OG_CACHE_HEADERS, OG_COLORS, OG_FONTS, OG_SIZE } from "@/lib/og";
 
@@ -44,6 +45,13 @@ export async function GET(_req: Request, ctx: RouteContext) {
   }
 
   const isMethod = m.type === "method";
+
+  // A freshly generated market sits at the LMSR uniform cold-start (exactly
+  // 50/50 for a 2-way winner, ~16.7% each for a 6-way method). The rest of the
+  // app deliberately hides those defaults until an odds-sync or a real trade
+  // (see market-card.tsx / lib/market-odds.ts), and the share card must do the
+  // same — otherwise the OG image advertises a line that doesn't exist yet.
+  const hasOdds = marketHasOdds(m.outcomes, m.total_volume);
 
   const outcomeA = m.outcomes.find((o) => o.order_index === 0);
   const outcomeB = m.outcomes.find((o) => o.order_index === 1);
@@ -147,7 +155,9 @@ export async function GET(_req: Request, ctx: RouteContext) {
         ) : null}
 
         <div style={{ display: "flex", gap: 24, marginTop: isMethod ? 32 : 50, flex: 1 }}>
-          {isMethod ? (
+          {!hasOdds ? (
+            <NoLinePanel />
+          ) : isMethod ? (
             topMethodOutcomes.map((o, i) => (
               <PriceCard
                 key={o.order_index}
@@ -189,6 +199,51 @@ export async function GET(_req: Request, ctx: RouteContext) {
       </div>
     ),
     { ...OG_SIZE, headers: OG_CACHE_HEADERS },
+  );
+}
+
+// Neutral placeholder for an untraded market, mirroring market-card.tsx's
+// "oddsComingSoon" state — never render the LMSR cold-start percentages.
+function NoLinePanel() {
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        flex: 1,
+        justifyContent: "center",
+        padding: 40,
+        backgroundColor: OG_COLORS.bgElev,
+        border: `2px solid ${OG_COLORS.border}`,
+        borderRadius: 12,
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          color: OG_COLORS.text,
+          fontSize: 56,
+          fontWeight: 800,
+          textTransform: "uppercase",
+          letterSpacing: -1,
+        }}
+      >
+        Market open
+      </div>
+      <div
+        style={{
+          display: "flex",
+          marginTop: 12,
+          color: OG_COLORS.muted,
+          fontSize: 26,
+          fontFamily: OG_FONTS.mono,
+          letterSpacing: 2,
+          textTransform: "uppercase",
+        }}
+      >
+        No line yet · odds coming soon
+      </div>
+    </div>
   );
 }
 

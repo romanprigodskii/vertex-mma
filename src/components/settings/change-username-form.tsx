@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 
 import { changeUsernameAction } from "@/app/[locale]/settings/actions";
+import { useMounted } from "@/hooks/use-mounted";
 
 const INPUT_CLASS =
   "rounded-sm border border-foreground/15 bg-background-elevated/30 px-3 py-2 font-sans text-sm text-foreground focus:border-primary focus:outline-none disabled:opacity-50";
@@ -34,7 +35,20 @@ export function ChangeUsernameForm({
   const [error, setError] = React.useState<string | null>(null);
   const [success, setSuccess] = React.useState<string | null>(null);
 
-  const daysLeft = daysLeftUntilEligible(usernameLastChangedAt);
+  const mounted = useMounted();
+  // daysLeftUntilEligible reads Date.now(); computing it during the initial
+  // render can disagree between the server clock and the browser clock at a day
+  // boundary, flipping `locked` (and thus the input/button disabled state) and
+  // producing a hydration mismatch. Gate it behind `mounted` (false on the
+  // server and the first client render) so the two agree — defaulting to the
+  // locked state whenever the username was changed before, until the real
+  // days-left fills in after mount. A never-changed user is eligible
+  // deterministically. Mirrors DailyBonusButton.
+  const daysLeft = mounted
+    ? daysLeftUntilEligible(usernameLastChangedAt)
+    : usernameLastChangedAt
+      ? COOLDOWN_DAYS
+      : 0;
   const locked = daysLeft > 0;
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -88,7 +102,10 @@ export function ChangeUsernameForm({
           title={t("usernameRule")}
           className={INPUT_CLASS}
         />
-        <span className="font-sans text-[11px] text-foreground-subtle">
+        <span
+          className="font-sans text-[11px] text-foreground-subtle"
+          suppressHydrationWarning
+        >
           {locked
             ? t("usernameCooldown", { count: daysLeft })
             : t("usernameRule")}

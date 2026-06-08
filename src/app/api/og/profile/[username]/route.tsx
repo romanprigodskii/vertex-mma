@@ -12,6 +12,38 @@ interface RouteContext {
   params: Promise<{ username: string }>;
 }
 
+/** Fetch a remote image and inline it as a data URI, or return null on any
+ *  failure (unreachable/slow host, non-2xx, non-image, SVG, empty/oversized).
+ *  avatar_url is user-controlled and points at arbitrary external hosts; letting
+ *  next/og fetch the <img> during render means a single bad avatar throws inside
+ *  Satori and 500s the whole share card for every crawler. Fetching + validating
+ *  it here lets a broken avatar degrade to the initials fallback instead. */
+async function fetchImageAsDataUri(url: string): Promise<string | null> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 2500);
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    if (!res.ok) return null;
+    const contentType = (res.headers.get("content-type") ?? "")
+      .split(";")[0]
+      .trim();
+    // Raster image only — Satori can't reliably rasterize SVG via <img>, and a
+    // non-image body would throw at render time.
+    if (!contentType.startsWith("image/") || contentType === "image/svg+xml") {
+      return null;
+    }
+    const buffer = await res.arrayBuffer();
+    // Skip empties and absurdly large payloads (we inline into the response).
+    if (buffer.byteLength === 0 || buffer.byteLength > 3_000_000) return null;
+    return `data:${contentType};base64,${Buffer.from(buffer).toString("base64")}`;
+  } catch {
+    // Unreachable host, abort/timeout, DNS failure, etc.
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export async function GET(_req: Request, ctx: RouteContext) {
   const { username } = await ctx.params;
   const profile = await getUserProfileByUsername(username);
@@ -40,6 +72,9 @@ export async function GET(_req: Request, ctx: RouteContext) {
 
   const achievements = await listUserAchievements(profile.userProfileId);
   const displayName = (profile.displayName || profile.username).slice(0, 22);
+  const avatarDataUri = profile.avatarUrl
+    ? await fetchImageAsDataUri(profile.avatarUrl)
+    : null;
 
   return new ImageResponse(
     (
@@ -88,10 +123,10 @@ export async function GET(_req: Request, ctx: RouteContext) {
             flex: 1,
           }}
         >
-          {profile.avatarUrl ? (
+          {avatarDataUri ? (
             // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text
             <img
-              src={profile.avatarUrl}
+              src={avatarDataUri}
               width={220}
               height={220}
               style={{

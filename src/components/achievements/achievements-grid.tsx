@@ -38,6 +38,10 @@ export function AchievementsGrid({
     tA.has(`${a.slug}.name`) ? tA(`${a.slug}.name`) : a.name;
   const aDesc = (a: { slug: string; description: string }) =>
     tA.has(`${a.slug}.description`) ? tA(`${a.slug}.description`) : a.description;
+  // Rarity is a raw DB enum (common/uncommon/rare/epic/legendary); localize via
+  // the rarity_* keys, falling back to the English enum value if one is missing.
+  const aRarity = (rarity: string) =>
+    tA.has(`rarity_${rarity}`) ? tA(`rarity_${rarity}`) : rarity;
   if (compact) {
     if (unlocked.length === 0) return null;
     return (
@@ -102,8 +106,8 @@ export function AchievementsGrid({
               {aDesc(a)}
             </p>
             <p className="mt-2 font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
-              {a.rarity}
-              {a.reward_coins > 0 ? ` · +${formatNumber(a.reward_coins)}c` : ""}
+              {aRarity(a.rarity)}
+              {a.reward_coins > 0 ? ` · +${formatNumber(a.reward_coins, locale)}c` : ""}
               {isUnlocked && unlockedRow
                 ? ` · ${new Date(unlockedRow.unlocked_at).toLocaleDateString(dateLocale)}`
                 : ""}

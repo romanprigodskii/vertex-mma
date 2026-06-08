@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import {
   Coins,
   LogOut,
@@ -16,6 +16,7 @@ import { formatNumber } from "@/lib/format";
 
 export function NavbarUserMenu({ user }: { user: CurrentUser }) {
   const t = useTranslations("userMenu");
+  const locale = useLocale();
   const [open, setOpen] = React.useState(false);
   const ref = React.useRef<HTMLDivElement>(null);
 
@@ -30,7 +31,10 @@ export function NavbarUserMenu({ user }: { user: CurrentUser }) {
     return () => document.removeEventListener("mousedown", onDocClick);
   }, [open]);
 
-  const initials = user.username.slice(0, 2).toUpperCase();
+  // Grapheme-safe: spread splits on code points, not UTF-16 units, so a leading
+  // emoji/surrogate-pair username doesn't get sliced into a broken half-glyph
+  // (mirrors ranking-view.tsx authorInitials).
+  const initials = [...user.username].slice(0, 2).join("").toUpperCase();
 
   return (
     <div ref={ref} className="relative">
@@ -65,7 +69,7 @@ export function NavbarUserMenu({ user }: { user: CurrentUser }) {
           <div className="mx-1 my-1 flex items-center gap-1.5 rounded-sm bg-background-base/40 px-2 py-1.5">
             <Coins className="h-4 w-4 text-gold" aria-hidden />
             <span className="font-sans text-sm tabular text-foreground">
-              {formatNumber(user.balanceCoins)}
+              {formatNumber(user.balanceCoins, locale)}
             </span>
             <span className="ml-auto font-mono text-[9px] uppercase tracking-widest text-foreground-subtle">
               {user.tier}

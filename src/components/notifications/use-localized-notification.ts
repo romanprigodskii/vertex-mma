@@ -62,13 +62,18 @@ export function useLocalizedNotification(): (n: NotificationRow) => {
       const titleKey = `title_${key}`;
       if (!t.has(titleKey)) return { title: n.title, body: n.body };
 
+      // Tier is a raw DB enum (bronze/silver/gold/diamond/champion); localize it
+      // via the tier_* labels so the RU title doesn't read "Повышение уровня ·
+      // ELITE". Fall back to the uppercased raw value for any unknown tier.
+      const rawTier = str(p!.tier);
+      const tierKey = `tier_${rawTier.toLowerCase()}`;
       const args = {
         coins: num(p!.coins),
         total: num(p!.total),
         shares: num(p!.shares),
         label: str(p!.label),
         reason: str(p!.reason),
-        tier: str(p!.tier).toUpperCase(),
+        tier: t.has(tierKey) ? t(tierKey) : rawTier.toUpperCase(),
       };
       const title = t(titleKey, args);
       const bodyKey = `body_${key}`;

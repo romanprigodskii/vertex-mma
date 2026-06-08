@@ -813,6 +813,11 @@
     "daysAgo": "{n} д назад",
     "title_tier_upgrade": "Повышение уровня · {tier}",
     "body_tier_upgrade": "Ты преодолел отметку в {total} заработанных монет. Ежедневный бонус увеличен!",
+    "tier_bronze": "Бронза",
+    "tier_silver": "Серебро",
+    "tier_gold": "Золото",
+    "tier_diamond": "Алмаз",
+    "tier_champion": "Чемпион",
     "title_bet_refunded": "Ставка возвращена · +{coins} монет",
     "body_bet_refunded": "{reason}",
     "title_sportsbook_won": "Ставка выиграла · +{coins} монет",
@@ -1264,7 +1269,12 @@
     "underdog_win": {
       "name": "Сенсация",
       "description": "Выиграна ставка с коэффициентом 3.00+."
-    }
+    },
+    "rarity_common": "Обычное",
+    "rarity_uncommon": "Необычное",
+    "rarity_rare": "Редкое",
+    "rarity_epic": "Эпическое",
+    "rarity_legendary": "Легендарное"
   },
   "transactions": {
     "metaTitle": "Операции с монетами",
