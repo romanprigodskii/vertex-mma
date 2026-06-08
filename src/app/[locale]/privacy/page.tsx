@@ -41,7 +41,9 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: "static" });
-  return { title: t("privacyTitle") };
+  // Without its own description this page would inherit the root layout's
+  // "AI-powered MMA fight simulator" copy — nonsensical for a privacy policy.
+  return { title: t("privacyTitle"), description: t("privacyLead") };
 }
 
 export default async function PrivacyPage({

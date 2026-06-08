@@ -19,7 +19,17 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: "cards" });
-  return { title: t("metaTitle"), description: t("metaDescription") };
+  const title = t("metaTitle");
+  const description = t("metaDescription");
+  // Set og/twitter explicitly so shared cards don't inherit the root layout's
+  // generic "Vertex MMA — AI-powered MMA fight simulator" — weak for a feature
+  // built around sharing.
+  return {
+    title,
+    description,
+    openGraph: { title, description, siteName: "Vertex MMA", type: "website" },
+    twitter: { title, description },
+  };
 }
 
 const SECTION_LABEL =

@@ -200,6 +200,7 @@
     "ufcDraws": "Ничьи в UFC",
     "ufcNoContests": "NC в UFC",
     "ufcBouts": "Боёв в UFC",
+    "ufcBoutsTotal": "из {total} за карьеру",
     "lastFightLabel": "Последний бой",
     "height": "Рост",
     "reach": "Размах рук",

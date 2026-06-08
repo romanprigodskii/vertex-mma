@@ -25,11 +25,14 @@ export const METHODS = [
 
 export type MethodId = (typeof METHODS)[number]["id"];
 
+// ids mirror boutStatusEnum (db/schema/enums.ts) so BoutStatusId stays a valid
+// key for real DB rows — the old "live"/"finished" never matched any status.
 export const BOUT_STATUSES = [
   { id: "scheduled", label: "Scheduled" },
-  { id: "live", label: "Live" },
-  { id: "finished", label: "Finished" },
+  { id: "in_progress", label: "In progress" },
+  { id: "completed", label: "Completed" },
   { id: "cancelled", label: "Cancelled" },
+  { id: "no_contest", label: "No contest" },
 ] as const;
 
 export type BoutStatusId = (typeof BOUT_STATUSES)[number]["id"];

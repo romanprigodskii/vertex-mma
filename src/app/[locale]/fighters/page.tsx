@@ -19,7 +19,11 @@ import {
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Fighters",
+  // `absolute` pins the full branded title independent of the root layout's
+  // "%s | Vertex MMA" template — so it renders neither a bare "Fighters" nor a
+  // double-branded "Fighters | Vertex MMA | Vertex MMA", and stays consistent
+  // with the branded detail/compare titles.
+  title: { absolute: "Fighters | Vertex MMA" },
   description:
     "Explore UFC fighters with detailed career stats, fight history, and AI-powered analysis.",
   openGraph: {

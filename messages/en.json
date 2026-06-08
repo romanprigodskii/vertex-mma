@@ -200,6 +200,7 @@
     "ufcDraws": "UFC draws",
     "ufcNoContests": "UFC no contests",
     "ufcBouts": "UFC bouts",
+    "ufcBoutsTotal": "of {total} career",
     "lastFightLabel": "Last fight",
     "height": "Height",
     "reach": "Reach",

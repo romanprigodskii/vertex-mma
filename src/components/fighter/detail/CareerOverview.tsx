@@ -113,7 +113,7 @@ export async function CareerOverview({ fighter }: CareerOverviewProps) {
         value={formatNumber(fighter.ufc_total)}
         detail={
           fighter.bout_count > fighter.ufc_total
-            ? `${formatNumber(fighter.bout_count)}`
+            ? t("ufcBoutsTotal", { total: formatNumber(fighter.bout_count) })
             : null
         }
       />

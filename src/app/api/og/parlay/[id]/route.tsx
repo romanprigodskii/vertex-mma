@@ -54,11 +54,16 @@ export async function GET(_req: Request, ctx: RouteContext) {
   if (!p) return notFound();
 
   const status = STATUS[p.status] ?? STATUS.open;
-  // Clamp the user-controlled display name (≤60 chars) so a long one can't
-  // wrap and break the hero layout — mirrors the profile OG route.
+  // Clamp the user-controlled display name (≤28 chars) so a long one can't
+  // wrap and break the hero layout — mirrors the profile OG route. Slice by
+  // code points (spread) so a surrogate pair (emoji, CJK supplementary char)
+  // at the boundary isn't split into a lone surrogate / replacement glyph.
   const bettorRaw = p.bettor_display_name || `@${p.bettor_username}`;
+  const bettorChars = [...bettorRaw];
   const bettor =
-    bettorRaw.length > 28 ? `${bettorRaw.slice(0, 27)}…` : bettorRaw;
+    bettorChars.length > 28
+      ? `${bettorChars.slice(0, 27).join("")}…`
+      : bettorRaw;
   // 5 legs keeps the card within the 630px canvas even with tall rows.
   const shownLegs = p.legs.slice(0, 5);
   // Count from the actually-rendered legs, not the frozen num_legs (a leg's
