@@ -85,7 +85,11 @@ export default async function EventsListPage({
   // linger as a non-canonical duplicate of /events.
   if (sp.filter === "upcoming") redirect({ href: "/events", locale });
   const filter = parseFilter(sp.filter);
-  const events = await listEvents(filter, 60);
+  const allEvents = await listEvents(filter, 60);
+  // /events is the UFC showcase ("…every UFC card on record"). Keep the listing
+  // UFC-only so a mis-tagged or news-seeded non-UFC card can't surface here; the
+  // per-event promotion data fix lives in a separate task.
+  const events = allEvents.filter((e) => e.promotion.toLowerCase() === "ufc");
   const emptyCopy = EMPTY_COPY[filter];
   const dateFmt = activeLocale === "ru" ? "ru-RU" : "en-US";
 

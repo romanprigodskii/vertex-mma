@@ -14,6 +14,8 @@ import { priceToDecimalOdds } from "@/lib/lmsr";
 import { marketHasOdds } from "@/lib/market-odds";
 import { getBoutExternalOdds, getMarketById } from "@/lib/markets";
 
+import { MarketDateTime } from "./market-datetime";
+
 export const dynamic = "force-dynamic";
 
 interface PageProps {
@@ -117,11 +119,7 @@ export default async function MarketDetailPage({ params }: PageProps) {
               {market.event_name}
             </Link>
             {" · "}
-            {new Date(market.event_date).toLocaleDateString(dateLocale, {
-              month: "long",
-              day: "numeric",
-              year: "numeric",
-            })}
+            <MarketDateTime iso={market.event_date} mode="date" />
           </p>
           <h1
             className="mt-3 break-words text-balance font-display uppercase tracking-tight text-foreground"
@@ -279,12 +277,7 @@ export default async function MarketDetailPage({ params }: PageProps) {
                 {t("statCloses")}
               </dt>
               <dd className="mt-1 font-mono text-xs tabular text-foreground">
-                {new Date(market.closes_at).toLocaleString(dateLocale, {
-                  month: "short",
-                  day: "numeric",
-                  hour: "numeric",
-                  minute: "2-digit",
-                })}
+                <MarketDateTime iso={market.closes_at} mode="datetime" />
               </dd>
             </div>
           </dl>
