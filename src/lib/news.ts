@@ -309,19 +309,28 @@ export async function listRelatedNews(opts: {
 /** Scan a body text for ANY fighter name in the catalog, not just the ones
  *  the ingest tagged. Used to backfill the autolinker when news_item.related_
  *  fighter_ids missed a mention (very common — ingest only catches obvious
- *  references). SQL: scan fighter.name_en for substring match against the
- *  body. Sequential scan on ~4k rows, fast enough for SSR. char_length >= 5
- *  filters out short surnames that would over-match. */
+ *  references). SQL: a literal, case-insensitive substring test via strpos —
+ *  NOT ILIKE — so a name that happens to contain a `%` or `_` (bad scrape)
+ *  can't act as a wildcard and over-match. On RU the body is the translated
+ *  text, so we also test name_ru: the English names don't appear in a Russian
+ *  body, so an EN-only scan would return next to nothing there. Sequential
+ *  scan on ~4k rows, fast enough for SSR. char_length >= 5 filters out short
+ *  surnames that would over-match. */
 async function scanFightersInBody(
   body: string,
   isRu: boolean,
 ): Promise<NewsFighter[]> {
+  const ruMatch = isRu
+    ? sql` OR (name_ru IS NOT NULL AND char_length(name_ru) >= 5
+        AND strpos(lower(${body}), lower(name_ru)) > 0)`
+    : sql``;
   const rows = (await db.execute<{ id: string; slug: string; name: string }>(sql`
     SELECT id::text AS id, slug, ${localizedNameSql("fighter", isRu)} AS name
     FROM fighter
-    WHERE name_en IS NOT NULL
-      AND char_length(name_en) >= 5
-      AND ${body} ILIKE '%' || name_en || '%'
+    WHERE (
+      (name_en IS NOT NULL AND char_length(name_en) >= 5
+        AND strpos(lower(${body}), lower(name_en)) > 0)${ruMatch}
+    )
     ORDER BY char_length(name_en) DESC
     LIMIT 40
   `)) as unknown as Array<{ id: string; slug: string; name: string }>;

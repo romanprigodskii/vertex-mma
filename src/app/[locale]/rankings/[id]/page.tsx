@@ -7,7 +7,7 @@ import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
 import { RankingView } from "@/components/rankings/ranking-view";
 import { ShareButton } from "@/components/share/share-button";
-import { Link } from "@/i18n/navigation";
+import { Link, getPathname } from "@/i18n/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { getRankingById } from "@/lib/rankings";
 
@@ -20,18 +20,31 @@ interface PageProps {
 export async function generateMetadata({ params }: PageProps) {
   const { id, locale } = await params;
   const r = await getRankingById(id);
-  if (!r) {
-    const tNF = await getTranslations({ locale, namespace: "notFound" });
-    return { title: tNF("rankingTitle") };
-  }
+  // Fire the 404 here, not only in the page body. The page has a loading.tsx,
+  // so its body renders inside a Suspense boundary that flushes a 200 shell
+  // before the data fetch resolves — a notFound() in the body then can't change
+  // the already-sent status. generateMetadata is awaited before the shell
+  // streams, so this is the spot where a missing ranking can still emit a 404.
+  if (!r) notFound();
   const t = await getTranslations({ locale, namespace: "rankings" });
   const desc = r.description
     ? `${r.description.slice(0, 140)}${r.description.length > 140 ? "…" : ""}`
     : t("metaRankedBy", { count: r.entry_count, username: r.author_username });
   const ogImage = `/api/og/rankings/${r.id}`;
+  // Canonical + hreflang for the bilingual (en bare / ru-prefixed) URLs so
+  // crawlers pair the two locale variants and consolidate the /en alias.
+  // Resolved to absolute URLs against layout's metadataBase.
+  // NOTE: this gap is site-wide (the rankings list and fighter pages also lack
+  // alternates); fixed here for the ranking detail page only.
+  const enPath = getPathname({ href: `/rankings/${r.id}`, locale: "en" });
+  const ruPath = getPathname({ href: `/rankings/${r.id}`, locale: "ru" });
   return {
     title: `${r.title} · ${t("by")} @${r.author_username}`,
     description: desc,
+    alternates: {
+      canonical: locale === "ru" ? ruPath : enPath,
+      languages: { en: enPath, ru: ruPath, "x-default": enPath },
+    },
     openGraph: {
       title: `${r.title} · @${r.author_username}`,
       description: desc,

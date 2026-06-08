@@ -34,11 +34,6 @@ export interface AccuracySummary {
   total: number;
   /** Hits over total. NaN when total = 0. */
   hitRate: number;
-  /** Per-confidence-band hit counts: [hits, total]. */
-  perConfidence: Record<
-    "low" | "medium" | "high",
-    { hits: number; total: number }
-  >;
   /** Latest model version that has graded data (NULL if no graded data). */
   modelVersion: string | null;
 }
@@ -80,6 +75,7 @@ export async function getGradedSimulations(
   // versions from accuracy stats so a v0.5.0 backtest doesn't get
   // polluted by v0.1.0 picks.
   const result = await db.execute<Row>(sql`
+    SELECT * FROM (
     SELECT DISTINCT ON (b.id)
       b.id::text AS bout_id,
       e.id::text AS event_id,
@@ -110,16 +106,17 @@ export async function getGradedSimulations(
       AND b.winner_id IS NOT NULL
       AND (b.method IS NULL OR b.method::text != 'no_contest')
     ORDER BY b.id, bs.generated_at DESC
+    ) graded
+    ORDER BY graded.event_date DESC, graded.bout_id
+    LIMIT ${limit}
   `);
 
-  // Pull up to a healthy buffer so we can sort and slice; the
-  // ORDER BY above is by bout_id (needed for DISTINCT ON), so we
-  // re-sort by event_date in JS.
+  // DISTINCT ON forces the inner ORDER BY to lead with bout_id, so the
+  // newest-first date sort + slice is pushed into the outer query above —
+  // only `limit` rows leave the database instead of the whole graded backlog.
   const rows = result as unknown as Row[];
-  rows.sort((a, b) => b.event_date.localeCompare(a.event_date));
-  const sliced = rows.slice(0, limit);
 
-  return sliced.map((r) => {
+  return rows.map((r) => {
     const predictedIsA = r.prob_a >= 0.5;
     const predProb = predictedIsA ? r.prob_a : r.prob_b;
     const correct = r.predicted_winner_id === r.actual_winner_id;
@@ -143,30 +140,21 @@ export async function getGradedSimulations(
 }
 
 /**
- * Aggregate hit rate + per-confidence breakdown over a list of graded
- * picks. Caller decides the window (e.g. pass last 30 to get
- * "last 30 days" or pass all to get model lifetime). NaN-safe.
+ * Aggregate hit rate over a list of graded picks. Caller decides the window
+ * (e.g. pass last 30 to get "last 30 days" or pass all to get model lifetime).
+ * NaN-safe.
  */
 export function summarizeAccuracy(picks: GradedSimulationPick[]): AccuracySummary {
-  const perConfidence: AccuracySummary["perConfidence"] = {
-    low: { hits: 0, total: 0 },
-    medium: { hits: 0, total: 0 },
-    high: { hits: 0, total: 0 },
-  };
   let hits = 0;
   let modelVersion: string | null = null;
   for (const p of picks) {
     if (p.correct) hits += 1;
-    const bucket = perConfidence[p.confidenceLabel] ?? perConfidence.low;
-    bucket.total += 1;
-    if (p.correct) bucket.hits += 1;
     modelVersion ??= p.modelVersion;
   }
   const total = picks.length;
   return {
     total,
     hitRate: total > 0 ? hits / total : Number.NaN,
-    perConfidence,
     modelVersion,
   };
 }
