@@ -377,6 +377,8 @@ async function main() {
     activity: number;
     recent_form_score: number;
     recent_loss_penalty: number;
+    months_since_last: number | null;
+    layoff_penalty: number;
     in_active_ranking: boolean;
   };
   const upserts: UpsertRow[] = [];
@@ -497,6 +499,9 @@ async function main() {
       activity: Number(r.activity),
       recent_form_score: r.recent_form_score,
       recent_loss_penalty: Number(r.recent_loss_penalty),
+      months_since_last:
+        r.months_since_last != null ? Number(r.months_since_last) : null,
+      layoff_penalty: Number(r.layoff_penalty),
       in_active_ranking: inActiveRanking,
     });
   }
@@ -515,7 +520,8 @@ async function main() {
         quality_wins_decayed, divisional_cp, divisional_current_cp,
         era_dominance_current, performance_diff_current,
         finishing_dominance_decayed, activity, recent_form_score,
-        recent_loss_penalty, in_active_ranking
+        recent_loss_penalty, months_since_last, layoff_penalty,
+        in_active_ranking
       )
       SELECT
         UNNEST(${slice.map((u) => u.fighter_id)}::uuid[]),
@@ -535,6 +541,8 @@ async function main() {
         UNNEST(${slice.map((u) => u.activity)}::float8[]),
         UNNEST(${slice.map((u) => u.recent_form_score)}::int[]),
         UNNEST(${slice.map((u) => u.recent_loss_penalty)}::float8[]),
+        UNNEST(${slice.map((u) => u.months_since_last)}::float8[]),
+        UNNEST(${slice.map((u) => u.layoff_penalty)}::float8[]),
         UNNEST(${slice.map((u) => (u.in_active_ranking ? "t" : "f"))}::text[])::boolean
     `;
   }
