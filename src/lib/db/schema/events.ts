@@ -184,6 +184,20 @@ export const boutScorecard = pgTable(
   ],
 );
 
+// Wave 60: curated title-fight bout IDs, mirrored from
+// src/lib/title-fights.ts (which is derived from the hand-verified
+// championship-history.ts + title-challenger-history.ts). The scraped
+// bout.is_title_fight flag is unreliable — UFCStats puts bonus icons in
+// the same cell as the belt, so whole main-card slates get flagged.
+// The fighter_vertex_score views' era_dominance_current CTEs read this
+// table instead. Synced (delete + insert) by
+// scripts/derive_title_fights.ts; seeded by migration 0088.
+export const titleFightBout = pgTable("title_fight_bout", {
+  boutId: uuid("bout_id")
+    .primaryKey()
+    .references(() => bout.id, { onDelete: "cascade" }),
+});
+
 // Wave 44: external sportsbook consensus odds per bout (one row per
 // (bout, source) pair). Used to seed initial LMSR shares so brand-new
 // markets open with prices close to the public market, and to render a

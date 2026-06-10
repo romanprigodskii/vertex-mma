@@ -198,6 +198,24 @@ export function isCuratedTitleFight(boutId: string | null | undefined): boolean 
   writeFileSync(path, fileContent, "utf8");
   console.log(`Wrote ${path}`);
 
+  // Wave 60: mirror the curated set into title_fight_bout — the
+  // fighter_vertex_score views' era_dominance_current CTEs and
+  // compute_score_history.ts read it instead of the unreliable scraped
+  // bout.is_title_fight flag.
+  const allIds = entries.map((e) => e.boutId);
+  await sql.begin(async (tx) => {
+    await tx`DELETE FROM title_fight_bout`;
+    await tx`
+      INSERT INTO title_fight_bout (bout_id)
+      SELECT id FROM bout WHERE id = ANY(${allIds}::uuid[])
+      ON CONFLICT (bout_id) DO NOTHING
+    `;
+  });
+  const [{ count }] = await sql<
+    [{ count: number }]
+  >`SELECT COUNT(*)::int AS count FROM title_fight_bout`;
+  console.log(`Synced title_fight_bout (${count} rows).`);
+
   await sql.end();
 }
 
