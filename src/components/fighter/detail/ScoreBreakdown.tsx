@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { ChevronDown, ChevronRight } from "lucide-react";
 
 import type {
+  ScoreAdjustmentRow,
   ScoreBreakdownData,
   ScoreComponentRow,
 } from "@/lib/fighter-detail";
@@ -117,16 +118,24 @@ export function ScoreBreakdown({ data, divisionalStatus }: ScoreBreakdownProps) 
           {tab === "current" ? (
             <BreakdownTable
               rows={data.current.rows}
+              adjustments={data.current.adjustments}
+              ageMultiplier={data.current.ageMultiplier}
+              credibility={data.current.credibility}
               rawTotal={data.current.rawTotal}
               curveMultiplier={data.current.curveMultiplier}
+              skidPenalty={data.current.skidPenalty}
               finalScore={data.current.finalScore}
               sourceLabel={sourceLabel}
             />
           ) : (
             <BreakdownTable
               rows={data.allTime.rows}
+              adjustments={[]}
+              ageMultiplier={null}
+              credibility={data.allTime.credibility}
               rawTotal={null}
               curveMultiplier={null}
+              skidPenalty={null}
               finalScore={data.allTime.finalScore}
               sourceLabel={t("sourceGlobal")}
             />
@@ -139,18 +148,39 @@ export function ScoreBreakdown({ data, divisionalStatus }: ScoreBreakdownProps) 
 
 function BreakdownTable({
   rows,
+  adjustments,
+  ageMultiplier,
+  credibility,
   rawTotal,
   curveMultiplier,
+  skidPenalty,
   finalScore,
   sourceLabel,
 }: {
   rows: ScoreComponentRow[];
+  adjustments: ScoreAdjustmentRow[];
+  ageMultiplier: number | null;
+  credibility: number | null;
   rawTotal: number | null;
   curveMultiplier: number | null;
+  skidPenalty: number | null;
   finalScore: number | null;
   sourceLabel: string;
 }) {
   const t = useTranslations("fighter");
+  // Wave 61: the visible pre-multiplier sum — component contributions
+  // plus the flat streak/layoff adjustments. raw_current = this
+  // × age × credibility (modulo the view's ≥0 clamps), so the chain in
+  // the footer reconciles the table with the stored raw subtotal.
+  const componentsSubtotal =
+    rows.reduce((s, r) => s + (r.raw ?? 0) * r.weight, 0) +
+    adjustments.reduce((s, a) => s + a.points, 0);
+  const showAge = ageMultiplier != null && Math.abs(ageMultiplier - 1) > 5e-4;
+  const showCred = credibility != null && credibility < 1 - 5e-4;
+  // Only worth a separate line when a multiplier sits between the
+  // components sum and the raw subtotal (or, on the all-time tab, when
+  // credibility damps the sum into the final score).
+  const showComponentsSubtotal = showAge || showCred;
   return (
     <div className="mt-4">
       <p className="mb-3 font-sans text-[10px] uppercase tracking-widest text-foreground-subtle">
@@ -203,8 +233,77 @@ function BreakdownTable({
               </tr>
             );
           })}
+          {/* Wave 61: flat raw-point adjustments (no weight column) —
+              the streak bonus and the layoff penalty that were always
+              inside raw_current but invisible here. */}
+          {adjustments.map((adj) => (
+            <tr key={adj.label} className="border-b border-foreground/5">
+              <td className="py-1.5 text-foreground">{adj.label}</td>
+              <td className="py-1.5 text-right text-foreground-muted">
+                {adj.raw != null ? adj.raw.toFixed(1) : "—"}
+              </td>
+              <td className="py-1.5 text-right text-foreground-subtle">—</td>
+              <td
+                className={cn(
+                  "py-1.5 text-right",
+                  adj.points < 0 ? "text-streak-loss" : "text-foreground",
+                )}
+              >
+                {adj.points > 0 ? "+" : ""}
+                {adj.points.toFixed(1)}
+              </td>
+            </tr>
+          ))}
         </tbody>
         <tfoot>
+          {/* Wave 61: full reconciliation chain — components subtotal,
+              the age/credibility multipliers (shown only when ≠1), the
+              stored raw subtotal, the curve, the post-curve skid
+              deduction (only when it fired), then the final score. */}
+          {showComponentsSubtotal ? (
+            <tr>
+              <td
+                colSpan={3}
+                className="pt-3 text-right font-sans text-[10px] uppercase tracking-widest text-foreground-muted"
+              >
+                {t("componentsSubtotal")}
+              </td>
+              <td className="pt-3 text-right font-mono text-sm tabular text-foreground">
+                {componentsSubtotal.toFixed(1)}
+              </td>
+            </tr>
+          ) : null}
+          {showAge ? (
+            <tr>
+              <td
+                colSpan={3}
+                className="pt-1 text-right font-sans text-[10px] uppercase tracking-widest text-foreground-muted"
+              >
+                {t("ageFactorLine")}
+              </td>
+              <td
+                className={cn(
+                  "pt-1 text-right font-mono text-sm tabular",
+                  ageMultiplier < 1 ? "text-streak-loss" : "text-foreground",
+                )}
+              >
+                ×{ageMultiplier.toFixed(2)}
+              </td>
+            </tr>
+          ) : null}
+          {showCred ? (
+            <tr>
+              <td
+                colSpan={3}
+                className="pt-1 text-right font-sans text-[10px] uppercase tracking-widest text-foreground-muted"
+              >
+                {t("credibilityLine")}
+              </td>
+              <td className="pt-1 text-right font-mono text-sm tabular text-streak-loss">
+                ×{credibility.toFixed(2)}
+              </td>
+            </tr>
+          ) : null}
           {rawTotal != null ? (
             <tr>
               <td
@@ -228,6 +327,19 @@ function BreakdownTable({
               </td>
               <td className="pt-1 text-right font-mono text-sm tabular text-foreground">
                 ×{curveMultiplier.toFixed(2)}
+              </td>
+            </tr>
+          ) : null}
+          {skidPenalty != null && skidPenalty > 0 ? (
+            <tr>
+              <td
+                colSpan={3}
+                className="pt-1 text-right font-sans text-[10px] uppercase tracking-widest text-foreground-muted"
+              >
+                {t("skidPenaltyLine")}
+              </td>
+              <td className="pt-1 text-right font-mono text-sm tabular text-streak-loss">
+                −{skidPenalty.toFixed(0)}
               </td>
             </tr>
           ) : null}

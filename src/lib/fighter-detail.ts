@@ -128,8 +128,8 @@ export type FighterDetail = {
 };
 
 /** Wave 17: weights powering ScoreBreakdown's contribution math. These
- *  mirror the locked Wave 15.1 current formula (migration 0046) and the
- *  all-time formula (migration 0017 / 0045). They are presentation-only
+ *  mirror the live view formula (migration 0088: Wave 31 current
+ *  branch, Wave 53 all-time branch). They are presentation-only
  *  constants — the database is still the source of truth for the
  *  scores themselves (raw_current / multiplied_current / vertex_score
  *  in fighter_vertex_score and fighter_divisional_score). Updating a
@@ -147,12 +147,16 @@ export const CURRENT_SCORE_WEIGHTS = {
   defensive_vulnerability: -0.10,
 } as const;
 
+/** Wave 61: re-synced with the live Wave 53 formula (migration 0074+).
+ *  The previous constants (0.28/0.22/0.22, no career peak) mirrored the
+ *  pre-Wave-53 formula and had drifted from the view. */
 export const ALL_TIME_SCORE_WEIGHTS = {
-  quality_wins: 0.28,
-  championship_pedigree: 0.22,
-  era_dominance: 0.22,
+  quality_wins: 0.24,
+  championship_pedigree: 0.20,
+  era_dominance: 0.18,
   performance_diff: 0.12,
   finishing_dominance: 0.16,
+  career_peak: 0.10,
   total_loss_penalty: -0.10,
 } as const;
 
@@ -162,17 +166,38 @@ export type ScoreComponentRow = {
   weight: number;
 };
 
+/** Wave 61: a flat raw-point adjustment (no weight) already baked into
+ *  raw_current — the win-streak bonus (+0..5) and the layoff penalty.
+ *  `raw` is the contextual value behind it (streak length in fights /
+ *  months since the last bout); `points` is the signed contribution. */
+export type ScoreAdjustmentRow = {
+  label: string;
+  raw: number | null;
+  points: number;
+};
+
 export type ScoreBreakdownData = {
   source: "divisional" | "global";
   divisionLabel: string | null;
   current: {
     rows: ScoreComponentRow[];
+    /** Wave 61: streak bonus + layoff penalty rows (raw points). */
+    adjustments: ScoreAdjustmentRow[];
+    /** Wave 61: ×(1 + age_factor) applied to the pre-multiplier sum. */
+    ageMultiplier: number | null;
+    /** Wave 61: Wave 54 sample-size damping (0.85..1). */
+    credibility: number | null;
     rawTotal: number | null;
     curveMultiplier: number | null;
+    /** Wave 61: post-curve skid / fresh-loss deduction
+     *  (multiplied_current − vertex_score, ≥0). */
+    skidPenalty: number | null;
     finalScore: number | null;
   };
   allTime: {
     rows: ScoreComponentRow[];
+    /** Wave 61: Wave 54 all-time credibility damping (0.62..1). */
+    credibility: number | null;
     finalScore: number | null;
   };
 };
@@ -289,6 +314,58 @@ export function buildScoreBreakdown(
       ? currentMultiplied / currentRaw
       : null;
 
+  // Wave 61: surface the flat raw-point adjustments and multipliers that
+  // were always inside raw_current / vertex_score but invisible in the
+  // table — without them the component rows never summed to the raw
+  // subtotal and the layoff decline couldn't be seen at all.
+  //
+  // Streak and age are career-level (identical in both views), so they
+  // always read from global. Layoff is division-specific when a
+  // divisional row drives the hero (months since the last bout IN THAT
+  // division); credibility keys on the matching sample size
+  // (bouts_in_division vs career ufc_bouts — both 0.85 floor, full by 12).
+  // current_streak encodes loss streaks as negatives — clamp the display
+  // value to ≥0 since this row is specifically about the WIN streak.
+  const streak =
+    global?.current_streak != null
+      ? Math.max(0, global.current_streak)
+      : null;
+  const streakBonus =
+    streak != null ? Math.min(5, Math.max(0, streak - 2)) : 0;
+  const monthsOut =
+    divisional !== null
+      ? divisional.months_since_last
+      : global?.months_since_last ?? null;
+  const layoffPenalty =
+    (divisional !== null
+      ? divisional.layoff_penalty
+      : global?.layoff_penalty) ?? 0;
+  const adjustments: ScoreAdjustmentRow[] = [
+    { label: "Win streak bonus (fights)", raw: streak, points: streakBonus },
+    {
+      label: "Layoff penalty (months out)",
+      raw: monthsOut,
+      // `|| 0` normalises the -0 that `-(0)` produces (it round-trips
+      // oddly through RSC serialisation).
+      points: -layoffPenalty || 0,
+    },
+  ];
+
+  const ageMultiplier =
+    global?.age_factor != null ? 1 + global.age_factor : null;
+
+  const credSample =
+    divisional !== null ? divisional.bouts_in_division : global?.ufc_bouts;
+  const credibility =
+    credSample != null
+      ? Math.min(1, 0.85 + 0.15 * Math.min(1, credSample / 12))
+      : null;
+
+  const skidPenalty =
+    currentMultiplied != null && currentFinal != null
+      ? Math.max(0, currentMultiplied - currentFinal)
+      : null;
+
   const allTimeRows: ScoreComponentRow[] = [
     {
       label: "Quality wins (career)",
@@ -316,23 +393,40 @@ export function buildScoreBreakdown(
       weight: ALL_TIME_SCORE_WEIGHTS.finishing_dominance,
     },
     {
+      // Wave 53: highest replayed vertex_score from fighter_score_history.
+      label: "Career peak (history)",
+      raw: global?.peak_career ?? null,
+      weight: ALL_TIME_SCORE_WEIGHTS.career_peak,
+    },
+    {
       label: "Total loss penalty",
       raw: global?.total_loss_penalty ?? null,
       weight: ALL_TIME_SCORE_WEIGHTS.total_loss_penalty,
     },
   ];
 
+  // Wave 54: all-time credibility damping (0.62 floor, full by 14).
+  const allTimeCredibility =
+    global?.ufc_bouts != null
+      ? Math.min(1, 0.62 + 0.38 * Math.min(1, global.ufc_bouts / 14))
+      : null;
+
   return {
     source,
     divisionLabel: divisional?.division ?? null,
     current: {
       rows: currentRows,
+      adjustments,
+      ageMultiplier,
+      credibility,
       rawTotal: currentRaw,
       curveMultiplier,
+      skidPenalty,
       finalScore: currentFinal,
     },
     allTime: {
       rows: allTimeRows,
+      credibility: allTimeCredibility,
       finalScore: global?.vertex_score_all_time ?? null,
     },
   };
@@ -360,6 +454,10 @@ export type FighterDivisionalScoreRow = {
   era_dominance: number | null;
   raw_current: number | null;
   multiplied_current: number | null;
+  /** Wave 61: division-specific layoff display signals (months since the
+   *  last bout IN THIS division; penalty already baked into raw_current). */
+  months_since_last: number | null;
+  layoff_penalty: number | null;
 };
 
 /** Wave 17: the slice of `fighter_vertex_score` columns ScoreBreakdown
@@ -386,6 +484,15 @@ export type GlobalScoreComponents = {
   total_loss_penalty: number | null;
   vertex_score: number | null;
   vertex_score_all_time: number | null;
+  /** Wave 61: raw-point adjustments and multipliers already baked into
+   *  raw_current / vertex_score(_all_time), surfaced so ScoreBreakdown
+   *  can reconcile the table with the headline numbers. */
+  current_streak: number | null;
+  age_factor: number | null;
+  months_since_last: number | null;
+  layoff_penalty: number | null;
+  ufc_bouts: number | null;
+  peak_career: number | null;
 };
 
 export type FightHistoryEntry = {
@@ -638,7 +745,9 @@ export async function getDivisionalScores(
       recent_loss_penalty,
       era_dominance_current AS era_dominance,
       raw_current,
-      multiplied_current
+      multiplied_current,
+      months_since_last,
+      layoff_penalty
     FROM fighter_divisional_score
     WHERE fighter_id = ${fighterId}::uuid
     ORDER BY
@@ -679,7 +788,13 @@ export async function getGlobalScoreComponents(
       finishing_dominance_score,
       total_loss_penalty,
       vertex_score,
-      vertex_score_all_time
+      vertex_score_all_time,
+      current_streak,
+      age_factor,
+      months_since_last,
+      layoff_penalty,
+      ufc_bouts,
+      peak_career
     FROM fighter_vertex_score
     WHERE id = ${fighterId}::uuid
     LIMIT 1

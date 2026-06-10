@@ -437,6 +437,12 @@ export const fighterDivisionalScore = pgTable(
     recentFormScore: smallint("recent_form_score"),
     recentLossPenalty: doublePrecision("recent_loss_penalty"),
 
+    // Wave 61: division-specific layoff signals so ScoreBreakdown can
+    // show the layoff deduction (months since last bout IN THIS division
+    // and the raw-point penalty already baked into raw_current).
+    monthsSinceLast: doublePrecision("months_since_last"),
+    layoffPenalty: doublePrecision("layoff_penalty"),
+
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
