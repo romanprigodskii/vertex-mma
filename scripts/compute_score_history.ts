@@ -22,7 +22,8 @@
  *
  * Components replicate the SQL view as faithfully as possible:
  *   - opp_tier_value: read from bout_opponent_tier (already date-anchored)
- *   - is_title_fight: from bout.is_title_fight
+ *   - is_title_fight: from curated title_fight_bout (Wave 60; the
+ *     scraped bout.is_title_fight flag over-counts)
  *   - method: from bout.method
  *   - finish detection: ko%/tko%/sub% match or NULL method + KD/sub_attempts
  *   - decay_factor: piecewise linear over years (1.0/0.3/0.1)
@@ -339,8 +340,9 @@ function computeEraDom(
     if (m <= 24) tf24++;
     if (m <= 36) tf36++;
   }
-  const v = (tf24 >= 1 ? 5 : 0) + (tf36 >= 2 ? 5 : 0);
-  return Math.min(10, v);
+  // Wave 60: 0-100 parity (was 0-10) — mirrors the view rescale.
+  const v = (tf24 >= 1 ? 50 : 0) + (tf36 >= 2 ? 50 : 0);
+  return Math.min(100, v);
 }
 
 // =====================================================================
@@ -947,7 +949,11 @@ async function main() {
       b.id::text AS bout_id,
       e.date::text AS event_date,
       b.weight_class::text AS weight_class,
-      COALESCE(b.is_title_fight, false) AS is_title_fight,
+      -- Wave 60: curated title fights (title_fight_bout) — the scraped
+      -- is_title_fight flag over-counts (bonus icons share the belt cell).
+      EXISTS (
+        SELECT 1 FROM title_fight_bout tfb WHERE tfb.bout_id = b.id
+      ) AS is_title_fight,
       b.method::text AS method,
       b.round_finished,
       b.time_finished_seconds,
