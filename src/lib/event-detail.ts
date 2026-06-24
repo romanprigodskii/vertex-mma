@@ -209,8 +209,11 @@ export async function getEventBouts(eventId: string): Promise<EventBout[]> {
     JOIN fighter fb ON fb.id = b.fighter_b_id
     WHERE b.event_id = ${eventId}::uuid
       AND b.status != 'cancelled'
+    -- Real UFC card order: main event, co-main, then top-to-bottom by the
+    -- scraped bout_order (1 = main, increasing down the card). ASC, not DESC —
+    -- DESC put the opening prelim right under the co-main.
     ORDER BY b.is_main_event DESC, b.is_co_main_event DESC,
-             b.bout_order DESC NULLS LAST, b.id ASC
+             b.bout_order ASC NULLS LAST, b.id ASC
   `);
   return [...(result as unknown as EventBout[])];
 }

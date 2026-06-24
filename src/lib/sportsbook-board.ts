@@ -116,7 +116,7 @@ export async function getSportsbookBoard(limit = 60): Promise<BoardEvent[]> {
     ) x ON true
     WHERE b.status = 'scheduled'
       AND e.date > NOW()
-    ORDER BY e.date ASC, b.bout_order DESC NULLS LAST, b.id ASC
+    ORDER BY e.date ASC, b.bout_order ASC NULLS LAST, b.id ASC
     LIMIT ${Math.min(150, Math.max(1, limit))}
   `)) as unknown as Row[];
 
