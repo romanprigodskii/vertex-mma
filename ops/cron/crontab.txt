@@ -1,0 +1,20 @@
+# Vertex MMA data pipeline (wrappers in /opt/vertex-cron/*.sh)
+# All scrapers share /var/lock/vertex-scrape.lock so they never overlap.
+# git pull is best-effort: a fetch failure leaves the checkout pinned,
+# it never aborts a job.
+
+# Hourly — news pipeline (RSS -> classify -> rephrase -> translate)
+0 * * * *    /opt/vertex-cron/news-refresh.sh
+
+# Every 6h — light: re-list events + recent bouts (results) + odds + matview
+0 */6 * * *  /opt/vertex-cron/scrape-refresh.sh
+
+# Weekly Sun 03:30 — UFC rankings (Wayback) -> ranking_snapshot, before the
+# daily recompute so fresh ranks land in scores the same day
+30 3 * * 0   /opt/vertex-cron/rankings-refresh.sh
+
+# Daily 04:30 — per-round bout stats + judge scorecards + full recompute
+30 4 * * *   /opt/vertex-cron/scrape-stats.sh
+
+# Weekly Sun 05:30 — full A-Z scrape (incl. enrich-fighters) + recompute
+30 5 * * 0   /opt/vertex-cron/scrape-full.sh
