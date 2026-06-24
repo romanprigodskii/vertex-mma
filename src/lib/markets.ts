@@ -195,6 +195,7 @@ export async function listOpenMarketsByEvent(
     JOIN fighter fb ON fb.id = b.fighter_b_id
     WHERE m.status = 'open'
       AND m.closes_at > NOW()
+      AND b.status != 'cancelled'
       AND e.id IN (SELECT id FROM limited_events)
     ORDER BY e.date ASC, b.bout_order DESC NULLS LAST, b.id ASC, m.type ASC
   `);

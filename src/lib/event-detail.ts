@@ -51,7 +51,7 @@ export async function listEvents(
         e.poster_url,
         e.status::text AS status,
         e.promotion::text AS promotion,
-        (SELECT COUNT(*)::int FROM bout WHERE event_id = e.id) AS bout_count
+        (SELECT COUNT(*)::int FROM bout WHERE event_id = e.id AND status != 'cancelled') AS bout_count
       FROM event e
       WHERE e.status IN ('upcoming', 'in_progress')
         AND e.date >= NOW() - INTERVAL '1 day'
@@ -74,7 +74,7 @@ export async function listEvents(
         e.poster_url,
         e.status::text AS status,
         e.promotion::text AS promotion,
-        (SELECT COUNT(*)::int FROM bout WHERE event_id = e.id) AS bout_count
+        (SELECT COUNT(*)::int FROM bout WHERE event_id = e.id AND status != 'cancelled') AS bout_count
       FROM event e
       WHERE e.status = 'completed' OR e.date < NOW() - INTERVAL '1 day'
       ORDER BY e.date DESC
@@ -95,7 +95,7 @@ export async function listEvents(
       e.poster_url,
       e.status::text AS status,
       e.promotion::text AS promotion,
-      (SELECT COUNT(*)::int FROM bout WHERE event_id = e.id) AS bout_count
+      (SELECT COUNT(*)::int FROM bout WHERE event_id = e.id AND status != 'cancelled') AS bout_count
     FROM event e
     ORDER BY e.date DESC
     LIMIT ${limit}
@@ -208,6 +208,7 @@ export async function getEventBouts(eventId: string): Promise<EventBout[]> {
     JOIN fighter fa ON fa.id = b.fighter_a_id
     JOIN fighter fb ON fb.id = b.fighter_b_id
     WHERE b.event_id = ${eventId}::uuid
+      AND b.status != 'cancelled'
     ORDER BY b.is_main_event DESC, b.is_co_main_event DESC,
              b.bout_order DESC NULLS LAST, b.id ASC
   `);
@@ -315,7 +316,7 @@ export async function getNextUpcomingEventForSidebar(): Promise<UpcomingEventSid
       ${localizedEventNameSql("e", isRu)} AS short_name,
       e.date::text AS date,
       e.promotion::text AS promotion,
-      (SELECT COUNT(*)::int FROM bout WHERE event_id = e.id) AS bout_count,
+      (SELECT COUNT(*)::int FROM bout WHERE event_id = e.id AND status != 'cancelled') AS bout_count,
       me.fighter_a_name AS main_event_fighter_a,
       me.fighter_b_name AS main_event_fighter_b,
       me.weight_class AS main_event_weight_class

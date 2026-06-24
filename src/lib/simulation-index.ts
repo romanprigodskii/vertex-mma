@@ -50,7 +50,9 @@ export interface SimulationIndexEvent {
 /**
  * Returns every upcoming UFC bout we've scored, grouped by event.
  *
- * "Upcoming" = bout.status != 'completed'. We pull from bout_simulation
+ * "Upcoming" = bout.status is neither 'completed' (those are graded in the
+ * accuracy view) nor 'cancelled' (scratched fights / scheduled bouts left
+ * behind on a past event). We pull from bout_simulation
  * (the calibrated ensemble headline number), join the matching
  * bout_simulation_rounds row when present (Phase 3 MC summary), and
  * surface enough fighter context (name, photo) to render the card
@@ -138,7 +140,9 @@ export async function getUpcomingSimulationIndex(): Promise<SimulationIndexEvent
     LEFT JOIN bout_simulation_rounds bsr
       ON bsr.bout_id = b.id AND bsr.model_version = bs.model_version
     WHERE e.promotion = 'ufc'
-      AND b.status != 'completed'
+      -- Only genuinely upcoming bouts: drop completed (graded separately) and
+      -- cancelled (a scratched fight, or a scheduled bout left on a past event).
+      AND b.status NOT IN ('completed', 'cancelled')
     ORDER BY b.id, bs.generated_at DESC
   `);
   const rows = result as unknown as Row[];

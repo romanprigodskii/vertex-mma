@@ -306,6 +306,29 @@ def reconcile_duplicate_events(conn: psycopg.Connection) -> int:
     return merged
 
 
+def cancel_past_scheduled_bouts(conn: psycopg.Connection) -> int:
+    """Mark as 'cancelled' any bout still 'scheduled' on an event whose date is
+    in the past. The card has happened; a bout with no result that the results
+    scrape never filled is a scratched / pulled fight. Without this they linger
+    as 'scheduled' and leak into upcoming/simulation views as phantom fights.
+
+    Idempotent; runs each events scrape. A 1-day grace avoids touching a card
+    that's mid-event. If a real result lands later, the bout upsert flips the
+    status back to 'completed' (EXCLUDED.status wins), so this is reversible.
+    """
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE bout SET status = 'cancelled', updated_at = now()
+            WHERE status = 'scheduled'
+              AND event_id IN (
+                SELECT id FROM event WHERE date < CURRENT_DATE - INTERVAL '1 day'
+              )
+            """
+        )
+        return cur.rowcount or 0
+
+
 def upsert_event_details(
     conn: psycopg.Connection,
     *,

@@ -7,7 +7,11 @@ from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
 from src.config import EVENTS_COMPLETED_URL, EVENTS_UPCOMING_URL
 from src.db import get_connection
 from src.http import Client
-from src.loaders.events import reconcile_duplicate_events, upsert_event_listing
+from src.loaders.events import (
+    cancel_past_scheduled_bouts,
+    reconcile_duplicate_events,
+    upsert_event_listing,
+)
 from src.parsers.events import parse_events_listing
 from src.utils.logger import log
 
@@ -48,6 +52,10 @@ def run(*, limit: int | None = None, dry_run: bool = False) -> dict[str, int]:
         if not dry_run:
             totals["merged"] = reconcile_duplicate_events(conn)
             conn.commit()
+            cancelled = cancel_past_scheduled_bouts(conn)
+            conn.commit()
+            if cancelled:
+                log.info(f"cancelled {cancelled} stale scheduled bout(s) on past events")
 
     log.info(
         f"phase 1 events: total_seen={totals['total_seen']} "
