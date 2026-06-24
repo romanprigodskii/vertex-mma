@@ -8,9 +8,10 @@
  * shown; odds lock at bet time; payout = floor(stake × odds) if the
  * selection hits.
  *
- * Odds are PURE MODEL (no market blending — a deliberate product choice): the
- * book's edge comes entirely from the overround (HOUSE_MARGIN) baked into the
- * decimal odds, plus the MAX_ODDS cap that bounds payout on long-shot props.
+ * Odds are PURE MODEL (no market blending — a deliberate product choice) and
+ * carry NO overround: HOUSE_MARGIN = 0, so a market's decimal odds invert to a
+ * fair book (implied probabilities sum to ~100%, not 106%). The only residual
+ * house edge is the MAX_ODDS cap that bounds payout on long-shot props.
  *
  * This module is intentionally DB-free so the money math is unit-tested in
  * isolation (src/lib/sportsbook.test.ts), exactly like the LMSR core.
@@ -21,9 +22,9 @@
 // =====================================================================
 
 /** Overround baked into every market: fair probs are inflated to sum to
- *  1 + HOUSE_MARGIN before inverting to odds, so the book keeps ~6% on a
- *  balanced book. Bumping this widens the house edge across the board. */
-export const HOUSE_MARGIN = 0.06;
+ *  1 + HOUSE_MARGIN before inverting to odds. Set to 0 — a no-vig book that
+ *  pays out at true model odds. Bump it above 0 to re-introduce a house edge. */
+export const HOUSE_MARGIN = 0;
 
 /** Hard floor / ceiling on displayed decimal odds. The ceiling bounds the
  *  payout on ~0%-probability props (e.g. "by submission" when the model

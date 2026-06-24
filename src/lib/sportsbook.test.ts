@@ -59,8 +59,9 @@ describe("oddsForMarket — margin + clamps", () => {
     // Odds are rounded to 2 decimals for display, so the book sums to
     // 1+margin only approximately.
     assert.ok(Math.abs(impliedSum - (1 + HOUSE_MARGIN)) < 0.01, `impliedSum=${impliedSum}`);
-    // 0.5 fair → 2.00 fair → shaded below 2.00 by the margin
-    assert.ok(odds[0] < 2.0 && odds[0] > 1.8);
+    // 0.5 fair → 2.00 fair odds, shaded to 2.00/(1+margin) by the overround.
+    // With HOUSE_MARGIN = 0 this is exactly 2.00 (a no-vig book).
+    assert.ok(Math.abs(odds[0] - 2.0 / (1 + HOUSE_MARGIN)) < 0.02, `odds0=${odds[0]}`);
   });
 
   it("favourite gets shorter odds than the dog", () => {
