@@ -11,7 +11,6 @@ export type NavSection = {
     | "markets"
     | "simulation"
     | "rankings"
-    | "cards"
     | "leaderboard";
 };
 
@@ -22,6 +21,5 @@ export const NAV_SECTIONS: NavSection[] = [
   { href: "/markets", labelKey: "markets" },
   { href: "/simulation", labelKey: "simulation" },
   { href: "/rankings", labelKey: "rankings" },
-  { href: "/cards", labelKey: "cards" },
   { href: "/leaderboard", labelKey: "leaderboard" },
 ];

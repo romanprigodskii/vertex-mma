@@ -3,7 +3,6 @@ export * from "./fighters";
 export * from "./events";
 export * from "./users";
 export * from "./markets";
-export * from "./cards";
 export * from "./news";
 export * from "./rankings";
 export * from "./simulation";
