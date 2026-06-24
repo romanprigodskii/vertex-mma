@@ -7,6 +7,11 @@
  *     weightClass, startDate, endDate). Every completed bout a champion
  *     had IN THAT DIVISION between startDate and endDate (inclusive) is
  *     a title fight: the win, every defense, and the belt-losing bout.
+ *     For a CURRENT reign (endDate === null) we also flag the champion's
+ *     UPCOMING/scheduled bout in that division — a reigning champion's
+ *     next fight at home is a title defense, so the card shows the belt
+ *     before the fight happens (the scraped is_title_fight flag can't be
+ *     trusted to do this; see below).
  *   - title-challenger-history.ts TITLE_CHALLENGES — fighters who lost a
  *     title fight without ever winning a belt. Each entry has the exact
  *     bout date, resolved directly.
@@ -63,6 +68,12 @@ async function main() {
   console.log(`Resolving ${CHAMPIONSHIP_HISTORY.length} reigns...`);
   for (const reign of CHAMPIONSHIP_HISTORY) {
     const end = reign.endDate ?? "2099-12-31";
+    // A current champion's scheduled next fight in their own division is a
+    // title defense — flag it ahead of time. Closed reigns: completed only.
+    const statuses =
+      reign.endDate == null
+        ? ["completed", "scheduled", "in_progress"]
+        : ["completed"];
     const rows = await sql<BoutQueryRow[]>`
       SELECT
         b.id::text AS bout_id,
@@ -77,7 +88,7 @@ async function main() {
       JOIN fighter fa ON fa.id = b.fighter_a_id
       JOIN fighter fb ON fb.id = b.fighter_b_id
       WHERE ff.slug = ${reign.slug}
-        AND b.status = 'completed'
+        AND b.status = ANY(${statuses})
         AND (
           b.weight_class::text = ${reign.weightClass}
           -- Pre-2002 UFC used era-specific division names (old

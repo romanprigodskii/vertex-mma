@@ -11,10 +11,13 @@
  * files: every completed bout a champion had in their division during a
  * reign, plus every lost title challenge.
  *
- * 395 bouts.
+ * 398 bouts.
  */
 
 const CURATED_TITLE_BOUT_IDS: readonly string[] = [
+  "3bc924a6-9179-40bb-8a86-f354bd527e6d", // 2026-08-15 · UFC 330: Makhachev vs. Machado Garry · Islam Makhachev vs Ian Machado Garry
+  "dc68d875-c4c2-4cee-b65e-89176608ef8c", // 2026-08-15 · UFC 330: Makhachev vs. Machado Garry · Mackenzie Dern vs Gillian Robertson
+  "ab113f8b-001c-4195-8cbd-f0c84bd37be3", // 2026-06-14 · UFC Freedom 250 · Justin Gaethje vs Ilia Topuria
   "e7569169-e92d-4f34-ab06-6cedb9bb4789", // 2026-05-09 · UFC 328: Chimaev vs. Strickland · Khamzat Chimaev vs Sean Strickland
   "ed2fa2cd-0896-40e3-9fd3-ef9b33e1377a", // 2026-05-09 · UFC 328: Chimaev vs. Strickland · Joshua Van vs Tatsuro Taira
   "93c107a5-7b18-401c-8271-794b89e41763", // 2026-04-11 · UFC 327: Prochazka vs. Ulberg · Carlos Ulberg vs Jiri Prochazka
