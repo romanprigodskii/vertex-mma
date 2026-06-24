@@ -493,6 +493,68 @@ def upsert_bouts(
             else:
                 counts.updated += 1
 
+        # --- Reconcile this card against the page (the UFCStats event page is
+        # authoritative for which fights are on it). Only when we actually
+        # parsed bouts, so a transient empty parse can't nuke a card.
+        if not dry_run and bouts:
+            seen_ids = [b.ufc_stats_id for b in bouts if b.ufc_stats_id]
+            if seen_ids:
+                # (B) A real SCHEDULED bout no longer on the page = opponent
+                # swap / fight moved off this card. Drop it so it doesn't linger
+                # with a stale date. Never touches completed or provisional bouts.
+                cur.execute(
+                    """
+                    UPDATE news_item SET related_bout_id = NULL
+                    WHERE related_bout_id IN (
+                        SELECT id FROM bout
+                        WHERE event_id = %s::uuid AND status = 'scheduled'
+                          AND ufc_stats_id IS NOT NULL AND NOT (ufc_stats_id = ANY(%s))
+                    )
+                    """,
+                    (event_id, seen_ids),
+                )
+                cur.execute(
+                    """
+                    DELETE FROM bout
+                    WHERE event_id = %s::uuid AND status = 'scheduled'
+                      AND ufc_stats_id IS NOT NULL AND NOT (ufc_stats_id = ANY(%s))
+                    """,
+                    (event_id, seen_ids),
+                )
+            # (A) News may have mis-dated one of these fights onto ANOTHER card
+            # as a provisional bout (ufc_stats_id NULL). Now that UFCStats places
+            # it here, repoint that news link to this real bout, then drop the
+            # cross-event provisional twin. (The same-event twin is already
+            # claimed in-place by the UPDATE above the INSERT.)
+            cur.execute(
+                """
+                UPDATE news_item ni SET related_bout_id = real.id
+                FROM bout prov, bout real
+                WHERE ni.related_bout_id = prov.id
+                  AND prov.ufc_stats_id IS NULL AND prov.status = 'scheduled'
+                  AND prov.event_id <> %s::uuid
+                  AND real.event_id = %s::uuid AND real.ufc_stats_id IS NOT NULL
+                  AND (
+                    (real.fighter_a_id = prov.fighter_a_id AND real.fighter_b_id = prov.fighter_b_id)
+                    OR (real.fighter_a_id = prov.fighter_b_id AND real.fighter_b_id = prov.fighter_a_id)
+                  )
+                """,
+                (event_id, event_id),
+            )
+            cur.execute(
+                """
+                DELETE FROM bout prov USING bout real
+                WHERE prov.ufc_stats_id IS NULL AND prov.status = 'scheduled'
+                  AND prov.event_id <> %s::uuid
+                  AND real.event_id = %s::uuid AND real.ufc_stats_id IS NOT NULL
+                  AND (
+                    (real.fighter_a_id = prov.fighter_a_id AND real.fighter_b_id = prov.fighter_b_id)
+                    OR (real.fighter_a_id = prov.fighter_b_id AND real.fighter_b_id = prov.fighter_a_id)
+                  )
+                """,
+                (event_id, event_id),
+            )
+
     return counts
 
 
