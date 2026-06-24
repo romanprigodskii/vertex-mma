@@ -28,6 +28,8 @@ git_sync() {
   echo "===== $(ts) scrape-stats start ====="
   cd /opt/vertex-cron/vertex-mma || { echo "$(ts) checkout missing"; exit 1; }
   git_sync
+  # Keep node deps in sync with the checked-out code (fast no-op when satisfied).
+  pnpm install --frozen-lockfile --prefer-offline --silent || echo "$(ts) pnpm install warned"
   VENV=scripts/scraper/venv
   [ -x "$VENV/bin/python" ] || { python3 -m venv "$VENV" && "$VENV/bin/pip" install --quiet --upgrade pip; }
   "$VENV/bin/pip" install --quiet -r scripts/scraper/requirements.txt || echo "$(ts) pip warned"
