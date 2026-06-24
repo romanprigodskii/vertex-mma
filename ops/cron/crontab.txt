@@ -9,9 +9,9 @@
 # Every 6h — light: re-list events + recent bouts (results) + odds + matview
 0 */6 * * *  /opt/vertex-cron/scrape-refresh.sh
 
-# Weekly Sun 03:30 — UFC rankings (Wayback) -> ranking_snapshot, before the
-# daily recompute so fresh ranks land in scores the same day
-30 3 * * 0   /opt/vertex-cron/rankings-refresh.sh
+# Daily 03:30 — live ufc.com/rankings -> ranking_snapshot, before the daily
+# recompute so fresh ranks land in scores the same day
+30 3 * * *   /opt/vertex-cron/rankings-refresh.sh
 
 # Daily 04:30 — per-round bout stats + judge scorecards + full recompute
 30 4 * * *   /opt/vertex-cron/scrape-stats.sh

@@ -1,11 +1,16 @@
 #!/bin/bash
-# Weekly UFC rankings refresh (Sun 03:30, before the daily recompute at 04:30
-# so new ranks propagate into scores the same day).
+# DAILY UFC rankings refresh (03:30, before the daily recompute at 04:30 so
+# fresh ranks propagate into scores the same day).
 #
-#   1. scrape_ufc_rankings.py  — Wayback CDX → imports/ufc_rankings_raw/*.html
-#                                (idempotent: only downloads new 14-day windows)
-#   2. parse_ufc_rankings.py   — raw HTML → imports/ufc_rankings_parsed.csv
-#   3. import_ufc_rankings.ts  — CSV → ranking_snapshot (idempotent upsert)
+#   1. fetch_ufc_rankings_live.py — GET live ufc.com/rankings (server-rendered)
+#                                   → imports/ufc_rankings_raw/{today}.html
+#   2. parse_ufc_rankings.py      — all raw HTML → imports/ufc_rankings_parsed.csv
+#   3. import_ufc_rankings.ts     — CSV → ranking_snapshot (idempotent upsert)
+#
+# Live fetch = no Archive.org lag (was the Wayback scraper, which only had
+# biweekly snapshots 1-3 days stale). The Wayback scraper
+# (scripts/scrape_ufc_rankings.py) is kept for one-time HISTORY backfill but is
+# not on the regular schedule — history doesn't change.
 #
 # ranking_snapshot feeds compute_opponent_quality (opponent tier by rank at
 # bout date); the recompute chain then propagates it into the scores.
@@ -27,8 +32,8 @@ git_sync() {
   echo "===== $(ts) rankings start ====="
   cd /opt/vertex-cron/vertex-mma || { echo "$(ts) checkout missing"; exit 1; }
   git_sync
-  echo "$(ts) wayback scrape"
-  python3 scripts/scrape_ufc_rankings.py || echo "$(ts) rankings scrape FAILED (non-fatal)"
+  echo "$(ts) live fetch ufc.com/rankings"
+  python3 scripts/fetch_ufc_rankings_live.py || echo "$(ts) live fetch FAILED (non-fatal — parse/import still run on prior snapshots)"
   echo "$(ts) parse"
   python3 scripts/parse_ufc_rankings.py || echo "$(ts) rankings parse FAILED (non-fatal)"
   echo "$(ts) import -> ranking_snapshot"

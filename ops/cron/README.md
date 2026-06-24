@@ -13,7 +13,7 @@ at runtime (the checkout's `git pull` is currently best-effort — see below).
 | every 6h | `scrape-refresh.sh` | re-list events + recent bouts (results) + bestfightodds + `fighter_with_stats` matview |
 | **daily 04:30** | `scrape-stats.sh` | **`enrich-bouts` (per-round stats) + `scorecards` + full recompute** |
 | weekly Sun 05:30 | `scrape-full.sh` | `run_all.py --phase all` (A-Z incl. enrich-fighters) + full recompute |
-| weekly Sun 03:30 | `rankings-refresh.sh` | Wayback `ufc.com/rankings` → parse → import `ranking_snapshot` (before the daily recompute) |
+| daily 03:30 | `rankings-refresh.sh` | live `ufc.com/rankings` → parse → import `ranking_snapshot` (before the daily recompute) |
 
 The daily `scrape-stats.sh` is the job whose absence let per-round stats,
 scorecards and score-history silently go ~1 month stale (the old cron only
