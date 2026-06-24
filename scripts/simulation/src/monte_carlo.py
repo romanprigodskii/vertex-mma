@@ -54,12 +54,19 @@ ROSTER_DEFAULTS = {
     "finish_rate_for": 0.4,
 }
 
-# Base per-second hazards (a "neutral" UFC bout has ~25 % chance of
-# ending by KO/TKO and ~10 % by sub over a ~14 min sample). These
-# numbers are tuned so that with average inputs the simulator emits
-# UFC-realistic finish-rate splits before any fighter-specific lift.
-BASE_KO_HAZARD_PER_SEC = 0.00040
-BASE_SUB_HAZARD_PER_SEC = 0.00018
+# Base per-second finish hazards, applied to BOTH fighters across the FULL
+# scheduled time (with the fatigue taper below). Empirically tuned so a real
+# slate averages ~33 % KO / 17 % sub / 50 % decision while a slugfest still
+# reads 60-70 % KO and a grappling match 30-40 % sub — i.e. the mean is right
+# AND the fighter-specific spread survives. Re-tune against a fresh slate if the
+# aggregate drifts (scripts/simulation tuning harness).
+BASE_KO_HAZARD_PER_SEC = 0.00022
+BASE_SUB_HAZARD_PER_SEC = 0.00016
+# Fatigue: the per-second finish hazard is multiplied by this factor RAISED TO
+# (round_index) so finishes taper a little each round. Without it the constant
+# per-second hazard compounds purely with fight length, so a 5-round bout racks
+# up more finishes than a 3-round one for no reason but extra ticks. 1.0 = off.
+FATIGUE_DECAY_PER_ROUND = 0.93
 # Strength multipliers — how much a fighter's own offensive stat or
 # the opponent's vulnerability moves the hazard.
 KO_OFFENSE_WEIGHT = 0.6
@@ -91,7 +98,10 @@ SHRINK_PSEUDO_COUNTS = 4.0
 METHOD_BASE_KO = 0.33
 METHOD_BASE_SUB = 0.17
 METHOD_BASE_DEC = 0.50
-METHOD_ANCHOR_LAMBDA = 0.6
+# Light touch now that the base hazard itself is calibrated: the anchor only
+# nudges extreme tails toward sanity, it does NOT flatten the spread (a slugfest
+# must still read well above 33% KO). 0.6 over-corrected toward decisions.
+METHOD_ANCHOR_LAMBDA = 0.10
 
 # Neutral anchors used by the lift formulas (lift = 1.0 at these values).
 _KO_OFF_ANCHOR = 0.35
@@ -272,12 +282,15 @@ def simulate_bout(
         active_idx = np.where(remaining)[0]
         # Draw probabilities only for still-active sims.
         u = rng.random((4, active_idx.size))
+        # Fatigue taper — later rounds finish a little less, so a 5-round bout
+        # doesn't out-finish a 3-round one purely on tick count.
+        decay = FATIGUE_DECAY_PER_ROUND ** (t // seconds_per_round)
         # Order matters slightly when multiple events fire same tick;
         # apply KO_a → KO_b → SUB_a → SUB_b with tie-break first-true wins.
-        hits_ko_a = u[0] < ko_a
-        hits_ko_b = u[1] < ko_b
-        hits_sub_a = u[2] < sub_a
-        hits_sub_b = u[3] < sub_b
+        hits_ko_a = u[0] < ko_a * decay
+        hits_ko_b = u[1] < ko_b * decay
+        hits_sub_a = u[2] < sub_a * decay
+        hits_sub_b = u[3] < sub_b * decay
         any_hit = hits_ko_a | hits_ko_b | hits_sub_a | hits_sub_b
         if not any_hit.any():
             continue
