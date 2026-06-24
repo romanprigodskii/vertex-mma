@@ -221,6 +221,13 @@ export function isCuratedTitleFight(boutId: string | null | undefined): boolean 
       SELECT id FROM bout WHERE id = ANY(${allIds}::uuid[])
       ON CONFLICT (bout_id) DO NOTHING
     `;
+    // UFC title fights are always 5 rounds, even off the main event (e.g. a
+    // co-main title bout). The scraper assigns 5 only to bout_order==1, so
+    // correct every curated title bout here.
+    await tx`
+      UPDATE bout SET scheduled_rounds = 5, updated_at = now()
+      WHERE id = ANY(${allIds}::uuid[]) AND scheduled_rounds < 5
+    `;
   });
   const [{ count }] = await sql<
     [{ count: number }]

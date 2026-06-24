@@ -477,8 +477,11 @@ def upsert_bouts(
                     bout_order = EXCLUDED.bout_order,
                     -- Refresh scheduled_rounds so a provisional bout the news
                     -- pipeline created at the default 3 is corrected to the
-                    -- real 5 (title/main event) on official adoption.
-                    scheduled_rounds = EXCLUDED.scheduled_rounds,
+                    -- real 5 (title/main event) on official adoption. GREATEST
+                    -- so a re-scrape never downgrades a curated title co-main
+                    -- (set to 5 by derive_title_fights, but bout_order != 1)
+                    -- back to 3.
+                    scheduled_rounds = GREATEST(EXCLUDED.scheduled_rounds, bout.scheduled_rounds),
                     status = EXCLUDED.status,
                     winner_id = COALESCE(EXCLUDED.winner_id, bout.winner_id),
                     method = COALESCE(EXCLUDED.method, bout.method),
