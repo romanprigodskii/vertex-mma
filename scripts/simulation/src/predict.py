@@ -23,7 +23,7 @@ from rich.console import Console
 from .config import ARTIFACTS_DIR, confidence_label
 from .db import get_connection
 from .ensemble import EnsembleModel, weight_group
-from .export import build_dataset, fetch_raw
+from .export import build_dataset, fetch_raw, stable_hash
 from .features import build_feature_matrix
 from .monte_carlo import FighterMC, simulate_bout
 
@@ -146,9 +146,10 @@ def predict_upcoming(*, force_version: str | None = None) -> int:
 
     # Phase 3 — Monte Carlo per-bout. We rebuild FighterMC from the
     # upcoming DataFrame rows; the snapshot fields are all present there
-    # (see export.FighterHistory.snapshot keys). seed is bout-stable so
-    # re-running the same bout gets the same distribution (within
-    # rounding) — easier to debug.
+    # (see export.FighterHistory.snapshot keys). seed is bout-stable
+    # (stable_hash, NOT the salted builtin hash) so re-running the same bout
+    # gets the same distribution across processes — the contract this comment
+    # promised but the old `hash()` quietly broke.
     mc_rows: list[tuple] = []
     for i, m in enumerate(meta.itertuples(index=False)):
         row = upcoming.iloc[i]
@@ -157,7 +158,7 @@ def predict_upcoming(*, force_version: str | None = None) -> int:
         a = FighterMC.from_snapshot(snap_a)
         b = FighterMC.from_snapshot(snap_b)
         scheduled_rounds = int(row["scheduled_rounds"])
-        mc = simulate_bout(a, b, scheduled_rounds, seed=hash(m.bout_id) & 0xFFFFFFFF)
+        mc = simulate_bout(a, b, scheduled_rounds, seed=stable_hash(m.bout_id))
         mc_rows.append(
             (
                 m.bout_id,

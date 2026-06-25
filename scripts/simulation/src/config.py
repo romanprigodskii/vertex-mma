@@ -35,6 +35,14 @@ LGB_PARAMS = {
     "bagging_freq": 5,
     "lambda_l2": 1.0,
     "verbosity": -1,
+    # Reproducibility: `seed` pins every sub-seed (bagging / feature
+    # sampling), and `deterministic` + `force_row_wise` make histogram
+    # construction independent of thread scheduling. Without these, bagging
+    # (bagging_fraction < 1) drew fresh randomness each run, so retraining the
+    # SAME data produced a different model and metadata.json was unreproducible.
+    "seed": 42,
+    "deterministic": True,
+    "force_row_wise": True,
 }
 LGB_NUM_ROUNDS = 2000
 LGB_EARLY_STOPPING_ROUNDS = 100

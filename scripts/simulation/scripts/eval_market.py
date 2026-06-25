@@ -45,11 +45,16 @@ def main() -> None:
     ensemble = EnsembleModel.load(ENSEMBLE_DIR)
     probs = ensemble.predict_proba_a(Xs["test"], gs["test"])
     y_test = ys["test"].to_numpy()
-    market = df.loc[metas["test"].index, "market_prob_a"].to_numpy(dtype=float)
+    # market_prob_a rides on `meta` and is reset_index'd off the same mask as
+    # Xs["test"] / ys["test"], so it's positionally aligned with `probs`. The
+    # old `df.loc[metas["test"].index, ...]` indexed the FULL df by the test
+    # split's 0..n reset index → it scored the EARLIEST bouts in history, not
+    # the test bouts.
+    market = metas["test"]["market_prob_a"].to_numpy(dtype=float)
 
     n = len(y_test)
     print(f"\n=== TEST split (out-of-sample), n={n} ===")
-    m = evaluate_probs(probs, ys["test"], df.loc[metas["test"].index, "market_prob_a"])
+    m = evaluate_probs(probs, ys["test"], metas["test"]["market_prob_a"])
     print(
         f"model   acc {m['accuracy']*100:.1f}%  brier {m['brier']:.3f}  "
         f"logloss {m['log_loss']:.3f}  auc {m['roc_auc']:.3f}"

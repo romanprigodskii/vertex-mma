@@ -149,6 +149,10 @@ class EnsembleModel:
             "reg_alpha": 0.1,
             "verbosity": 0,
             "tree_method": "hist",
+            # Pin the seed so subsample / colsample draws repeat run-to-run —
+            # the XGB half of the reproducibility fix (LightGBM is pinned via
+            # LGB_PARAMS in config.py).
+            "seed": 42,
         }
         dtr = xgb.DMatrix(X_tr, label=y_tr.astype(int))
         dva = xgb.DMatrix(X_va, label=y_va.astype(int))

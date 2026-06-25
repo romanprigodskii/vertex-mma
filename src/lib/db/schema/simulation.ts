@@ -37,8 +37,11 @@ export const boutSimulation = pgTable(
     /** 'low' / 'medium' / 'high' — derived from |prob - 0.5|. See
      *  scripts/simulation/src/config.py CONFIDENCE_BANDS. */
     confidenceLabel: text("confidence_label").notNull(),
-    /** Market-implied prob A wins, if opening odds were available at
-     *  prediction time. NULL otherwise. */
+    /** Market-implied prob A wins from the latest (closing) sportsbook line,
+     *  if any line was scraped by prediction time. NULL otherwise. Used only
+     *  for the edge/value display (edgeA below) — it is NOT a model input
+     *  (the closing line is a near-leak and is missing for most upcoming
+     *  bouts; see scripts/simulation/src/features.py). */
     marketProbA: real("market_prob_a"),
     /** model_prob_a - market_prob_a. Positive = model thinks A is more
      *  likely than the market does. Used for the "value" indicator in

@@ -17,6 +17,7 @@ row per completed UFC bout where both fighters had ≥1 prior UFC bout
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 from datetime import date
 from typing import Any
@@ -27,6 +28,21 @@ from rich.console import Console
 from .db import get_connection
 
 console = Console()
+
+
+def stable_hash(s: str) -> int:
+    """Deterministic 32-bit hash of a string, stable across processes.
+
+    Python's builtin ``hash()`` is salted per-process (PYTHONHASHSEED is
+    randomized unless pinned), so using it for the A/B symmetrization flip
+    and the Monte-Carlo seed made both non-reproducible: retraining
+    reshuffled which bouts were flipped (a different model every run) and
+    each predict run drew a different MC distribution despite the
+    "bout-stable" contract in predict.py. blake2b is seed-free, so the same
+    bout_id always maps to the same value."""
+    return int.from_bytes(
+        hashlib.blake2b(s.encode("utf-8"), digest_size=4).digest(), "big"
+    )
 
 
 # --------------------------------------------------------------------------
@@ -94,10 +110,15 @@ SELECT
 FROM fighter f
 """
 
-# Opening sportsbook line per bout (one row per bout, source preferred =
-# 'bestfightodds'). Decimal odds; we'll convert to implied prob in feature
-# engineering. NULL for bouts where no scrape happened (mostly historical
-# pre-2020 events) — those rows fall back to "no odds feature" handling.
+# LATEST (closing) sportsbook line per bout (one row per bout, source
+# preferred = 'bestfightodds'). The scraper UPSERTs the same (bout_id,
+# source) row every ~6h (08_scrape_bestfightodds.py: ON CONFLICT DO UPDATE),
+# so for a completed bout this is the closing line, NOT an opening line.
+# `ORDER BY ... fetched_at DESC` just picks the freshest scrape per bout.
+# Decimal odds → implied prob downstream. As of the market-leak fix this is
+# used ONLY for the edge/value display (model_prob - market_prob); it is NOT
+# a model feature (a closing line is a near-leak in backtest and is absent
+# for most upcoming bouts at predict time — train/serve skew).
 EXTERNAL_ODDS_SQL = """
 SELECT DISTINCT ON (bout_id)
   bout_id::text AS bout_id,
@@ -378,7 +399,7 @@ class FighterHistory:
     def apply_bout(
         self,
         *,
-        is_winner: bool,
+        result: str,  # "win" | "loss" | "draw"
         method: str | None,
         is_title_fight: bool,
         event_dt: date,
@@ -395,7 +416,7 @@ class FighterHistory:
             method = ""
         else:
             method = str(method).lower()
-        if is_winner:
+        if result == "win":
             self.wins += 1
             if method in ("ko", "tko"):
                 self.wins_ko += 1
@@ -405,7 +426,7 @@ class FighterHistory:
                 self.wins_dec += 1
             self.recent_results.append("W")
             self.current_streak = max(1, self.current_streak + 1) if self.current_streak >= 0 else 1
-        else:
+        elif result == "loss":
             self.losses += 1
             if method in ("ko", "tko"):
                 self.losses_ko += 1
@@ -415,6 +436,16 @@ class FighterHistory:
                 self.losses_dec += 1
             self.recent_results.append("L")
             self.current_streak = min(-1, self.current_streak - 1) if self.current_streak <= 0 else -1
+        else:  # draw — a bout that happened, but neither a win nor a loss.
+            # Previously draws were funneled through the `else` branch above and
+            # counted as LOSSES for BOTH fighters (losses += 1, "L" in form,
+            # streak driven negative), permanently corrupting win_rate / losses
+            # / recent form / streak for every later snapshot. A draw must not
+            # touch wins or losses. Record "D" so it still occupies a recency
+            # slot (recentN_wins counts "W", and "D" correctly is not a win) and
+            # snap the streak to 0 (a draw ends a run without starting one).
+            self.recent_results.append("D")
+            self.current_streak = 0
         # Keep recent_results bounded so it doesn't grow forever; only the
         # tail matters for recent-form features.
         if len(self.recent_results) > 10:
@@ -555,9 +586,11 @@ def build_dataset(
         stance_a = info_a["stance"] if info_a is not None else None
         stance_b = info_b["stance"] if info_b is not None else None
 
-        # Opening odds (decimal). Convert to implied prob via 1/odds and
-        # de-vig naively (a/(a+b)) so the pair sums to 1. Stored as
+        # Latest (closing) line odds (decimal). Convert to implied prob via
+        # 1/odds and de-vig naively (a/(a+b)) so the pair sums to 1. Stored as
         # `market_prob_a` — single canonical "market believes A wins" prob.
+        # Kept on the row for the edge/value display (model_prob - market_prob)
+        # and for the honest model-vs-market backtest; it is NOT a model input.
         market_prob_a: float | None = None
         if bout_id in odds.index:
             row = odds.loc[bout_id]
@@ -636,10 +669,15 @@ def build_dataset(
         )
 
         if is_completed and not is_nc:
-            a_winner = bout.winner_id == fa
-            b_winner = bout.winner_id == fb
+            # Draw (winner_id NULL) → "draw" for both; otherwise exactly one
+            # side wins. NC is already excluded by the guard above.
+            if is_draw:
+                result_a = result_b = "draw"
+            else:
+                result_a = "win" if bout.winner_id == fa else "loss"
+                result_b = "win" if bout.winner_id == fb else "loss"
             ha.apply_bout(
-                is_winner=a_winner,
+                result=result_a,
                 method=bout.method,
                 is_title_fight=bool(bout.is_title_fight),
                 event_dt=ev_date,
@@ -648,7 +686,7 @@ def build_dataset(
                 duration_seconds=duration,
             )
             hb.apply_bout(
-                is_winner=b_winner,
+                result=result_b,
                 method=bout.method,
                 is_title_fight=bool(bout.is_title_fight),
                 event_dt=ev_date,
@@ -669,8 +707,11 @@ def symmetrize_for_training(df: pd.DataFrame) -> pd.DataFrame:
     """Fix the scrape convention where `fighter_a_id == winner_id` in 98.8%
     of completed bouts. Without this the model trivially learns "always
     pick A" and posts 98% accuracy with AUC 0.5. We deterministically
-    flip A↔B per bout (hashed by bout_id) so target_a_wins is ~50/50 and
-    the model has to learn from features rather than slot order.
+    flip A↔B per bout (hashed by bout_id with the process-stable
+    `stable_hash`, NOT the salted builtin `hash`) so target_a_wins is ~50/50
+    and the model has to learn from features rather than slot order. Using a
+    stable hash keeps the flipped set — and therefore the trained model —
+    identical across runs.
 
     Only applies to rows with a known target; inference-only rows (NaN
     target) are returned unchanged."""
@@ -679,7 +720,7 @@ def symmetrize_for_training(df: pd.DataFrame) -> pd.DataFrame:
     # Deterministic 50/50 mask keyed on bout_id, restricted to rows that
     # have a real target.
     has_target = df["target_a_wins"].notna()
-    mask = df["bout_id"].apply(lambda b: (hash(b) & 0xFFFFFFFF) % 2 == 1) & has_target
+    mask = df["bout_id"].apply(lambda b: stable_hash(b) % 2 == 1) & has_target
 
     # Collect every (a_col, b_col) pair from the row schema.
     pairs: list[tuple[str, str]] = []

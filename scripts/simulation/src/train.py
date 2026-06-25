@@ -92,6 +92,14 @@ def evaluate_probs(
     y: pd.Series,
     market_prob_a: pd.Series | None = None,
 ) -> dict[str, float]:
+    # Reset every input to a common positional 0..n-1 index. `probs` is a
+    # numpy array straight off predict_proba_a (positional), while `y` and
+    # `market_prob_a` come from reset_index'd splits — but defensively
+    # normalizing here is what makes the boolean masking below alignment-safe
+    # regardless of caller index, which is exactly what the old market bug
+    # (df.loc[reset_index]) got wrong.
+    probs = np.asarray(probs, dtype=float)
+    y = pd.Series(np.asarray(y)).reset_index(drop=True)
     pred = (probs >= 0.5).astype(int)
     out: dict[str, float] = {
         "n": int(len(y)),
@@ -101,16 +109,30 @@ def evaluate_probs(
         "roc_auc": float(roc_auc_score(y, probs)),
     }
     if market_prob_a is not None:
-        m = market_prob_a.copy()
-        m_mask = m.notna()
+        m = pd.Series(np.asarray(market_prob_a, dtype=float)).reset_index(drop=True)
+        m_mask = m.notna().to_numpy()
         if m_mask.any():
-            m_clipped = m.loc[m_mask].clip(1e-4, 1 - 1e-4)
-            y_m = y.loc[m_mask]
+            m_clipped = m[m_mask].clip(1e-4, 1 - 1e-4)
+            y_m = y[m_mask]
             m_pred = (m_clipped >= 0.5).astype(int)
+            # Market on the bouts that actually have odds.
             out["market_accuracy"] = float(accuracy_score(y_m, m_pred))
             out["market_log_loss"] = float(log_loss(y_m, m_clipped))
             out["market_brier"] = float(brier_score_loss(y_m, m_clipped))
             out["market_n"] = int(m_mask.sum())
+            # MODEL on the SAME odds subset — the apples-to-apples comparison.
+            # The headline `accuracy` above is over ALL bouts in the split;
+            # comparing it to `market_accuracy` (odds subset only) is what made
+            # "model not worse than market" misleading. These let the report
+            # put both on the identical set of bouts.
+            p_sub = probs[m_mask]
+            out["model_accuracy_on_market"] = float(
+                accuracy_score(y_m, (p_sub >= 0.5).astype(int))
+            )
+            out["model_log_loss_on_market"] = float(
+                log_loss(y_m, p_sub.clip(1e-4, 1 - 1e-4))
+            )
+            out["model_brier_on_market"] = float(brier_score_loss(y_m, p_sub))
     return out
 
 
@@ -131,6 +153,35 @@ def print_metrics_table(metrics: dict[str, dict[str, float]]) -> None:
             f"{m['log_loss']:.3f}",
             f"{m['brier']:.3f}",
             f"{m['roc_auc']:.3f}",
+        )
+    console.print(table)
+
+
+def print_market_comparison(metrics: dict[str, dict[str, float]]) -> None:
+    """Honest model-vs-market: both scored on the SAME bouts (those with a
+    sportsbook line). Only splits that have any odds appear. This is the
+    comparison the old code got wrong — model accuracy was over all bouts,
+    market accuracy over the ~20% with odds, on misaligned rows."""
+    rows = [n for n in ("train", "val", "test") if "market_n" in metrics[n]]
+    if not rows:
+        console.log("no bouts with odds in any split — skipping market comparison")
+        return
+    table = Table(title="Model vs market — identical bouts (odds only)")
+    table.add_column("Split")
+    table.add_column("N (odds)", justify="right")
+    table.add_column("Model Acc", justify="right")
+    table.add_column("Market Acc", justify="right")
+    table.add_column("Model LogLoss", justify="right")
+    table.add_column("Market LogLoss", justify="right")
+    for name in rows:
+        m = metrics[name]
+        table.add_row(
+            name,
+            f"{m['market_n']:,}",
+            f"{m['model_accuracy_on_market']:.3f}",
+            f"{m['market_accuracy']:.3f}",
+            f"{m['model_log_loss_on_market']:.3f}",
+            f"{m['market_log_loss']:.3f}",
         )
     console.print(table)
 
@@ -203,13 +254,20 @@ def run_training(df: pd.DataFrame) -> dict[str, dict[str, float]]:
     metrics: dict[str, dict[str, float]] = {}
     for name in ("train", "val", "test"):
         probs = ensemble.predict_proba_a(Xs[name], gs[name])
+        # market_prob_a rides on `meta` (build_feature_matrix), so metas[name]
+        # is reset_index'd off the SAME mask as Xs[name]/ys[name] — i.e. row i
+        # of `market` is row i of `probs`. The previous code indexed the FULL
+        # df by the split's reset index (df.loc[metas[name].index, ...]), which
+        # for val/test selected the earliest bouts in history instead of the
+        # split's bouts (and silently dropped the market metrics entirely).
         market = (
-            df.loc[metas[name].index, "market_prob_a"]
-            if "market_prob_a" in df.columns
+            metas[name]["market_prob_a"]
+            if "market_prob_a" in metas[name].columns
             else None
         )
         metrics[name] = evaluate_probs(probs, ys[name], market)
     print_metrics_table(metrics)
+    print_market_comparison(metrics)
 
     # Per-learner test performance so we see whether the ensemble is
     # actually pulling its weight vs the strongest single model.

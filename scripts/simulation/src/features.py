@@ -3,12 +3,19 @@
 We use DIFFERENCES (A - B) as the primary signal — the model is then
 inherently symmetric (training on the same bout flipped just negates
 the features and the target, so we don't need to augment). A handful of
-context features (weight class, title fight, market prob) stay unflipped.
+context features (weight class, title fight) stay unflipped.
+
+NOTE: the sportsbook line (market_prob_a / market_log_odds) is deliberately
+NOT a model feature. The scraped line is the CLOSING line — a near-leak in
+backtest and absent for most upcoming bouts at predict time (train/serve
+skew) — and letting the LogReg learner echo it made "beats the market" a
+circular claim. market_prob_a still rides along on `meta` so predict.py can
+compute the edge (model_prob - market_prob) and so train.py can score the
+model against the market on the SAME bouts, but the model never sees it.
 """
 
 from __future__ import annotations
 
-import numpy as np
 import pandas as pd
 
 # Numeric per-fighter columns where "A minus B" is the right signal.
@@ -71,6 +78,8 @@ ABSOLUTE_KEEP = [
     "kd_absorbed_per_fight",
 ]
 
+# Context features kept as-is (not differenced). market_prob_a is NOT here:
+# it is comparison-only (see module docstring), carried on `meta`, not `X`.
 CONTEXT_COLUMNS = [
     "is_title_fight",
     "is_main_event",
@@ -78,7 +87,6 @@ CONTEXT_COLUMNS = [
     "weight_class",
     "stance_a",
     "stance_b",
-    "market_prob_a",
 ]
 
 
@@ -102,10 +110,8 @@ def build_feature_matrix(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series, pd.
     out["is_title_fight"] = df["is_title_fight"].astype("int8")
     out["is_main_event"] = df["is_main_event"].astype("int8")
     out["scheduled_rounds"] = df["scheduled_rounds"].astype("int8")
-    out["market_prob_a"] = pd.to_numeric(df["market_prob_a"], errors="coerce")
-    # market_log_odds — gives the model a nicer scaled view of the line.
-    p = out["market_prob_a"].clip(1e-4, 1 - 1e-4)
-    out["market_log_odds"] = np.log(p / (1 - p))
+    # market_prob_a / market_log_odds intentionally omitted — see module
+    # docstring. The market line is comparison-only and rides on `meta` below.
 
     # Categorical: one-hot for stance pairing and weight class (keep small).
     for col_name in ("stance_a", "stance_b"):
@@ -156,7 +162,13 @@ def build_feature_matrix(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series, pd.
 
     X = pd.DataFrame(out)
     y = df["target_a_wins"].astype("int8")
-    meta = df[["bout_id", "event_id", "event_date", "fighter_a_id", "fighter_b_id"]].copy()
+    # market_prob_a travels on `meta` (NOT `X`) so it stays positionally
+    # aligned with each temporal split for the honest model-vs-market
+    # comparison and the predict.py edge, without ever entering the model.
+    meta_cols = ["bout_id", "event_id", "event_date", "fighter_a_id", "fighter_b_id"]
+    if "market_prob_a" in df.columns:
+        meta_cols.append("market_prob_a")
+    meta = df[meta_cols].copy()
     return X, y, meta
 
 
@@ -171,8 +183,6 @@ def feature_names() -> list[str]:
         "is_title_fight",
         "is_main_event",
         "scheduled_rounds",
-        "market_prob_a",
-        "market_log_odds",
     ]
     for side in ("stance_a", "stance_b"):
         cols += [f"{side}_orthodox", f"{side}_southpaw", f"{side}_switch"]
