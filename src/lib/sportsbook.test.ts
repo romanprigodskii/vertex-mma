@@ -13,7 +13,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
-  HOUSE_MARGIN,
+  HOUSE_MARGIN_WINNER,
+  HOUSE_MARGIN_PROP,
   MAX_MARKET_EDGE,
   MAX_ODDS,
   MIN_ODDS,
@@ -52,16 +53,22 @@ function baseResult(over: Partial<BoutResult> = {}): BoutResult {
 }
 
 describe("oddsForMarket — margin + clamps", () => {
-  it("applies ~HOUSE_MARGIN overround to a balanced 2-way book", () => {
-    const odds = oddsForMarket([0.5, 0.5]);
+  it("applies the winner overround (default tier) to a balanced 2-way book", () => {
+    const odds = oddsForMarket([0.5, 0.5]); // default margin = winner tier
     // implied = (0.5)*(1+m) each → sum of implied = 1+m
     const impliedSum = 1 / odds[0] + 1 / odds[1];
     // Odds are rounded to 2 decimals for display, so the book sums to
     // 1+margin only approximately.
-    assert.ok(Math.abs(impliedSum - (1 + HOUSE_MARGIN)) < 0.01, `impliedSum=${impliedSum}`);
+    assert.ok(Math.abs(impliedSum - (1 + HOUSE_MARGIN_WINNER)) < 0.01, `impliedSum=${impliedSum}`);
     // 0.5 fair → 2.00 fair odds, shaded to 2.00/(1+margin) by the overround.
-    // With HOUSE_MARGIN = 0 this is exactly 2.00 (a no-vig book).
-    assert.ok(Math.abs(odds[0] - 2.0 / (1 + HOUSE_MARGIN)) < 0.02, `odds0=${odds[0]}`);
+    assert.ok(Math.abs(odds[0] - 2.0 / (1 + HOUSE_MARGIN_WINNER)) < 0.02, `odds0=${odds[0]}`);
+  });
+
+  it("a heavier prop margin shortens odds vs the winner margin", () => {
+    const [wOdds] = oddsForMarket([0.5, 0.5], HOUSE_MARGIN_WINNER);
+    const [pOdds] = oddsForMarket([0.5, 0.5], HOUSE_MARGIN_PROP);
+    assert.ok(HOUSE_MARGIN_PROP > HOUSE_MARGIN_WINNER);
+    assert.ok(pOdds < wOdds, `prop ${pOdds} should be < winner ${wOdds}`);
   });
 
   it("favourite gets shorter odds than the dog", () => {
@@ -76,13 +83,13 @@ describe("oddsForMarket — margin + clamps", () => {
     assert.ok(odds[0] >= MIN_ODDS);
   });
 
-  it("handles a 6-way method book summing to 1+margin in implied terms", () => {
+  it("handles a 6-way method book summing to 1+prop-margin in implied terms", () => {
     const probs = [0.3, 0.05, 0.1, 0.25, 0.05, 0.25];
-    const odds = oddsForMarket(probs);
+    const odds = oddsForMarket(probs, HOUSE_MARGIN_PROP); // method = prop tier
     const impliedSum = odds.reduce((a, o) => a + 1 / o, 0);
     // Some cells may hit the MAX_ODDS clamp, but with these inputs none do,
     // so the book should sum to ~1+margin (loose: 2-decimal odds rounding).
-    assert.ok(Math.abs(impliedSum - (1 + HOUSE_MARGIN)) < 0.01, `impliedSum=${impliedSum}`);
+    assert.ok(Math.abs(impliedSum - (1 + HOUSE_MARGIN_PROP)) < 0.01, `impliedSum=${impliedSum}`);
   });
 
   it("degenerate all-zero book falls back to MIN_ODDS, never NaN/Infinity", () => {
@@ -179,10 +186,79 @@ describe("computeSportsbookOutcomes", () => {
     assert.ok(a.decimalOdds < b.decimalOdds);
   });
 
-  it("Under 2.5 prob = P(finish R1)+P(finish R2)", () => {
+  it("Under 2.5 prob = rescaled P(finish R1)+P(finish R2)", () => {
+    // finishByRound sums to 0.45 but the reconciled finish total is 0.50
+    // (koA+koB+subA+subB), so the round curve is scaled by 0.50/0.45 to stay
+    // consistent with the method/distance markets.
     const out = computeSportsbookOutcomes(sim);
     const u = out.find((o) => o.code === "u2_5")!;
-    assert.ok(Math.abs(u.prob - (0.2 + 0.15)) < 1e-9);
+    const expected = (0.2 + 0.15) * (0.5 / 0.45);
+    assert.ok(Math.abs(u.prob - expected) < 1e-9, `u=${u.prob} expected=${expected}`);
+  });
+
+  it("totals market is omitted when the MC produced no finish mass", () => {
+    const allDecision: SportsbookSimInput = {
+      probA: 0.6,
+      probB: 0.4,
+      rounds: {
+        probKoA: 0, probKoB: 0, probSubA: 0, probSubB: 0,
+        probDecisionA: 0.6, probDecisionB: 0.4,
+        finishByRound: [0, 0, 0, null, null],
+      },
+    };
+    const out = computeSportsbookOutcomes(allDecision);
+    assert.equal(out.filter((o) => o.marketKind === "total_rounds").length, 0);
+    // distance still settles — and says ~100% goes the distance.
+    const yes = out.find((o) => o.code === "dist_yes")!;
+    assert.ok(yes.prob > 0.99);
+  });
+});
+
+describe("computeSportsbookOutcomes — cross-market consistency (point 8)", () => {
+  // Props must all come from ONE reconciled distribution: P(distance) must
+  // equal the method market's P(decision), and P(no distance) the method's
+  // total finish prob — otherwise the markets are mutually arbitrageable.
+  function assertConsistent(sim: SportsbookSimInput) {
+    const out = computeSportsbookOutcomes(sim);
+    const p = (code: string) => out.find((o) => o.code === code)!.prob;
+    const methodDecision = p("a_dec") + p("b_dec");
+    const methodFinish = p("a_ko") + p("a_sub") + p("b_ko") + p("b_sub");
+    assert.ok(
+      Math.abs(p("dist_yes") - methodDecision) < 1e-9,
+      `dist_yes=${p("dist_yes")} vs method decision=${methodDecision}`,
+    );
+    assert.ok(
+      Math.abs(p("dist_no") - methodFinish) < 1e-9,
+      `dist_no=${p("dist_no")} vs method finish=${methodFinish}`,
+    );
+    assert.ok(Math.abs(p("dist_yes") + p("dist_no") - 1) < 1e-9);
+    // Under 2.5 finishes are a subset of all finishes → ≤ dist_no.
+    assert.ok(p("u2_5") <= p("dist_no") + 1e-9);
+  }
+
+  it("holds with no market line (pure model)", () => {
+    assertConsistent({
+      probA: 0.65, probB: 0.35,
+      rounds: {
+        probKoA: 0.3, probKoB: 0.1, probSubA: 0.05, probSubB: 0.05,
+        probDecisionA: 0.3, probDecisionB: 0.2,
+        finishByRound: [0.2, 0.15, 0.1, null, null], // intentionally ≠ Σmethod
+      },
+    });
+  });
+
+  it("still holds when the edge-guard pulls the level away from the MC", () => {
+    // marketProbA=0.54 guards a 0.28 model call up to 0.39 → reconciliation is
+    // NON-identity, so this proves distance tracks the reconciled method
+    // decision, not the raw finishByRound.
+    assertConsistent({
+      probA: 0.28, probB: 0.72, marketProbA: 0.54,
+      rounds: {
+        probKoA: 0.2, probKoB: 0.4, probSubA: 0.04, probSubB: 0.12,
+        probDecisionA: 0.04, probDecisionB: 0.2,
+        finishByRound: [0.3, 0.2, 0.1, null, null],
+      },
+    });
   });
 });
 

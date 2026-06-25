@@ -703,6 +703,44 @@ def build_dataset(
     return df
 
 
+def _ab_column_pairs(df: pd.DataFrame) -> list[tuple[str, str]]:
+    """Every (``*_a``, ``*_b``) column pair in the row schema, plus the
+    ``fighter_a_id`` ↔ ``fighter_b_id`` id pair. Shared by the training-time
+    symmetrization and the inference-time order averaging so they swap exactly
+    the same set of columns."""
+    pairs: list[tuple[str, str]] = []
+    for col in df.columns:
+        if col.endswith("_a") and col not in ("fighter_a_id",):
+            base = col[:-2]
+            partner = f"{base}_b"
+            if partner in df.columns:
+                pairs.append((col, partner))
+    # Add fighter_a_id ↔ fighter_b_id explicitly so we don't accidentally
+    # double-swap if a base name happens to match "fighter".
+    pairs.append(("fighter_a_id", "fighter_b_id"))
+    return pairs
+
+
+def swap_sides(df: pd.DataFrame) -> pd.DataFrame:
+    """Return a copy of df with EVERY row's A-side fields swapped with their
+    B-side counterparts (and ``market_prob_a`` → 1 − ``market_prob_a``).
+
+    Used at inference to average a prediction over both fighter orderings. The
+    model is only antisymmetric in its diff features — abs_*_a/_b, stance_a/_b
+    one-hots break true antisymmetry, so P(A>B) computed from the raw scrape
+    order ≠ 1 − P(B>A). Averaging the two orders removes the dependence on the
+    arbitrary fighter slot order coming out of the scrape."""
+    df = df.copy()
+    for a_col, b_col in _ab_column_pairs(df):
+        a_vals = df[a_col].copy()
+        df[a_col] = df[b_col]
+        df[b_col] = a_vals
+    if "market_prob_a" in df.columns:
+        notna = df["market_prob_a"].notna()
+        df.loc[notna, "market_prob_a"] = 1.0 - df.loc[notna, "market_prob_a"]
+    return df
+
+
 def symmetrize_for_training(df: pd.DataFrame) -> pd.DataFrame:
     """Fix the scrape convention where `fighter_a_id == winner_id` in 98.8%
     of completed bouts. Without this the model trivially learns "always
@@ -722,17 +760,9 @@ def symmetrize_for_training(df: pd.DataFrame) -> pd.DataFrame:
     has_target = df["target_a_wins"].notna()
     mask = df["bout_id"].apply(lambda b: stable_hash(b) % 2 == 1) & has_target
 
-    # Collect every (a_col, b_col) pair from the row schema.
-    pairs: list[tuple[str, str]] = []
-    for col in df.columns:
-        if col.endswith("_a") and col not in ("fighter_a_id",):
-            base = col[:-2]
-            partner = f"{base}_b"
-            if partner in df.columns:
-                pairs.append((col, partner))
-    # Add fighter_a_id ↔ fighter_b_id explicitly so we don't accidentally
-    # double-swap if base name matches "fighter".
-    pairs.append(("fighter_a_id", "fighter_b_id"))
+    # Collect every (a_col, b_col) pair from the row schema (shared with the
+    # inference-time swap_sides so both swap an identical column set).
+    pairs = _ab_column_pairs(df)
 
     for a_col, b_col in pairs:
         a_vals = df.loc[mask, a_col].copy()

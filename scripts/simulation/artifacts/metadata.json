@@ -1,7 +1,7 @@
 {
   "model_version": "v0.5.0",
   "model_kind": "ensemble",
-  "trained_at": "2026-06-25T05:09:56.438111Z",
+  "trained_at": "2026-06-25T05:33:03.874785Z",
   "feature_columns": [
     "diff_height",
     "diff_reach",
@@ -237,6 +237,12 @@
       "model_brier_on_market": 0.22523659512847896
     }
   },
+  "split_roles": {
+    "train": "fit (in-sample)",
+    "val": "early-stop + blender fit + blend-mode select \u2014 OPTIMISTIC, not held-out",
+    "test": "held-out \u2014 clean"
+  },
+  "clean_holdout_metric": "test",
   "test_breakdown_by_learner": {
     "p_lgb_global": {
       "n": 629,

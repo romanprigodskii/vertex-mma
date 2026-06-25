@@ -23,7 +23,7 @@ from rich.console import Console
 from .config import ARTIFACTS_DIR, confidence_label
 from .db import get_connection
 from .ensemble import EnsembleModel, weight_group
-from .export import build_dataset, fetch_raw, stable_hash
+from .export import build_dataset, fetch_raw, stable_hash, swap_sides
 from .features import build_feature_matrix
 from .monte_carlo import FighterMC, simulate_bout
 
@@ -88,10 +88,20 @@ def predict_upcoming(*, force_version: str | None = None) -> int:
     X, _, meta = build_feature_matrix(upcoming_fill)
     # Weight-group per bout — needed so the ensemble can route to the
     # right per-class specialist. Pulled from the upcoming DataFrame
-    # which carries weight_class through from build_dataset.
+    # which carries weight_class through from build_dataset. Weight class is
+    # order-independent, so the same groups apply to the swapped order below.
     groups = upcoming["weight_class"].apply(weight_group).reset_index(drop=True)
 
-    probs_a = model.predict_proba_a(X, groups)
+    # Order-invariant winner prob: the model isn't perfectly antisymmetric
+    # (abs_*_a/_b, stance one-hots), so the raw scrape order would leak into
+    # the prediction. Score both orders and average:
+    #   P(A wins) = ½·[ predict(A,B) + (1 − predict(B,A)) ].
+    X_swapped, _, _ = build_feature_matrix(swap_sides(upcoming_fill))
+    probs_a_orig = model.predict_proba_a(X, groups)
+    probs_a_swapped = model.predict_proba_a(X_swapped, groups)
+    probs_a = 0.5 * (probs_a_orig + (1.0 - probs_a_swapped))
+    # SHAP stays on the original order — it explains this row's inputs as
+    # scraped; the headline prob is the symmetrized one above.
     shap_matrix = model.shap_contributions(X)  # (n_bouts, n_features)
     confidences = [confidence_label(max(p, 1 - p)) for p in probs_a]
     pred_winners = [

@@ -8,10 +8,14 @@
  * shown; odds lock at bet time; payout = floor(stake × odds) if the
  * selection hits.
  *
- * Odds are PURE MODEL (no market blending — a deliberate product choice) and
- * carry NO overround: HOUSE_MARGIN = 0, so a market's decimal odds invert to a
- * fair book (implied probabilities sum to ~100%, not 106%). The only residual
- * house edge is the MAX_ODDS cap that bounds payout on long-shot props.
+ * Odds are PURE MODEL (no market blending — a deliberate product choice) but
+ * carry a TIERED overround (HOUSE_MARGIN_WINNER / HOUSE_MARGIN_PROP) so the
+ * house holds a structural edge and the coin economy stays solvent — a no-vig
+ * book is <=-EV for the house, worse the less calibrated the model. Every prop
+ * market (method / totals / distance) is derived from ONE reconciled
+ * distribution anchored to the edge-guarded winner prob, so the books can't be
+ * arbitraged against each other. See scripts/backtest_sportsbook.ts for the
+ * realized house-P&L check behind the margin choice.
  *
  * This module is intentionally DB-free so the money math is unit-tested in
  * isolation (src/lib/sportsbook.test.ts), exactly like the LMSR core.
@@ -21,10 +25,15 @@
 // Tunables
 // =====================================================================
 
-/** Overround baked into every market: fair probs are inflated to sum to
- *  1 + HOUSE_MARGIN before inverting to odds. Set to 0 — a no-vig book that
- *  pays out at true model odds. Bump it above 0 to re-introduce a house edge. */
-export const HOUSE_MARGIN = 0;
+/** Overround (vig) baked into a market: its fair probs are inflated to sum to
+ *  1 + margin before inverting to odds, so the house holds a structural edge.
+ *  TIERED by how trustworthy the underlying model is:
+ *   - winner is the best-calibrated market → light vig.
+ *   - method / totals / distance ride the Monte-Carlo method+round split, the
+ *     least reliable and most exploitable part of the model → heavier vig.
+ *  (A no-vig book, both 0, is <=-EV for the house — the prior setting.) */
+export const HOUSE_MARGIN_WINNER = 0.04;
+export const HOUSE_MARGIN_PROP = 0.08;
 
 /** Hard floor / ceiling on displayed decimal odds. The ceiling bounds the
  *  payout on ~0%-probability props (e.g. "by submission" when the model
@@ -230,31 +239,22 @@ export function hasValueEdge(
   return e != null && e >= threshold;
 }
 
-/** P(fight goes the distance) = 1 − P(any finish). Driven by the round
- *  finish distribution so it stays consistent with the totals market. */
-function distanceProb(rounds: SportsbookRoundsInput): number {
-  const finish = rounds.finishByRound.reduce<number>(
-    (acc, r) => acc + (r ?? 0),
-    0,
-  );
-  return clampProb(1 - finish);
-}
-
 // =====================================================================
 // Margin → decimal odds
 // =====================================================================
 
 /**
- * Convert a market's fair probabilities into decimal odds with the house
+ * Convert a market's fair probabilities into decimal odds with a house
  * overround applied. Each market is normalised independently so its book
- * sums to (1 + HOUSE_MARGIN) of implied probability, then inverted and
- * clamped to [MIN_ODDS, MAX_ODDS].
+ * sums to (1 + margin) of implied probability, then inverted and clamped to
+ * [MIN_ODDS, MAX_ODDS]. Pass the market's tier (HOUSE_MARGIN_WINNER vs
+ * HOUSE_MARGIN_PROP); defaults to the winner tier.
  *
  *   fair p_i → q_i = (p_i / Σp) · (1 + margin) → odds_i = 1 / q_i
  */
 export function oddsForMarket(
   fairProbs: number[],
-  margin = HOUSE_MARGIN,
+  margin = HOUSE_MARGIN_WINNER,
 ): number[] {
   const ps = fairProbs.map(clampProb);
   const sum = ps.reduce((a, c) => a + c, 0);
@@ -288,10 +288,10 @@ export function computeSportsbookOutcomes(
   const guardedA = applyEdgeGuard(sim.probA, sim.marketProbA ?? null);
   const guardedB = clampProb(1 - guardedA);
 
-  // ── Winner (moneyline) ───────────────────────────────────────────
+  // ── Winner (moneyline) — light tier ──────────────────────────────
   {
     const probs = [guardedA, guardedB];
-    const odds = oddsForMarket(probs);
+    const odds = oddsForMarket(probs, HOUSE_MARGIN_WINNER);
     out.push({ marketKind: "winner", code: "win_a", side: "a", prob: probs[0], decimalOdds: odds[0] });
     out.push({ marketKind: "winner", code: "win_b", side: "b", prob: probs[1], decimalOdds: odds[1] });
   }
@@ -299,11 +299,24 @@ export function computeSportsbookOutcomes(
   if (!sim.rounds) return out;
   const r = sim.rounds;
 
-  // ── Method of victory (6-way: A/B × KO·Sub·Dec) ─────────────────
+  // Single reconciled distribution for ALL props, anchored to the edge-guarded
+  // winner prob. method P(decision), the totals split, and distance Yes/No are
+  // ALL derived from this one source so they're mutually consistent — the old
+  // code priced method off the reconciled probs but totals/distance off the RAW
+  // finishByRound (whose Σ ≠ the reconciled finish total), which at zero margin
+  // was a guaranteed cross-market +EV for the bettor.
+  const m = reconcileMethodProbs(r, guardedA, guardedB);
+  const decTotal = m.a_dec + m.b_dec; // P(goes to decision) = P(distance)
+  const finishTotal = 1 - decTotal; // P(any KO/Sub, either side)
+  // Rescale the per-round finish curve so it sums to the reconciled finish
+  // total; this is what ties the totals market to method + distance.
+  const rawFinish = r.finishByRound.reduce<number>((acc, x) => acc + (x ?? 0), 0);
+  const finishScale = rawFinish > 0 ? finishTotal / rawFinish : 0;
+
+  // ── Method of victory (6-way: A/B × KO·Sub·Dec) — prop tier ──────
   {
-    const m = reconcileMethodProbs(r, guardedA, guardedB);
     const probs = [m.a_ko, m.a_sub, m.a_dec, m.b_ko, m.b_sub, m.b_dec].map(clampProb);
-    const odds = oddsForMarket(probs);
+    const odds = oddsForMarket(probs, HOUSE_MARGIN_PROP);
     const codes: { code: SportsbookSelectionCode; side: "a" | "b" }[] = [
       { code: "a_ko", side: "a" },
       { code: "a_sub", side: "a" },
@@ -317,25 +330,28 @@ export function computeSportsbookOutcomes(
     });
   }
 
-  // ── Total rounds: Over / Under 2.5 (whole-round basis) ───────────
-  // Under 2.5 = finished in round 1 or 2. Over 2.5 = reached round 3+
-  // OR went to a decision. Whole-round (not 2:30) basis to settle
-  // unambiguously from round_finished + method.
-  {
-    const f1 = r.finishByRound[0] ?? 0;
-    const f2 = r.finishByRound[1] ?? 0;
+  // ── Total rounds: Over / Under 2.5 (whole-round basis) — prop tier ─
+  // Under 2.5 = finished in round 1 or 2. Over 2.5 = reached round 3+ OR went
+  // to a decision. Built from the RESCALED finish curve so it agrees with the
+  // method/distance markets. Skipped when the MC produced no finish mass to
+  // split across rounds (can't price a round total without a round shape).
+  if (rawFinish > 0) {
+    const f1 = (r.finishByRound[0] ?? 0) * finishScale;
+    const f2 = (r.finishByRound[1] ?? 0) * finishScale;
     const pUnder = clampProb(f1 + f2);
     const pOver = clampProb(1 - (f1 + f2));
-    const odds = oddsForMarket([pOver, pUnder]);
+    const odds = oddsForMarket([pOver, pUnder], HOUSE_MARGIN_PROP);
     out.push({ marketKind: "total_rounds", code: "o2_5", side: null, prob: pOver, decimalOdds: odds[0] });
     out.push({ marketKind: "total_rounds", code: "u2_5", side: null, prob: pUnder, decimalOdds: odds[1] });
   }
 
-  // ── Goes the distance: Yes / No ──────────────────────────────────
+  // ── Goes the distance: Yes / No — prop tier ──────────────────────
+  // pYes is exactly the method market's P(decision) (decTotal), so a bettor
+  // can't arb "dist_yes" against "a_dec + b_dec".
   {
-    const pYes = distanceProb(r);
-    const pNo = clampProb(1 - pYes);
-    const odds = oddsForMarket([pYes, pNo]);
+    const pYes = clampProb(decTotal);
+    const pNo = clampProb(finishTotal);
+    const odds = oddsForMarket([pYes, pNo], HOUSE_MARGIN_PROP);
     out.push({ marketKind: "distance", code: "dist_yes", side: null, prob: pYes, decimalOdds: odds[0] });
     out.push({ marketKind: "distance", code: "dist_no", side: null, prob: pNo, decimalOdds: odds[1] });
   }

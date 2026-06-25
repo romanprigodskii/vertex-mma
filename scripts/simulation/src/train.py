@@ -36,6 +36,19 @@ console = Console()
 
 ENSEMBLE_DIR = ARTIFACTS_DIR / "ensemble"
 
+# What each temporal split is actually USED for — so the report doesn't present
+# the val number as a clean generalization estimate. val is consumed 3–4×
+# (LGB/XGB/specialist early-stopping → blender fit → blend-mode argmin), so its
+# headline logloss is the very quantity minimized (it equals
+# val_blend_logloss[best_mode]) and is optimistic by construction. TEST is the
+# only split untouched by any fitting/selection — the one honest metric.
+SPLIT_ROLES: dict[str, str] = {
+    "train": "fit (in-sample)",
+    "val": "early-stop + blender fit + blend-mode select — OPTIMISTIC, not held-out",
+    "test": "held-out — clean",
+}
+CLEAN_HOLDOUT_SPLIT = "test"
+
 
 def temporal_split(
     X: pd.DataFrame, y: pd.Series, meta: pd.DataFrame
@@ -144,6 +157,7 @@ def print_metrics_table(metrics: dict[str, dict[str, float]]) -> None:
     table.add_column("LogLoss", justify="right")
     table.add_column("Brier", justify="right")
     table.add_column("AUC", justify="right")
+    table.add_column("Role")
     for name in ("train", "val", "test"):
         m = metrics[name]
         table.add_row(
@@ -153,8 +167,13 @@ def print_metrics_table(metrics: dict[str, dict[str, float]]) -> None:
             f"{m['log_loss']:.3f}",
             f"{m['brier']:.3f}",
             f"{m['roc_auc']:.3f}",
+            SPLIT_ROLES[name],
         )
     console.print(table)
+    console.log(
+        f"[dim]only '{CLEAN_HOLDOUT_SPLIT}' is a clean held-out estimate; "
+        f"val is reused for model selection (optimistic) — see SPLIT_ROLES[/dim]"
+    )
 
 
 def print_market_comparison(metrics: dict[str, dict[str, float]]) -> None:
@@ -291,6 +310,11 @@ def run_training(df: pd.DataFrame) -> dict[str, dict[str, float]]:
         "lgb_params": lgb_params,
         "blender": train_meta,
         "metrics": metrics,
+        # Honesty flags: val is reused for early-stopping + blender fit +
+        # blend-mode selection, so its metrics are optimistic by construction
+        # (val log-loss == the minimized val_blend_logloss). Only test is clean.
+        "split_roles": SPLIT_ROLES,
+        "clean_holdout_metric": CLEAN_HOLDOUT_SPLIT,
         "test_breakdown_by_learner": {k: v for k, v in by_learner.items()},
         "n_train": int(len(Xs["train"])),
         "n_val": int(len(Xs["val"])),
