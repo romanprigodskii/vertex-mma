@@ -1237,6 +1237,7 @@
     "statWithEdge": "Edge к рынку",
     "statRecentAccuracy": "Точность недавних",
     "statRecentAccuracySub": "по {n} оцен. боям",
+    "accuracyCaveat": "Модель работает примерно на уровне рынка — её преимущество над простым выбором фаворита невелико, а оценённые бои смещены к более предсказуемым.",
     "filterLabel": "Фильтр:",
     "filterAll": "Все бои",
     "filterHighConfidence": "Только уверенные",

@@ -85,6 +85,7 @@ export async function getGradedSimulations(
     confidence_label: string;
     prob_a: number;
     prob_b: number;
+    fighter_a_id: string;
     predicted_winner_id: string | null;
     predicted_winner_name: string | null;
     predicted_winner_slug: string | null;
@@ -109,6 +110,7 @@ export async function getGradedSimulations(
       bs.confidence_label,
       bs.prob_a,
       bs.prob_b,
+      b.fighter_a_id::text AS fighter_a_id,
       bs.predicted_winner_id::text AS predicted_winner_id,
       ${localizedNameSql("pf", isRu)} AS predicted_winner_name,
       pf.slug AS predicted_winner_slug,
@@ -139,7 +141,14 @@ export async function getGradedSimulations(
   const sliced = rows.slice(0, limit);
 
   return sliced.map((r) => {
-    const predictedIsA = r.prob_a >= 0.5;
+    // Derive the shown probability from predicted_winner_id (the authoritative
+    // pick that `correct` and the name also use), NOT prob_a>=0.5 — the two can
+    // diverge (e.g. order-averaged inference, a re-import), which would show one
+    // fighter's name beside the other's win probability.
+    const predictedIsA =
+      r.predicted_winner_id != null
+        ? r.predicted_winner_id === r.fighter_a_id
+        : r.prob_a >= 0.5;
     const predProb = predictedIsA ? r.prob_a : r.prob_b;
     const correct = r.predicted_winner_id === r.actual_winner_id;
     return {

@@ -61,12 +61,15 @@ CREATE OR REPLACE FUNCTION public.fixed_odds_grade(
   SELECT CASE p_code
     WHEN 'win_a' THEN CASE WHEN p_winner IS NULL THEN 'void' WHEN p_winner = p_a THEN 'won' ELSE 'lost' END
     WHEN 'win_b' THEN CASE WHEN p_winner IS NULL THEN 'void' WHEN p_winner = p_b THEN 'won' ELSE 'lost' END
-    WHEN 'a_ko'  THEN CASE WHEN p_winner IS NULL OR p_mb='dq' THEN 'void' WHEN p_winner=p_a AND p_mb='ko'  THEN 'won' ELSE 'lost' END
-    WHEN 'a_sub' THEN CASE WHEN p_winner IS NULL OR p_mb='dq' THEN 'void' WHEN p_winner=p_a AND p_mb='sub' THEN 'won' ELSE 'lost' END
-    WHEN 'a_dec' THEN CASE WHEN p_winner IS NULL OR p_mb='dq' THEN 'void' WHEN p_winner=p_a AND p_mb='dec' THEN 'won' ELSE 'lost' END
-    WHEN 'b_ko'  THEN CASE WHEN p_winner IS NULL OR p_mb='dq' THEN 'void' WHEN p_winner=p_b AND p_mb='ko'  THEN 'won' ELSE 'lost' END
-    WHEN 'b_sub' THEN CASE WHEN p_winner IS NULL OR p_mb='dq' THEN 'void' WHEN p_winner=p_b AND p_mb='sub' THEN 'won' ELSE 'lost' END
-    WHEN 'b_dec' THEN CASE WHEN p_winner IS NULL OR p_mb='dq' THEN 'void' WHEN p_winner=p_b AND p_mb='dec' THEN 'won' ELSE 'lost' END
+    -- DQ has no KO/Sub/Dec bucket: void the WINNER's method bets, LOSE the
+    -- loser's (a bet on a fighter who didn't win can't be a push). KEEP IN SYNC
+    -- with settleSelection in src/lib/sportsbook.ts.
+    WHEN 'a_ko'  THEN CASE WHEN p_winner IS NULL THEN 'void' WHEN p_mb='dq' THEN (CASE WHEN p_winner=p_a THEN 'void' ELSE 'lost' END) WHEN p_winner=p_a AND p_mb='ko'  THEN 'won' ELSE 'lost' END
+    WHEN 'a_sub' THEN CASE WHEN p_winner IS NULL THEN 'void' WHEN p_mb='dq' THEN (CASE WHEN p_winner=p_a THEN 'void' ELSE 'lost' END) WHEN p_winner=p_a AND p_mb='sub' THEN 'won' ELSE 'lost' END
+    WHEN 'a_dec' THEN CASE WHEN p_winner IS NULL THEN 'void' WHEN p_mb='dq' THEN (CASE WHEN p_winner=p_a THEN 'void' ELSE 'lost' END) WHEN p_winner=p_a AND p_mb='dec' THEN 'won' ELSE 'lost' END
+    WHEN 'b_ko'  THEN CASE WHEN p_winner IS NULL THEN 'void' WHEN p_mb='dq' THEN (CASE WHEN p_winner=p_b THEN 'void' ELSE 'lost' END) WHEN p_winner=p_b AND p_mb='ko'  THEN 'won' ELSE 'lost' END
+    WHEN 'b_sub' THEN CASE WHEN p_winner IS NULL THEN 'void' WHEN p_mb='dq' THEN (CASE WHEN p_winner=p_b THEN 'void' ELSE 'lost' END) WHEN p_winner=p_b AND p_mb='sub' THEN 'won' ELSE 'lost' END
+    WHEN 'b_dec' THEN CASE WHEN p_winner IS NULL THEN 'void' WHEN p_mb='dq' THEN (CASE WHEN p_winner=p_b THEN 'void' ELSE 'lost' END) WHEN p_winner=p_b AND p_mb='dec' THEN 'won' ELSE 'lost' END
     WHEN 'o2_5'  THEN CASE WHEN p_went_distance THEN 'won' WHEN p_round IS NULL THEN 'void' WHEN p_round <= 2 THEN 'lost' ELSE 'won' END
     WHEN 'u2_5'  THEN CASE WHEN p_went_distance THEN 'lost' WHEN p_round IS NULL THEN 'void' WHEN p_round <= 2 THEN 'won' ELSE 'lost' END
     WHEN 'dist_yes' THEN CASE WHEN p_went_distance THEN 'won' ELSE 'lost' END
@@ -119,11 +122,14 @@ DECLARE
   v_bet record; v_outcome text; v_new_balance bigint;
 BEGIN
   SELECT status::text AS status, winner_id, fighter_a_id, fighter_b_id,
-         method::text AS method, round_finished
+         method::text AS method, round_finished, scheduled_rounds
     INTO v_bout FROM bout WHERE id = p_bout_id;
   IF NOT FOUND THEN RETURN; END IF;
   v_mb := fixed_odds_method_bucket(v_bout.method);
-  v_wd := v_mb IN ('dec','draw');
+  -- A decision always went the distance; a DRAW only if it reached the final
+  -- scheduled round (a technical draw can end early). KEEP IN SYNC with
+  -- settleSelection in src/lib/sportsbook.ts.
+  v_wd := v_mb = 'dec' OR (v_mb = 'draw' AND (v_bout.round_finished IS NULL OR v_bout.scheduled_rounds IS NULL OR v_bout.round_finished >= v_bout.scheduled_rounds));
   IF v_bout.status NOT IN ('completed','no_contest','cancelled')
      AND v_bout.winner_id IS NULL AND v_mb NOT IN ('draw','nc') THEN RETURN; END IF;
   v_terminal_void := (v_bout.status='cancelled' OR v_bout.status='no_contest' OR v_mb='nc');
@@ -186,11 +192,14 @@ DECLARE
   v_combined numeric; v_payout bigint; v_new_balance bigint;
 BEGIN
   SELECT status::text AS status, winner_id, fighter_a_id, fighter_b_id,
-         method::text AS method, round_finished
+         method::text AS method, round_finished, scheduled_rounds
     INTO v_bout FROM bout WHERE id = p_bout_id;
   IF NOT FOUND THEN RETURN; END IF;
   v_mb := fixed_odds_method_bucket(v_bout.method);
-  v_wd := v_mb IN ('dec','draw');
+  -- A decision always went the distance; a DRAW only if it reached the final
+  -- scheduled round (a technical draw can end early). KEEP IN SYNC with
+  -- settleSelection in src/lib/sportsbook.ts.
+  v_wd := v_mb = 'dec' OR (v_mb = 'draw' AND (v_bout.round_finished IS NULL OR v_bout.scheduled_rounds IS NULL OR v_bout.round_finished >= v_bout.scheduled_rounds));
   IF v_bout.status NOT IN ('completed','no_contest','cancelled')
      AND v_bout.winner_id IS NULL AND v_mb NOT IN ('draw','nc') THEN RETURN; END IF;
   v_terminal_void := (v_bout.status='cancelled' OR v_bout.status='no_contest' OR v_mb='nc');

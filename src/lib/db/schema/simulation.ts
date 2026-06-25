@@ -123,6 +123,10 @@ export const boutSimulationRounds = pgTable(
       .references(() => bout.id, { onDelete: "cascade" }),
     modelVersion: text("model_version").notNull(),
     nSimulations: integer("n_simulations").notNull(),
+    /** The Monte-Carlo sim's OWN winner prob. DIAGNOSTIC ONLY — every consumer
+     *  (panel, sportsbook) reconciles the method/round split to the ENSEMBLE
+     *  winner prob (bout_simulation.prob_a), which is what bets settle against.
+     *  Kept for debugging the MC vs the ensemble; do NOT bet/score off these. */
     mcWinnerProbA: real("mc_winner_prob_a").notNull(),
     mcWinnerProbB: real("mc_winner_prob_b").notNull(),
     probKoA: real("prob_ko_a").notNull(),

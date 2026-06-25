@@ -405,11 +405,27 @@ def simulate_bout(
     win_a = prob_ko_a + prob_sub_a + prob_dec_a
     win_b = prob_ko_b + prob_sub_b + prob_dec_b
 
-    # Average finish time over the sims that actually ended in a finish.
+    # Expected finish time GIVEN a finish, weighted by the ANCHORED per-method
+    # probabilities. A plain mean over finishing sims ignores the anchor's
+    # method reweighting (KO finishes earlier than subs, so shifting the KO/sub
+    # mix moves the expected time); using per-method means keeps it consistent
+    # with the anchored summary and avoids any single-sim blow-up.
     avg_finish: float | None = None
-    early = finish_seconds[(finish_method != "dec_a") & (finish_method != "dec_b") & (finish_round > 0)]
-    if early.size > 0:
-        avg_finish = float(np.mean(early))
+    _anchored_method = {
+        "ko_a": prob_ko_a,
+        "ko_b": prob_ko_b,
+        "sub_a": prob_sub_a,
+        "sub_b": prob_sub_b,
+    }
+    _num = 0.0
+    _den = 0.0
+    for _key, _p in _anchored_method.items():
+        _secs = finish_seconds[finish_method == _key]
+        if _secs.size > 0 and _p > 0:
+            _num += _p * float(np.mean(_secs))
+            _den += _p
+    if _den > 0:
+        avg_finish = _num / _den
 
     # Per-round breakdown: distribute each method's ANCHORED total across rounds
     # by that method's round SHARE (shares sum to 1), so Σ_rounds equals the

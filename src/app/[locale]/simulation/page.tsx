@@ -208,6 +208,13 @@ export default async function SimulationIndexPage({
             </ul>
           ) : null}
 
+          {/* Honest framing: the model is ~market-level, not a sharp edge. */}
+          {summary.totalBouts > 0 || accuracy.total > 0 ? (
+            <p className="mb-6 max-w-2xl font-sans text-[11px] leading-relaxed text-foreground-subtle">
+              {t("accuracyCaveat")}
+            </p>
+          ) : null}
+
           {/* Filter row */}
           {allEvents.length > 0 ? (
             <div className="mb-6 flex flex-wrap items-baseline gap-x-3 gap-y-2 text-[11px] uppercase tracking-widest">

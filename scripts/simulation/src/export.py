@@ -235,6 +235,7 @@ class FighterHistory:
         "control_seconds",
         "control_seconds_absorbed",
         "total_seconds",
+        "stat_seconds",  # time in bouts that HAD round-stats (per-minute denom)
         "title_bouts",
         "last_bout_date",
         "recent_results",  # list of "W"/"L" for last N bouts
@@ -273,6 +274,7 @@ class FighterHistory:
         self.control_seconds = 0
         self.control_seconds_absorbed = 0
         self.total_seconds = 0
+        self.stat_seconds = 0
         self.title_bouts = 0
         self.last_bout_date: date | None = None
         self.recent_results: list[str] = []
@@ -286,9 +288,13 @@ class FighterHistory:
         finish_rate = (
             (self.wins_ko + self.wins_sub) / self.wins if self.wins else None
         )
-        # Per-minute / per-15-min rates only meaningful with some fight time.
-        per_min = (self.total_seconds / 60.0) if self.total_seconds else None
-        per_15m = (self.total_seconds / 900.0) if self.total_seconds else None
+        # Per-minute / per-15-min rates use stat_seconds — the time spent in
+        # bouts that actually HAD round-stats — as the denominator, so they
+        # match the numerators (sig strikes, TDs, control), which only
+        # accumulate for those bouts. Using total_seconds (all bouts) diluted
+        # the rates for fighters with stat-less bouts in their history.
+        per_min = (self.stat_seconds / 60.0) if self.stat_seconds else None
+        per_15m = (self.stat_seconds / 900.0) if self.stat_seconds else None
         slpm = (self.sig_str_landed / per_min) if per_min else None
         sapm = (self.sig_str_absorbed / per_min) if per_min else None
         td_per15 = (self.td_landed / per_15m) if per_15m else None
@@ -453,6 +459,9 @@ class FighterHistory:
         self.last_bout_date = event_dt
         self.total_seconds += duration_seconds
         if own_stats:
+            # Only count this bout's time toward the per-minute denominator when
+            # we have its round-stats — otherwise the rates get diluted.
+            self.stat_seconds += duration_seconds
             self.sig_str_landed += own_stats.get("sig_str_landed", 0) or 0
             self.sig_str_attempted += own_stats.get("sig_str_attempted", 0) or 0
             self.sig_str_head_landed += own_stats.get("sig_str_head_landed", 0) or 0

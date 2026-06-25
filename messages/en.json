@@ -1237,6 +1237,7 @@
     "statWithEdge": "Edges vs market",
     "statRecentAccuracy": "Recent accuracy",
     "statRecentAccuracySub": "{n} graded picks",
+    "accuracyCaveat": "The model performs at roughly market level — its edge over simply picking the betting favourite is small, and graded picks skew toward more predictable matchups.",
     "filterLabel": "Filter:",
     "filterAll": "All bouts",
     "filterHighConfidence": "High-confidence only",

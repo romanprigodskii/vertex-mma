@@ -314,10 +314,12 @@ describe("settleSelection — method", () => {
     assert.equal(settleSelection("b_sub", r), "won");
     assert.equal(settleSelection("a_sub", r), "lost");
   });
-  it("DQ voids all method bets but the winner still settles", () => {
+  it("DQ voids the WINNER's method bets but LOSES the loser's; winner settles", () => {
     const r = baseResult({ winnerId: A, method: "dq", roundFinished: 2 });
-    assert.equal(settleSelection("a_ko", r), "void");
-    assert.equal(settleSelection("b_dec", r), "void");
+    assert.equal(settleSelection("a_ko", r), "void"); // A won, but not by a bucket
+    assert.equal(settleSelection("a_dec", r), "void");
+    assert.equal(settleSelection("b_ko", r), "lost"); // B didn't win at all
+    assert.equal(settleSelection("b_dec", r), "lost");
     assert.equal(settleSelection("win_a", r), "won");
   });
   it("draw voids method bets", () => {
@@ -367,6 +369,22 @@ describe("settleSelection — goes the distance", () => {
     const r = baseResult({ winnerId: null, method: "draw", roundFinished: 3 });
     assert.equal(settleSelection("dist_yes", r), "won");
     assert.equal(settleSelection("dist_no", r), "lost");
+  });
+  it("early TECHNICAL draw (round < scheduled) did NOT go the distance", () => {
+    const r = baseResult({
+      winnerId: null, method: "draw", roundFinished: 1, scheduledRounds: 3,
+    });
+    assert.equal(settleSelection("dist_yes", r), "lost");
+    assert.equal(settleSelection("dist_no", r), "won");
+    assert.equal(settleSelection("u2_5", r), "won"); // ended in R1 → Under
+    assert.equal(settleSelection("o2_5", r), "lost");
+  });
+  it("full-distance draw (round == scheduled) still grades as went-distance", () => {
+    const r = baseResult({
+      winnerId: null, method: "draw", roundFinished: 3, scheduledRounds: 3,
+    });
+    assert.equal(settleSelection("dist_yes", r), "won");
+    assert.equal(settleSelection("o2_5", r), "won");
   });
   it("KO finish → dist_no won", () => {
     const r = baseResult({ method: "ko", roundFinished: 1 });

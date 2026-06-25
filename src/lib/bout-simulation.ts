@@ -12,6 +12,9 @@ export interface BoutSimulationFeature {
 
 export interface BoutSimulationRounds {
   nSimulations: number;
+  /** The MC's OWN winner prob — DIAGNOSTIC only. Consumers reconcile the method
+   *  split to the ENSEMBLE winner prob (bout_simulation.prob_a), which is what
+   *  the UI shows and bets settle against. Don't render/bet off these. */
   mcWinnerProbA: number;
   mcWinnerProbB: number;
   probKoA: number;

@@ -37,10 +37,15 @@ export const HOUSE_MARGIN_WINNER = 0.04;
 export const HOUSE_MARGIN_PROP = 0.08;
 
 /** Hard floor / ceiling on displayed decimal odds. The ceiling bounds the
- *  payout on ~0%-probability props (e.g. "by submission" when the model
- *  says 0.3%) so a single long-shot can't drain the coin economy. The floor
- *  keeps a near-certain favourite from paying out a meaningless 1.00x. */
-export const MIN_ODDS = 1.04;
+ *  payout on ~0%-probability props (e.g. "by submission" when the model says
+ *  0.3%) so a single long-shot can't drain the coin economy. The floor keeps a
+ *  near-certain favourite from paying a meaningless 1.00x — but note it
+ *  OVERPAYS on extreme favourites whose fair odds fall below MIN_ODDS (model
+ *  p > 1/MIN_ODDS), a small −EV to the house. Kept low (1.02) so that overpay
+ *  window is narrow and the house margin survives for realistic favourites; the
+ *  MAX_ODDS cap + round-down on the long-shot side more than offset it across a
+ *  full two-way book. */
+export const MIN_ODDS = 1.02;
 export const MAX_ODDS = 25;
 
 /** Edge-guard: max distance (in probability) the model's winner prob may sit
@@ -380,6 +385,11 @@ export interface BoutResult {
   method: string | null;
   /** Round the bout ended (null for unscored / data gaps). */
   roundFinished: number | null;
+  /** Scheduled rounds (3 or 5). Lets a DRAW be graded for distance/totals by
+   *  whether it actually reached the final round — a TECHNICAL draw can end
+   *  early. Optional: when absent, a draw falls back to "went the distance"
+   *  (the common decision-draw case). */
+  scheduledRounds?: number | null;
 }
 
 type MethodBucket = "ko" | "sub" | "dec" | "dq" | "draw" | "nc" | "unknown";
@@ -427,7 +437,15 @@ export function settleSelection(
     return "void";
   }
 
-  const wentDistance = mb === "dec" || mb === "draw";
+  // A decision always went the full distance. A DRAW usually did too (a
+  // decision draw), but a TECHNICAL draw can end early — if we know the
+  // scheduled length and it stopped before the final round, it did NOT go the
+  // distance. Absent scheduledRounds/roundFinished, fall back to "went distance".
+  const drawWentDistance =
+    r.roundFinished == null ||
+    r.scheduledRounds == null ||
+    r.roundFinished >= r.scheduledRounds;
+  const wentDistance = mb === "dec" || (mb === "draw" && drawWentDistance);
 
   switch (code) {
     // ── Winner ──────────────────────────────────────────────────
@@ -446,8 +464,13 @@ export function settleSelection(
     case "b_sub":
     case "b_dec": {
       if (r.winnerId == null) return "void"; // draw → no winning fighter
-      if (mb === "dq") return "void"; // no KO/Sub/Dec bucket for a DQ
       const side = code[0] === "a" ? r.fighterAId : r.fighterBId;
+      if (mb === "dq") {
+        // A DQ has no KO/Sub/Dec bucket. A bet on the LOSER clearly lost; a bet
+        // on the actual WINNER is void (he won, but not by a gradeable method).
+        // (Old behaviour voided BOTH sides, refunding losing-side method bets.)
+        return r.winnerId === side ? "void" : "lost";
+      }
       const bucket = code.slice(2); // "ko" | "sub" | "dec"
       return r.winnerId === side && mb === bucket ? "won" : "lost";
     }

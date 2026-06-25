@@ -77,6 +77,7 @@ interface SimRow {
   fighter_b_id: string;
   method: string | null;
   round_finished: number | null;
+  scheduled_rounds: number | null;
   prob_a: number;
   prob_b: number;
   market_prob_a: number | null;
@@ -116,6 +117,7 @@ async function main() {
       b.fighter_b_id::text AS fighter_b_id,
       b.method::text AS method,
       b.round_finished AS round_finished,
+      b.scheduled_rounds AS scheduled_rounds,
       bs.prob_a, bs.prob_b, bs.market_prob_a,
       br.prob_ko_a, br.prob_ko_b, br.prob_sub_a, br.prob_sub_b,
       br.prob_decision_a, br.prob_decision_b,
@@ -173,6 +175,7 @@ async function main() {
       fighterBId: r.fighter_b_id,
       method: r.method,
       roundFinished: r.round_finished,
+      scheduledRounds: r.scheduled_rounds,
     };
 
     const outcomes = computeSportsbookOutcomes(sim);

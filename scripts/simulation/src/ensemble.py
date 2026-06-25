@@ -410,6 +410,13 @@ class EnsembleModel:
         for i, g in enumerate(groups.values):
             spec = self.lgb_specialists.get(g)
             if spec is None:
+                # No specialist for this weight group → fall back to the global
+                # LGB. NB: the blender's 4th input was trained as a REAL
+                # specialist, so this fallback feeds it an off-distribution value
+                # — a known minor inconsistency that's inert in practice because
+                # all three groups (light / welter_middle / heavy) always train a
+                # specialist (the <200-row guard in fit() never trips on the full
+                # dataset). It would only bite a future tiny/odd group.
                 p_spec[i] = p_lgb[i]
             else:
                 p_spec[i] = spec.predict(
