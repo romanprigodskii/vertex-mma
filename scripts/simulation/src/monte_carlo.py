@@ -1,34 +1,35 @@
 """Monte Carlo round simulator.
 
-For each upcoming bout we simulate N=10,000 fights using per-minute
-hazard rates derived from each fighter's historical stats (already
-materialized in the FighterHistory snapshots from export.py). The
-output is a distribution of (winner, method, round_finished) we can
-join with the LightGBM prob for a richer "how" panel.
+For each upcoming bout we simulate N=10,000 fights and read off a distribution
+of (winner, method, round_finished) to join with the LightGBM winner prob for a
+richer "how" panel.
 
-Modeling choices, all kept deliberately simple in Phase 3:
+Finish model (Phase 6 redesign — replaces the old memoryless per-second
+Bernoulli, which decayed geometrically from the opening bell and let longer
+bouts rack up finishes purely on tick count):
 
-* Time is sliced into 1-second ticks; each tick rolls a finish chance.
-* KO hazard per second for fighter X = base + α × X.knockdowns_per_fight
-  scaled into a per-second rate, modulated by opponent's prior_losses_ko
-  rate (chin proxy). Same shape for SUB hazard using sub_per15 +
-  opponent's prior_losses_sub.
-* No-finish ticks accumulate "round momentum" — at the bell, the
-  fighter with more accumulated control time + sig strikes is the
-  decision favorite (Bradley-Terry-ish softmax with temperature).
-* When a fighter has no prior bouts (rare — both must have ≥1 by the
-  predict.py filter, but stats can still be partial), the missing stat
-  defaults to roster averages.
-* Calibration guards (constants below): the offense/defense lift multipliers
-  are CLAMPED, small-sample career rates are SHRUNK toward roster means, and
-  the final KO/sub/decision mix is ANCHORED toward real UFC base rates. These
-  counter the per-second hazard compounding finishes toward ~100% over 3-5
-  rounds; without them a puncher-vs-weak-chin 5-rounder reads as a near-certain
-  KO and decisions collapse to ~0.
+* Finishes are a time-INHOMOGENEOUS Poisson process. The TOTAL finish
+  log-hazard over a bout, H, is set PER FIGHTER-PAIR and is independent of the
+  number of scheduled rounds — so P(finish) ≈ 1 − exp(−H) no longer balloons for
+  5-round bouts (a small, non-proportional championship-round bonus is the only
+  length effect). This is the core fix for "5-rounders over-finish 3-rounders".
+* That total hazard is distributed across the fight by an ACCUMULATED-DAMAGE
+  timing shape: per-second finish weight rises as (floor + τ^γ) with τ the
+  fraction of the fight elapsed, so finishes cluster in the later rounds as
+  damage piles up, instead of front-loading. A within-round ramp adds the
+  end-of-round push, and a power tilt shifts a heavy hitter's finishes earlier
+  (flash-KO capable) vs a point-fighter's later.
+* A per-fight finish CAP bounds P(any finish) so a puncher-vs-weak-chin bout
+  can't asymptote toward a near-certain finish.
+* Career rates are still SHRUNK toward roster means (tiny denominators), lift
+  multipliers CLAMPED, and the final KO/sub/decision mix lightly ANCHORED toward
+  real UFC base rates — but the per-fight scales now do most of the calibration,
+  so the anchor is only a tail safety net.
 
-Phase 4+ ideas (NOT in this implementation): per-round fatigue decay (the real
-root fix — lower the base hazard + cap per-fight finish prob), takedown →
-ground positions, strike location heatmaps.
+Still simplified vs reality (noted, not modelled): explicit per-strike damage
+state, takedown→ground position chains, true sub-from-grappling timing distinct
+from KO timing. The hazard shape is a deterministic function of the fighters
+(fast, calibratable), not a per-simulation stochastic damage walk.
 """
 
 from __future__ import annotations
@@ -54,54 +55,65 @@ ROSTER_DEFAULTS = {
     "finish_rate_for": 0.4,
 }
 
-# Base per-second finish hazards, applied to BOTH fighters across the FULL
-# scheduled time (with the fatigue taper below). Empirically tuned so a real
-# slate averages ~33 % KO / 17 % sub / 50 % decision while a slugfest still
-# reads 60-70 % KO and a grappling match 30-40 % sub — i.e. the mean is right
-# AND the fighter-specific spread survives. Re-tune against a fresh slate if the
-# aggregate drifts (scripts/simulation tuning harness).
-BASE_KO_HAZARD_PER_SEC = 0.00022
-BASE_SUB_HAZARD_PER_SEC = 0.00016
-# Fatigue: the per-second finish hazard is multiplied by this factor RAISED TO
-# (round_index) so finishes taper a little each round. Without it the constant
-# per-second hazard compounds purely with fight length, so a 5-round bout racks
-# up more finishes than a 3-round one for no reason but extra ticks. 1.0 = off.
-FATIGUE_DECAY_PER_ROUND = 0.93
-# Strength multipliers — how much a fighter's own offensive stat or
-# the opponent's vulnerability moves the hazard.
+SECONDS_PER_ROUND = 300
+
+# === Per-fight finish log-hazards ============================================
+# Total per-fight KO / submission log-hazard for an AVERAGE matchup (all lifts =
+# 1). P(that finish) ≈ 1 − exp(−H). Tuned so a realistic slate averages roughly
+# 33% KO / 17% sub / 50% decision while preserving the fighter-specific spread
+# (a slugfest still reads well above 33% KO, a grappling match above 17% sub).
+KO_TOTAL_SCALE = 0.185
+SUB_TOTAL_SCALE = 0.140
+
+# Offense/defense lifts (same shape + clamp as the old per-second model) scale
+# H per matchup. Raw small-sample ratios are clamped so a 1-of-1 "glass chin"
+# can't hand the opponent a ~6× multiplier and saturate P(KO).
 KO_OFFENSE_WEIGHT = 0.6
 KO_DEFENSE_WEIGHT = 1.0
 SUB_OFFENSE_WEIGHT = 0.8
 SUB_DEFENSE_WEIGHT = 1.0
+LIFT_MIN, LIFT_MAX = 0.4, 2.5
+
+# Per-fight finish CAP: no bout may exceed this P(any finish).
+FINISH_CAP_MAX = 0.90
+
+# Modest, NON-proportional bonus for the two extra championship rounds: a
+# 5-round bout finishes a bit more often than a 3-round one (more time to break
+# a hurt fighter), but nowhere near the tick-count blowup of the old model.
+# Applied as ×(1 + bonus) interpolated over 3r→5r.
+LENGTH_FINISH_BONUS = 0.12
+
+# === Accumulated-damage timing shape =========================================
+# Per-second finish weight at fight-fraction τ rises as (DAMAGE_FLOOR + τ^γ):
+# the floor keeps early/flash finishes possible; τ^γ clusters finishes late as
+# damage accumulates.
+DAMAGE_GAMMA = 1.6  # global lateness; >1 pushes finishes toward later rounds
+DAMAGE_FLOOR = 0.12  # floor so an early finish is never impossible
+GAMMA_MIN, GAMMA_MAX = 0.9, 2.8
+# Within-round ramp: hazard rises through each round (fatigue / pre-bell push),
+# partially resetting between rounds.
+ROUND_RAMP = 0.55
+# Power tilt: a heavy hitter's finishes shift earlier, a point-fighter's later.
+# Scales γ by the attacker's KO power (γ_eff = γ / power).
+POWER_TILT = 0.35
+POWER_MIN, POWER_MAX = 0.6, 1.6
 
 # Decision-time scoring softness.
 DECISION_TEMPERATURE = 0.45
 
-# --- Calibration guards (fix for KO over-prediction) -------------------------
-# 1. Clamp the offense/defense lift multipliers. Raw small-sample career ratios
-#    (e.g. a fighter whose single career loss was a KO -> losses_ko_rate = 1.0)
-#    otherwise hand the opponent a ~6x "glass chin" multiplier and saturate
-#    P(KO) -> 1.0. Clamp keeps any single lift in a sane band.
-LIFT_MIN, LIFT_MAX = 0.4, 2.5
-# 2. Bayesian shrinkage: blend a fighter's raw finish/durability rate toward the
-#    neutral anchor with this many pseudo-observations, so tiny denominators
-#    (1-of-1 rates) aren't taken at face value. rate' = (rate*n + anchor*k)/(n+k).
+# === Calibration guards ======================================================
+# Bayesian shrinkage: blend a fighter's raw finish/durability rate toward the
+# neutral anchor with this many pseudo-observations (tiny denominators aren't
+# taken at face value). rate' = (rate*n + anchor*k)/(n+k).
 SHRINK_PSEUDO_COUNTS = 4.0
-# 3. Anchor the simulated method mix toward real UFC base rates. The per-second
-#    hazard compounds finishes over 3-5 rounds, so the raw split skews KO-heavy
-#    and decision-light. We blend each side's CONDITIONAL (method | this fighter
-#    wins) mix toward the base with weight LAMBDA, which PRESERVES each fighter's
-#    win probability and only reshapes how they win. LAMBDA is the tuning knob:
-#    0 = raw simulator, 1 = pure base rate. The proper fix (lower the base
-#    hazard + per-fight finish cap + fatigue decay) is deferred; this anchor is
-#    the low-risk near-term correction.
+
+# Light method-mix anchor toward real UFC base rates — preserves each fighter's
+# win prob, only reshapes how they win. Now that the per-fight scales do most of
+# the calibration, this is a small tail safety net (0 = raw, 1 = pure base).
 METHOD_BASE_KO = 0.33
 METHOD_BASE_SUB = 0.17
 METHOD_BASE_DEC = 0.50
-# Light touch now that the base hazard itself is calibrated: the anchor only
-# nudges extreme tails toward sanity, it does NOT flatten the spread (a slugfest
-# must still read well above 33% KO). 0.6 over-corrected toward decisions.
-METHOD_ANCHOR_LAMBDA = 0.10
+METHOD_ANCHOR_LAMBDA = 0.08
 
 # Neutral anchors used by the lift formulas (lift = 1.0 at these values).
 _KO_OFF_ANCHOR = 0.35
@@ -110,8 +122,12 @@ _SUB_OFF_ANCHOR = 1.0
 _SUB_DEF_ANCHOR = 0.05
 
 
+def _clamp(x: float, lo: float, hi: float) -> float:
+    return min(hi, max(lo, x))
+
+
 def _clamp_lift(x: float) -> float:
-    return min(LIFT_MAX, max(LIFT_MIN, x))
+    return _clamp(x, LIFT_MIN, LIFT_MAX)
 
 
 def _shrink(rate: float, n: int, anchor: float, k: float = SHRINK_PSEUDO_COUNTS) -> float:
@@ -183,18 +199,41 @@ class FighterMC:
         )
 
 
-def _ko_hazard(att: FighterMC, deff: FighterMC) -> float:
+def _ko_total_loghaz(att: FighterMC, deff: FighterMC) -> float:
+    """Total per-fight KO log-hazard for `att` finishing `deff` (lift = 1 at the
+    neutral anchors). P(this KO) ≈ 1 − exp(−H) before the other methods compete."""
     offense_lift = _clamp_lift(1.0 + KO_OFFENSE_WEIGHT * (att.kd_per_fight / _KO_OFF_ANCHOR - 1.0))
     defense_lift = _clamp_lift(1.0 + KO_DEFENSE_WEIGHT * (deff.losses_ko_rate / _KO_DEF_ANCHOR - 1.0))
-    return BASE_KO_HAZARD_PER_SEC * offense_lift * defense_lift
+    return KO_TOTAL_SCALE * offense_lift * defense_lift
 
 
-def _sub_hazard(att: FighterMC, deff: FighterMC) -> float:
-    # sub_per15 is per 15 minutes of fight time → per second ≈ /900,
-    # but the absolute base hazard already covers most of the rate.
+def _sub_total_loghaz(att: FighterMC, deff: FighterMC) -> float:
+    """Total per-fight submission log-hazard for `att` finishing `deff`."""
     offense_lift = _clamp_lift(1.0 + SUB_OFFENSE_WEIGHT * (att.sub_per15 / _SUB_OFF_ANCHOR - 1.0))
     defense_lift = _clamp_lift(1.0 + SUB_DEFENSE_WEIGHT * (deff.losses_sub_rate / _SUB_DEF_ANCHOR - 1.0))
-    return BASE_SUB_HAZARD_PER_SEC * offense_lift * defense_lift
+    return SUB_TOTAL_SCALE * offense_lift * defense_lift
+
+
+def _power(att: FighterMC) -> float:
+    """Finishing-power factor for the timing tilt: >1 for heavy hitters (their
+    finishes shift earlier), <1 for point-fighters (later)."""
+    return _clamp(1.0 + POWER_TILT * (att.kd_per_fight / _KO_OFF_ANCHOR - 1.0), POWER_MIN, POWER_MAX)
+
+
+def _timing_weights(att_power: float, total_seconds: int) -> np.ndarray:
+    """Per-second finish weights (sum to 1) shaping WHEN finishes land. Rises as
+    (DAMAGE_FLOOR + τ^γ) across the fight (accumulated damage), times a
+    within-round ramp. γ is shifted by the attacker's power so punchers finish
+    a touch earlier. Normalized so the total hazard is unchanged (length-safe)."""
+    t = np.arange(total_seconds)
+    tau = t / max(total_seconds - 1, 1)
+    round_frac = (t % SECONDS_PER_ROUND) / SECONDS_PER_ROUND
+    gamma = _clamp(DAMAGE_GAMMA / att_power, GAMMA_MIN, GAMMA_MAX)
+    shape = (DAMAGE_FLOOR + tau**gamma) * (1.0 + ROUND_RAMP * round_frac)
+    s = float(shape.sum())
+    if s <= 0:
+        return np.full(total_seconds, 1.0 / max(total_seconds, 1))
+    return shape / s
 
 
 def _decision_logit(a: FighterMC, b: FighterMC) -> float:
@@ -258,19 +297,41 @@ def simulate_bout(
     seed: int | None = None,
 ) -> MCResult:
     rng = np.random.default_rng(seed)
+    total_seconds = scheduled_rounds * SECONDS_PER_ROUND
 
-    ko_a = _ko_hazard(a, b)
-    ko_b = _ko_hazard(b, a)
-    sub_a = _sub_hazard(a, b)
-    sub_b = _sub_hazard(b, a)
+    # Per-fight TOTAL finish log-hazards — independent of the number of rounds
+    # (the fix for length bias). One modest non-proportional championship-round
+    # bonus is the only length effect.
+    length_bonus = 1.0 + LENGTH_FINISH_BONUS * max(0, scheduled_rounds - 3) / 2.0
+    H_ko_a = _ko_total_loghaz(a, b) * length_bonus
+    H_sub_a = _sub_total_loghaz(a, b) * length_bonus
+    H_ko_b = _ko_total_loghaz(b, a) * length_bonus
+    H_sub_b = _sub_total_loghaz(b, a) * length_bonus
 
-    seconds_per_round = 300
-    total_seconds = scheduled_rounds * seconds_per_round
+    # Per-fight finish cap: bound P(any finish) so an extreme matchup can't
+    # asymptote toward a certain finish.
+    H_total = H_ko_a + H_sub_a + H_ko_b + H_sub_b
+    cap_H = -np.log(1.0 - FINISH_CAP_MAX)
+    if H_total > cap_H and H_total > 0:
+        s = cap_H / H_total
+        H_ko_a *= s
+        H_sub_a *= s
+        H_ko_b *= s
+        H_sub_b *= s
 
-    # Per-second per-event probabilities are tiny; we vectorize across
-    # simulations: each simulation maintains a "remaining" mask. At each
-    # tick draw 4 Bernoullis (KO_a, KO_b, SUB_a, SUB_b). First true →
-    # finish event for that sim.
+    # Accumulated-damage timing: A finishing B is shaped by A's power (how fast A
+    # breaks B down), and vice versa. Each schedule sums to 1, so the totals
+    # above (and thus P(finish)) are unchanged — only the WHEN moves.
+    w_b = _timing_weights(_power(a), total_seconds)  # timing of B being finished
+    w_a = _timing_weights(_power(b), total_seconds)  # timing of A being finished
+    haz_ko_a = H_ko_a * w_b
+    haz_sub_a = H_sub_a * w_b
+    haz_ko_b = H_ko_b * w_a
+    haz_sub_b = H_sub_b * w_a
+
+    # Vectorize across simulations: each sim keeps a "remaining" mask. At each
+    # tick draw 4 Bernoullis (KO_a, KO_b, SUB_a, SUB_b) at that tick's hazard.
+    # First true → finish event for that sim.
     remaining = np.ones(n_simulations, dtype=bool)
     finish_method = np.full(n_simulations, "", dtype=object)
     finish_seconds = np.full(n_simulations, -1, dtype=np.int32)
@@ -280,17 +341,14 @@ def simulate_bout(
         if not remaining.any():
             break
         active_idx = np.where(remaining)[0]
-        # Draw probabilities only for still-active sims.
+        # Draw probabilities only for still-active sims, vs this tick's hazards.
         u = rng.random((4, active_idx.size))
-        # Fatigue taper — later rounds finish a little less, so a 5-round bout
-        # doesn't out-finish a 3-round one purely on tick count.
-        decay = FATIGUE_DECAY_PER_ROUND ** (t // seconds_per_round)
         # Order matters slightly when multiple events fire same tick;
         # apply KO_a → KO_b → SUB_a → SUB_b with tie-break first-true wins.
-        hits_ko_a = u[0] < ko_a * decay
-        hits_ko_b = u[1] < ko_b * decay
-        hits_sub_a = u[2] < sub_a * decay
-        hits_sub_b = u[3] < sub_b * decay
+        hits_ko_a = u[0] < haz_ko_a[t]
+        hits_ko_b = u[1] < haz_ko_b[t]
+        hits_sub_a = u[2] < haz_sub_a[t]
+        hits_sub_b = u[3] < haz_sub_b[t]
         any_hit = hits_ko_a | hits_ko_b | hits_sub_a | hits_sub_b
         if not any_hit.any():
             continue
@@ -310,7 +368,7 @@ def simulate_bout(
                 m = "sub_b"
             finish_method[sim_i] = m
             finish_seconds[sim_i] = t + 1
-            finish_round[sim_i] = (t // seconds_per_round) + 1
+            finish_round[sim_i] = (t // SECONDS_PER_ROUND) + 1
             remaining[sim_i] = False
 
     # Simulations that survived to the bell → decision. Stochastic

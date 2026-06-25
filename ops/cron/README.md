@@ -14,6 +14,7 @@ at runtime (the checkout's `git pull` is currently best-effort — see below).
 | **daily 04:30** | `scrape-stats.sh` | **`enrich-bouts` (per-round stats) + `scorecards` + full recompute** |
 | daily 05:15 | `predict-refresh.sh` | score upcoming bouts → `bout_simulation`/`_features`/`_rounds` (winner + Monte-Carlo props) so the sportsbook + "how" panel don't go stale. Committed model (no retrain). Needs `.env.local` at the repo root for `DATABASE_URL`. |
 | weekly Sun 05:30 | `scrape-full.sh` | `run_all.py --phase all` (A-Z incl. enrich-fighters) + full recompute |
+| weekly Sun 07:00 | `retrain-refresh.sh` | retrain the model on the latest data (refit-on-all served weights) → commit + push artifacts **if** the weights changed. Deterministic, so no-op when no new fights. Auto-commits to main; needs deploy-key push access + `.env.local`. |
 | daily 03:30 | `rankings-refresh.sh` | live `ufc.com/rankings` → parse → import `ranking_snapshot` (before the daily recompute) |
 
 The daily `scrape-stats.sh` is the job whose absence let per-round stats,

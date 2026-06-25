@@ -296,9 +296,19 @@ def run_training(df: pd.DataFrame) -> dict[str, dict[str, float]]:
         by_learner[learner_name] = evaluate_probs(probs, ys["test"])
     print_breakdown_table(by_learner)
 
-    # Persist artifacts.
+    # Production refit: the SERVED model trains on ALL data (train+val+test) so
+    # deployed weights include the most recent fights — not only data before
+    # TRAIN_END (the split model never sees val/test, ~2.5yr stale by mid-2026).
+    # The split-trained `ensemble` stays the source of the honest held-out
+    # metrics above; `prod` is what we actually save + serve.
+    groups_all = meta["weight_class"].apply(weight_group).reset_index(drop=True)
+    console.log(f"refitting production model on ALL {len(X):,} rows (served weights)…")
+    prod = ensemble.refit_on_all(X, y, groups_all)
+    served_through = str(pd.to_datetime(meta["event_date"]).max().date())
+
+    # Persist artifacts — the PRODUCTION (refit-on-all) model.
     ENSEMBLE_DIR.mkdir(exist_ok=True)
-    ensemble.save(ENSEMBLE_DIR)
+    prod.save(ENSEMBLE_DIR)
 
     metadata = {
         "model_version": MODEL_VERSION,
@@ -315,6 +325,15 @@ def run_training(df: pd.DataFrame) -> dict[str, dict[str, float]]:
         # (val log-loss == the minimized val_blend_logloss). Only test is clean.
         "split_roles": SPLIT_ROLES,
         "clean_holdout_metric": CLEAN_HOLDOUT_SPLIT,
+        # The SAVED/served model is refit on ALL data; the metrics above come
+        # from the split model and are a conservative estimate (the served model
+        # has strictly more training data, incl. the most recent fights).
+        "served_model": {
+            "refit_on_all_data": True,
+            "n_rows": int(len(X)),
+            "trained_through": served_through,
+            "note": "served weights = train+val+test; metrics are the split model's honest held-out estimate",
+        },
         "test_breakdown_by_learner": {k: v for k, v in by_learner.items()},
         "n_train": int(len(Xs["train"])),
         "n_val": int(len(Xs["val"])),
@@ -324,6 +343,7 @@ def run_training(df: pd.DataFrame) -> dict[str, dict[str, float]]:
         json.dumps(metadata, indent=2, default=str)
     )
     console.log(
-        f"saved ensemble to {ENSEMBLE_DIR.name}/ · metadata.json refreshed"
+        f"saved PRODUCTION ensemble (refit on all {len(X):,} rows, "
+        f"through {served_through}) to {ENSEMBLE_DIR.name}/ · metadata.json refreshed"
     )
     return metrics

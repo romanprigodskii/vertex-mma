@@ -131,13 +131,13 @@ class EnsembleModel:
             ],
         )
 
-    def _train_xgb(
-        self, X_tr: pd.DataFrame, y_tr: pd.Series, X_va: pd.DataFrame, y_va: pd.Series
-    ) -> xgb.Booster:
-        # XGBoost params chosen to be a deliberate twin of the LGB
-        # config but with different regularization defaults — the
-        # ensemble benefits when its members disagree on edge cases.
-        params = {
+    @staticmethod
+    def _xgb_params() -> dict[str, Any]:
+        # XGBoost params chosen to be a deliberate twin of the LGB config but
+        # with different regularization defaults — the ensemble benefits when
+        # its members disagree on edge cases. `seed` pins subsample/colsample
+        # draws (reproducibility; LightGBM is pinned via LGB_PARAMS).
+        return {
             "objective": "binary:logistic",
             "eval_metric": "logloss",
             "learning_rate": 0.05,
@@ -149,21 +149,39 @@ class EnsembleModel:
             "reg_alpha": 0.1,
             "verbosity": 0,
             "tree_method": "hist",
-            # Pin the seed so subsample / colsample draws repeat run-to-run —
-            # the XGB half of the reproducibility fix (LightGBM is pinned via
-            # LGB_PARAMS in config.py).
             "seed": 42,
         }
+
+    def _train_xgb(
+        self, X_tr: pd.DataFrame, y_tr: pd.Series, X_va: pd.DataFrame, y_va: pd.Series
+    ) -> xgb.Booster:
         dtr = xgb.DMatrix(X_tr, label=y_tr.astype(int))
         dva = xgb.DMatrix(X_va, label=y_va.astype(int))
         return xgb.train(
-            params,
+            self._xgb_params(),
             dtr,
             num_boost_round=1000,
             evals=[(dva, "val")],
             early_stopping_rounds=50,
             verbose_eval=False,
         )
+
+    # ── fixed-iteration trainers (production refit on ALL data) ─────────
+
+    def _train_lgb_fixed(
+        self, X: pd.DataFrame, y: pd.Series, num_rounds: int
+    ) -> lgb.Booster:
+        """Train LGB for a FIXED round count (no val / early stopping). Used by
+        the production refit: the iteration count comes from the eval-split run,
+        so we can train on ALL data without holding any out."""
+        dtr = lgb.Dataset(X, label=y)
+        return lgb.train(self.lgb_params, dtr, num_boost_round=max(1, int(num_rounds)))
+
+    def _train_xgb_fixed(
+        self, X: pd.DataFrame, y: pd.Series, num_rounds: int
+    ) -> xgb.Booster:
+        dtr = xgb.DMatrix(X, label=y.astype(int))
+        return xgb.train(self._xgb_params(), dtr, num_boost_round=max(1, int(num_rounds)))
 
     def _train_logreg(
         self, X_tr: pd.DataFrame, y_tr: pd.Series
@@ -305,6 +323,60 @@ class EnsembleModel:
         }
         return self.training_meta
 
+    # ── production refit on ALL data ───────────────────────────────────
+
+    def refit_on_all(
+        self,
+        X_all: pd.DataFrame,
+        y_all: pd.Series,
+        groups_all: pd.Series,
+    ) -> "EnsembleModel":
+        """Return a PRODUCTION ensemble whose base learners are refit on the
+        FULL dataset (train+val+test), so the SERVED weights include the most
+        recent fights instead of only data before TRAIN_END. The temporal-split
+        model this is called on stays the source of the honest held-out metrics;
+        this is the model we actually deploy.
+
+        Iteration counts are taken from the eval-split fit (best_iteration), so
+        no held-out val is needed to refit on all data. The blender + blend mode
+        + weights are TRANSFERRED unchanged — they're meta-parameters selected on
+        val and can't be re-fit without a holdout, and they're stable.
+        """
+        assert self.lgb_global is not None and self.xgb_global is not None
+        X_all = X_all.reset_index(drop=True)
+        y_all = y_all.reset_index(drop=True)
+        groups_all = groups_all.reset_index(drop=True)
+
+        prod = EnsembleModel(
+            feature_columns=self.feature_columns,
+            lgb_params=self.lgb_params,
+            lgb_num_rounds=self.lgb_num_rounds,
+            lgb_early_stopping=self.lgb_early_stopping,
+        )
+        lgb_rounds = self.lgb_global.best_iteration or self.lgb_num_rounds
+        prod.lgb_global = self._train_lgb_fixed(X_all, y_all, lgb_rounds)
+        xgb_rounds = (self.xgb_global.best_iteration or 1000) + 1
+        prod.xgb_global = self._train_xgb_fixed(X_all, y_all, xgb_rounds)
+        prod.logreg, prod.scaler, prod.logreg_means = self._train_logreg(X_all, y_all)
+        for g, spec in self.lgb_specialists.items():
+            mask = (groups_all == g).to_numpy()
+            if mask.sum() == 0:
+                continue
+            spec_rounds = spec.best_iteration or self.lgb_num_rounds
+            prod.lgb_specialists[g] = self._train_lgb_fixed(
+                X_all.loc[mask].reset_index(drop=True),
+                y_all.loc[mask].reset_index(drop=True),
+                spec_rounds,
+            )
+        # Transfer the blend config unchanged (meta-params selected on val).
+        prod.blender = self.blender
+        prod.calibrator = self.calibrator
+        prod._blend_mode = getattr(self, "_blend_mode", "logreg")
+        prod._blend_weights = getattr(self, "_blend_weights", [])
+        prod._val_blend_logloss = getattr(self, "_val_blend_logloss", {})
+        prod.training_meta = dict(self.training_meta)
+        return prod
+
     # ── prediction ─────────────────────────────────────────────────────
 
     def _base_predict_matrix(
@@ -319,9 +391,12 @@ class EnsembleModel:
         assert self.logreg_means is not None
         X_filled = X.fillna(pd.Series(self.logreg_means, index=X.columns)).fillna(0.0)
         p_lgb = self.lgb_global.predict(X, num_iteration=self.lgb_global.best_iteration)
-        p_xgb = self.xgb_global.predict(
-            xgb.DMatrix(X), iteration_range=(0, self.xgb_global.best_iteration + 1)
-        )
+        # `best_iteration` only exists when early stopping was used (the eval
+        # model). The production refit trains a FIXED round count → no best_
+        # iteration; iteration_range=(0, 0) tells XGBoost to use all trees.
+        xgb_best = getattr(self.xgb_global, "best_iteration", None)
+        xgb_range = (0, int(xgb_best) + 1) if xgb_best is not None else (0, 0)
+        p_xgb = self.xgb_global.predict(xgb.DMatrix(X), iteration_range=xgb_range)
         p_log = self.logreg.predict_proba(self.scaler.transform(X_filled.values))[:, 1]
         p_spec = np.empty(len(X), dtype=np.float64)
         for i, g in enumerate(groups.values):

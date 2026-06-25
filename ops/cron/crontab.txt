@@ -23,3 +23,8 @@
 
 # Weekly Sun 05:30 — full A-Z scrape (incl. enrich-fighters) + recompute
 30 5 * * 0   /opt/vertex-cron/scrape-full.sh
+
+# Weekly Sun 07:00 — retrain the model on the latest data (refit-on-all) and
+# push refreshed artifacts if the weights changed, AFTER the full scrape +
+# recompute. Keeps the served weights from drifting (no-op when no new fights).
+0 7 * * 0    /opt/vertex-cron/retrain-refresh.sh
