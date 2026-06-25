@@ -29,10 +29,13 @@
  * win we also look up the opponent's UFC.com/rankings rank at bout date
  * (within 4 weeks before) from ranking_snapshot. That yields a rank-tier
  * — top5_rank / top10_rank / top15_rank / none — which is compared to the
- * champion-tier and the higher-multiplier one wins. Pre-2017 bouts (no
- * snapshot data) fall back to fighter.peak_rank. Rank=0 (champion slot)
- * is intentionally ignored on the rank path so the champion-tier remains
- * the authoritative apex signal.
+ * champion-tier and the higher-multiplier one wins. Pre-2017 bouts have no
+ * snapshot data, so they get rank-tier "none" and rely on the (point-in-time)
+ * champion-tier alone — the old fighter.peak_rank fallback was dropped because
+ * peak_rank is the opponent's career-MAX rank (future info for an early-career
+ * bout), a point-in-time leak into the simulation's vertex_score feature.
+ * Rank=0 (champion slot) is intentionally ignored on the rank path so the
+ * champion-tier remains the authoritative apex signal.
  */
 import { config } from "dotenv";
 config({ path: ".env.local" });
@@ -75,15 +78,9 @@ const CHAMP_TIER_WEIGHT: Record<Tier, number> = {
 };
 
 const RANKING_LOOKBACK_DAYS = 28;
-const PRE_SNAPSHOT_CUTOFF = new Date("2017-01-01");
 
 /** Sorted-descending-by-date ranking snapshots per fighter_id. */
 const rankByFighter = new Map<string, Array<{ date: Date; rank: number }>>();
-/** opponent_id → { gender, peak_rank } from fighter table. */
-const fighterMeta = new Map<
-  string,
-  { gender: "male" | "female"; peakRank: number | null }
->();
 
 /** rank-at-bout lookup. Returns null when no snapshot in window. */
 function rankAtBout(opponentId: string, boutDate: Date): number | null {
@@ -110,30 +107,19 @@ function rankToTier(rank: number | null): RankTier {
   return "none";
 }
 
-/** Pre-2017 fallback: map opponent.peak_rank to a rank-tier. */
-function peakRankToTier(peakRank: number | null): RankTier {
-  if (peakRank === null) return "none";
-  if (peakRank === -1) return "none"; // ex-champion — champion-tier handles
-  if (peakRank >= 1 && peakRank <= 5) return "top5";
-  if (peakRank <= 10) return "top10";
-  if (peakRank <= 15) return "top15";
-  return "none";
-}
-
-/** Returns (rankTier, source) for a given opponent at a given bout date. */
+/** Returns (rankTier, source) for a given opponent at a given bout date.
+ *  Point-in-time only: a rank-tier requires a ranking_snapshot at/just before
+ *  the bout. Pre-2017 bouts have no snapshots → tier "none" (the champion-tier
+ *  source, which IS point-in-time, still applies). The old fighter.peak_rank
+ *  fallback was removed: peak_rank is the opponent's career-MAX rank, i.e.
+ *  future info for an early-career bout — a leak into the sim's vertex_score. */
 function classifyByRank(
   opponentId: string,
   boutDate: Date,
-): { tier: RankTier; source: "snapshot" | "peak_fallback" | "none" } {
+): { tier: RankTier; source: "snapshot" | "none" } {
   const snapRank = rankAtBout(opponentId, boutDate);
   if (snapRank !== null) {
     return { tier: rankToTier(snapRank), source: "snapshot" };
-  }
-  if (boutDate < PRE_SNAPSHOT_CUTOFF) {
-    const meta = fighterMeta.get(opponentId);
-    if (meta?.peakRank !== undefined) {
-      return { tier: peakRankToTier(meta.peakRank), source: "peak_fallback" };
-    }
   }
   return { tier: "none", source: "none" };
 }
@@ -309,13 +295,11 @@ function classify(
 }
 
 async function main() {
-  console.log("Loading ranking snapshots + fighter meta...");
+  console.log("Loading ranking snapshots...");
   // ranking_snapshot grouped by fighter_id, sorted DESC by date for the
-  // window-walk in rankAtBout. is_women filter is folded in via the
-  // gender check on the corresponding fighter — we only keep rows where
-  // is_women matches the fighter's recorded gender. (Cross-gender
-  // mismatches are zero in practice for ranking_snapshot since the
-  // importer's gender filter prevents it, but we guard defensively.)
+  // window-walk in rankAtBout. ranking_snapshot is already gender-separated by
+  // its is_women column + the importer's filter, so each fighter_id maps to one
+  // gender — no extra gender join is needed here.
   const snapRows = await sql<
     { fighter_id: string; date: Date; rank: number; is_women: boolean }[]
   >`
@@ -334,17 +318,6 @@ async function main() {
     rankByFighter.set(r.fighter_id, arr);
   }
   console.log(`  ${rankByFighter.size} fighters have ranking history`);
-
-  const metaRows = await sql<
-    { id: string; gender: "male" | "female"; peak_rank: number | null }[]
-  >`
-    SELECT id::text AS id, gender::text AS gender, peak_rank
-    FROM fighter
-  `;
-  for (const m of metaRows) {
-    fighterMeta.set(m.id, { gender: m.gender, peakRank: m.peak_rank });
-  }
-  console.log(`  ${fighterMeta.size} fighter meta rows`);
 
   console.log("Loading bouts...");
   const rows = await sql<BoutRecord[]>`
