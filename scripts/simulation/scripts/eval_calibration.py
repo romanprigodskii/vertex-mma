@@ -36,7 +36,12 @@ from src.export import build_dataset, fetch_raw, symmetrize_for_training  # noqa
 from src.features import build_feature_matrix, feature_names  # noqa: E402
 from src.train import temporal_split  # noqa: E402
 
-ENSEMBLE_DIR = ARTIFACTS_DIR / "ensemble"
+# Evaluate the EVAL (split-trained) model so val/test are genuinely out-of-
+# sample — the served artifacts/ensemble/ is refit on ALL data, so calibrating
+# against its test split would be in-sample. Fall back to the served model only
+# if the eval model is absent.
+_EVAL_DIR = ARTIFACTS_DIR / "ensemble_eval"
+ENSEMBLE_DIR = _EVAL_DIR if _EVAL_DIR.exists() else ARTIFACTS_DIR / "ensemble"
 EPS = 1e-6
 
 

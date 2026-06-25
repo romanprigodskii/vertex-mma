@@ -252,10 +252,22 @@ async function MonteCarloBlock({
   // Find the most likely (method, round) cell — used for the headline
   // sentence. Decision sits at "round = scheduled_rounds + 1" so it
   // sorts after all round-finish cells.
-  const finishByRound = rounds.finishByRound.filter(
+  const finishByRoundRaw = rounds.finishByRound.filter(
     (v): v is number => v != null,
   );
-  const scheduledRounds = finishByRound.length;
+  const scheduledRounds = finishByRoundRaw.length;
+  // Rescale the raw MC per-round finish probs to the RECONCILED finish total
+  // (1 − reconciled decision prob) so the per-round strip + headline cells share
+  // a denominator with the reconciled method totals shown above — two views of
+  // ONE distribution (same fix as the sportsbook cross-market consistency).
+  // Before this, the headline compared raw-MC round probs against the
+  // reconciled decision prob, two different representations of one quantity.
+  const decisionProb = m.probDecisionA + m.probDecisionB;
+  const reconciledFinishTotal = Math.max(0, 1 - decisionProb);
+  const rawFinishSum = finishByRoundRaw.reduce((s, v) => s + v, 0);
+  const finishScale = rawFinishSum > 0 ? reconciledFinishTotal / rawFinishSum : 0;
+  const finishByRound = finishByRoundRaw.map((v) => v * finishScale);
+
   // Per-round finish cells, each labelled with the round's DOMINANT method
   // (KO vs Sub) from the MC distribution — not a hardcoded "KO". Falls back to
   // the overall dominant finish method for rounds without a per-method split
@@ -271,7 +283,6 @@ async function MonteCarloBlock({
       prob: finishByRound[i],
     });
   }
-  const decisionProb = m.probDecisionA + m.probDecisionB;
   cells.push({ kind: "dec", round: scheduledRounds + 1, prob: decisionProb });
   cells.sort((x, y) => y.prob - x.prob);
   const top = cells[0];

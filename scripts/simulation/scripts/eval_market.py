@@ -29,7 +29,12 @@ from src.export import build_dataset, fetch_raw, symmetrize_for_training  # noqa
 from src.features import build_feature_matrix, feature_names  # noqa: E402
 from src.train import evaluate_probs, temporal_split  # noqa: E402
 
-ENSEMBLE_DIR = ARTIFACTS_DIR / "ensemble"
+# Evaluate the EVAL (split-trained) model so the test split is genuinely
+# out-of-sample. artifacts/ensemble/ is refit on ALL data (incl. test) for
+# serving, so loading it here would be in-sample/optimistic. Fall back to the
+# served model (with a warning) only if the eval model isn't present.
+_EVAL_DIR = ARTIFACTS_DIR / "ensemble_eval"
+ENSEMBLE_DIR = _EVAL_DIR if _EVAL_DIR.exists() else ARTIFACTS_DIR / "ensemble"
 
 
 def main() -> None:
@@ -42,6 +47,10 @@ def main() -> None:
     meta = meta.merge(df[["bout_id", "weight_class"]], on="bout_id", how="left")
     Xs, ys, metas, gs = temporal_split(X, y, meta)
 
+    if ENSEMBLE_DIR.name != "ensemble_eval":
+        print("WARNING: eval_market.py: ensemble_eval/ missing — evaluating the "
+              "served (all-data) model; test-split numbers are IN-SAMPLE. "
+              "Retrain to regenerate the eval model.")
     ensemble = EnsembleModel.load(ENSEMBLE_DIR)
     probs = ensemble.predict_proba_a(Xs["test"], gs["test"])
     y_test = ys["test"].to_numpy()

@@ -2,7 +2,8 @@
 
 Three things get written per bout:
 
-  1. bout_simulation                  — calibrated ensemble winner prob
+  1. bout_simulation                  — blended ensemble winner prob (NOT
+                                        post-hoc calibrated — see ensemble.py)
   2. bout_simulation_features         — top-N SHAP attributions (Phase 2,
                                         sourced from the ensemble's
                                         global LightGBM — interpretable)

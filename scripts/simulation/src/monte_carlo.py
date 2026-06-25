@@ -405,45 +405,49 @@ def simulate_bout(
     win_a = prob_ko_a + prob_sub_a + prob_dec_a
     win_b = prob_ko_b + prob_sub_b + prob_dec_b
 
-    # Per-(fighter, method) scale factors so the per-round breakdown below stays
-    # consistent with the anchored summary (each finish lives in one round, so
-    # scaling each round's count by the same factor keeps the sums equal to the
-    # anchored totals).
-    def _mscale(anchored: float, raw: float) -> float:
-        return anchored / raw if raw > 0 else 0.0
-
-    mscale = {
-        "ko_a": _mscale(prob_ko_a, raw_ko_a),
-        "ko_b": _mscale(prob_ko_b, raw_ko_b),
-        "sub_a": _mscale(prob_sub_a, raw_sub_a),
-        "sub_b": _mscale(prob_sub_b, raw_sub_b),
-    }
-
-    # Per-round finish probability (any method, either fighter).
-    finished_mask = finish_round > 0
+    # Average finish time over the sims that actually ended in a finish.
     avg_finish: float | None = None
-    if finished_mask.any():
-        early = finish_seconds[finished_mask & (finish_method != "dec_a") & (finish_method != "dec_b")]
-        if early.size > 0:
-            avg_finish = float(np.mean(early))
+    early = finish_seconds[(finish_method != "dec_a") & (finish_method != "dec_b") & (finish_round > 0)]
+    if early.size > 0:
+        avg_finish = float(np.mean(early))
 
-    # Per-round finish probability (any method, either fighter), weighted by
-    # the per-method anchor scale so it matches the anchored summary totals.
-    prob_finish_per_round: dict[int, float] = {}
-    for r in range(1, scheduled_rounds + 1):
-        m_in_r = finish_method[finish_round == r]
-        scaled = sum(float(np.sum(m_in_r == key)) * mscale[key] for key in mscale)
-        prob_finish_per_round[r] = scaled / n_simulations
+    # Per-round breakdown: distribute each method's ANCHORED total across rounds
+    # by that method's round SHARE (shares sum to 1), so Σ_rounds equals the
+    # anchored summary total EXACTLY. The old code multiplied raw per-round
+    # counts by anchored/raw, which lost mass when raw==0 (anchor invented
+    # finishes the rounds couldn't represent) and blew up a single sim ~120×
+    # when a method was rare — so the rounds didn't sum back to prob_ko/prob_sub
+    # despite the docstring's claim. When a method has too few raw sims to
+    # estimate its own timing, fall back to the POOLED finish-round timing.
+    MIN_METHOD_SAMPLES = 25
+    anchored_totals = {
+        "ko_a": prob_ko_a,
+        "ko_b": prob_ko_b,
+        "sub_a": prob_sub_a,
+        "sub_b": prob_sub_b,
+    }
+    rounds_range = list(range(1, scheduled_rounds + 1))
 
-    # JSONB payload — per-round per-method breakdown for any downstream
-    # consumer who wants finer detail than the summary columns. Scaled to the
-    # anchored summary so the rounds sum back to prob_ko_*/prob_sub_*.
-    by_round: dict[str, Any] = {}
-    for r in range(1, scheduled_rounds + 1):
-        m_in_r = finish_method[finish_round == r]
-        by_round[str(r)] = {
-            key: float(np.sum(m_in_r == key)) * mscale[key] / n_simulations for key in mscale
-        }
+    def _round_share(rounds_arr: np.ndarray) -> dict[int, float]:
+        if rounds_arr.size == 0:
+            return {r: 1.0 / len(rounds_range) for r in rounds_range}
+        return {r: float(np.sum(rounds_arr == r)) / rounds_arr.size for r in rounds_range}
+
+    pooled_share = _round_share(
+        finish_round[(finish_method != "dec_a") & (finish_method != "dec_b") & (finish_round > 0)]
+    )
+    method_share: dict[str, dict[int, float]] = {}
+    for key in anchored_totals:
+        rk = finish_round[finish_method == key]
+        method_share[key] = _round_share(rk) if rk.size >= MIN_METHOD_SAMPLES else pooled_share
+
+    by_round: dict[str, Any] = {
+        str(r): {key: anchored_totals[key] * method_share[key][r] for key in anchored_totals}
+        for r in rounds_range
+    }
+    prob_finish_per_round: dict[int, float] = {
+        r: sum(by_round[str(r)][key] for key in anchored_totals) for r in rounds_range
+    }
     distribution = {
         "n_simulations": n_simulations,
         "winner_prob_a": float(win_a),

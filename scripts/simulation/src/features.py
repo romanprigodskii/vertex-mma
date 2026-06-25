@@ -110,6 +110,10 @@ def build_feature_matrix(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series, pd.
     out["is_title_fight"] = df["is_title_fight"].astype("int8")
     out["is_main_event"] = df["is_main_event"].astype("int8")
     out["scheduled_rounds"] = df["scheduled_rounds"].astype("int8")
+    # Women's divisions differ in pace / finish rates — give the model the flag
+    # (was fetched but never used). Default to men's when gender is missing.
+    gender = df["gender"].fillna("male").astype(str) if "gender" in df.columns else "male"
+    out["is_womens"] = (gender == "female").astype("int8")
     # market_prob_a / market_log_odds intentionally omitted — see module
     # docstring. The market line is comparison-only and rides on `meta` below.
 
@@ -147,7 +151,7 @@ def build_feature_matrix(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series, pd.
     out["age_curve_diff"] = (((age_b - 30) ** 2 - (age_a - 30) ** 2) / 100).astype("float32")
 
     weight_cat = df["weight_class"].fillna("unknown").astype(str)
-    for wc in (
+    _STD_WC = (
         "strawweight",
         "flyweight",
         "bantamweight",
@@ -157,8 +161,13 @@ def build_feature_matrix(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series, pd.
         "middleweight",
         "light_heavyweight",
         "heavyweight",
-    ):
+    )
+    for wc in _STD_WC:
         out[f"wc_{wc}"] = (weight_cat == wc).astype("int8")
+    # catchweight / openweight / unknown fall through every one-hot above → all
+    # zeros, indistinguishable from a missing class. Flag them so the model can
+    # treat those (often short-notice / heavy) bouts differently.
+    out["wc_other"] = (~weight_cat.isin(_STD_WC)).astype("int8")
 
     X = pd.DataFrame(out)
     y = df["target_a_wins"].astype("int8")
@@ -183,6 +192,7 @@ def feature_names() -> list[str]:
         "is_title_fight",
         "is_main_event",
         "scheduled_rounds",
+        "is_womens",
     ]
     for side in ("stance_a", "stance_b"):
         cols += [f"{side}_orthodox", f"{side}_southpaw", f"{side}_switch"]
@@ -201,5 +211,6 @@ def feature_names() -> list[str]:
         "wc_middleweight",
         "wc_light_heavyweight",
         "wc_heavyweight",
+        "wc_other",
     ]
     return cols

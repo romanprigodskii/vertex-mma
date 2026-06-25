@@ -2,9 +2,10 @@
  * Vertex Sportsbook — fixed-odds betting engine.
  *
  * Unlike the LMSR prediction market (src/lib/lmsr.ts), the sportsbook offers
- * FIXED decimal odds derived from our own prediction model: the calibrated
- * winner probability (bout_simulation) plus the Monte-Carlo method / round
- * distribution (bout_simulation_rounds). The user stakes coins at the odds
+ * FIXED decimal odds derived from our own prediction model: the blended
+ * winner probability (bout_simulation; model output, NOT post-hoc calibrated)
+ * plus the Monte-Carlo method / round distribution (bout_simulation_rounds).
+ * The user stakes coins at the odds
  * shown; odds lock at bet time; payout = floor(stake × odds) if the
  * selection hits.
  *
@@ -105,7 +106,9 @@ export interface SportsbookRoundsInput {
 }
 
 export interface SportsbookSimInput {
-  /** Calibrated ensemble winner probabilities (sum ≈ 1). */
+  /** Blended ensemble winner probabilities (sum ≈ 1). Model output — not
+   *  post-hoc calibrated; the shipped weighted_mean blend is mildly
+   *  under-dispersed (see scripts/simulation/src/ensemble.py). */
   probA: number;
   probB: number;
   /** Monte-Carlo method/round split. null → only the winner market is offered. */

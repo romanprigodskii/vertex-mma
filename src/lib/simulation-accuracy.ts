@@ -29,11 +29,20 @@ export interface GradedSimulationPick {
   method: string | null;
 }
 
+/** Below this many graded picks the hit rate is too noisy to present as a
+ *  headline stat (a 2-pick "100%" is meaningless). Consumers should gate the
+ *  big number on `summary.reliable` and otherwise show "not enough data yet". */
+export const MIN_RELIABLE_GRADED = 20;
+
 export interface AccuracySummary {
   /** Number of graded picks in the window. */
   total: number;
   /** Hits over total. NaN when total = 0. */
   hitRate: number;
+  /** False when `total < MIN_RELIABLE_GRADED` — the rate is too small a sample
+   *  to trust as a headline figure (and the graded set is itself biased toward
+   *  predictable fighters — see getGradedSimulations). */
+  reliable: boolean;
   /** Per-confidence-band hit counts: [hits, total]. */
   perConfidence: Record<
     "low" | "medium" | "high",
@@ -51,6 +60,16 @@ export interface AccuracySummary {
  * Returns up to `limit` rows ordered by event_date DESC (newest
  * first), so callers asking for "recent graded picks" get the most
  * relevant set.
+ *
+ * SAMPLING BIAS (read the headline accuracy with this in mind): a bout only
+ * gets a prediction when BOTH fighters already had ≥1 prior UFC bout (the
+ * predict.py feature-engineering filter), and only predictions with a
+ * resolvable winner are graded here. So the graded set skews toward
+ * experienced, more-predictable matchups and EXCLUDES debuts / short-notice
+ * fights — the hit rate is optimistic vs the full slate, and is a "recent
+ * graded picks" figure, not population accuracy. Gate the headline on
+ * `summarizeAccuracy(...).reliable` (min-N) so a handful of picks can't render
+ * a meaningless 100%.
  */
 export async function getGradedSimulations(
   limit = 60,
@@ -166,6 +185,7 @@ export function summarizeAccuracy(picks: GradedSimulationPick[]): AccuracySummar
   return {
     total,
     hitRate: total > 0 ? hits / total : Number.NaN,
+    reliable: total >= MIN_RELIABLE_GRADED,
     perConfidence,
     modelVersion,
   };

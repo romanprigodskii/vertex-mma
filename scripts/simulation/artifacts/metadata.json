@@ -1,7 +1,7 @@
 {
   "model_version": "v0.5.0",
   "model_kind": "ensemble",
-  "trained_at": "2026-06-25T06:00:59.512776Z",
+  "trained_at": "2026-06-25T06:28:15.721400Z",
   "feature_columns": [
     "diff_height",
     "diff_reach",
@@ -54,6 +54,7 @@
     "is_title_fight",
     "is_main_event",
     "scheduled_rounds",
+    "is_womens",
     "stance_a_orthodox",
     "stance_a_southpaw",
     "stance_a_switch",
@@ -71,7 +72,8 @@
     "wc_welterweight",
     "wc_middleweight",
     "wc_light_heavyweight",
-    "wc_heavyweight"
+    "wc_heavyweight",
+    "wc_other"
   ],
   "train_end": "2024-01-01",
   "val_end": "2025-01-01",
@@ -164,28 +166,30 @@
       1.0,
       1.0,
       1.0,
+      1.0,
+      1.0,
       1.0
     ]
   },
   "blender": {
     "blend_mode": "weighted_mean",
     "val_blend_logloss": {
-      "logreg": 0.6757554872152801,
-      "mean": 0.6503163459310866,
-      "weighted_mean": 0.644790123103807
+      "logreg": 0.6767763700655108,
+      "mean": 0.6517750805438307,
+      "weighted_mean": 0.6445578632845232
     },
     "weighted_mean_weights": {
-      "p_lgb_global": 0.10293280615371424,
-      "p_xgb_global": 0.2686520184921566,
-      "p_logreg": 0.5872954117552747,
-      "p_specialist": 0.04111976359885454
+      "p_lgb_global": 0.07823541852384157,
+      "p_xgb_global": 0.24761706133510053,
+      "p_logreg": 0.6259547783284118,
+      "p_specialist": 0.04819274181264605
     },
-    "blender_intercept": -0.532741189817481,
+    "blender_intercept": -0.49864884263748444,
     "blender_coefs": {
-      "p_lgb_global": 0.21434982250665213,
-      "p_xgb_global": 0.3264048127190835,
-      "p_logreg": 0.4718585189469033,
-      "p_specialist": 0.0875687221986409
+      "p_lgb_global": 0.10524289425717447,
+      "p_xgb_global": 0.3294403037329096,
+      "p_logreg": 0.5121499810620845,
+      "p_specialist": 0.07959018419658914
     },
     "specialists": [
       "light",
@@ -196,45 +200,45 @@
   "metrics": {
     "train": {
       "n": 5415,
-      "accuracy": 0.660572483841182,
-      "log_loss": 0.623221811025863,
-      "brier": 0.21655658778859307,
-      "roc_auc": 0.7243116984321926,
+      "accuracy": 0.6550323176361957,
+      "log_loss": 0.6275245036271956,
+      "brier": 0.2185842307361195,
+      "roc_auc": 0.7157160292687959,
       "market_accuracy": 0.6486751717369971,
       "market_log_loss": 0.6208337183313487,
       "market_brier": 0.21620256762005985,
       "market_n": 1019,
-      "model_accuracy_on_market": 0.6633954857703631,
-      "model_log_loss_on_market": 0.6185379397477958,
-      "model_brier_on_market": 0.21434147470817508
+      "model_accuracy_on_market": 0.6565260058881256,
+      "model_log_loss_on_market": 0.6230413268481263,
+      "model_brier_on_market": 0.2164538876515689
     },
     "val": {
       "n": 433,
-      "accuracy": 0.628175519630485,
-      "log_loss": 0.644790123103807,
-      "brier": 0.22677097028747759,
-      "roc_auc": 0.6768886043533932,
+      "accuracy": 0.6212471131639723,
+      "log_loss": 0.6445578632845232,
+      "brier": 0.2266119706237741,
+      "roc_auc": 0.6792787025181393,
       "market_accuracy": 0.7244897959183674,
       "market_log_loss": 0.5800616408142409,
       "market_brier": 0.19754360952251526,
       "market_n": 98,
       "model_accuracy_on_market": 0.7142857142857143,
-      "model_log_loss_on_market": 0.6168212826764193,
-      "model_brier_on_market": 0.2132828465930345
+      "model_log_loss_on_market": 0.6189332408312264,
+      "model_brier_on_market": 0.21424297803215475
     },
     "test": {
       "n": 629,
-      "accuracy": 0.6327503974562798,
-      "log_loss": 0.6421121133276535,
-      "brier": 0.22545222896541642,
-      "roc_auc": 0.6827911219215568,
+      "accuracy": 0.6248012718600954,
+      "log_loss": 0.6438411327679128,
+      "brier": 0.22630802319468435,
+      "roc_auc": 0.6784534306273438,
       "market_accuracy": 0.6843853820598007,
       "market_log_loss": 0.5994762594756888,
       "market_brier": 0.20697059970580736,
       "market_n": 301,
       "model_accuracy_on_market": 0.6378737541528239,
-      "model_log_loss_on_market": 0.6420923262312136,
-      "model_brier_on_market": 0.22523659512847896
+      "model_log_loss_on_market": 0.6435442917845753,
+      "model_brier_on_market": 0.22596021484475742
     }
   },
   "split_roles": {
@@ -252,38 +256,38 @@
   "test_breakdown_by_learner": {
     "p_lgb_global": {
       "n": 629,
-      "accuracy": 0.615262321144674,
-      "log_loss": 0.6499373598735039,
-      "brier": 0.22895740325324607,
-      "roc_auc": 0.6761731022600588
+      "accuracy": 0.6343402225755167,
+      "log_loss": 0.6599662544471484,
+      "brier": 0.23363948570032764,
+      "roc_auc": 0.6704368095672444
     },
     "p_xgb_global": {
       "n": 629,
-      "accuracy": 0.6375198728139905,
-      "log_loss": 0.6419497874260284,
-      "brier": 0.2252043254758478,
-      "roc_auc": 0.6871490828012567
+      "accuracy": 0.6343402225755167,
+      "log_loss": 0.6438053505548295,
+      "brier": 0.22608237587485056,
+      "roc_auc": 0.6849194283976892
     },
     "p_logreg": {
       "n": 629,
-      "accuracy": 0.6263910969793323,
-      "log_loss": 0.6453314094395765,
-      "brier": 0.22728472205488356,
-      "roc_auc": 0.6701935745414007
+      "accuracy": 0.6232114467408585,
+      "log_loss": 0.6460012070819535,
+      "brier": 0.22765285940354762,
+      "roc_auc": 0.667629471977298
     },
     "p_specialist": {
       "n": 629,
-      "accuracy": 0.615262321144674,
-      "log_loss": 0.6666434483841669,
-      "brier": 0.23692958389719795,
-      "roc_auc": 0.6448565926826797
+      "accuracy": 0.6232114467408585,
+      "log_loss": 0.6707772129957812,
+      "brier": 0.23894625086697063,
+      "roc_auc": 0.6415627850410459
     },
     "p_blended": {
       "n": 629,
-      "accuracy": 0.6327503974562798,
-      "log_loss": 0.6421121133276535,
-      "brier": 0.22545222896541642,
-      "roc_auc": 0.6827911219215568
+      "accuracy": 0.6248012718600954,
+      "log_loss": 0.6438411327679128,
+      "brier": 0.22630802319468435,
+      "roc_auc": 0.6784534306273438
     }
   },
   "n_train": 5415,

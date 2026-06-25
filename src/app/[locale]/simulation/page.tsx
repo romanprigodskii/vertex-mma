@@ -179,7 +179,10 @@ export default async function SimulationIndexPage({
                 <p className="font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
                   {t("statRecentAccuracy")}
                 </p>
-                {accuracy.total > 0 ? (
+                {/* Gate the headline % on a reliable sample (MIN_RELIABLE_GRADED)
+                    so a handful of graded picks can't render a misleading 100%;
+                    below that we show the running count instead of a rate. */}
+                {accuracy.reliable ? (
                   <>
                     <p className="mt-1 font-display text-2xl tabular text-foreground">
                       {Math.round(accuracy.hitRate * 100)}
@@ -190,9 +193,16 @@ export default async function SimulationIndexPage({
                     </p>
                   </>
                 ) : (
-                  <p className="mt-1 font-display text-2xl tabular text-foreground-subtle">
-                    —
-                  </p>
+                  <>
+                    <p className="mt-1 font-display text-2xl tabular text-foreground-subtle">
+                      —
+                    </p>
+                    {accuracy.total > 0 ? (
+                      <p className="font-mono text-[10px] tabular text-foreground-subtle">
+                        {t("statRecentAccuracySub", { n: accuracy.total })}
+                      </p>
+                    ) : null}
+                  </>
                 )}
               </li>
             </ul>

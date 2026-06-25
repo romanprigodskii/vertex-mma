@@ -585,6 +585,13 @@ def build_dataset(
         age_b = age_years(info_b["dob"] if info_b is not None else None, ev_date)
         stance_a = info_a["stance"] if info_a is not None else None
         stance_b = info_b["stance"] if info_b is not None else None
+        # Bout gender (men's vs women's divisions differ in pace/finish rates).
+        # Both fighters share it; take A's, fall back to B's.
+        gender: str | None = None
+        if info_a is not None and not pd.isna(info_a["gender"]):
+            gender = str(info_a["gender"])
+        elif info_b is not None and not pd.isna(info_b["gender"]):
+            gender = str(info_b["gender"])
 
         # Latest (closing) line odds (decimal). Convert to implied prob via
         # 1/odds and de-vig naively (a/(a+b)) so the pair sums to 1. Stored as
@@ -640,6 +647,7 @@ def build_dataset(
                 "age_b": age_b,
                 "stance_a": stance_a,
                 "stance_b": stance_b,
+                "gender": gender,
                 "market_prob_a": market_prob_a,
                 "target_a_wins": target,
             }

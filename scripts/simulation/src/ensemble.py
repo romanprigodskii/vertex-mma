@@ -19,8 +19,15 @@ specialist per bout, the blender doesn't need to know which group —
 it just sees a single "p_specialist" column.
 
 Blender: LogisticRegression on the four base predictions evaluated on
-the validation split. Output goes through isotonic calibration so the
-final probabilities are still well-calibrated for the UI.
+the validation split (one of three modes — logreg / mean / weighted_mean —
+picked on val log-loss in fit()).
+
+NOTE ON CALIBRATION: NO post-blender calibrator is applied (calibrator=None).
+Isotonic on the ~430 val rows double-dipped noise and pushed test log-loss
+0.65→0.72, so the blended probability is shipped as-is. The usually-chosen
+`weighted_mean` mode AVERAGES the learners' probabilities, which is mildly
+UNDER-DISPERSED (Jensen — pulled toward 0.5), so the output is NOT guaranteed
+calibrated. Don't describe these probabilities as "calibrated" downstream.
 """
 
 from __future__ import annotations
@@ -86,7 +93,8 @@ def derive_group_from_features(X_row: pd.Series) -> str:
 
 class EnsembleModel:
     """Container with persistence — handles training all sub-models and
-    blending them into a single calibrated probability."""
+    blending them into a single probability (blended, not post-hoc
+    calibrated — see the module docstring)."""
 
     def __init__(
         self,
@@ -287,13 +295,13 @@ class EnsembleModel:
         self._blend_weights = weights.tolist()
         self._val_blend_logloss = {k: float(v) for k, v in options.items()}
 
-        # NB: no post-blender isotonic calibration. LogReg blender
-        # already outputs well-calibrated sigmoid probabilities; adding
-        # an isotonic on top means we'd be fitting TWO transforms on
-        # the same 430 val rows (double-dipping noise) — empirically
-        # that pushed test log-loss from 0.65 to 0.72 in our setup.
-        # Identity passthrough makes load() simpler and removes one
-        # source of overfit.
+        # NB: no post-blender calibrator. Fitting isotonic on the ~430 val rows
+        # double-dipped noise and pushed test log-loss 0.65→0.72, so we ship the
+        # blended prob as-is. CAVEAT: the chosen mode is often `weighted_mean`
+        # (a mean of the learners' probs), which is mildly under-dispersed, so
+        # the output is NOT guaranteed calibrated — downstream copy must not
+        # claim it is. (A no-vig book would leak any residual miscalibration into
+        # EV, part of why the sportsbook carries a margin.)
         self.calibrator = None
 
         # Bookkeeping — store the blender weights AND the chosen blend

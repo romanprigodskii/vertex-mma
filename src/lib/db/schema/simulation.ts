@@ -14,10 +14,10 @@ import {
 import { bout } from "./events";
 import { fighter } from "./fighters";
 
-// Phase 1 simulation output (scripts/simulation, LightGBM + isotonic
-// calibration). Mirrors the JSON written by predict.py — see that file
-// for the model contract. One row per (bout, model_version) so we keep
-// a history when we retrain under a new version.
+// Phase 1 simulation output (scripts/simulation, LightGBM+XGB+LogReg ensemble,
+// blended — NOT post-hoc calibrated). Mirrors the JSON written by predict.py —
+// see that file for the model contract. One row per (bout, model_version) so we
+// keep a history when we retrain under a new version.
 export const boutSimulation = pgTable(
   "bout_simulation",
   {
@@ -26,7 +26,8 @@ export const boutSimulation = pgTable(
       .notNull()
       .references(() => bout.id, { onDelete: "cascade" }),
     modelVersion: text("model_version").notNull(),
-    /** Calibrated probability that fighter A wins. probB = 1 - probA. */
+    /** Blended model probability that fighter A wins (NOT post-hoc
+     *  calibrated — see scripts/simulation/src/ensemble.py). probB = 1 - probA. */
     probA: real("prob_a").notNull(),
     probB: real("prob_b").notNull(),
     /** The fighter the model thinks wins — convenient for UI joins. */

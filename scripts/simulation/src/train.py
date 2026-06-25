@@ -35,6 +35,11 @@ from .features import build_feature_matrix, feature_names
 console = Console()
 
 ENSEMBLE_DIR = ARTIFACTS_DIR / "ensemble"
+# The SPLIT-trained model is saved here too, so the manual eval scripts
+# (eval_market / eval_calibration) can evaluate OUT-OF-SAMPLE: the served model
+# in ENSEMBLE_DIR is refit on ALL data, so a test-split eval against it would be
+# in-sample (optimistic).
+ENSEMBLE_EVAL_DIR = ARTIFACTS_DIR / "ensemble_eval"
 
 # What each temporal split is actually USED for — so the report doesn't present
 # the val number as a clean generalization estimate. val is consumed 3–4×
@@ -302,11 +307,17 @@ def run_training(df: pd.DataFrame) -> dict[str, dict[str, float]]:
     # The split-trained `ensemble` stays the source of the honest held-out
     # metrics above; `prod` is what we actually save + serve.
     groups_all = meta["weight_class"].apply(weight_group).reset_index(drop=True)
+
+    # Persist the EVAL (split-trained) model so eval_market / eval_calibration
+    # keep evaluating out-of-sample (the served model below is refit on all data).
+    ENSEMBLE_EVAL_DIR.mkdir(exist_ok=True)
+    ensemble.save(ENSEMBLE_EVAL_DIR)
+
     console.log(f"refitting production model on ALL {len(X):,} rows (served weights)…")
     prod = ensemble.refit_on_all(X, y, groups_all)
     served_through = str(pd.to_datetime(meta["event_date"]).max().date())
 
-    # Persist artifacts — the PRODUCTION (refit-on-all) model.
+    # Persist artifacts — the PRODUCTION (refit-on-all) model is what we serve.
     ENSEMBLE_DIR.mkdir(exist_ok=True)
     prod.save(ENSEMBLE_DIR)
 
