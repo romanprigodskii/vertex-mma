@@ -25,6 +25,12 @@ export interface BoutSimulationRounds {
    *  the probability the bout was finished IN that round (any method,
    *  either fighter). NULL when scheduled_rounds < that index. */
   finishByRound: Array<number | null>;
+  /** The DOMINANT finish method ("ko" | "sub") within each round, parsed
+   *  from the Monte-Carlo per-round/per-method distribution. Aligned with
+   *  finishByRound (index 0 = round 1). NULL when that round had no finish
+   *  mass or the prediction predates the distribution payload. Lets the UI
+   *  label a round's likely finish correctly instead of assuming KO. */
+  finishMethodByRound: Array<"ko" | "sub" | null>;
 }
 
 /**
@@ -112,6 +118,33 @@ export interface BoutSimulationRow {
 }
 
 /**
+ * Parse the Monte-Carlo `distribution` JSONB into the dominant finish method
+ * ("ko" | "sub") for each round. The payload shape (see monte_carlo.py) is
+ * `{ by_round: { "1": { ko_a, ko_b, sub_a, sub_b }, … } }`. Per round we sum
+ * KO (a+b) vs Sub (a+b) and keep whichever is larger; NULL when a round has no
+ * finish mass or the payload is absent/malformed (older predictions). Returns
+ * a length-5 array aligned with finishByRound (index 0 = round 1).
+ */
+function dominantFinishMethodByRound(
+  distribution: unknown,
+): Array<"ko" | "sub" | null> {
+  const empty: Array<"ko" | "sub" | null> = [null, null, null, null, null];
+  if (!distribution || typeof distribution !== "object") return empty;
+  const byRound = (distribution as { by_round?: unknown }).by_round;
+  if (!byRound || typeof byRound !== "object") return empty;
+  const num = (v: unknown): number => (typeof v === "number" ? v : 0);
+  return empty.map((_, i) => {
+    const cell = (byRound as Record<string, unknown>)[String(i + 1)];
+    if (!cell || typeof cell !== "object") return null;
+    const c = cell as Record<string, unknown>;
+    const ko = num(c.ko_a) + num(c.ko_b);
+    const sub = num(c.sub_a) + num(c.sub_b);
+    if (ko <= 0 && sub <= 0) return null;
+    return ko >= sub ? "ko" : "sub";
+  });
+}
+
+/**
  * Latest row in bout_simulation for this bout. Phase 1 emits one row per
  * (bout_id, model_version); we order by generated_at DESC so a fresh
  * model version overrides older predictions. NULL when no prediction
@@ -189,6 +222,7 @@ export async function getBoutSimulation(
     prob_finish_round_3: number | null;
     prob_finish_round_4: number | null;
     prob_finish_round_5: number | null;
+    distribution: unknown;
   };
   const roundsResult = await db.execute<RRow>(sql`
     SELECT n_simulations, mc_winner_prob_a, mc_winner_prob_b,
@@ -196,7 +230,8 @@ export async function getBoutSimulation(
            prob_decision_a, prob_decision_b,
            avg_finish_seconds,
            prob_finish_round_1, prob_finish_round_2, prob_finish_round_3,
-           prob_finish_round_4, prob_finish_round_5
+           prob_finish_round_4, prob_finish_round_5,
+           distribution
     FROM bout_simulation_rounds
     WHERE bout_id = ${boutId}::uuid
       AND model_version = ${r.model_version}
@@ -224,6 +259,9 @@ export async function getBoutSimulation(
             roundsRows[0].prob_finish_round_4,
             roundsRows[0].prob_finish_round_5,
           ],
+          finishMethodByRound: dominantFinishMethodByRound(
+            roundsRows[0].distribution,
+          ),
         };
 
   return {

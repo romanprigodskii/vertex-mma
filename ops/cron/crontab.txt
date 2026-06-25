@@ -16,5 +16,10 @@
 # Daily 04:30 — per-round bout stats + judge scorecards + full recompute
 30 4 * * *   /opt/vertex-cron/scrape-stats.sh
 
+# Daily 05:15 — score upcoming bouts with the model (winner + Monte-Carlo
+# props) AFTER the stats+recompute so predictions use fresh features. Keeps
+# bout_simulation + sportsbook prop markets from going stale.
+15 5 * * *   /opt/vertex-cron/predict-refresh.sh
+
 # Weekly Sun 05:30 — full A-Z scrape (incl. enrich-fighters) + recompute
 30 5 * * 0   /opt/vertex-cron/scrape-full.sh

@@ -256,10 +256,20 @@ async function MonteCarloBlock({
     (v): v is number => v != null,
   );
   const scheduledRounds = finishByRound.length;
+  // Per-round finish cells, each labelled with the round's DOMINANT method
+  // (KO vs Sub) from the MC distribution — not a hardcoded "KO". Falls back to
+  // the overall dominant finish method for rounds without a per-method split
+  // (predictions made before the distribution payload existed).
+  const overallFinishKind: "ko" | "sub" =
+    m.probKoA + m.probKoB >= m.probSubA + m.probSubB ? "ko" : "sub";
   type Cell = { kind: "ko" | "sub" | "dec"; round: number; prob: number };
   const cells: Cell[] = [];
   for (let i = 0; i < scheduledRounds; i += 1) {
-    cells.push({ kind: "ko", round: i + 1, prob: finishByRound[i] });
+    cells.push({
+      kind: rounds.finishMethodByRound[i] ?? overallFinishKind,
+      round: i + 1,
+      prob: finishByRound[i],
+    });
   }
   const decisionProb = m.probDecisionA + m.probDecisionB;
   cells.push({ kind: "dec", round: scheduledRounds + 1, prob: decisionProb });

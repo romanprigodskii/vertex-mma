@@ -51,6 +51,9 @@ function pickHeadlineMethod(bout: SimulationIndexBout): {
     probDecisionB: bout.mcProbDecisionB ?? 0,
     avgFinishSeconds: bout.mcAvgFinishSeconds ?? null,
     finishByRound: [],
+    // Card carries only aggregate method probs (no per-round split);
+    // reconcileMcMethodProbs ignores these two fields anyway.
+    finishMethodByRound: [],
   };
   const reconciled = reconcileMcMethodProbs(rounds, bout.probA);
   const candidates: Array<{
