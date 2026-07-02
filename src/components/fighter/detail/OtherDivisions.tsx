@@ -1,5 +1,6 @@
 import { getTranslations } from "next-intl/server";
 
+import { WEIGHT_SHORT } from "@/lib/constants";
 import type { FighterDivisionalScoreRow } from "@/lib/fighter-detail";
 import { cn } from "@/lib/utils";
 
@@ -15,20 +16,6 @@ const WEIGHT_LABEL: Record<string, string> = {
   heavyweight: "Heavyweight",
   catchweight: "Catchweight",
   openweight: "Openweight",
-};
-
-const WEIGHT_SHORT: Record<string, string> = {
-  strawweight: "STR",
-  flyweight: "FLY",
-  bantamweight: "BW",
-  featherweight: "FW",
-  lightweight: "LW",
-  welterweight: "WW",
-  middleweight: "MW",
-  light_heavyweight: "LHW",
-  heavyweight: "HW",
-  catchweight: "CW",
-  openweight: "OW",
 };
 
 const STATUS_KEY: Record<

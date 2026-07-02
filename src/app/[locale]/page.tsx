@@ -51,6 +51,10 @@ async function getTopFighters(
   // exists. Sort AND display by that one canonical number so the home
   // list never contradicts the profile (e.g. Pereira 80 LHW, not the
   // global 85).
+  //
+  // KEEP IN SYNC: the official P4P board query in
+  // src/lib/official-rankings.ts uses this same coalesce + ordering
+  // (per-gender). A change to the headline rule here must land there too.
   const result = await db.execute<TopFighter>(sql`
     SELECT
       f.id::text AS id,

@@ -12,6 +12,22 @@ export const WEIGHT_CLASSES = [
 
 export type WeightClassId = (typeof WEIGHT_CLASSES)[number]["id"];
 
+/** Short division codes shared by OtherDivisions and the official ranking
+ *  board — single source so abbreviations can't drift between surfaces. */
+export const WEIGHT_SHORT: Record<string, string> = {
+  strawweight: "STR",
+  flyweight: "FLY",
+  bantamweight: "BW",
+  featherweight: "FW",
+  lightweight: "LW",
+  welterweight: "WW",
+  middleweight: "MW",
+  light_heavyweight: "LHW",
+  heavyweight: "HW",
+  catchweight: "CW",
+  openweight: "OW",
+};
+
 export const METHODS = [
   { id: "KO", label: "KO" },
   { id: "TKO", label: "TKO" },
