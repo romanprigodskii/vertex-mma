@@ -181,7 +181,8 @@ export const CHAMPIONSHIP_HISTORY: readonly ChampionshipReign[] = [
   // ============================================================
   // LIGHTWEIGHT
   // ============================================================
-  { slug: "ilia-topuria-54f64b",          weightClass: "lightweight", startDate: "2025-06-28", endDate: null,         defenses: 0 },
+  { slug: "justin-gaethje-9e8f6c", weightClass: "lightweight", startDate: "2026-06-14", endDate: null, defenses: 0 }, // AUTO(reconcile 2026-07-02): beat Ilia Topuria
+  { slug: "ilia-topuria-54f64b",          weightClass: "lightweight", startDate: "2025-06-28", endDate: "2026-06-14",         defenses: 0 }, // lost unification vs Gaethje — AUTO(reconcile 2026-07-02)
   { slug: "islam-makhachev-275aca",       weightClass: "lightweight", startDate: "2022-10-22", endDate: "2025-05-13", defenses: 4, endReason: "vacated" }, // Volkanovski 1, Volkanovski 2, Poirier, Moicano; vacated to WW (Dana White announcement)
   { slug: "charles-oliveira-07225b",      weightClass: "lightweight", startDate: "2021-05-15", endDate: "2022-05-06", defenses: 1, endReason: "stripped" }, // Poirier — stripped at weigh-ins
   { slug: "khabib-nurmagomedov-032cc3",   weightClass: "lightweight", startDate: "2018-04-07", endDate: "2021-03-19", defenses: 3, endReason: "retired" }, // Conor, Poirier, Gaethje; retired holding the belt
@@ -196,7 +197,7 @@ export const CHAMPIONSHIP_HISTORY: readonly ChampionshipReign[] = [
   { slug: "jens-pulver-442601",           weightClass: "lightweight", startDate: "2001-02-23", endDate: "2002-04-01", defenses: 2, endReason: "vacated" }, // Uno, BJ Penn (draw retained); vacated
 
   // Interim LW belts that never converted to undisputed
-  { slug: "justin-gaethje-9e8f6c",        weightClass: "lightweight", startDate: "2026-01-24", endDate: null,         defenses: 0, isInterim: true }, // UFC 324 — current interim alongside Topuria undisputed
+  { slug: "justin-gaethje-9e8f6c",        weightClass: "lightweight", startDate: "2026-01-24", endDate: "2026-06-14",         defenses: 0, isInterim: true }, // UFC 324 vs Pimblett; unified vs Topuria 2026-06-14 — AUTO(reconcile 2026-07-02)
   { slug: "justin-gaethje-9e8f6c",        weightClass: "lightweight", startDate: "2020-05-09", endDate: "2020-10-24", defenses: 0, isInterim: true }, // UFC 249 vs Ferguson; lost unification vs Khabib at UFC 254
   { slug: "dustin-poirier-029eaf",        weightClass: "lightweight", startDate: "2019-04-13", endDate: "2019-09-07", defenses: 0, isInterim: true }, // UFC 236 vs Holloway; lost unification vs Khabib at UFC 242
   { slug: "tony-ferguson-22a92d",         weightClass: "lightweight", startDate: "2017-10-07", endDate: "2018-04-07", defenses: 0, isInterim: true, endReason: "stripped" }, // UFC 216; stripped (injury)
@@ -236,7 +237,7 @@ export const CHAMPIONSHIP_HISTORY: readonly ChampionshipReign[] = [
   // ============================================================
   // FLYWEIGHT
   // ============================================================
-  { slug: "joshua-van-17e976",         weightClass: "flyweight", startDate: "2025-12-06", endDate: null,         defenses: 0 }, // beat Pantoja at UFC 323
+  { slug: "joshua-van-17e976",         weightClass: "flyweight", startDate: "2025-12-06", endDate: null,         defenses: 1 }, // beat Pantoja at UFC 323; def. Taira
   { slug: "alexandre-pantoja-a0f000",  weightClass: "flyweight", startDate: "2023-07-08", endDate: "2025-12-06", defenses: 4 }, // Royval 2, Erceg, Asakura, Kape
   { slug: "brandon-moreno-792be9",     weightClass: "flyweight", startDate: "2023-01-21", endDate: "2023-07-08", defenses: 0 }, // reign 3 undisputed — unified vs Figueiredo at UFC 283
   { slug: "brandon-moreno-792be9",     weightClass: "flyweight", startDate: "2022-07-30", endDate: "2023-01-21", defenses: 0, isInterim: true }, // UFC 277 vs Kara-France; unified at UFC 283 (def. Figueiredo)
@@ -269,7 +270,7 @@ export const CHAMPIONSHIP_HISTORY: readonly ChampionshipReign[] = [
   // ============================================================
   // WOMEN'S FLYWEIGHT (uses flyweight enum)
   // ============================================================
-  { slug: "valentina-shevchenko-132deb", weightClass: "flyweight", startDate: "2024-09-14", endDate: null,         defenses: 1 }, // reign 2 — Fiorot
+  { slug: "valentina-shevchenko-132deb", weightClass: "flyweight", startDate: "2024-09-14", endDate: null,         defenses: 2 }, // reign 2 — Fiorot, Zhang
   { slug: "alexa-grasso-e8b731",         weightClass: "flyweight", startDate: "2023-03-04", endDate: "2024-09-14", defenses: 0 }, // Shev 2 draw retained but lost trilogy
   { slug: "valentina-shevchenko-132deb", weightClass: "flyweight", startDate: "2018-12-08", endDate: "2023-03-04", defenses: 7 }, // reign 1 — Eye, Carmouche 2, Maia, Cerminara, Andrade, Murphy, Santos
   { slug: "nicco-montano-1de9ad",        weightClass: "flyweight", startDate: "2017-12-01", endDate: "2018-09-08", defenses: 0, endReason: "stripped" }, // stripped (weight)

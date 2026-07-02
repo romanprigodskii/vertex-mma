@@ -32,6 +32,8 @@
     "photos:dry": "cd scripts/photo_scraper && ./venv/bin/python scripts/fetch_photos.py --limit 5 --dry-run",
     "photos:fetch": "cd scripts/photo_scraper && ./venv/bin/python scripts/fetch_photos.py --workers 4",
     "roster:import": "tsx scripts/import_roster_watch.ts",
+    "champions:reconcile": "tsx scripts/reconcile_champions.ts",
+    "champions:reconcile:dry": "tsx scripts/reconcile_champions.ts --dry-run",
     "markets:generate": "tsx scripts/generate_markets.ts",
     "markets:generate:dry": "tsx scripts/generate_markets.ts --limit=5",
     "markets:settle": "tsx scripts/settle_market.ts",

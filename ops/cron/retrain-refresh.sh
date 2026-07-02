@@ -20,6 +20,13 @@ ts() { date "+%Y-%m-%d %H:%M:%S"; }
   echo "===== $(ts) retrain-refresh start ====="
   cd /opt/vertex-cron/vertex-mma || { echo "$(ts) checkout missing"; exit 1; }
 
+  # Serialize with the scrape/recompute jobs (BLOCKING wait, unlike their
+  # flock -n): the reset --hard below would otherwise wipe a mid-chain
+  # champion reconcile on this shared checkout while Sunday's scrape-full
+  # (05:30, ~60-90 min) is still running.
+  exec 9>/var/lock/vertex-scrape.lock
+  flock 9 || echo "$(ts) flock failed — proceeding unserialized"
+
   # Start from a clean, current main (discard any stale local artifact edits a
   # previous failed push may have left).
   git fetch --quiet origin main 2>/dev/null \
