@@ -181,10 +181,13 @@ async function RankingRow({ row, rank, board }: RankingRowProps) {
           {rank}
         </span>
 
+        {/* border-0: the default avatar ring reads as a grey frame around
+            transparent UFC cutout photos, especially in light theme. */}
         <FighterAvatar
           name={row.name}
           photoUrl={row.photo_thumbnail_url}
           size={isTop ? "lg" : "sm"}
+          className="border-0"
         />
 
         <div className="min-w-0 flex-1">
