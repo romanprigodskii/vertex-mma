@@ -130,11 +130,23 @@ backdrop — that's a preview-only quirk. Real-world clients honour the
   readable — the look just isn't fullscreen-black.
 - Gmail dark mode renders the template correctly.
 
-## Limits
+## Limits — TWO caps in the signup pipeline, raise BOTH
 
-- Resend free: 3 000/month, 100/day.
-- Bursts may get throttled at the free tier.
-- Past 3 000/month: upgrade ($20/month buys 50 000).
+1. **Resend free tier: 3 000/month, 100/day.** The daily cap is what
+   throttles registrations first. Upgrade to Pro ($20/month → 50 000/month,
+   **daily cap removed entirely**) at resend.com → Billing. Pure billing
+   change: the API key, Supabase SMTP settings, and DNS stay as-is.
+2. **Supabase Auth email rate limit: 30/hour by default with custom
+   SMTP** — hidden second cap that bites BEFORE Resend under a signup
+   burst, even on a paid Resend plan. Raise it at Supabase Dashboard →
+   Authentication → Rate Limits → "Rate limit for sending emails"
+   (e.g. 300/hour).
+
+Also consuming the same budget: password resets and email changes (an
+email change sends TWO — old-address confirm + new-address verify).
+Google OAuth signups send no email at all — the free relief valve.
+Disabling "Confirm email" (Supabase → Auth) removes signup emails
+entirely, at the cost of unverified addresses — not recommended past beta.
 
 ## Future
 
