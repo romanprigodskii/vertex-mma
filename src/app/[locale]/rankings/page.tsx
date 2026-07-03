@@ -8,7 +8,12 @@ import { OfficialRankingBoard } from "@/components/rankings/official-ranking-boa
 import { RankingCard } from "@/components/rankings/ranking-card";
 import { Link } from "@/i18n/navigation";
 import { getCurrentUser } from "@/lib/auth";
-import { getOfficialRanking, resolveBoard } from "@/lib/official-rankings";
+import {
+  ALL_DEPTH_CAP,
+  getOfficialRanking,
+  resolveBoard,
+  resolveDepth,
+} from "@/lib/official-rankings";
 import { listRecentRankings } from "@/lib/rankings";
 
 export const dynamic = "force-dynamic";
@@ -28,18 +33,24 @@ export default async function RankingsListPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ board?: string }>;
+  searchParams: Promise<{ board?: string; depth?: string }>;
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
-  const { board: boardParam } = await searchParams;
+  const { board: boardParam, depth: depthParam } = await searchParams;
   const board = resolveBoard(boardParam);
+  const depth = resolveDepth(depthParam);
   const t = await getTranslations("rankings");
-  const [rows, rankings, currentUser] = await Promise.all([
-    getOfficialRanking(board),
+  // Fetch one row past the visible window so the expand control only
+  // renders when there genuinely is more to show.
+  const shownLimit = depth === "all" ? ALL_DEPTH_CAP : depth;
+  const [rowsPlusOne, rankings, currentUser] = await Promise.all([
+    getOfficialRanking(board, shownLimit + 1),
     listRecentRankings(30),
     getCurrentUser(),
   ]);
+  const rows = rowsPlusOne.slice(0, shownLimit);
+  const hasMore = rowsPlusOne.length > rows.length;
 
   return (
     <>
@@ -59,7 +70,12 @@ export default async function RankingsListPage({
             </p>
           </header>
 
-          <OfficialRankingBoard board={board} rows={rows} />
+          <OfficialRankingBoard
+            board={board}
+            rows={rows}
+            depth={depth}
+            hasMore={hasMore}
+          />
 
           {/* Community rankings */}
           <section aria-label={t("communityHeading")} className="mt-14 md:mt-20">

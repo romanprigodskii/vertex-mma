@@ -83,6 +83,21 @@ export function resolveBoard(param: string | undefined): OfficialBoard {
   return OFFICIAL_BOARDS.find((b) => b.id === param) ?? OFFICIAL_BOARDS[0];
 }
 
+/** Progressive board disclosure driven by the ?depth= search param:
+ *  top-15 (default) → top-50 → the whole ranking pool. */
+export type BoardDepth = 15 | 50 | "all";
+
+/** Sanity cap for depth="all" — the largest division pool is ~70 fighters
+ *  and a P4P "all" is the full active roster per gender (~400). */
+export const ALL_DEPTH_CAP = 500;
+
+/** Validate a ?depth= param; unknown values fall back to the default 15. */
+export function resolveDepth(param: string | undefined): BoardDepth {
+  if (param === "50") return 50;
+  if (param === "all") return "all";
+  return 15;
+}
+
 // Type alias (not interface) so it satisfies db.execute's
 // Record<string, unknown> constraint structurally.
 export type OfficialRankingRow = {

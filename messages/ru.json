@@ -903,7 +903,10 @@
     "emptyBoard": "В этом дивизионе пока нет бойцов с рейтингом.",
     "streakWin": "W{n}",
     "streakLoss": "L{n}",
-    "vertexCaption": "Vertex Score"
+    "vertexCaption": "Vertex Score",
+    "expandTo50": "Показать топ-50",
+    "expandAll": "Показать всех",
+    "collapseTo15": "Свернуть до топ-15"
   },
   "theme": {
     "switchToDark": "Переключить на тёмную тему",

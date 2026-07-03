@@ -1,4 +1,4 @@
-import { Crown } from "lucide-react";
+import { ChevronDown, ChevronUp, Crown } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 
 import { FighterAvatar } from "@/components/fighter/FighterAvatar";
@@ -8,6 +8,7 @@ import { getCountryFlag } from "@/lib/fighter-helpers";
 import {
   championMark,
   OFFICIAL_BOARDS,
+  type BoardDepth,
   type OfficialBoard,
   type OfficialRankingRow,
 } from "@/lib/official-rankings";
@@ -17,6 +18,9 @@ import { classifyFighter, getTierStyle } from "@/lib/vertex-tier";
 interface OfficialRankingBoardProps {
   board: OfficialBoard;
   rows: OfficialRankingRow[];
+  depth: BoardDepth;
+  /** True when the pool holds more fighters than the visible window. */
+  hasMore: boolean;
 }
 
 /**
@@ -28,6 +32,8 @@ interface OfficialRankingBoardProps {
 export async function OfficialRankingBoard({
   board,
   rows,
+  depth,
+  hasMore,
 }: OfficialRankingBoardProps) {
   const t = await getTranslations("rankings");
   const tWeight = await getTranslations("weight");
@@ -118,8 +124,64 @@ export async function OfficialRankingBoard({
             ))}
           </ol>
         )}
+
+        {(hasMore || depth !== 15) && (
+          <div className="flex flex-wrap items-center justify-center gap-3 border-t border-foreground/10 px-4 py-3">
+            {depth === 15 && hasMore && (
+              <DepthLink board={board} depth="50" icon="down">
+                {t("expandTo50")}
+              </DepthLink>
+            )}
+            {depth === 50 && hasMore && (
+              <DepthLink board={board} depth="all" icon="down">
+                {t("expandAll")}
+              </DepthLink>
+            )}
+            {depth !== 15 && (
+              <DepthLink board={board} depth={undefined} icon="up">
+                {t("collapseTo15")}
+              </DepthLink>
+            )}
+          </div>
+        )}
       </div>
     </section>
+  );
+}
+
+function DepthLink({
+  board,
+  depth,
+  icon,
+  children,
+}: {
+  board: OfficialBoard;
+  depth: "50" | "all" | undefined;
+  icon: "down" | "up";
+  children: React.ReactNode;
+}) {
+  const query: Record<string, string> = {};
+  if (board.id !== "p4p") query.board = board.id;
+  if (depth) query.depth = depth;
+  return (
+    // scroll={false}: the reader is at the bottom of the list — an RSC
+    // navigation that jumps back to the top would lose their place.
+    <Link
+      href={{
+        pathname: "/rankings",
+        query: Object.keys(query).length > 0 ? query : undefined,
+      }}
+      prefetch={false}
+      scroll={false}
+      className="inline-flex items-center gap-1.5 rounded-full border border-foreground/15 px-4 py-1.5 font-mono text-[11px] uppercase tracking-wider text-foreground-muted transition-colors hover:border-foreground/30 hover:text-foreground"
+    >
+      {icon === "down" ? (
+        <ChevronDown className="h-3.5 w-3.5" aria-hidden />
+      ) : (
+        <ChevronUp className="h-3.5 w-3.5" aria-hidden />
+      )}
+      {children}
+    </Link>
   );
 }
 

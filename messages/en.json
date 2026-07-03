@@ -903,7 +903,10 @@
     "emptyBoard": "No ranked fighters in this division yet.",
     "streakWin": "W{n}",
     "streakLoss": "L{n}",
-    "vertexCaption": "Vertex Score"
+    "vertexCaption": "Vertex Score",
+    "expandTo50": "Show top 50",
+    "expandAll": "Show everyone",
+    "collapseTo15": "Collapse to top 15"
   },
   "theme": {
     "switchToDark": "Switch to dark theme",
