@@ -1,0 +1,27 @@
+# Custom "dream fight" simulation worker — polls the custom_simulation
+# queue and scores requests with the committed ensemble artifacts.
+#
+# Install on the VPS:
+#   scp ops/systemd/vertex-sim-worker.service root@<vps>:/etc/systemd/system/
+#   systemctl daemon-reload && systemctl enable --now vertex-sim-worker
+#
+# Code/artifact updates: the checkout is git-reset by the cron wrappers;
+# the running python keeps its loaded image, so predict-refresh.sh
+# restarts this service daily after syncing. Manual: systemctl restart
+# vertex-sim-worker.
+[Unit]
+Description=Vertex MMA custom simulation worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/vertex-cron/vertex-mma/scripts/simulation
+ExecStart=/opt/vertex-cron/vertex-mma/scripts/simulation/venv/bin/python scripts/run_custom.py --loop --interval 10
+Restart=always
+RestartSec=15
+# The sim package reads DATABASE_URL from the repo-root .env.local via
+# src/db.py (python-dotenv), same as run_predict.py — no Environment= needed.
+
+[Install]
+WantedBy=multi-user.target

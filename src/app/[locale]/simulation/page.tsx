@@ -135,6 +135,25 @@ export default async function SimulationIndexPage({
             ) : null}
           </header>
 
+          {/* Dream-fight builder entry point (Wave 62) */}
+          <Link
+            href="/simulation/custom"
+            prefetch={false}
+            className="mb-8 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primary/25 bg-primary/[0.06] px-4 py-4 transition-colors hover:bg-primary/[0.1] sm:px-6"
+          >
+            <span className="min-w-0">
+              <span className="block font-display text-lg uppercase tracking-tight text-foreground sm:text-xl">
+                {t("customCtaTitle")}
+              </span>
+              <span className="mt-0.5 block font-sans text-sm text-foreground-muted">
+                {t("customCtaLead")}
+              </span>
+            </span>
+            <span className="shrink-0 rounded-sm bg-primary px-4 py-2 font-display text-sm uppercase tracking-widest text-background-base">
+              {t("customCtaButton")} →
+            </span>
+          </Link>
+
           {/* Quick stats strip. The three upcoming-derived tiles only render
               when there are upcoming bouts — otherwise they would show a row
               of zeros beside a real accuracy %, which reads as broken. The

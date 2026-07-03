@@ -1,4 +1,5 @@
 import {
+  check,
   index,
   integer,
   jsonb,
@@ -10,9 +11,11 @@ import {
   unique,
   uuid,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 import { bout } from "./events";
 import { fighter } from "./fighters";
+import { userProfile } from "./users";
 
 // Phase 1 simulation output (scripts/simulation, LightGBM+XGB+LogReg ensemble,
 // blended — NOT post-hoc calibrated). Mirrors the JSON written by predict.py —
@@ -154,3 +157,68 @@ export const boutSimulationRounds = pgTable(
 
 export type BoutSimulationRoundsRow = typeof boutSimulationRounds.$inferSelect;
 export type NewBoutSimulationRoundsRow = typeof boutSimulationRounds.$inferInsert;
+
+// Wave 62 — custom "dream fight" simulation queue. Users pick two fighters
+// and, per fighter, the bout whose form to take (NULL as_of = current form:
+// the fighter's full history to date; a set as_of = history up to AND
+// INCLUDING that bout — post-fight form). The Next.js server action INSERTs
+// status='pending'; the Python worker (scripts/simulation/scripts/
+// run_custom.py, systemd vertex-sim-worker on the VPS) scores the matchup
+// with the committed ensemble + Monte Carlo and fills `result` jsonb.
+// Created by drizzle/migrations/0090 (scripts/apply_custom_simulation.ts);
+// declared here so db:push never sees it as an unknown table to drop.
+export const customSimulation = pgTable(
+  "custom_simulation",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userProfileId: uuid("user_profile_id").references(() => userProfile.id, {
+      onDelete: "set null",
+    }),
+    fighterAId: uuid("fighter_a_id")
+      .notNull()
+      .references(() => fighter.id, { onDelete: "cascade" }),
+    fighterBId: uuid("fighter_b_id")
+      .notNull()
+      .references(() => fighter.id, { onDelete: "cascade" }),
+    asOfBoutAId: uuid("as_of_bout_a_id").references(() => bout.id, {
+      onDelete: "set null",
+    }),
+    asOfBoutBId: uuid("as_of_bout_b_id").references(() => bout.id, {
+      onDelete: "set null",
+    }),
+    /** 'pending' | 'done' | 'failed' */
+    status: text("status").notNull().default("pending"),
+    modelVersion: text("model_version"),
+    /** Full scored payload (probs, MC method/round split, per-side form
+     *  snapshots, sim context) — shape versioned by model_version; see
+     *  scripts/simulation/src/custom.py. */
+    result: jsonb("result"),
+    error: text("error"),
+    requestedAt: timestamp("requested_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+  },
+  (table) => [
+    check(
+      "custom_simulation_distinct_fighters",
+      sql`${table.fighterAId} <> ${table.fighterBId}`,
+    ),
+    check(
+      "custom_simulation_status_check",
+      sql`${table.status} IN ('pending', 'done', 'failed')`,
+    ),
+    index("custom_simulation_user_idx").on(
+      table.userProfileId,
+      table.requestedAt,
+    ),
+    index("custom_simulation_pair_idx").on(
+      table.fighterAId,
+      table.fighterBId,
+      table.status,
+    ),
+  ],
+);
+
+export type CustomSimulationRow = typeof customSimulation.$inferSelect;
+export type NewCustomSimulationRow = typeof customSimulation.$inferInsert;

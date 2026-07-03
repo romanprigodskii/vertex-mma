@@ -39,5 +39,14 @@ git_sync() {
   cd scripts/simulation
   echo "$(ts) scoring upcoming bouts (run_predict)"
   venv/bin/python scripts/run_predict.py || echo "$(ts) run_predict FAILED"
+
+  # The custom-sim worker daemon keeps yesterday's python image loaded; the
+  # git_sync above just refreshed code + model artifacts on disk, so bounce
+  # the service to pick them up (no-op if it isn't installed).
+  if systemctl is-enabled --quiet vertex-sim-worker 2>/dev/null; then
+    systemctl restart vertex-sim-worker \
+      && echo "$(ts) vertex-sim-worker restarted" \
+      || echo "$(ts) vertex-sim-worker restart FAILED"
+  fi
   echo "===== $(ts) predict-refresh done ====="
 } >> "$LOG" 2>&1
