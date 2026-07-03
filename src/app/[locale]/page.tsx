@@ -341,6 +341,7 @@ export default async function HomePage({
               </p>
               <Link
                 href="/signup"
+                data-umami-event="signup-cta"
                 className="mt-6 inline-block rounded-sm bg-primary px-6 py-3 font-display text-sm uppercase tracking-widest text-background-base hover:opacity-90"
               >
                 {t("createAccount")}

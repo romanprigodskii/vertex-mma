@@ -1,0 +1,55 @@
+# Umami analytics (stats.vertexmma.com) — self-hosted, privacy-friendly.
+# Routed by Coolify's Traefik via labels (same certresolver/entrypoints as
+# the main app). Secrets live in /opt/umami/.env (chmod 600).
+services:
+  umami:
+    image: ghcr.io/umami-software/umami:postgresql-latest
+    container_name: umami
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://umami:${POSTGRES_PASSWORD}@umami-db:5432/umami
+      DATABASE_TYPE: postgresql
+      APP_SECRET: ${APP_SECRET}
+    depends_on:
+      umami-db:
+        condition: service_healthy
+    networks:
+      - coolify
+      - internal
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: coolify
+      traefik.http.routers.http-umami.entryPoints: http
+      traefik.http.routers.http-umami.rule: "Host(`stats.vertexmma.com`) && PathPrefix(`/`)"
+      traefik.http.routers.http-umami.middlewares: redirect-to-https
+      traefik.http.routers.http-umami.service: umami-svc
+      traefik.http.routers.https-umami.entryPoints: https
+      traefik.http.routers.https-umami.rule: "Host(`stats.vertexmma.com`) && PathPrefix(`/`)"
+      traefik.http.routers.https-umami.tls: "true"
+      traefik.http.routers.https-umami.tls.certresolver: letsencrypt
+      traefik.http.routers.https-umami.middlewares: gzip
+      traefik.http.routers.https-umami.service: umami-svc
+      traefik.http.services.umami-svc.loadbalancer.server.port: "3000"
+  umami-db:
+    image: postgres:15-alpine
+    container_name: umami-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: umami
+      POSTGRES_USER: umami
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - umami-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U umami"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - internal
+networks:
+  coolify:
+    external: true
+  internal: {}
+volumes:
+  umami-db-data: {}

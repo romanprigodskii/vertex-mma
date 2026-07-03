@@ -361,6 +361,7 @@ export function SportsbookPanel({
               <button
                 type="button"
                 onClick={onPlace}
+                data-umami-event="sportsbook-bet-place"
                 disabled={
                   pending ||
                   !selected ||

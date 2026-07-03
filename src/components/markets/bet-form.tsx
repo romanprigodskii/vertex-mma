@@ -176,6 +176,7 @@ export function BetForm({ market, userBalance }: Props) {
 
         <button
           type="submit"
+          data-umami-event="lmsr-bet-place"
           disabled={pending || parsedCoins < 1 || parsedCoins > userBalance}
           className="rounded-sm bg-primary px-4 py-2 font-display text-sm uppercase tracking-widest text-background-base hover:opacity-90 disabled:opacity-50"
         >

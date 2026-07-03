@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Bebas_Neue, Inter, JetBrains_Mono, Oswald } from "next/font/google";
 import { notFound } from "next/navigation";
+import Script from "next/script";
 import { hasLocale, NextIntlClientProvider } from "next-intl";
 import { setRequestLocale } from "next-intl/server";
 
@@ -94,6 +95,17 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col bg-background-base text-foreground font-sans antialiased">
+        {/* Self-hosted Umami analytics (stats.vertexmma.com, /opt/umami on
+            the VPS). Privacy-friendly: no cookies, no personal data — no
+            consent banner needed. The website id is public by nature (it
+            ships in the HTML). Custom events use data-umami-event attrs. */}
+        {process.env.NODE_ENV === "production" && (
+          <Script
+            src="https://stats.vertexmma.com/script.js"
+            data-website-id="c8b3ab7c-8b83-4f11-8d91-ed92c0d7987a"
+            strategy="afterInteractive"
+          />
+        )}
         <NextIntlClientProvider>
           <SkipToContent />
           <ThemeProvider>

@@ -253,6 +253,7 @@ export function BetSlipWidget() {
               <button
                 type="button"
                 onClick={onPlace}
+                data-umami-event="parlay-place"
                 disabled={pending || !enoughLegs || parsedStake < 1}
                 className="mt-3 w-full rounded-sm bg-primary px-4 py-2.5 font-display text-sm uppercase tracking-widest text-background-base hover:opacity-90 disabled:opacity-50"
               >

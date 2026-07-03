@@ -119,6 +119,7 @@ export function CustomSimBuilder({ isSignedIn }: CustomSimBuilderProps) {
         <button
           type="button"
           onClick={submit}
+          data-umami-event="dream-fight-run"
           disabled={!canSubmit}
           className={cn(
             "inline-flex items-center gap-2 rounded-sm bg-primary px-6 py-2.5 font-display text-sm uppercase tracking-widest text-background-base transition-opacity",
