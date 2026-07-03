@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, Swords, X } from "lucide-react";
+import { Check, ChevronDown, Loader2, Swords, X } from "lucide-react";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useTranslations } from "next-intl";
 
@@ -289,29 +289,170 @@ function SideColumn({ label, picked, onPick, boutId, onBout }: SideColumnProps) 
         </div>
       )}
 
-      <label className="mt-3 block">
-        <span className="mb-1 block font-mono text-[10px] uppercase tracking-[0.2em] text-foreground-subtle">
+      <div className="mt-3">
+        <span
+          id={`form-label-${label}`}
+          className="mb-1 block font-mono text-[10px] uppercase tracking-[0.2em] text-foreground-subtle"
+        >
           {t("formLabel")}
         </span>
-        <select
-          value={boutId}
-          onChange={(e) => onBout(e.target.value)}
+        <FormSelect
+          labelId={`form-label-${label}`}
+          boutId={boutId}
+          onBout={onBout}
+          bouts={bouts}
           disabled={!picked || boutsLoading}
-          className="w-full rounded-md border border-foreground/15 bg-background-base/40 px-3 py-2.5 font-sans text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50"
-        >
-          <option value="">
-            {boutsLoading ? t("loadingBouts") : t("currentForm")}
-          </option>
-          {bouts.map((bt) => (
-            <option key={bt.bout_id} value={bt.bout_id}>
-              {`${bt.result} · ${bt.opponent_name} · ${bt.event_name} (${bt.date})`}
-            </option>
-          ))}
-        </select>
-      </label>
+          placeholder={boutsLoading ? t("loadingBouts") : t("currentForm")}
+        />
+      </div>
       <p className="mt-1.5 font-sans text-xs text-foreground-subtle">
         {t("formHint")}
       </p>
+    </div>
+  );
+}
+
+const RESULT_CLASS: Record<FormPickerBout["result"], string> = {
+  W: "text-streak-win",
+  L: "text-streak-loss",
+  D: "text-foreground-muted",
+};
+
+/** Site-styled replacement for the native <select> (the OS dropdown looked
+ *  alien next to the rest of the builder): button trigger + an absolute
+ *  listbox matching the fighter-search dropdown above, with coloured W/L
+ *  letters and a check on the active option. */
+function FormSelect({
+  labelId,
+  boutId,
+  onBout,
+  bouts,
+  disabled,
+  placeholder,
+}: {
+  labelId: string;
+  boutId: string;
+  onBout: (id: string) => void;
+  bouts: FormPickerBout[];
+  disabled: boolean;
+  placeholder: string;
+}) {
+  const t = useTranslations("customSim");
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+
+  // Close on any outside pointer press (same pattern as the navbar
+  // notifications dropdown).
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open]);
+
+  const selected = bouts.find((b) => b.bout_id === boutId) ?? null;
+
+  return (
+    <div ref={rootRef} className="relative">
+      <button
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-labelledby={labelId}
+        disabled={disabled}
+        onClick={() => setOpen((v) => !v)}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") setOpen(false);
+        }}
+        className="flex w-full items-center justify-between gap-2 rounded-md border border-foreground/15 bg-background-base/40 px-3 py-2.5 text-left font-sans text-sm text-foreground transition-colors hover:border-foreground/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50"
+      >
+        <span className="min-w-0 truncate">
+          {selected ? (
+            <>
+              <span className={cn("font-mono", RESULT_CLASS[selected.result])}>
+                {selected.result}
+              </span>
+              {` · ${selected.opponent_name} `}
+              <span className="text-foreground-subtle">
+                · {selected.event_name} ({selected.date})
+              </span>
+            </>
+          ) : (
+            placeholder
+          )}
+        </span>
+        <ChevronDown
+          className={cn(
+            "h-4 w-4 shrink-0 text-foreground-subtle transition-transform",
+            open && "rotate-180",
+          )}
+          aria-hidden
+        />
+      </button>
+
+      {open && (
+        <ul
+          role="listbox"
+          aria-labelledby={labelId}
+          className="absolute z-20 mt-1 max-h-72 w-full overflow-y-auto rounded-md border border-foreground/15 bg-background-overlay shadow-elevation-2"
+        >
+          <li role="option" aria-selected={boutId === ""}>
+            <button
+              type="button"
+              onClick={() => {
+                onBout("");
+                setOpen(false);
+              }}
+              className={cn(
+                "flex w-full items-center gap-2 px-3 py-2 text-left font-sans text-sm transition-colors hover:bg-foreground/[0.06]",
+                boutId === "" ? "text-primary" : "text-foreground",
+              )}
+            >
+              <Check
+                className={cn("h-3.5 w-3.5 shrink-0", boutId !== "" && "invisible")}
+                aria-hidden
+              />
+              {t("currentForm")}
+            </button>
+          </li>
+          {bouts.map((bt) => {
+            const active = bt.bout_id === boutId;
+            return (
+              <li key={bt.bout_id} role="option" aria-selected={active}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onBout(bt.bout_id);
+                    setOpen(false);
+                  }}
+                  className={cn(
+                    "flex w-full items-center gap-2 px-3 py-2 text-left font-sans text-sm transition-colors hover:bg-foreground/[0.06]",
+                    active ? "text-primary" : "text-foreground",
+                  )}
+                >
+                  <Check
+                    className={cn("h-3.5 w-3.5 shrink-0", !active && "invisible")}
+                    aria-hidden
+                  />
+                  <span className={cn("w-4 shrink-0 font-mono", RESULT_CLASS[bt.result])}>
+                    {bt.result}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate">
+                    {bt.opponent_name}
+                    <span className="ml-1.5 text-xs text-foreground-subtle">
+                      {bt.event_name} · {bt.date}
+                    </span>
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </div>
   );
 }
