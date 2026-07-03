@@ -354,7 +354,10 @@ function buildWhere(filters: FighterCatalogFilters): SQL {
     // Champion fighters in Apex / Elite / Established bands appear in
     // those tier filters AND in the champion filter — by design, the
     // two dimensions are independent.
-    const bestScore = sql`COALESCE(f.vertex_score, f.vertex_score_all_time)`;
+    // Bucketed on the SAME headline number the card displays (audit fix:
+    // the old COALESCE(current, all-time) put retired fighters with a
+    // stale current score into the wrong band vs their displayed tier).
+    const bestScore = headlineScoreSql();
     switch (filters.tier) {
       case "apex":
         conditions.push(sql`${bestScore} >= 75`);
@@ -407,28 +410,35 @@ function buildWhere(filters: FighterCatalogFilters): SQL {
   return sql`WHERE ${sql.join(conditions, sql` AND `)}`;
 }
 
+/** SQL twin of headlineScore() (src/lib/vertex-tier.ts): retired/released/
+ *  inactive → all-time ALWAYS; active → divisional (the joined fds row) →
+ *  global → all-time fallback. Requires the fds LEFT JOIN to be present in
+ *  the query. Used for sort keys and tier-filter buckets so the ORDER/filter
+ *  always agrees with the number FighterCard displays — sorting by one
+ *  number while showing another is the documented historical bug class. */
+function headlineScoreSql(): SQL {
+  return sql`(CASE
+    WHEN f.roster_status IN ('retired', 'released', 'inactive')
+      THEN f.vertex_score_all_time
+    ELSE COALESCE(fds.vertex_score, f.vertex_score, f.vertex_score_all_time)
+  END)`;
+}
+
 function buildOrderBy(filters: FighterCatalogFilters): SQL {
   const hasQuery = Boolean(filters.q?.trim());
-  // Sort by the canonical divisional score (`divisional_sort_score` =
-  // COALESCE(divisional, global)) for both the single-weight catalog
-  // (that division's score) AND the unfiltered catalog (the fighter's
-  // own current-division score — same number the profile hero shows).
-  // Only multi-weight comparison stays on the global score, since
-  // divisional scores aren't comparable across divisions.
-  const multiWeight = (filters.weight?.length ?? 0) > 1;
+  // Sort by the SAME headline number the card displays (headlineScoreSql —
+  // divisional for the joined division, global fallback, all-time for
+  // retired). The old keys diverged from the display in three ways the
+  // ratings audit flagged: active fighters with only an all-time score sank
+  // to the NULLS LAST bucket while their card showed a high number; retired
+  // fighters sorted on a stale current score their card never shows; and
+  // query mode ranked on GREATEST(current, all-time) — a number no surface
+  // displays.
   switch (filters.sort) {
     case "vertex_current":
-      if (!multiWeight) {
-        return hasQuery
-          ? sql`match_tier DESC, GREATEST(COALESCE(f.vertex_score, 0), COALESCE(f.vertex_score_all_time, 0)) DESC, f.bout_count DESC, match_score DESC`
-          : sql`divisional_sort_score DESC NULLS LAST, f.vertex_score_all_time DESC NULLS LAST, f.bout_count DESC`;
-      }
-      // Active fighters' current Vertex Score, falling back to all-time so
-      // retired legends still rank somewhere. NULL scores (<3 UFC bouts)
-      // sink to the bottom.
       return hasQuery
-        ? sql`match_tier DESC, GREATEST(COALESCE(f.vertex_score, 0), COALESCE(f.vertex_score_all_time, 0)) DESC, f.bout_count DESC, match_score DESC`
-        : sql`f.vertex_score DESC NULLS LAST, f.vertex_score_all_time DESC NULLS LAST, f.bout_count DESC`;
+        ? sql`match_tier DESC, ${headlineScoreSql()} DESC NULLS LAST, f.bout_count DESC, match_score DESC`
+        : sql`${headlineScoreSql()} DESC NULLS LAST, f.vertex_score_all_time DESC NULLS LAST, f.bout_count DESC`;
     case "vertex_all_time":
       return hasQuery
         ? sql`match_tier DESC, f.vertex_score_all_time DESC NULLS LAST, f.bout_count DESC, match_score DESC`
@@ -579,28 +589,24 @@ export async function searchFightersWithFilters(
     : sql``;
 
   // Divisional score join. Single-weight filter → join the FILTERED
-  // division. No weight filter → join the fighter's OWN current division
-  // so the catalog shows the canonical headline score (same as the
-  // profile hero, Wave 14B.2). Multi-weight comparison keeps the global
-  // score — divisional scores aren't comparable across divisions.
+  // division. Otherwise (no filter OR multi-weight) → join the fighter's
+  // OWN current division so the catalog shows the canonical headline
+  // score (same as the profile hero, Wave 14B.2). The old multi-weight
+  // path skipped the join entirely, so the same fighter's card showed
+  // the global score under a two-division filter and the divisional one
+  // everywhere else (audit fix) — the join is now unconditional and the
+  // headlineScoreSql sort/filter fragments rely on it.
   const singleWeight = filters.weight?.length === 1;
-  const multiWeight = (filters.weight?.length ?? 0) > 1;
   const divisionalJoin = singleWeight
     ? sql`LEFT JOIN fighter_divisional_score fds
             ON fds.fighter_id = f.id
            AND fds.division::text = ${filters.weight![0]}
            AND fds.in_active_ranking = TRUE`
-    : multiWeight
-      ? sql``
-      : sql`LEFT JOIN fighter_divisional_score fds
-              ON fds.fighter_id = f.id
-             AND fds.division::text = f.current_division
-             AND fds.in_active_ranking = TRUE`;
-  const divisionalSelect = multiWeight
-    ? sql`,
-      NULL::int AS divisional_score,
-      NULL::text AS divisional_status`
-    : sql`,
+    : sql`LEFT JOIN fighter_divisional_score fds
+            ON fds.fighter_id = f.id
+           AND fds.division::text = f.current_division
+           AND fds.in_active_ranking = TRUE`;
+  const divisionalSelect = sql`,
       fds.vertex_score AS divisional_score,
       fds.divisional_status,
       COALESCE(fds.vertex_score, f.vertex_score) AS divisional_sort_score`;
@@ -653,6 +659,7 @@ export async function searchFightersWithFilters(
   const countQuery = sql`
     SELECT COUNT(*)::int AS total
     FROM fighter_with_stats f
+    ${divisionalJoin}
     ${where}
   `;
 
@@ -750,9 +757,13 @@ export async function getFightersBySlug(
       COALESCE(f.championship_pedigree, 0)::int AS championship_pedigree,
       COALESCE(f.is_dominant_champion, false) AS is_dominant_champion,
       COALESCE(f.ufc_total, 0)::int AS ufc_bouts,
-      NULL::int AS divisional_score,
-      NULL::text AS divisional_status
+      fds.vertex_score AS divisional_score,
+      fds.divisional_status
     FROM fighter_with_stats f
+    LEFT JOIN fighter_divisional_score fds
+      ON fds.fighter_id = f.id
+     AND fds.division::text = f.current_division
+     AND fds.in_active_ranking = TRUE
     WHERE f.slug IN (${values})
   `);
   const rows = result as unknown as FighterCatalogRow[];

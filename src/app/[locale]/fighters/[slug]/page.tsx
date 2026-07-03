@@ -39,7 +39,7 @@ import {
 import { listNewsForFighter } from "@/lib/news";
 import { getPeakVertex } from "@/lib/score-history";
 import { getSimilarFighters } from "@/lib/similar-fighters";
-import { headlineScore } from "@/lib/vertex-tier";
+import { clampHeadline, headlineScore } from "@/lib/vertex-tier";
 
 export const dynamic = "force-dynamic";
 
@@ -182,8 +182,21 @@ export default async function FighterDetailPage({ params }: PageProps) {
 
   // Wave 17: breakdown follows the hero — divisional row when one drives
   // the hero, global otherwise. Returns null when both inputs are null
-  // (≤2 UFC bouts → fighter has no row in either source).
-  const breakdown = buildScoreBreakdown(activeDivisionalRow, globalComponents);
+  // (≤2 UFC bouts → fighter has no row in either source). When the hero
+  // basis is all_time (retired, or active with no current score) the
+  // Current tab is suppressed entirely — a stale vertex_score on a
+  // retired fighter must never surface a current number the hero hides.
+  const breakdown = buildScoreBreakdown(activeDivisionalRow, globalComponents, {
+    suppressCurrent: heroHeadline.basis === "all_time",
+  });
+
+  // Peak panel deltas ("vs current", still-at-peak) must compare against
+  // the SAME current number the hero shows — divisional when it drives
+  // the hero, and nothing at all for retired fighters (a stale global
+  // vertex_score would otherwise fake a "softened since peak" verdict).
+  const peakInfo = peakVertex
+    ? { ...peakVertex, currentScore: heroCurrentScore }
+    : null;
 
   return (
     <>
@@ -241,7 +254,10 @@ export default async function FighterDetailPage({ params }: PageProps) {
                 aria-label={
                   fighter.vertex_score_all_time != null
                     ? t("openAllTimeHistoryScore", {
-                        score: fighter.vertex_score_all_time,
+                        // clamp: raw all-time can exceed 100 (sort order);
+                        // the visible circle clamps, the accessible name
+                        // must announce the same number.
+                        score: clampHeadline(fighter.vertex_score_all_time)!,
                       })
                     : t("openAllTimeHistory")
                 }
@@ -272,7 +288,10 @@ export default async function FighterDetailPage({ params }: PageProps) {
                 aria-label={
                   fighter.vertex_score_all_time != null
                     ? t("openAllTimeHistoryScore", {
-                        score: fighter.vertex_score_all_time,
+                        // clamp: raw all-time can exceed 100 (sort order);
+                        // the visible circle clamps, the accessible name
+                        // must announce the same number.
+                        score: clampHeadline(fighter.vertex_score_all_time)!,
                       })
                     : t("openAllTimeHistory")
                 }
@@ -302,9 +321,9 @@ export default async function FighterDetailPage({ params }: PageProps) {
               />
             </div>
           ) : null}
-          {peakVertex ? (
+          {peakInfo ? (
             <div className="mt-6">
-              <PeakVertex info={peakVertex} />
+              <PeakVertex info={peakInfo} />
             </div>
           ) : null}
         </Container>

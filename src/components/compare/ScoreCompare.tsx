@@ -36,27 +36,33 @@ export function ScoreCompare({
   scoreModeB,
 }: ScoreCompareProps) {
   const t = useTranslations("compare");
-  if (!breakdownA && !breakdownB) {
-    return (
-      <p className="py-6 text-center font-sans text-sm text-foreground-muted">
-        {t("noBreakdown")}
-      </p>
-    );
-  }
+  // The component table below compares CURRENT-score components. A fighter
+  // whose headline is all_time (retired — the profile hides their current
+  // number entirely) must not fill a column with stale current components,
+  // so their side is treated as absent (headline rule).
+  const hasCurrentA =
+    scoreModeA === "current" &&
+    breakdownA != null &&
+    breakdownA.current.finalScore != null;
+  const hasCurrentB =
+    scoreModeB === "current" &&
+    breakdownB != null &&
+    breakdownB.current.finalScore != null;
 
-  const rowsA = breakdownA?.current.rows ?? [];
-  const rowsB = breakdownB?.current.rows ?? [];
+  const rowsA = hasCurrentA ? breakdownA.current.rows : [];
+  const rowsB = hasCurrentB ? breakdownB.current.rows : [];
   const rowCount = Math.max(rowsA.length, rowsB.length);
   const labelA = lastName(fighterAName);
   const labelB = lastName(fighterBName);
-  // When exactly one fighter has a breakdown, the other's whole column is a
-  // run of em-dashes. Name the fighter who lacks the data so the asymmetry
-  // reads as "not enough bouts" rather than a glitch.
-  const missingName = !breakdownA
-    ? fighterAName
-    : !breakdownB
-      ? fighterBName
-      : null;
+  // When exactly one fighter has a current breakdown, the other's whole
+  // column is a run of em-dashes. Name the fighter who lacks the data so
+  // the asymmetry reads as "not enough data" rather than a glitch.
+  const missingName =
+    !hasCurrentA && hasCurrentB
+      ? fighterAName
+      : !hasCurrentB && hasCurrentA
+        ? fighterBName
+        : null;
 
   return (
     <div className="mt-4 space-y-6">
@@ -86,6 +92,11 @@ export function ScoreCompare({
         </div>
       </div>
 
+      {rowCount === 0 ? (
+        <p className="py-4 text-center font-sans text-sm text-foreground-muted">
+          {t("noBreakdown")}
+        </p>
+      ) : (
       <div className="overflow-x-auto rounded-md border border-foreground/10 bg-background-elevated/30">
         <table className="w-full min-w-[320px] font-mono text-xs tabular">
           <thead>
@@ -194,6 +205,7 @@ export function ScoreCompare({
           </tbody>
         </table>
       </div>
+      )}
 
       {missingName ? (
         <p className="text-center font-sans text-xs text-foreground-subtle">

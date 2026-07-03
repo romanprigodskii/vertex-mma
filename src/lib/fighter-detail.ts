@@ -219,6 +219,12 @@ export type ScoreBreakdownData = {
 export function buildScoreBreakdown(
   divisional: FighterDivisionalScoreRow | null,
   global: GlobalScoreComponents | null,
+  opts?: {
+    /** Headline basis is all_time (retired, or active without a current
+     *  score): null out the Current side so the tab disables — a stale
+     *  vertex_score must never surface a current number the hero hides. */
+    suppressCurrent?: boolean;
+  },
 ): ScoreBreakdownData | null {
   if (divisional === null && global === null) return null;
 
@@ -422,7 +428,7 @@ export function buildScoreBreakdown(
       rawTotal: currentRaw,
       curveMultiplier,
       skidPenalty,
-      finalScore: currentFinal,
+      finalScore: opts?.suppressCurrent ? null : currentFinal,
     },
     allTime: {
       rows: allTimeRows,

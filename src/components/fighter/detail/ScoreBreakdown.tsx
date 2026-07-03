@@ -351,7 +351,12 @@ function BreakdownTable({
               {curveMultiplier != null ? t("finalAfterCurve") : t("finalClamp")}
             </td>
             <td className="pt-3 text-right font-display text-xl tabular text-foreground">
-              {finalScore != null ? finalScore : "—"}
+              {/* The label says "clamp 0-100" — honour it: raw all-time can
+                  exceed 100 (kept for sort order) and must not out-shout the
+                  clamped hero circle above. */}
+              {finalScore != null
+                ? Math.min(100, Math.max(0, Math.round(finalScore)))
+                : "—"}
             </td>
           </tr>
         </tfoot>

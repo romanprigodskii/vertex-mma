@@ -213,7 +213,10 @@ async function SideCard({
         <p className="mt-0.5 font-mono text-[11px] uppercase tracking-wider text-foreground-subtle">
           {side.as_of_bout_id
             ? t("formAsOf", { date: side.as_of_date })
-            : t("formCurrent")}{" "}
+            : // Date the "current" snapshot anchors to (last bout) — the VTX
+              // number is point-in-time, not the live site headline, and
+              // must not read as one (audit fix).
+              t("formCurrentAnchored", { date: side.as_of_date })}{" "}
           · {side.record}
           {side.age != null ? ` · ${t("ageAt", { age: side.age })}` : ""}
           {side.vertex_score != null ? ` · VTX ${side.vertex_score}` : ""}

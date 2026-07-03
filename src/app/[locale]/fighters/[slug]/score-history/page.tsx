@@ -9,11 +9,12 @@ import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
 import { FighterSearchTrigger } from "@/components/search/fighter-search-palette";
 import { Link } from "@/i18n/navigation";
-import { getFighterBySlug } from "@/lib/fighter-detail";
+import { getDivisionalScores, getFighterBySlug } from "@/lib/fighter-detail";
 import {
   getScoreHistory,
   type ScoreHistoryPoint,
 } from "@/lib/score-history";
+import { headlineScore } from "@/lib/vertex-tier";
 
 export const dynamic = "force-dynamic";
 
@@ -80,7 +81,27 @@ export default async function FighterScoreHistoryPage({
   const { mode: rawMode } = await searchParams;
   const mode = resolveMode(rawMode);
 
-  const history = await getScoreHistory(fighter.id);
+  // Mirror the profile hero EXACTLY (Wave 14B.2): the octagon the user
+  // clicked shows the divisional score when an in_active_ranking row
+  // drives it, so the chart's right edge must show the same number —
+  // fighter_score_history itself replays only the GLOBAL formula.
+  const divisionalScores = await getDivisionalScores(fighter.id);
+  const activeDivisionalRow = fighter.current_division
+    ? divisionalScores.find(
+        (d) =>
+          d.division === fighter.current_division && d.in_active_ranking,
+      ) ?? null
+    : null;
+  const heroHeadline = headlineScore({
+    rosterStatus: fighter.roster_status,
+    divisionalScore: activeDivisionalRow?.vertex_score ?? null,
+    vertexScore: fighter.vertex_score,
+    vertexScoreAllTime: fighter.vertex_score_all_time,
+  });
+  const history = await getScoreHistory(fighter.id, {
+    liveCurrentScore:
+      heroHeadline.basis === "all_time" ? null : heroHeadline.value,
+  });
   const boutHistory = history.filter((p) => p.kind === "bout");
   const modeHistory =
     mode === "all_time"

@@ -73,7 +73,8 @@ async function getTopFighters(
       AND COALESCE(fds.vertex_score, f.vertex_score) IS NOT NULL
     ORDER BY
       COALESCE(fds.vertex_score, f.vertex_score) DESC,
-      f.bout_count DESC
+      f.bout_count DESC,
+      f.slug ASC
     LIMIT ${limit}
   `);
   return [...(result as unknown as TopFighter[])];
@@ -195,7 +196,13 @@ export default async function HomePage({
                       className="flex items-center gap-4 rounded-md border border-foreground/10 bg-background-elevated/30 px-4 py-3 transition-colors hover:border-foreground/20 hover:bg-foreground/[0.04]"
                     >
                       <span className="min-w-[2.5rem] text-center font-display text-2xl tabular text-foreground-subtle">
-                        #{i + 1}
+                        {/* Competition ranking — tied scores share a place,
+                            matching the official P4P board's tie handling. */}
+                        #
+                        {i > 0 && topFighters[i - 1].score === f.score
+                          ? topFighters.findIndex((x) => x.score === f.score) +
+                            1
+                          : i + 1}
                       </span>
                       {f.photo_thumbnail_url || f.photo_url ? (
                         // eslint-disable-next-line @next/next/no-img-element

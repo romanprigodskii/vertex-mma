@@ -169,6 +169,13 @@ async function fetchOfficialRanking(
           AND fds.in_active_ranking = TRUE
           AND f.gender = ${board.gender}
           AND f.roster_status = 'active'
+          -- Pin to the fighter's LIVE current division: the materialize
+          -- script guarantees this within one successful pipeline run, but
+          -- a mid-chain abort can leave yesterday's divisional row while
+          -- current_division already moved — the profile hero would then
+          -- show the global score while this board showed the stale
+          -- divisional one (audit fix).
+          AND fds.division::text = f.current_division
           AND fds.vertex_score IS NOT NULL
 
         UNION ALL
@@ -275,8 +282,12 @@ async function fetchAllTimeRanking(
       f.current_streak_count,
       NULL::text AS divisional_status,
       ${
+        // weight_class_primary, NOT current_division: the all-time DIVISION
+        // boards pool on primary, so the P4P tag must point at the board
+        // the fighter actually appears on (audit fix — a retired legend's
+        // current_division tracks their last bout, possibly a one-off).
         board.kind === "p4p"
-          ? sql`COALESCE(f.current_division, f.weight_class_primary::text)`
+          ? sql`f.weight_class_primary::text`
           : sql`NULL::text`
       } AS p4p_division
     FROM fighter_with_stats f

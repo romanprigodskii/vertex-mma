@@ -52,7 +52,14 @@ export async function OtherDivisions({ rows, currentDivision }: OtherDivisionsPr
             : WEIGHT_LABEL[row.division] ?? row.division;
           const short = WEIGHT_SHORT[row.division] ?? row.division.toUpperCase();
           const inactive = !row.in_active_ranking;
-          const isCurrentDivision = row.division === currentDivision;
+          // The ACTIVE chip needs BOTH: this is the fighter's current
+          // division AND the row is in the ranking pool — a stale
+          // (in_active_ranking=false) row for the current division must
+          // not wear a primary-coloured ACTIVE badge while dimmed (audit
+          // fix: it competed with the hero's number as "his active
+          // division rating").
+          const isCurrentDivision =
+            row.division === currentDivision && row.in_active_ranking;
           const statusLabel = t(STATUS_KEY[row.divisional_status]);
           return (
             <li

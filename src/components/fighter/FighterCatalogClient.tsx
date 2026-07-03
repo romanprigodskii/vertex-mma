@@ -395,7 +395,14 @@ export function FighterCatalogClient({
                         showRank={showRank}
                         priority={i < 4}
                         scoreMode={
-                          filters.sort === "vertex_all_time"
+                          // Both all-time-flavoured sorts show the all-time
+                          // score on cards: vertex_all_time sorts on it
+                          // directly; all_time ranks by the historical-
+                          // greatness composite (wins × rate × credibility)
+                          // and previously displayed headline currents that
+                          // bore no relation to the rank order (audit fix).
+                          filters.sort === "vertex_all_time" ||
+                          filters.sort === "all_time"
                             ? "all_time"
                             : "current"
                         }

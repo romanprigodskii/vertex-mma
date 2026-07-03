@@ -206,13 +206,19 @@ export default async function ComparePage({ params, searchParams }: PageProps) {
     vertexScoreAllTime: fighterB.vertex_score_all_time,
   });
 
+  // suppressCurrent for all_time-basis fighters (retired, or active with
+  // no current score): the component table compares CURRENT components —
+  // a stale global current for a retired fighter must not fill the column
+  // (mirrors the profile's ScoreBreakdown gating).
   const breakdownA = buildScoreBreakdown(
     headlineA.basis === "divisional" ? activeDivA : null,
     globalA,
+    { suppressCurrent: headlineA.basis === "all_time" },
   );
   const breakdownB = buildScoreBreakdown(
     headlineB.basis === "divisional" ? activeDivB : null,
     globalB,
+    { suppressCurrent: headlineB.basis === "all_time" },
   );
 
   return (

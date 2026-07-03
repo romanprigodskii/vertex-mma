@@ -309,19 +309,34 @@ export interface ScoreHistoryPoint {
  * scripts/compute_score_history.ts.
  *
  * The **latest anchor's** score is overridden with the live displayed
- * value from `fighter` (the same number drawn in the octagon/circle on
- * the profile). Earlier anchors compute time-windowed signals
- * (activity, recent_form, layoff, recent_loss_penalty) as-of-bout-date,
- * but the view that backs the profile column computes them as-of-today
- * — so the replayed latest anchor naturally reads higher when the
- * fighter has been idle since (e.g., Islam's activity score for the 12
- * months ending Nov 2025 captures two championship bouts; the 12
- * months ending today catches just one). Overriding only the last
- * point keeps the chart's right edge consistent with the number the
- * user just clicked on.
+ * value (the same number drawn in the octagon/circle on the profile).
+ * Earlier anchors compute time-windowed signals (activity, recent_form,
+ * layoff, recent_loss_penalty) as-of-bout-date, but the view that backs
+ * the profile column computes them as-of-today — so the replayed latest
+ * anchor naturally reads higher when the fighter has been idle since
+ * (e.g., Islam's activity score for the 12 months ending Nov 2025
+ * captures two championship bouts; the 12 months ending today catches
+ * just one). Overriding only the last point keeps the chart's right
+ * edge consistent with the number the user just clicked on.
+ *
+ * IMPORTANT (Wave 14B.2 divisional hero): fighter_score_history replays
+ * the GLOBAL current formula, but the profile octagon shows the
+ * DIVISIONAL score whenever an in_active_ranking row drives the hero.
+ * Callers on hero-linked surfaces must pass `liveCurrentScore` = the
+ * headline current the profile actually displays (null when the profile
+ * shows no current number at all — retired) so the right edge matches
+ * the octagon. When the option is omitted the override falls back to
+ * the global fighter.vertex_score (legacy behavior).
  */
 export async function getScoreHistory(
   fighterId: string,
+  opts?: {
+    /** The CURRENT number the profile hero displays (divisional when it
+     *  drives the hero). `null` = the profile shows no current number
+     *  (retired) → keep the replayed value untouched. Omit for the
+     *  legacy global-column override. */
+    liveCurrentScore?: number | null;
+  },
 ): Promise<ScoreHistoryPoint[]> {
   type Row = {
     bout_id: string | null;
@@ -416,7 +431,9 @@ export async function getScoreHistory(
     const live = liveRows[0];
     if (live) {
       const last = points[points.length - 1];
-      if (live.cur != null) last.currentScore = live.cur;
+      const cur =
+        opts?.liveCurrentScore !== undefined ? opts.liveCurrentScore : live.cur;
+      if (cur != null) last.currentScore = cur;
       if (live.at != null) last.allTimeScore = live.at;
     }
   }
