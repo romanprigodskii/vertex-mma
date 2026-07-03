@@ -83,6 +83,17 @@ export function resolveBoard(param: string | undefined): OfficialBoard {
   return OFFICIAL_BOARDS.find((b) => b.id === param) ?? OFFICIAL_BOARDS[0];
 }
 
+/** Board era driven by the ?mode= search param. CURRENT ranks the active
+ *  pool by current Vertex Score; ALL-TIME ranks every fighter ever (≥3 UFC
+ *  bouts, retired legends included) by vertex_score_all_time, with the
+ *  division boards pooled on weight_class_primary. */
+export type BoardMode = "current" | "all_time";
+
+/** Validate a ?mode= param; unknown values fall back to current. */
+export function resolveMode(param: string | undefined): BoardMode {
+  return param === "all-time" ? "all_time" : "current";
+}
+
 /** Progressive board disclosure driven by the ?depth= search param:
  *  top-15 (default) → top-50 → the whole ranking pool. */
 export type BoardDepth = 15 | 50 | "all";
@@ -122,7 +133,11 @@ async function fetchOfficialRanking(
   board: OfficialBoard,
   isRu: boolean,
   limit: number,
+  mode: BoardMode,
 ): Promise<OfficialRankingRow[]> {
+  if (mode === "all_time") {
+    return fetchAllTimeRanking(board, isRu, limit);
+  }
   if (board.kind === "division") {
     // Two branches, mirroring the catalog's single-weight pool: divisional
     // rows first, then active fighters in this division without a divisional
@@ -230,14 +245,61 @@ async function fetchOfficialRanking(
   return rows as unknown as OfficialRankingRow[];
 }
 
+/** ALL-TIME boards: every fighter with an all-time score (≥3 UFC bouts,
+ *  retired included), pooled on weight_class_primary for divisions.
+ *  vertex_score_all_time is raw (can exceed 100 for sort order) — sort on
+ *  the raw value, display the clamped one (clampHeadline convention), so
+ *  ties are computed on the number users actually see. */
+async function fetchAllTimeRanking(
+  board: OfficialBoard,
+  isRu: boolean,
+  limit: number,
+): Promise<OfficialRankingRow[]> {
+  const divisionFilter =
+    board.kind === "division"
+      ? sql`AND f.weight_class_primary::text = ${board.division}`
+      : sql``;
+  const rows = await db.execute<OfficialRankingRow>(sql`
+    SELECT
+      f.id::text AS fighter_id,
+      f.slug,
+      ${localizedNameSql("f", isRu)} AS name,
+      f.country_code,
+      f.photo_thumbnail_url,
+      LEAST(100, GREATEST(0, ROUND(f.vertex_score_all_time)))::int AS score,
+      f.ufc_wins,
+      f.ufc_losses,
+      f.ufc_draws,
+      f.ufc_total,
+      f.current_streak_type,
+      f.current_streak_count,
+      NULL::text AS divisional_status,
+      ${
+        board.kind === "p4p"
+          ? sql`COALESCE(f.current_division, f.weight_class_primary::text)`
+          : sql`NULL::text`
+      } AS p4p_division
+    FROM fighter_with_stats f
+    WHERE f.gender = ${board.gender}
+      AND f.vertex_score_all_time IS NOT NULL
+      ${divisionFilter}
+    ORDER BY f.vertex_score_all_time DESC,
+             f.ufc_wins DESC,
+             f.slug ASC
+    LIMIT ${limit}
+  `);
+  return rows as unknown as OfficialRankingRow[];
+}
+
 // Scores only move when the daily rating recompute runs, so cache each
 // board for an hour — same policy (and rationale) as the homepage
-// getCachedTopFighters. Args (boardId, isRu, limit) are part of the key.
+// getCachedTopFighters. Args (boardId, isRu, limit, mode) are part of
+// the key.
 const cachedOfficialRanking = unstable_cache(
-  async (boardId: string, isRu: boolean, limit: number) => {
+  async (boardId: string, isRu: boolean, limit: number, mode: BoardMode) => {
     const board = OFFICIAL_BOARDS.find((b) => b.id === boardId);
     if (!board) return [];
-    return fetchOfficialRanking(board, isRu, limit);
+    return fetchOfficialRanking(board, isRu, limit, mode);
   },
   ["official-ranking"],
   { revalidate: 3600 },
@@ -246,11 +308,12 @@ const cachedOfficialRanking = unstable_cache(
 export async function getOfficialRanking(
   board: OfficialBoard,
   limit = 15,
+  mode: BoardMode = "current",
 ): Promise<OfficialRankingRow[]> {
   // Locale is request-scoped — resolve it OUTSIDE the cache boundary
   // (project unstable_cache convention) and pass it in as a key part.
   const isRu = await isRuLocale();
-  return cachedOfficialRanking(board.id, isRu, limit);
+  return cachedOfficialRanking(board.id, isRu, limit, mode);
 }
 
 /**
@@ -270,4 +333,17 @@ export function championMark(
   );
   if (active.length === 0) return null;
   return { isInterim: active.every((r) => r.isInterim === true) };
+}
+
+/** ALL-TIME boards crown anyone who EVER held the belt in the division
+ *  (any reign, open or closed); interim-only holders get the interim mark. */
+export function championMarkAllTime(
+  slug: string,
+  division: WeightClass | null,
+): { isInterim: boolean } | null {
+  const reigns = getChampionshipReigns(slug).filter(
+    (r) => division === null || r.weightClass === division,
+  );
+  if (reigns.length === 0) return null;
+  return { isInterim: reigns.every((r) => r.isInterim === true) };
 }

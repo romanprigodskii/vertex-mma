@@ -906,7 +906,11 @@
     "vertexCaption": "Vertex Score",
     "expandTo50": "Show top 50",
     "expandAll": "Show everyone",
-    "collapseTo15": "Collapse to top 15"
+    "collapseTo15": "Collapse to top 15",
+    "modeAria": "Ranking era",
+    "modeCurrent": "Current",
+    "modeAllTime": "All-time",
+    "rankedByVertexAllTime": "Ranked by all-time Vertex Score"
   },
   "theme": {
     "switchToDark": "Switch to dark theme",

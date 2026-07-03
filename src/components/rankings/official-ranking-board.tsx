@@ -7,8 +7,10 @@ import { WEIGHT_SHORT } from "@/lib/constants";
 import { getCountryFlag } from "@/lib/fighter-helpers";
 import {
   championMark,
+  championMarkAllTime,
   OFFICIAL_BOARDS,
   type BoardDepth,
+  type BoardMode,
   type OfficialBoard,
   type OfficialRankingRow,
 } from "@/lib/official-rankings";
@@ -19,8 +21,23 @@ interface OfficialRankingBoardProps {
   board: OfficialBoard;
   rows: OfficialRankingRow[];
   depth: BoardDepth;
+  mode: BoardMode;
   /** True when the pool holds more fighters than the visible window. */
   hasMore: boolean;
+}
+
+/** Shared ?board/?mode/?depth query builder — every board link must carry
+ *  the era so switching divisions doesn't silently reset to current. */
+function boardQuery(
+  b: OfficialBoard,
+  mode: BoardMode,
+  depth?: "50" | "all",
+): Record<string, string> | undefined {
+  const q: Record<string, string> = {};
+  if (b.id !== "p4p") q.board = b.id;
+  if (mode === "all_time") q.mode = "all-time";
+  if (depth) q.depth = depth;
+  return Object.keys(q).length > 0 ? q : undefined;
 }
 
 /**
@@ -33,6 +50,7 @@ export async function OfficialRankingBoard({
   board,
   rows,
   depth,
+  mode,
   hasMore,
 }: OfficialRankingBoardProps) {
   const t = await getTranslations("rankings");
@@ -60,6 +78,38 @@ export async function OfficialRankingBoard({
 
   return (
     <section aria-label={t("officialHeading")}>
+      {/* Era toggle: current pool vs all-time legacy board */}
+      <div
+        role="group"
+        aria-label={t("modeAria")}
+        className="mb-4 inline-flex rounded-md border border-foreground/15 p-0.5"
+      >
+        {(
+          [
+            { m: "current" as const, label: t("modeCurrent") },
+            { m: "all_time" as const, label: t("modeAllTime") },
+          ] satisfies { m: BoardMode; label: string }[]
+        ).map(({ m, label }) => {
+          const active = m === mode;
+          return (
+            <Link
+              key={m}
+              href={{ pathname: "/rankings", query: boardQuery(board, m) }}
+              prefetch={false}
+              aria-current={active ? "page" : undefined}
+              className={cn(
+                "rounded px-3 py-1.5 font-mono text-[11px] uppercase tracking-wider transition-colors",
+                active
+                  ? "bg-primary text-background-base"
+                  : "text-foreground-muted hover:text-foreground",
+              )}
+            >
+              {label}
+            </Link>
+          );
+        })}
+      </div>
+
       <nav aria-label={t("boardNavAria")} className="space-y-2">
         {groups.map((group) => (
           <div key={group.label} className="flex items-start gap-3">
@@ -74,7 +124,7 @@ export async function OfficialRankingBoard({
                     key={b.id}
                     href={{
                       pathname: "/rankings",
-                      query: b.id === "p4p" ? undefined : { board: b.id },
+                      query: boardQuery(b, mode),
                     }}
                     prefetch={false}
                     aria-current={active ? "page" : undefined}
@@ -104,7 +154,7 @@ export async function OfficialRankingBoard({
             {fullLabel(board)}
           </h2>
           <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-foreground-subtle">
-            {t("rankedByVertex")}
+            {mode === "all_time" ? t("rankedByVertexAllTime") : t("rankedByVertex")}
           </p>
         </div>
 
@@ -114,31 +164,49 @@ export async function OfficialRankingBoard({
           </p>
         ) : (
           <ol className="divide-y divide-foreground/[0.06]">
-            {rows.map((row, i) => (
-              <RankingRow
-                key={row.fighter_id}
-                row={row}
-                rank={i + 1}
-                board={board}
-              />
-            ))}
+            {(() => {
+              // Competition ranking ("1224"): equal scores share a place,
+              // the next distinct score skips the tied slots. Rows arrive
+              // sorted by score DESC, so ties are always adjacent; the
+              // window always starts at the top, so slice-local ranks are
+              // globally correct.
+              const ranks: number[] = [];
+              rows.forEach((row, i) => {
+                ranks.push(
+                  i > 0 && row.score === rows[i - 1].score
+                    ? ranks[i - 1]
+                    : i + 1,
+                );
+              });
+              return rows.map((row, i) => (
+                <RankingRow
+                  key={row.fighter_id}
+                  row={row}
+                  rank={ranks[i]}
+                  featured={i === 0}
+                  board={board}
+                  mode={mode}
+                  t={t}
+                />
+              ));
+            })()}
           </ol>
         )}
 
         {(hasMore || depth !== 15) && (
           <div className="flex flex-wrap items-center justify-center gap-3 border-t border-foreground/10 px-4 py-3">
             {depth === 15 && hasMore && (
-              <DepthLink board={board} depth="50" icon="down">
+              <DepthLink board={board} mode={mode} depth="50" icon="down">
                 {t("expandTo50")}
               </DepthLink>
             )}
             {depth === 50 && hasMore && (
-              <DepthLink board={board} depth="all" icon="down">
+              <DepthLink board={board} mode={mode} depth="all" icon="down">
                 {t("expandAll")}
               </DepthLink>
             )}
             {depth !== 15 && (
-              <DepthLink board={board} depth={undefined} icon="up">
+              <DepthLink board={board} mode={mode} depth={undefined} icon="up">
                 {t("collapseTo15")}
               </DepthLink>
             )}
@@ -151,25 +219,24 @@ export async function OfficialRankingBoard({
 
 function DepthLink({
   board,
+  mode,
   depth,
   icon,
   children,
 }: {
   board: OfficialBoard;
+  mode: BoardMode;
   depth: "50" | "all" | undefined;
   icon: "down" | "up";
   children: React.ReactNode;
 }) {
-  const query: Record<string, string> = {};
-  if (board.id !== "p4p") query.board = board.id;
-  if (depth) query.depth = depth;
   return (
     // scroll={false}: the reader is at the bottom of the list — an RSC
     // navigation that jumps back to the top would lose their place.
     <Link
       href={{
         pathname: "/rankings",
-        query: Object.keys(query).length > 0 ? query : undefined,
+        query: boardQuery(board, mode, depth),
       }}
       prefetch={false}
       scroll={false}
@@ -185,25 +252,41 @@ function DepthLink({
   );
 }
 
+type RankingsTranslator = Awaited<
+  ReturnType<typeof getTranslations<"rankings">>
+>;
+
 interface RankingRowProps {
   row: OfficialRankingRow;
   rank: number;
+  /** Hero treatment for the list's first row only — a score tied with #1
+   *  shares the rank number but not the oversized layout. */
+  featured: boolean;
   board: OfficialBoard;
+  mode: BoardMode;
+  /** Passed down (not re-resolved) so rows stay SYNC server components —
+   *  async rows suspend individually and stream after the shell, which
+   *  hides the list from no-JS crawlers. */
+  t: RankingsTranslator;
 }
 
-async function RankingRow({ row, rank, board }: RankingRowProps) {
-  const t = await getTranslations("rankings");
-  const isTop = rank === 1;
-  const champ = championMark(row.slug, board.division);
-  // Board rows are current-score surfaces; tier colour must agree with the
-  // displayed number (headline convention).
+function RankingRow({ row, rank, featured, board, mode, t }: RankingRowProps) {
+  const isTop = featured;
+  // Current boards crown ACTIVE reigns; all-time boards crown anyone who
+  // ever held the belt in the division.
+  const champ =
+    mode === "all_time"
+      ? championMarkAllTime(row.slug, board.division)
+      : championMark(row.slug, board.division);
+  // Tier colour must agree with the displayed number (headline convention);
+  // the score column already carries the era the board is showing.
   const tierStyle = getTierStyle(
     classifyFighter({
       slug: row.slug,
-      vertexScore: row.score,
-      vertexScoreAllTime: null,
+      vertexScore: mode === "all_time" ? null : row.score,
+      vertexScoreAllTime: mode === "all_time" ? row.score : null,
       ufcBouts: row.ufc_total,
-      scoreMode: "current",
+      scoreMode: mode === "all_time" ? "all_time" : "current",
     }).tier,
   );
   const record =

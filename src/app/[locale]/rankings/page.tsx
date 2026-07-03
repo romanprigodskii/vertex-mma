@@ -13,6 +13,7 @@ import {
   getOfficialRanking,
   resolveBoard,
   resolveDepth,
+  resolveMode,
 } from "@/lib/official-rankings";
 import { listRecentRankings } from "@/lib/rankings";
 
@@ -33,19 +34,24 @@ export default async function RankingsListPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ board?: string; depth?: string }>;
+  searchParams: Promise<{ board?: string; depth?: string; mode?: string }>;
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
-  const { board: boardParam, depth: depthParam } = await searchParams;
+  const {
+    board: boardParam,
+    depth: depthParam,
+    mode: modeParam,
+  } = await searchParams;
   const board = resolveBoard(boardParam);
   const depth = resolveDepth(depthParam);
+  const mode = resolveMode(modeParam);
   const t = await getTranslations("rankings");
   // Fetch one row past the visible window so the expand control only
   // renders when there genuinely is more to show.
   const shownLimit = depth === "all" ? ALL_DEPTH_CAP : depth;
   const [rowsPlusOne, rankings, currentUser] = await Promise.all([
-    getOfficialRanking(board, shownLimit + 1),
+    getOfficialRanking(board, shownLimit + 1, mode),
     listRecentRankings(30),
     getCurrentUser(),
   ]);
@@ -74,6 +80,7 @@ export default async function RankingsListPage({
             board={board}
             rows={rows}
             depth={depth}
+            mode={mode}
             hasMore={hasMore}
           />
 

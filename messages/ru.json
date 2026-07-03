@@ -906,7 +906,11 @@
     "vertexCaption": "Vertex Score",
     "expandTo50": "Показать топ-50",
     "expandAll": "Показать всех",
-    "collapseTo15": "Свернуть до топ-15"
+    "collapseTo15": "Свернуть до топ-15",
+    "modeAria": "Эпоха рейтинга",
+    "modeCurrent": "Текущий",
+    "modeAllTime": "За всю историю",
+    "rankedByVertexAllTime": "По all-time Vertex Score"
   },
   "theme": {
     "switchToDark": "Переключить на тёмную тему",
