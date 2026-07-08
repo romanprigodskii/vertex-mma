@@ -21,7 +21,14 @@ EXACT_MAP: dict[str, str] = {
     "Draw": "draw",
     "No Contest": "no_contest",
     "DQ": "dq",
-    "Could Not Continue": "tko",
+    # "Could Not Continue" / "CNC" is a commission ruling, not a finish:
+    # the bout is declared a No Contest (accidental foul, fighter unable
+    # to continue). Verified against fight-details pages 2026-07-08 —
+    # every CNC bout in UFCStats history shows NC for both fighters and
+    # has no winner. (Was mapped to "tko" before, which made these bouts
+    # read as completed TKOs with a NULL winner — i.e. impossible draws —
+    # and corrupted both fighters' histories in the model export.)
+    "Could Not Continue": "no_contest",
     "Overturned": "no_contest",
 }
 
@@ -43,7 +50,7 @@ def map_method(value: str | None) -> str | None:
       - "SUBRear Naked Choke" (no-space concat) → "submission"
       - "Decision - Unanimous"                → "decision_unanimous"
       - "U-DEC" (legacy short form)           → "decision_unanimous"
-      - "CNC"                                 → "tko" (could-not-continue)
+      - "CNC"                                 → "no_contest" (could-not-continue ruling)
       - "OverturnedGuillotine Choke"          → "no_contest"
 
     Returns None when no rule applies — callers persist NULL in that
@@ -85,12 +92,12 @@ def map_method(value: str | None) -> str | None:
     if upper.startswith("OVERTURNED"):
         return "no_contest"
 
-    # Wave 16.2: "CNC" is UFCStats' abbreviation for "Could Not
-    # Continue" — usually a doctor stoppage / accidental headbutt
-    # cutting the bout short. Treat as TKO (matches the existing
-    # "Could Not Continue" exact-match → tko).
+    # "CNC" is UFCStats' abbreviation for "Could Not Continue" — a No
+    # Contest ruling (accidental foul, fighter unable to continue), NOT
+    # a TKO: a legitimate doctor-stoppage win is reported as "KO/TKO".
+    # All 33 CNC bouts in UFCStats history are winner-less NCs.
     if upper.startswith("CNC"):
-        return "tko"
+        return "no_contest"
 
     # Decision variants come in both "Decision - X" and "X-DEC" forms.
     if "UNANIMOUS" in upper or upper.startswith("U-DEC"):

@@ -482,7 +482,17 @@ def upsert_bouts(
                     -- (set to 5 by derive_title_fights, but bout_order != 1)
                     -- back to 3.
                     scheduled_rounds = GREATEST(EXCLUDED.scheduled_rounds, bout.scheduled_rounds),
-                    status = EXCLUDED.status,
+                    -- A completed bout must never be demoted back to
+                    -- 'scheduled' by a re-scrape: a degraded parse (layout
+                    -- change, transient page) yields no method/winner/round
+                    -- and would otherwise flip the row to 'scheduled' —
+                    -- where the reconcile pass below is then allowed to
+                    -- DELETE it. Results only ever move forward.
+                    status = CASE
+                        WHEN bout.status = 'completed' AND EXCLUDED.status = 'scheduled'
+                        THEN bout.status
+                        ELSE EXCLUDED.status
+                    END,
                     winner_id = COALESCE(EXCLUDED.winner_id, bout.winner_id),
                     method = COALESCE(EXCLUDED.method, bout.method),
                     -- Wave 16: always refresh method_detail from the

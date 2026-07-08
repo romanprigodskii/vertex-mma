@@ -41,9 +41,11 @@ function mapMethod(value: string | null): string | null {
     DRAW: "draw",
     "NO CONTEST": "no_contest",
     DQ: "dq",
-    "COULD NOT CONTINUE": "tko",
+    // CNC ("Could Not Continue") is a No Contest ruling, not a TKO —
+    // see map_method() in methods.py for the full rationale.
+    "COULD NOT CONTINUE": "no_contest",
     OVERTURNED: "no_contest",
-    CNC: "tko",
+    CNC: "no_contest",
   };
   if (exact[upper]) return exact[upper];
 
@@ -59,7 +61,7 @@ function mapMethod(value: string | null): string | null {
   }
   if (upper.startsWith("SUB")) return "submission";
   if (upper.startsWith("OVERTURNED")) return "no_contest";
-  if (upper.startsWith("CNC")) return "tko";
+  if (upper.startsWith("CNC")) return "no_contest";
 
   if (upper.includes("UNANIMOUS") || upper.startsWith("U-DEC"))
     return "decision_unanimous";
@@ -72,7 +74,7 @@ function mapMethod(value: string | null): string | null {
   if (upper.includes("NO CONTEST")) return "no_contest";
   if (upper.startsWith("DQ") || upper.includes("DISQUALIFICATION"))
     return "dq";
-  if (upper.includes("COULD NOT CONTINUE")) return "tko";
+  if (upper.includes("COULD NOT CONTINUE")) return "no_contest";
 
   return null;
 }
