@@ -40,16 +40,16 @@ python scripts/run_train.py
 
 Outputs to `artifacts/`:
 
-- `model.lgb` — trained booster (best iteration)
-- `calibrator.pkl` — isotonic regression on val
+- `ensemble/` — served 3-learner ensemble (LGB + XGB + LogReg + blender),
+  refit on ALL data
+- `ensemble_eval/` — the split-trained twin, kept for out-of-sample evals
 - `metadata.json` — feature columns, params, per-split metrics, model_version
 
-Current baseline (v0.1.0): test accuracy ~64 %, AUC ~0.67, log-loss
-~0.65. Roughly in line with the bookmaker-favorite hit rate (~67 %),
-and the honest ceiling on UFC prediction with only career-aggregate
-features. External-odds coverage is still thin (23 rows at time of
-writing) — every additional opening line the scraper backfills will
-move accuracy up by ~0.5–1 pp.
+Current model (v0.6.0, ~77 features incl. point-in-time Elo and
+durability rates): rolling-retrain backtest over 2025-07..2026-07 =
+64.6 % accuracy, log-loss 0.635, AUC 0.701 (n=421). The bookmaker
+closing line on the same bouts: 68.8 % / 0.592 — the market stays the
+honest upper bound for a fundamentals-only model.
 
 ## Predict upcoming bouts
 

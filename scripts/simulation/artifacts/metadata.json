@@ -1,7 +1,7 @@
 {
-  "model_version": "v0.5.0",
+  "model_version": "v0.6.0",
   "model_kind": "ensemble",
-  "trained_at": "2026-07-05T07:00:32.076313Z",
+  "trained_at": "2026-07-08T18:47:18.845992Z",
   "feature_columns": [
     "diff_height",
     "diff_reach",
@@ -35,6 +35,10 @@
     "diff_current_streak",
     "diff_finish_against_per_bout",
     "diff_avg_bout_seconds",
+    "diff_kd_absorbed_per_fight",
+    "diff_control_absorbed_per_min",
+    "diff_reversals_per_fight",
+    "diff_elo",
     "abs_age_a",
     "abs_age_b",
     "abs_vertex_score_a",
@@ -51,6 +55,8 @@
     "abs_kd_per_fight_b",
     "abs_kd_absorbed_per_fight_a",
     "abs_kd_absorbed_per_fight_b",
+    "abs_elo_a",
+    "abs_elo_b",
     "is_title_fight",
     "is_main_event",
     "scheduled_rounds",
@@ -83,20 +89,20 @@
       "binary_logloss",
       "auc"
     ],
-    "learning_rate": 0.058007849901952485,
-    "num_leaves": 49,
-    "min_data_in_leaf": 113,
-    "feature_fraction": 0.6507141219012553,
-    "bagging_fraction": 0.5424765914743351,
-    "bagging_freq": 7,
-    "lambda_l2": 0.004042852934121959,
+    "learning_rate": 0.06717307494439789,
+    "num_leaves": 63,
+    "min_data_in_leaf": 47,
+    "feature_fraction": 0.8297098249147963,
+    "bagging_fraction": 0.6930156044133179,
+    "bagging_freq": 4,
+    "lambda_l2": 1.7608904121671312,
     "verbosity": -1,
     "seed": 42,
     "deterministic": true,
     "force_row_wise": true,
-    "max_depth": 4,
-    "lambda_l1": 0.11808596641763931,
-    "min_gain_to_split": 0.08537504078488067,
+    "max_depth": 3,
+    "lambda_l1": 0.005796964799606552,
+    "min_gain_to_split": 0.09526833319973148,
     "feature_contri": [
       1.0,
       1.0,
@@ -130,8 +136,14 @@
       1.0,
       1.0,
       1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
       0.5,
       0.5,
+      1.0,
+      1.0,
       1.0,
       1.0,
       1.0,
@@ -174,71 +186,64 @@
   "blender": {
     "blend_mode": "weighted_mean",
     "val_blend_logloss": {
-      "logreg": 0.6776090692600327,
-      "mean": 0.6541664000847611,
-      "weighted_mean": 0.6458283861223163
+      "logreg": 0.6769301950612582,
+      "mean": 0.6492617531061333,
+      "weighted_mean": 0.6433172369784843
     },
     "weighted_mean_weights": {
-      "p_lgb_global": 0.14963607681315838,
-      "p_xgb_global": 0.13795076842301568,
-      "p_logreg": 0.6723762886937551,
-      "p_specialist": 0.04003686607007076
+      "p_lgb_global": 0.06508983775688573,
+      "p_xgb_global": 0.18672560873059374,
+      "p_logreg": 0.7481845535125206
     },
-    "blender_intercept": -0.4717202739245209,
+    "blender_intercept": -0.470272205947005,
     "blender_coefs": {
-      "p_lgb_global": 0.20490918516852075,
-      "p_xgb_global": 0.24707084843329663,
-      "p_logreg": 0.5268878828918614,
-      "p_specialist": -0.008335470469965517
-    },
-    "specialists": [
-      "light",
-      "welter_middle",
-      "heavy"
-    ]
+      "p_lgb_global": 0.10743818713622648,
+      "p_xgb_global": 0.31137112677691975,
+      "p_logreg": 0.5442721582810947
+    }
   },
   "metrics": {
     "train": {
-      "n": 5415,
-      "accuracy": 0.6441366574330564,
-      "log_loss": 0.6366329628949592,
-      "brier": 0.2228664354271872,
-      "roc_auc": 0.6972344878902089,
-      "market_accuracy": 0.6486751717369971,
-      "market_log_loss": 0.6208337183313487,
-      "market_brier": 0.21620256762005985,
-      "market_n": 1019,
-      "model_accuracy_on_market": 0.6427870461236507,
-      "model_log_loss_on_market": 0.6314772174522314,
-      "model_brier_on_market": 0.2204673970182068
+      "n": 5391,
+      "accuracy": 0.6490447041365238,
+      "log_loss": 0.6326259858884311,
+      "brier": 0.22106897046762894,
+      "roc_auc": 0.7013081773472245,
+      "market_accuracy": 0.6495557749259625,
+      "market_log_loss": 0.6197354075098291,
+      "market_brier": 0.21573558341371965,
+      "market_n": 1013,
+      "model_accuracy_on_market": 0.6544916090819348,
+      "model_log_loss_on_market": 0.6285547231722048,
+      "model_brier_on_market": 0.2191604304739412
     },
     "val": {
-      "n": 433,
-      "accuracy": 0.605080831408776,
-      "log_loss": 0.6458283861223163,
-      "brier": 0.22728604125798946,
-      "roc_auc": 0.6748399487836108,
-      "market_accuracy": 0.7244897959183674,
-      "market_log_loss": 0.5800616408142409,
-      "market_brier": 0.19754360952251526,
-      "market_n": 98,
-      "model_accuracy_on_market": 0.6836734693877551,
-      "model_log_loss_on_market": 0.6239732493445953,
-      "model_brier_on_market": 0.21675612247653667
+      "n": 429,
+      "accuracy": 0.6410256410256411,
+      "log_loss": 0.6433172369784843,
+      "brier": 0.22616383370779536,
+      "roc_auc": 0.6780946997695552,
+      "market_accuracy": 0.7395833333333334,
+      "market_log_loss": 0.5740309876140085,
+      "market_brier": 0.19463046739768708,
+      "market_n": 96,
+      "model_accuracy_on_market": 0.65625,
+      "model_log_loss_on_market": 0.6212571622138188,
+      "model_brier_on_market": 0.21581821286712013
     },
     "test": {
-      "n": 639,
-      "accuracy": 0.6244131455399061,
-      "log_loss": 0.6455546193646143,
-      "brier": 0.22712532945705266,
-      "roc_auc": 0.6760703063629222,
-      "market_accuracy": 0.6816720257234726,
-      "market_log_loss": 0.5980530725739625,
-      "market_brier": 0.2063632327686513,
-      "market_n": 311,
-      "model_accuracy_on_market": 0.639871382636656,
-      "model_log_loss_on_market": 0.6458120244366714,
-      "model_brier_on_market": 0.2270936280090916
+      "n": 635,
+      "accuracy": 0.6251968503937008,
+      "log_loss": 0.6424693899442135,
+      "brier": 0.2257360657505783,
+      "roc_auc": 0.6788241373827317,
+      "market_accuracy": 0.6872964169381107,
+      "market_log_loss": 0.593723323070211,
+      "market_brier": 0.20437897320943296,
+      "market_n": 307,
+      "model_accuracy_on_market": 0.6384364820846905,
+      "model_log_loss_on_market": 0.642775830658929,
+      "model_brier_on_market": 0.22557157330990973
     }
   },
   "split_roles": {
@@ -249,48 +254,41 @@
   "clean_holdout_metric": "test",
   "served_model": {
     "refit_on_all_data": true,
-    "n_rows": 6487,
+    "n_rows": 6455,
     "trained_through": "2026-06-27",
     "note": "served weights = train+val+test; metrics are the split model's honest held-out estimate"
   },
   "test_breakdown_by_learner": {
     "p_lgb_global": {
-      "n": 639,
-      "accuracy": 0.6369327073552425,
-      "log_loss": 0.6548525972009319,
-      "brier": 0.2312442977980192,
-      "roc_auc": 0.6686567164179105
+      "n": 635,
+      "accuracy": 0.6204724409448819,
+      "log_loss": 0.6602960606986299,
+      "brier": 0.23376751225886697,
+      "roc_auc": 0.6799173159484815
     },
     "p_xgb_global": {
-      "n": 639,
-      "accuracy": 0.6416275430359938,
-      "log_loss": 0.6443456590585217,
-      "brier": 0.2261636433430243,
-      "roc_auc": 0.6905832678711704
+      "n": 635,
+      "accuracy": 0.6409448818897637,
+      "log_loss": 0.6452360046070562,
+      "brier": 0.22664616368178314,
+      "roc_auc": 0.6878875814914931
     },
     "p_logreg": {
-      "n": 639,
-      "accuracy": 0.6181533646322379,
-      "log_loss": 0.6472242613072862,
-      "brier": 0.2282112376493455,
-      "roc_auc": 0.6661822466614297
-    },
-    "p_specialist": {
-      "n": 639,
-      "accuracy": 0.5837245696400626,
-      "log_loss": 0.67571968646132,
-      "brier": 0.24139513237715057,
-      "roc_auc": 0.6239689709347996
+      "n": 635,
+      "accuracy": 0.6204724409448819,
+      "log_loss": 0.6444040722933054,
+      "brier": 0.22685155366136125,
+      "roc_auc": 0.671678724757513
     },
     "p_blended": {
-      "n": 639,
-      "accuracy": 0.6244131455399061,
-      "log_loss": 0.6455546193646143,
-      "brier": 0.22712532945705266,
-      "roc_auc": 0.6760703063629222
+      "n": 635,
+      "accuracy": 0.6251968503937008,
+      "log_loss": 0.6424693899442135,
+      "brier": 0.2257360657505783,
+      "roc_auc": 0.6788241373827317
     }
   },
-  "n_train": 5415,
-  "n_val": 433,
-  "n_test": 639
+  "n_train": 5391,
+  "n_val": 429,
+  "n_test": 635
 }

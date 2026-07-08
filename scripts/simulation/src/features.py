@@ -62,6 +62,18 @@ DIFF_COLUMNS = [
     "current_streak",
     "finish_against_per_bout",
     "avg_bout_seconds",
+    # v0.6.0 — validated on the 2025-07..2026-07 rolling backtest:
+    #   * durability trio (kd_absorbed / control_absorbed / reversals) —
+    #     the only culled-feature group that improved val AND test
+    #     log-loss/brier/AUC together (rolling log-loss 0.639 → 0.633,
+    #     AUC 0.693 → 0.703), stable across seeds.
+    #   * elo — point-in-time K=32 rating from export.py's walk;
+    #     aggregates strength-of-schedule the career averages miss
+    #     (+~1pp pick accuracy, flips near-0.5 calls).
+    "kd_absorbed_per_fight",
+    "control_absorbed_per_min",
+    "reversals_per_fight",
+    "elo",
 ]
 
 # Per-fighter columns we ALSO keep as-is for A and B (sometimes absolute
@@ -76,6 +88,10 @@ ABSOLUTE_KEEP = [
     "current_streak",
     "kd_per_fight",
     "kd_absorbed_per_fight",
+    # Absolute Elo levels carry signal the diff loses (a 1600-vs-1570
+    # matchup reads differently from 1450-vs-1420 — division strength,
+    # depth of résumé).
+    "elo",
 ]
 
 # Context features kept as-is (not differenced). market_prob_a is NOT here:

@@ -44,15 +44,14 @@ def main() -> None:
     df = symmetrize_for_training(build_dataset(fetch_raw()))
     X, y, meta = build_feature_matrix(df)
     X = X[feature_names()]
-    meta = meta.merge(df[["bout_id", "weight_class"]], on="bout_id", how="left")
-    Xs, ys, metas, gs = temporal_split(X, y, meta)
+    Xs, ys, metas = temporal_split(X, y, meta)
 
     if ENSEMBLE_DIR.name != "ensemble_eval":
         print("WARNING: eval_market.py: ensemble_eval/ missing — evaluating the "
               "served (all-data) model; test-split numbers are IN-SAMPLE. "
               "Retrain to regenerate the eval model.")
     ensemble = EnsembleModel.load(ENSEMBLE_DIR)
-    probs = ensemble.predict_proba_a(Xs["test"], gs["test"])
+    probs = ensemble.predict_proba_a(Xs["test"])
     y_test = ys["test"].to_numpy()
     # market_prob_a rides on `meta` and is reset_index'd off the same mask as
     # Xs["test"] / ys["test"], so it's positionally aligned with `probs`. The

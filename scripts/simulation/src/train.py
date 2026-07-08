@@ -1,6 +1,5 @@
-"""Phase 5 — train the EnsembleModel (LightGBM + XGBoost + LogReg + per-class
-LightGBM specialists, blended by a small LogReg + isotonic calibration).
-Artifacts go to scripts/simulation/artifacts/ensemble/."""
+"""Train the EnsembleModel (LightGBM + XGBoost + LogReg, blended on the
+val split). Artifacts go to scripts/simulation/artifacts/ensemble/."""
 
 from __future__ import annotations
 
@@ -29,7 +28,7 @@ from .config import (
     TRAIN_END,
     VAL_END,
 )
-from .ensemble import EnsembleModel, weight_group
+from .ensemble import EnsembleModel
 from .features import build_feature_matrix, feature_names
 
 console = Console()
@@ -43,7 +42,7 @@ ENSEMBLE_EVAL_DIR = ARTIFACTS_DIR / "ensemble_eval"
 
 # What each temporal split is actually USED for — so the report doesn't present
 # the val number as a clean generalization estimate. val is consumed 3–4×
-# (LGB/XGB/specialist early-stopping → blender fit → blend-mode argmin), so its
+# (LGB/XGB early-stopping → blender fit → blend-mode argmin), so its
 # headline logloss is the very quantity minimized (it equals
 # val_blend_logloss[best_mode]) and is optimistic by construction. TEST is the
 # only split untouched by any fitting/selection — the one honest metric.
@@ -57,11 +56,9 @@ CLEAN_HOLDOUT_SPLIT = "test"
 
 def temporal_split(
     X: pd.DataFrame, y: pd.Series, meta: pd.DataFrame
-) -> tuple[dict, dict, dict, dict]:
-    """Train / val / test split by event_date, plus per-row weight-group
-    assignment so the ensemble's specialists can pick their subset."""
+) -> tuple[dict, dict, dict]:
+    """Train / val / test split by event_date."""
     dt = pd.to_datetime(meta["event_date"])
-    groups = meta["weight_class"].apply(weight_group).reset_index(drop=True)
     train_end = pd.to_datetime(TRAIN_END)
     val_end = pd.to_datetime(VAL_END)
     train_mask = dt < train_end
@@ -82,16 +79,11 @@ def temporal_split(
         "val": meta.loc[val_mask].reset_index(drop=True),
         "test": meta.loc[test_mask].reset_index(drop=True),
     }
-    gs = {
-        "train": groups.loc[train_mask].reset_index(drop=True),
-        "val": groups.loc[val_mask].reset_index(drop=True),
-        "test": groups.loc[test_mask].reset_index(drop=True),
-    }
     console.log(
         f"split sizes — train {len(Xs['train']):,} · val {len(Xs['val']):,} · "
         f"test {len(Xs['test']):,}"
     )
-    return Xs, ys, metas, gs
+    return Xs, ys, metas
 
 
 def _load_tuned_params() -> dict:
@@ -234,13 +226,7 @@ def run_training(df: pd.DataFrame) -> dict[str, dict[str, float]]:
     cols = feature_names()
     X = X[cols]
 
-    # meta needs weight_class for the splitter; build_feature_matrix
-    # drops it, so pull from the source df via the bout_id join.
-    meta = meta.merge(
-        df[["bout_id", "weight_class"]], on="bout_id", how="left"
-    )
-
-    Xs, ys, metas, gs = temporal_split(X, y, meta)
+    Xs, ys, metas = temporal_split(X, y, meta)
     if len(Xs["train"]) == 0 or len(Xs["val"]) == 0:
         raise RuntimeError(
             "Empty train or val split. Check TRAIN_END / VAL_END vs your data range."
@@ -259,25 +245,22 @@ def run_training(df: pd.DataFrame) -> dict[str, dict[str, float]]:
         lgb_early_stopping=LGB_EARLY_STOPPING_ROUNDS,
     )
 
-    console.log("training ensemble (LGB + XGB + LogReg + per-class specialists)…")
+    console.log("training ensemble (LGB + XGB + LogReg)…")
     train_meta = ensemble.fit(
         X_train=Xs["train"],
         y_train=ys["train"],
-        groups_train=gs["train"],
         X_val=Xs["val"],
         y_val=ys["val"],
-        groups_val=gs["val"],
     )
     console.log(
         "blender coefs: "
         + " ".join(f"{k}={v:+.2f}" for k, v in train_meta["blender_coefs"].items())
-        + f" · specialists trained: {train_meta['specialists']}"
     )
 
     # Headline blended metrics per split.
     metrics: dict[str, dict[str, float]] = {}
     for name in ("train", "val", "test"):
-        probs = ensemble.predict_proba_a(Xs[name], gs[name])
+        probs = ensemble.predict_proba_a(Xs[name])
         # market_prob_a rides on `meta` (build_feature_matrix), so metas[name]
         # is reset_index'd off the SAME mask as Xs[name]/ys[name] — i.e. row i
         # of `market` is row i of `probs`. The previous code indexed the FULL
@@ -295,7 +278,7 @@ def run_training(df: pd.DataFrame) -> dict[str, dict[str, float]]:
 
     # Per-learner test performance so we see whether the ensemble is
     # actually pulling its weight vs the strongest single model.
-    test_breakdown = ensemble.predict_proba_breakdown(Xs["test"], gs["test"])
+    test_breakdown = ensemble.predict_proba_breakdown(Xs["test"])
     by_learner: dict[str, dict[str, float]] = {}
     for learner_name, probs in test_breakdown.items():
         by_learner[learner_name] = evaluate_probs(probs, ys["test"])
@@ -306,7 +289,6 @@ def run_training(df: pd.DataFrame) -> dict[str, dict[str, float]]:
     # TRAIN_END (the split model never sees val/test, ~2.5yr stale by mid-2026).
     # The split-trained `ensemble` stays the source of the honest held-out
     # metrics above; `prod` is what we actually save + serve.
-    groups_all = meta["weight_class"].apply(weight_group).reset_index(drop=True)
 
     # Persist the EVAL (split-trained) model so eval_market / eval_calibration
     # keep evaluating out-of-sample (the served model below is refit on all data).
@@ -314,7 +296,7 @@ def run_training(df: pd.DataFrame) -> dict[str, dict[str, float]]:
     ensemble.save(ENSEMBLE_EVAL_DIR)
 
     console.log(f"refitting production model on ALL {len(X):,} rows (served weights)…")
-    prod = ensemble.refit_on_all(X, y, groups_all)
+    prod = ensemble.refit_on_all(X, y)
     served_through = str(pd.to_datetime(meta["event_date"]).max().date())
 
     # Persist artifacts — the PRODUCTION (refit-on-all) model is what we serve.

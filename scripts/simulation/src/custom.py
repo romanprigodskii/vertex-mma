@@ -21,8 +21,7 @@ fantasy matchups stay fair:
 
 Context: 5 scheduled rounds, main event, non-title. Weight class = the
 shared class of both as-of bouts when they agree, else 'catchweight'
-(→ wc_other flag; the ensemble routes catchweight to the welter_middle
-specialist, its documented fallback).
+(→ wc_other flag).
 
 The worker (scripts/run_custom.py) polls the custom_simulation queue
 written by the Next.js server action, scores each pending row with the
@@ -43,8 +42,14 @@ from psycopg.types.json import Jsonb
 from rich.console import Console
 
 from .db import get_connection
-from .ensemble import weight_group
-from .export import FighterHistory, _fight_duration_seconds, stable_hash, swap_sides
+from .export import (
+    ELO_INITIAL,
+    ELO_K,
+    FighterHistory,
+    _fight_duration_seconds,
+    stable_hash,
+    swap_sides,
+)
 from .features import build_feature_matrix
 from .monte_carlo import FighterMC, simulate_bout
 from .predict import LoadedModel
@@ -72,6 +77,51 @@ _STD_WC = {
 # --------------------------------------------------------------------------
 # Per-fighter form snapshot
 # --------------------------------------------------------------------------
+
+# Every completed UFC bout, chronological — the Elo walk needs the FULL
+# timeline (each update depends on the opponent's rating at that moment),
+# so a single-fighter history can't reproduce it.
+ALL_BOUTS_ELO_SQL = """
+SELECT
+  b.id::text AS bout_id,
+  b.fighter_a_id::text AS fighter_a_id,
+  b.fighter_b_id::text AS fighter_b_id,
+  b.winner_id::text AS winner_id,
+  b.method::text AS method
+FROM bout b
+JOIN event e ON e.id = b.event_id
+WHERE e.promotion = 'ufc' AND b.status = 'completed'
+ORDER BY e.date ASC, b.bout_order ASC NULLS LAST, b.id ASC
+"""
+
+
+def compute_elo_maps(conn) -> tuple[dict[tuple[str, str], float], dict[str, float]]:
+    """Replay the full bout timeline with the same K/skip rules as
+    export.build_dataset. Returns (post_bout, current):
+      * post_bout[(bout_id, fighter_id)] — rating right AFTER that bout,
+        matching the "form as of bout X includes X" contract (same as the
+        vertex anchor written AT the bout);
+      * current[fighter_id] — rating after their whole history.
+    """
+    ratings: dict[str, float] = {}
+    post: dict[tuple[str, str], float] = {}
+    with conn.cursor() as cur:
+        cur.execute(ALL_BOUTS_ELO_SQL)
+        for bout_id, fa, fb, winner, method in cur.fetchall():
+            ra = ratings.get(fa, ELO_INITIAL)
+            rb = ratings.get(fb, ELO_INITIAL)
+            # Decisive results only — draws/NCs leave ratings untouched.
+            if winner in (fa, fb) and method != "no_contest":
+                expected_a = 1.0 / (1.0 + 10.0 ** ((rb - ra) / 400.0))
+                score_a = 1.0 if winner == fa else 0.0
+                ra += ELO_K * (score_a - expected_a)
+                rb += ELO_K * ((1.0 - score_a) - (1.0 - expected_a))
+                ratings[fa] = ra
+                ratings[fb] = rb
+            post[(bout_id, fa)] = ra
+            post[(bout_id, fb)] = rb
+    return post, ratings
+
 
 FIGHTER_BOUTS_SQL = """
 SELECT
@@ -153,6 +203,7 @@ class FormSnapshot:
     weight_class: str | None  # weight class of the anchoring bout
     age_years: float | None
     record: str  # "W-L" (draws appended when non-zero) at the anchor
+    elo: float  # point-in-time Elo (post-anchor for as-of, current otherwise)
 
 
 class SnapshotError(Exception):
@@ -160,8 +211,19 @@ class SnapshotError(Exception):
 
 
 def build_form_snapshot(
-    conn, fighter_id: str, as_of_bout_id: str | None, *, today: date
+    conn,
+    fighter_id: str,
+    as_of_bout_id: str | None,
+    *,
+    today: date,
+    elo_maps: tuple[dict[tuple[str, str], float], dict[str, float]] | None = None,
 ) -> FormSnapshot:
+    # The Elo walk needs the full bout timeline; callers scoring several
+    # snapshots (process_pending) pass a precomputed pair to avoid
+    # replaying it per side.
+    if elo_maps is None:
+        elo_maps = compute_elo_maps(conn)
+    elo_post, elo_current = elo_maps
     with conn.cursor() as cur:
         cur.execute(FIGHTER_INFO_SQL, (fighter_id,))
         info_row = cur.fetchone()
@@ -263,6 +325,14 @@ def build_form_snapshot(
     if draws > 0:
         record += f"-{draws}"
 
+    # Point-in-time Elo mirrors the vertex anchor semantics: an as-of form
+    # carries the rating right AFTER the anchoring bout; current form
+    # carries the rating after the full history.
+    if as_of_bout_id is not None:
+        elo = elo_post.get((anchor["bout_id"], fighter_id), ELO_INITIAL)
+    else:
+        elo = elo_current.get(fighter_id, ELO_INITIAL)
+
     return FormSnapshot(
         fighter_id=fighter_id,
         snapshot=snapshot,
@@ -273,6 +343,7 @@ def build_form_snapshot(
         weight_class=anchor["weight_class"],
         age_years=age,
         record=record,
+        elo=elo,
     )
 
 
@@ -288,7 +359,7 @@ def _sim_weight_class(a: FormSnapshot, b: FormSnapshot) -> str:
         and a.weight_class in _STD_WC
     ):
         return a.weight_class
-    return "catchweight"  # → wc_other one-hot; specialist falls back
+    return "catchweight"  # → wc_other one-hot
 
 
 def score_pair(
@@ -316,6 +387,8 @@ def score_pair(
         "stance_a": a.info.get("stance"),
         "stance_b": b.info.get("stance"),
         "gender": gender,
+        "elo_a": a.elo,
+        "elo_b": b.elo,
         "market_prob_a": None,
         "target_a_wins": 0,  # dummy — build_feature_matrix selects on it
     }
@@ -326,11 +399,10 @@ def score_pair(
 
     df = pd.DataFrame([row])
     X, _, _ = build_feature_matrix(df)
-    groups = pd.Series([weight_group(wc)])
     X_swapped, _, _ = build_feature_matrix(swap_sides(df))
     # Order-invariant winner prob, same as predict.py.
-    p_orig = float(model.predict_proba_a(X, groups)[0])
-    p_swap = float(model.predict_proba_a(X_swapped, groups)[0])
+    p_orig = float(model.predict_proba_a(X)[0])
+    p_swap = float(model.predict_proba_a(X_swapped)[0])
     prob_a = 0.5 * (p_orig + (1.0 - p_swap))
 
     mc = simulate_bout(
@@ -424,10 +496,13 @@ def process_pending(model: LoadedModel, *, limit: int = 10) -> int:
         with conn.cursor() as cur:
             cur.execute(CLAIM_SQL, (limit,))
             jobs = cur.fetchall()
+        # One full-timeline Elo replay per batch (not per side) — the walk
+        # is the expensive part of snapshot building.
+        elo_maps = compute_elo_maps(conn) if jobs else None
         for sim_id, fa, fb, asof_a, asof_b in jobs:
             try:
-                snap_a = build_form_snapshot(conn, fa, asof_a, today=today)
-                snap_b = build_form_snapshot(conn, fb, asof_b, today=today)
+                snap_a = build_form_snapshot(conn, fa, asof_a, today=today, elo_maps=elo_maps)
+                snap_b = build_form_snapshot(conn, fb, asof_b, today=today, elo_maps=elo_maps)
                 result = score_pair(model, sim_id, snap_a, snap_b)
                 with conn.cursor() as cur:
                     cur.execute(

@@ -90,14 +90,13 @@ def main() -> None:
     df = symmetrize_for_training(build_dataset(fetch_raw()))
     X, y, meta = build_feature_matrix(df)
     X = X[feature_names()]
-    meta = meta.merge(df[["bout_id", "weight_class"]], on="bout_id", how="left")
-    Xs, ys, metas, gs = temporal_split(X, y, meta)
+    Xs, ys, metas = temporal_split(X, y, meta)
 
     ens = EnsembleModel.load(ENSEMBLE_DIR)
     # predict_proba_a applies the (currently None) calibrator → this IS the
     # uncalibrated blended prob.
-    p_val = ens.predict_proba_a(Xs["val"], gs["val"])
-    p_test = ens.predict_proba_a(Xs["test"], gs["test"])
+    p_val = ens.predict_proba_a(Xs["val"])
+    p_test = ens.predict_proba_a(Xs["test"])
     y_val = ys["val"].to_numpy().astype(int)
     y_test = ys["test"].to_numpy().astype(int)
 

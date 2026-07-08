@@ -1,5 +1,5 @@
-"""Ensemble model: blend of several base learners trained on the same
-feature matrix, plus per-weight-class LightGBM specialists.
+"""Ensemble model: blend of three base learners trained on the same
+feature matrix.
 
 Base learners (always trained on the global dataset):
   - LightGBM (Optuna-tuned hyperparameters)
@@ -8,17 +8,14 @@ Base learners (always trained on the global dataset):
     blend has both tree and linear viewpoints — these disagree on
     extrapolation cases the GBTs overfit on small data)
 
-Specialists (per weight-class group):
-  - "light"         : strawweight + flyweight + bantamweight + featherweight + lightweight
-  - "welter_middle" : welterweight + middleweight
-  - "heavy"         : light_heavyweight + heavyweight
+v0.6.0 dropped the per-weight-class LightGBM specialists: on every
+honest evaluation (served split AND the 2025-07..2026-07 rolling
+backtest) the specialist was the worst learner by a wide margin
+(solo log-loss ~0.68 vs ~0.64 for the others — each weight group has
+too little data to beat the global model it was forked from) and
+removing it from the blend never hurt any metric.
 
-Each bout maps to exactly one group; the specialist's prediction is
-used as the 4th input to the blender. Because there's only one
-specialist per bout, the blender doesn't need to know which group —
-it just sees a single "p_specialist" column.
-
-Blender: LogisticRegression on the four base predictions evaluated on
+Blender: LogisticRegression on the three base predictions evaluated on
 the validation split (one of three modes — logreg / mean / weighted_mean —
 picked on val log-loss in fit()).
 
@@ -46,51 +43,6 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
 
 
-# Map every weight_class value to one of three training groups. Unknown
-# classes (catchweight, openweight, NULL) fall back to "welter_middle"
-# because that group has the most data and the broadest style mix.
-WEIGHT_GROUP_MAP: dict[str, str] = {
-    "strawweight": "light",
-    "flyweight": "light",
-    "bantamweight": "light",
-    "featherweight": "light",
-    "lightweight": "light",
-    "welterweight": "welter_middle",
-    "middleweight": "welter_middle",
-    "light_heavyweight": "heavy",
-    "heavyweight": "heavy",
-}
-GROUP_NAMES = ("light", "welter_middle", "heavy")
-
-
-def weight_group(weight_class: str | None) -> str:
-    if weight_class is None:
-        return "welter_middle"
-    return WEIGHT_GROUP_MAP.get(weight_class, "welter_middle")
-
-
-def derive_group_from_features(X_row: pd.Series) -> str:
-    """Recover the weight group from a one-hot feature row at predict
-    time. Falls back to 'welter_middle' when no wc_* column is hot
-    (catchweight / openweight)."""
-    for col in (
-        "wc_strawweight",
-        "wc_flyweight",
-        "wc_bantamweight",
-        "wc_featherweight",
-        "wc_lightweight",
-    ):
-        if X_row.get(col, 0) == 1:
-            return "light"
-    for col in ("wc_welterweight", "wc_middleweight"):
-        if X_row.get(col, 0) == 1:
-            return "welter_middle"
-    for col in ("wc_light_heavyweight", "wc_heavyweight"):
-        if X_row.get(col, 0) == 1:
-            return "heavy"
-    return "welter_middle"
-
-
 class EnsembleModel:
     """Container with persistence — handles training all sub-models and
     blending them into a single probability (blended, not post-hoc
@@ -114,7 +66,6 @@ class EnsembleModel:
         self.scaler: StandardScaler | None = None
         # Imputer values learned on train for logreg (mean per column).
         self.logreg_means: np.ndarray | None = None
-        self.lgb_specialists: dict[str, lgb.Booster] = {}
         self.blender: LogisticRegression | None = None
         self.calibrator: IsotonicRegression | None = None
         self.training_meta: dict[str, Any] = {}
@@ -216,10 +167,8 @@ class EnsembleModel:
         self,
         X_train: pd.DataFrame,
         y_train: pd.Series,
-        groups_train: pd.Series,
         X_val: pd.DataFrame,
         y_val: pd.Series,
-        groups_val: pd.Series,
     ) -> dict[str, Any]:
         # 1. Train base learners on the full train split.
         self.lgb_global = self._train_lgb(X_train, y_train, X_val, y_val)
@@ -228,28 +177,10 @@ class EnsembleModel:
             X_train, y_train
         )
 
-        # 2. Specialists per weight group. Each gets the SAME val split
-        # (the small-group val numbers are noisy but we use them only
-        # for early stopping; the blender is what protects us downstream).
-        for g in GROUP_NAMES:
-            mask_tr = groups_train == g
-            mask_va = groups_val == g
-            if mask_tr.sum() < 200 or mask_va.sum() < 20:
-                # Not enough data to fit a specialist for this group; the
-                # ensemble silently falls back to the global LGB
-                # prediction for these bouts.
-                continue
-            self.lgb_specialists[g] = self._train_lgb(
-                X_train.loc[mask_tr].reset_index(drop=True),
-                y_train.loc[mask_tr].reset_index(drop=True),
-                X_val.loc[mask_va].reset_index(drop=True),
-                y_val.loc[mask_va].reset_index(drop=True),
-            )
+        # 2. Build val-set base predictions for the blender.
+        val_preds = self._base_predict_matrix(X_val)
 
-        # 3. Build val-set base predictions for the blender.
-        val_preds = self._base_predict_matrix(X_val, groups_val)
-
-        # 4. Pick the best of three blend strategies on val log-loss:
+        # 3. Pick the best of three blend strategies on val log-loss:
         #
         #   * "logreg"        — full LogReg blender (C=0.1). Best when
         #                       val signal is strong; can over-weight
@@ -313,7 +244,7 @@ class EnsembleModel:
             "weighted_mean_weights": {
                 name: float(w)
                 for name, w in zip(
-                    ["p_lgb_global", "p_xgb_global", "p_logreg", "p_specialist"],
+                    ["p_lgb_global", "p_xgb_global", "p_logreg"],
                     self._blend_weights,
                     strict=False,
                 )
@@ -322,12 +253,11 @@ class EnsembleModel:
             "blender_coefs": {
                 name: float(c)
                 for name, c in zip(
-                    ["p_lgb_global", "p_xgb_global", "p_logreg", "p_specialist"],
+                    ["p_lgb_global", "p_xgb_global", "p_logreg"],
                     blender.coef_[0],
                     strict=False,
                 )
             },
-            "specialists": list(self.lgb_specialists.keys()),
         }
         return self.training_meta
 
@@ -337,7 +267,6 @@ class EnsembleModel:
         self,
         X_all: pd.DataFrame,
         y_all: pd.Series,
-        groups_all: pd.Series,
     ) -> "EnsembleModel":
         """Return a PRODUCTION ensemble whose base learners are refit on the
         FULL dataset (train+val+test), so the SERVED weights include the most
@@ -353,7 +282,6 @@ class EnsembleModel:
         assert self.lgb_global is not None and self.xgb_global is not None
         X_all = X_all.reset_index(drop=True)
         y_all = y_all.reset_index(drop=True)
-        groups_all = groups_all.reset_index(drop=True)
 
         prod = EnsembleModel(
             feature_columns=self.feature_columns,
@@ -366,16 +294,6 @@ class EnsembleModel:
         xgb_rounds = (self.xgb_global.best_iteration or 1000) + 1
         prod.xgb_global = self._train_xgb_fixed(X_all, y_all, xgb_rounds)
         prod.logreg, prod.scaler, prod.logreg_means = self._train_logreg(X_all, y_all)
-        for g, spec in self.lgb_specialists.items():
-            mask = (groups_all == g).to_numpy()
-            if mask.sum() == 0:
-                continue
-            spec_rounds = spec.best_iteration or self.lgb_num_rounds
-            prod.lgb_specialists[g] = self._train_lgb_fixed(
-                X_all.loc[mask].reset_index(drop=True),
-                y_all.loc[mask].reset_index(drop=True),
-                spec_rounds,
-            )
         # Transfer the blend config unchanged (meta-params selected on val).
         prod.blender = self.blender
         prod.calibrator = self.calibrator
@@ -387,11 +305,9 @@ class EnsembleModel:
 
     # ── prediction ─────────────────────────────────────────────────────
 
-    def _base_predict_matrix(
-        self, X: pd.DataFrame, groups: pd.Series
-    ) -> np.ndarray:
-        """Stack base predictions as [p_lgb, p_xgb, p_logreg, p_specialist]
-        with one row per input bout."""
+    def _base_predict_matrix(self, X: pd.DataFrame) -> np.ndarray:
+        """Stack base predictions as [p_lgb, p_xgb, p_logreg] with one row
+        per input bout."""
         assert self.lgb_global is not None
         assert self.xgb_global is not None
         assert self.logreg is not None
@@ -406,32 +322,14 @@ class EnsembleModel:
         xgb_range = (0, int(xgb_best) + 1) if xgb_best is not None else (0, 0)
         p_xgb = self.xgb_global.predict(xgb.DMatrix(X), iteration_range=xgb_range)
         p_log = self.logreg.predict_proba(self.scaler.transform(X_filled.values))[:, 1]
-        p_spec = np.empty(len(X), dtype=np.float64)
-        for i, g in enumerate(groups.values):
-            spec = self.lgb_specialists.get(g)
-            if spec is None:
-                # No specialist for this weight group → fall back to the global
-                # LGB. NB: the blender's 4th input was trained as a REAL
-                # specialist, so this fallback feeds it an off-distribution value
-                # — a known minor inconsistency that's inert in practice because
-                # all three groups (light / welter_middle / heavy) always train a
-                # specialist (the <200-row guard in fit() never trips on the full
-                # dataset). It would only bite a future tiny/odd group.
-                p_spec[i] = p_lgb[i]
-            else:
-                p_spec[i] = spec.predict(
-                    X.iloc[[i]], num_iteration=spec.best_iteration
-                )[0]
-        return np.column_stack([p_lgb, p_xgb, p_log, p_spec])
+        return np.column_stack([p_lgb, p_xgb, p_log])
 
-    def predict_proba_a(
-        self, X: pd.DataFrame, groups: pd.Series
-    ) -> np.ndarray:
+    def predict_proba_a(self, X: pd.DataFrame) -> np.ndarray:
         """Final P(A wins). Blend mode is picked at fit() time on val
         log-loss — see EnsembleModel.fit for the three options
         (logreg / mean / weighted_mean)."""
         assert self.blender is not None
-        base = self._base_predict_matrix(X, groups)
+        base = self._base_predict_matrix(X)
         mode = getattr(self, "_blend_mode", None)
         if mode == "mean":
             return base.mean(axis=1)
@@ -443,18 +341,15 @@ class EnsembleModel:
         # Default / "logreg" mode.
         return self.blender.predict_proba(base)[:, 1]
 
-    def predict_proba_breakdown(
-        self, X: pd.DataFrame, groups: pd.Series
-    ) -> dict[str, np.ndarray]:
+    def predict_proba_breakdown(self, X: pd.DataFrame) -> dict[str, np.ndarray]:
         """Per-learner predictions — handy for debugging blender weights
         and for the metadata report."""
-        base = self._base_predict_matrix(X, groups)
+        base = self._base_predict_matrix(X)
         return {
             "p_lgb_global": base[:, 0],
             "p_xgb_global": base[:, 1],
             "p_logreg": base[:, 2],
-            "p_specialist": base[:, 3],
-            "p_blended": self.predict_proba_a(X, groups),
+            "p_blended": self.predict_proba_a(X),
         }
 
     # ── persistence ────────────────────────────────────────────────────
@@ -465,8 +360,11 @@ class EnsembleModel:
         assert self.xgb_global is not None
         self.lgb_global.save_model(str(dir_path / "lgb_global.lgb"))
         self.xgb_global.save_model(str(dir_path / "xgb_global.json"))
-        for g, model in self.lgb_specialists.items():
-            model.save_model(str(dir_path / f"lgb_specialist_{g}.lgb"))
+        # v0.6.0 dropped the weight-class specialists — clear out any
+        # lgb_specialist_*.lgb files a previous version left in this dir so
+        # the artifact set on disk always matches the loaded model.
+        for stale in dir_path.glob("lgb_specialist_*.lgb"):
+            stale.unlink()
         joblib.dump(self.logreg, dir_path / "logreg.pkl")
         joblib.dump(self.scaler, dir_path / "logreg_scaler.pkl")
         np.save(dir_path / "logreg_means.npy", self.logreg_means)
@@ -494,10 +392,6 @@ class EnsembleModel:
         m.lgb_global = lgb.Booster(model_file=str(dir_path / "lgb_global.lgb"))
         m.xgb_global = xgb.Booster()
         m.xgb_global.load_model(str(dir_path / "xgb_global.json"))
-        for g in GROUP_NAMES:
-            p = dir_path / f"lgb_specialist_{g}.lgb"
-            if p.exists():
-                m.lgb_specialists[g] = lgb.Booster(model_file=str(p))
         m.logreg = joblib.load(dir_path / "logreg.pkl")
         m.scaler = joblib.load(dir_path / "logreg_scaler.pkl")
         m.logreg_means = np.load(dir_path / "logreg_means.npy")

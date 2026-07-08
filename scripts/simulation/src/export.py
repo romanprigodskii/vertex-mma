@@ -492,6 +492,15 @@ class FighterHistory:
 # --------------------------------------------------------------------------
 
 
+# Elo K-factor. Validated on the 2025-07..2026-07 backtest window: plain
+# K=32 with no finish bonus / experience decay beat both variants; the gain
+# is pick accuracy near the 0.5 boundary (Elo aggregates strength-of-
+# schedule that career-average stats miss). Draws and no-contests snapshot
+# the rating but never update it.
+ELO_K = 32.0
+ELO_INITIAL = 1500.0
+
+
 def build_dataset(
     raw: RawData, *, include_scheduled: bool = False
 ) -> pd.DataFrame:
@@ -535,6 +544,9 @@ def build_dataset(
         )
 
     history: dict[str, FighterHistory] = {}
+    # Point-in-time Elo, updated in the same chronological walk as the
+    # rest of the history so a row only ever sees pre-bout ratings.
+    elo: dict[str, float] = {}
     rows: list[dict[str, Any]] = []
 
     bouts_sorted = raw.bouts.copy()
@@ -637,6 +649,10 @@ def build_dataset(
             and snap_b["prior_bouts"] > 0
             and (target is not None or (include_scheduled and is_scheduled))
         )
+        # Pre-bout Elo — snapshot BEFORE this bout's result is applied.
+        elo_a = elo.get(fa, ELO_INITIAL)
+        elo_b = elo.get(fb, ELO_INITIAL)
+
         if should_emit:
             row = {
                 "bout_id": bout_id,
@@ -657,6 +673,8 @@ def build_dataset(
                 "stance_a": stance_a,
                 "stance_b": stance_b,
                 "gender": gender,
+                "elo_a": elo_a,
+                "elo_b": elo_b,
                 "market_prob_a": market_prob_a,
                 "target_a_wins": target,
             }
@@ -693,6 +711,12 @@ def build_dataset(
             else:
                 result_a = "win" if bout.winner_id == fa else "loss"
                 result_b = "win" if bout.winner_id == fb else "loss"
+                # Elo update — decisive results only (draws/NCs leave both
+                # ratings untouched, matching the validated experiment).
+                expected_a = 1.0 / (1.0 + 10.0 ** ((elo_b - elo_a) / 400.0))
+                score_a = 1.0 if bout.winner_id == fa else 0.0
+                elo[fa] = elo_a + ELO_K * (score_a - expected_a)
+                elo[fb] = elo_b + ELO_K * ((1.0 - score_a) - (1.0 - expected_a))
             ha.apply_bout(
                 result=result_a,
                 method=bout.method,

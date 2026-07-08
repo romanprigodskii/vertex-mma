@@ -23,7 +23,7 @@ from rich.console import Console
 
 from .config import ARTIFACTS_DIR, confidence_label
 from .db import get_connection
-from .ensemble import EnsembleModel, weight_group
+from .ensemble import EnsembleModel
 from .export import build_dataset, fetch_raw, stable_hash, swap_sides
 from .features import build_feature_matrix
 from .monte_carlo import FighterMC, simulate_bout
@@ -50,9 +50,9 @@ class LoadedModel:
         self.feature_columns: list[str] = self.metadata["feature_columns"]
         self.model_version: str = self.metadata["model_version"]
 
-    def predict_proba_a(self, X: pd.DataFrame, groups: pd.Series) -> np.ndarray:
+    def predict_proba_a(self, X: pd.DataFrame) -> np.ndarray:
         X = X[self.feature_columns]
-        return self.ensemble.predict_proba_a(X, groups)
+        return self.ensemble.predict_proba_a(X)
 
     def shap_contributions(self, X: pd.DataFrame) -> np.ndarray:
         """TreeSHAP values from the ENSEMBLE's global LightGBM. The
@@ -87,19 +87,14 @@ def predict_upcoming(*, force_version: str | None = None) -> int:
     upcoming_fill = upcoming.copy()
     upcoming_fill["target_a_wins"] = 0
     X, _, meta = build_feature_matrix(upcoming_fill)
-    # Weight-group per bout — needed so the ensemble can route to the
-    # right per-class specialist. Pulled from the upcoming DataFrame
-    # which carries weight_class through from build_dataset. Weight class is
-    # order-independent, so the same groups apply to the swapped order below.
-    groups = upcoming["weight_class"].apply(weight_group).reset_index(drop=True)
 
     # Order-invariant winner prob: the model isn't perfectly antisymmetric
     # (abs_*_a/_b, stance one-hots), so the raw scrape order would leak into
     # the prediction. Score both orders and average:
     #   P(A wins) = ½·[ predict(A,B) + (1 − predict(B,A)) ].
     X_swapped, _, _ = build_feature_matrix(swap_sides(upcoming_fill))
-    probs_a_orig = model.predict_proba_a(X, groups)
-    probs_a_swapped = model.predict_proba_a(X_swapped, groups)
+    probs_a_orig = model.predict_proba_a(X)
+    probs_a_swapped = model.predict_proba_a(X_swapped)
     probs_a = 0.5 * (probs_a_orig + (1.0 - probs_a_swapped))
     # SHAP stays on the original order — it explains this row's inputs as
     # scraped; the headline prob is the symmetrized one above.
