@@ -28,6 +28,8 @@
     "scrape:country:dry": "cd scripts/scraper && ./venv/bin/python scripts/06_backfill_country.py --dry-run --limit 5 --workers 1",
     "scrape:scorecards": "cd scripts/scraper && ./venv/bin/python scripts/07_scrape_scorecards.py",
     "scrape:scorecards:dry": "cd scripts/scraper && ./venv/bin/python scripts/07_scrape_scorecards.py --dry-run --limit 5",
+    "scrape:sherdog": "cd scripts/scraper && ./venv/bin/python scripts/17_scrape_sherdog.py",
+    "scrape:sherdog:dry": "cd scripts/scraper && ./venv/bin/python scripts/17_scrape_sherdog.py --dry-run --limit 5",
     "photos:setup": "cd scripts/photo_scraper && python3 -m venv venv && ./venv/bin/pip install -r requirements.txt",
     "photos:dry": "cd scripts/photo_scraper && ./venv/bin/python scripts/fetch_photos.py --limit 5 --dry-run",
     "photos:fetch": "cd scripts/photo_scraper && ./venv/bin/python scripts/fetch_photos.py --workers 4",

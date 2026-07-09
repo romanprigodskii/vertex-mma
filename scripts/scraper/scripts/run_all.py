@@ -16,6 +16,10 @@ PHASES = {
     "enrich-bouts": "05_enrich_bouts.py",
     "scorecards": "07_scrape_scorecards.py",
     "odds": "08_scrape_bestfightodds.py",
+    # Sherdog pre-UFC fight histories (incremental: new + upcoming-bout
+    # fighters). Not in any group — the cron wrapper calls the standalone
+    # entrypoint directly; --full backfill lives only there too.
+    "sherdog": "17_scrape_sherdog.py",
 }
 
 PHASE_GROUPS = {

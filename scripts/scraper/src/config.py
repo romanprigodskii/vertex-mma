@@ -18,6 +18,13 @@ REQUEST_TIMEOUT = 30.0
 # Re-sync fighter detail pages older than this (days).
 FIGHTER_RESYNC_DAYS = 30
 
+# Sherdog (pre-UFC fight history). Heavier pages + we're a guest there —
+# keep a full second between requests. Upcoming-bout fighters get their
+# history re-scraped when older than the resync window (regional results
+# and late-notice debutant records change close to fight day).
+SHERDOG_RATE_LIMIT_SECONDS = 1.0
+SHERDOG_RESYNC_DAYS = 7
+
 # Checkpoint cadence
 CHECKPOINT_EVERY_FIGHTERS = 50
 CHECKPOINT_EVERY_BOUTS = 100

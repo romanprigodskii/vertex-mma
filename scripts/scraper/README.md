@@ -38,6 +38,14 @@ The scraper reads `DATABASE_URL` from `../../.env.local`, so make sure the proje
 
 # Small real run for verification.
 ./venv/bin/python scripts/run_all.py --phase quick --limit 20
+
+# Sherdog pre-UFC fight histories (step 17). Incremental by default:
+# never-attempted fighters + upcoming-bout fighters (unmatched retries and
+# stale re-syncs). Feeds the sim model's pre-UFC features.
+./venv/bin/python scripts/17_scrape_sherdog.py                 # incremental
+./venv/bin/python scripts/17_scrape_sherdog.py --full          # everyone (~4 h)
+./venv/bin/python scripts/17_scrape_sherdog.py --retry-unmatched  # 2nd pass
+./venv/bin/python scripts/run_all.py --phase sherdog           # same incremental
 ```
 
 ## Resumability
@@ -46,9 +54,11 @@ Phases 4 and 5 write a checkpoint file (`.checkpoint_fighters.json`, `.checkpoin
 
 Phases 1–3 are naturally idempotent — they upsert by `ufc_stats_id`, so re-running just refreshes existing rows.
 
+Step 17 (Sherdog) checkpoints every 50 fighters to `.checkpoint_sherdog.json` for intra-run resume and DELETES the file on clean completion — cross-run scheduling is driven by DB state (`fighter.sherdog_match_status`, `fighter.sherdog_synced_at`), never by the checkpoint. History writes are delete-and-reinsert per fighter, so re-syncs are idempotent.
+
 ## Etiquette
 
-- Rate limit: 0.6 s between requests in phases 1–3, 1.0 s in enrichment phases.
+- Rate limit: 0.6 s between requests in phases 1–3, 1.0 s in enrichment phases and on Sherdog (step 17).
 - Sequential only, no parallelism.
 - User-Agent identifies the scraper: `VertexMMA-Scraper/1.0`.
 - Exponential backoff on 429 and 5xx (2 s → 4 s → 8 s, 3 retries total).
@@ -64,6 +74,7 @@ scripts/scraper/
     config.py            # URLs, rate limits, retry settings
     db.py                # psycopg connection, reads .env.local
     http.py              # httpx client with retries
+    sherdog.py           # Sherdog search/profile parsing + identity matching
     parsers/             # HTML -> typed dicts (no DB)
       events.py
       event_details.py
@@ -74,6 +85,7 @@ scripts/scraper/
       events.py
       fighters.py
       bout_stats.py
+      sherdog.py         # fighter_sherdog_bout delete-and-reinsert sync
     utils/
       slugify.py, dates.py, methods.py, weight_classes.py,
       stance.py, countries.py, measures.py, logger.py
@@ -83,6 +95,8 @@ scripts/scraper/
     03_scrape_bouts.py
     04_enrich_fighters.py
     05_enrich_bouts.py
+    ...                  # 06-16: country, scorecards, odds, news, videos, i18n
+    17_scrape_sherdog.py # pre-UFC fight histories (see Usage)
     run_all.py
 ```
 
