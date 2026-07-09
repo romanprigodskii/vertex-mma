@@ -13,6 +13,10 @@
 # recompute so fresh ranks land in scores the same day
 30 3 * * *   /opt/vertex-cron/rankings-refresh.sh
 
+# Daily 04:00 — Sherdog pre-UFC histories for new + upcoming-bout fighters,
+# before predict 05:15 so debutant records reach the model the same morning
+0 4 * * *    /opt/vertex-cron/sherdog-refresh.sh
+
 # Daily 04:30 — per-round bout stats + judge scorecards + full recompute
 30 4 * * *   /opt/vertex-cron/scrape-stats.sh
 

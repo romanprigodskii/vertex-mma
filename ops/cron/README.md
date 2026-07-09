@@ -11,6 +11,7 @@ at runtime (the checkout's `git pull` is currently best-effort — see below).
 |---|---|---|
 | hourly | `news-refresh.sh` | RSS → extract → classify (Haiku) → rephrase → translate; auto-creates provisional events/bouts |
 | every 6h | `scrape-refresh.sh` | re-list events + recent bouts (results) + bestfightodds + `fighter_with_stats` matview |
+| daily 04:00 | `sherdog-refresh.sh` | Sherdog pre-UFC fight histories (step 17, incremental: new fighters + upcoming-bout retries/re-syncs) → `fighter_sherdog_bout`, feeds the model's pre-UFC features before predict at 05:15 |
 | **daily 04:30** | `scrape-stats.sh` | **`enrich-bouts` (per-round stats) + `scorecards` + full recompute** |
 | daily 05:15 | `predict-refresh.sh` | score upcoming bouts → `bout_simulation`/`_features`/`_rounds` (winner + Monte-Carlo props) so the sportsbook + "how" panel don't go stale. Committed model (no retrain). Needs `.env.local` at the repo root for `DATABASE_URL`. |
 | weekly Sun 05:30 | `scrape-full.sh` | `run_all.py --phase all` (A-Z incl. enrich-fighters) + full recompute |
@@ -39,8 +40,12 @@ derive_title_fights → compute_opponent_quality → compute_current_division
 
 ## Conventions
 
-- All scrapers share `flock /var/lock/vertex-scrape.lock` → never overlap.
-  News has its own `/var/lock/vertex-news.lock`.
+- All ufcstats scrapers share `flock /var/lock/vertex-scrape.lock` → never
+  overlap. News has its own `/var/lock/vertex-news.lock`, rankings
+  `/var/lock/vertex-rankings.lock` (fd 7), sherdog
+  `/var/lock/vertex-sherdog.lock` (fd 6 — separate on purpose: it doesn't
+  touch ufcstats.com, and holding the shared lock past 04:30 would make
+  scrape-stats silently skip its run).
 - `git_sync()` is **best-effort**: a fetch failure leaves the checkout pinned
   and never aborts the job (prints `git: sync skipped — staying on pinned …`).
 - Logs: `/var/log/vertex-cron.log` (scrape+recompute), `/var/log/vertex-news.log`.
