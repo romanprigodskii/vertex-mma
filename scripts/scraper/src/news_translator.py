@@ -57,6 +57,11 @@ OUTPUT_SCHEMA = {
 
 _CYRILLIC = re.compile(r"[А-Яа-яЁё]")
 _MAX_BODY_CHARS = 6000
+# Source bodies shorter than this may legitimately translate without any
+# Cyrillic (org/event names only, e.g. a degenerate "PFL MENA 9" body), so the
+# echo-detection Cyrillic gate below is skipped for them — otherwise such items
+# would re-enter the translation queue on every run forever.
+_SHORT_BODY_CHARS = 120
 
 
 @dataclass
@@ -122,6 +127,7 @@ def translate_batch(
     text = next((b.text for b in response.content if b.type == "text"), "")
     data = json.loads(text)
 
+    src_bodies = {it.index: (it.body or "").strip() for it in items}
     out: dict[int, NewsTranslation] = {}
     for row in data.get("results", []):
         idx = row.get("index")
@@ -131,8 +137,15 @@ def translate_batch(
         if not title_ru or not _CYRILLIC.search(title_ru):
             continue
         body_ru = (row.get("body_ru") or "").strip()
+        # No Cyrillic in the body usually means the model echoed English back
+        # (treat as failed → retried next run) — unless the source body is too
+        # short to require any (see _SHORT_BODY_CHARS).
+        body_ok = bool(body_ru) and (
+            bool(_CYRILLIC.search(body_ru))
+            or len(src_bodies.get(idx, "")) < _SHORT_BODY_CHARS
+        )
         out[idx] = NewsTranslation(
             title_ru=title_ru,
-            body_ru=body_ru if (body_ru and _CYRILLIC.search(body_ru)) else None,
+            body_ru=body_ru if body_ok else None,
         )
     return out
