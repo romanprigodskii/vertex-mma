@@ -61,15 +61,16 @@ export interface AccuracySummary {
  * first), so callers asking for "recent graded picks" get the most
  * relevant set.
  *
- * SAMPLING BIAS (read the headline accuracy with this in mind): a bout only
- * gets a prediction when BOTH fighters already had ≥1 prior UFC bout (the
- * predict.py feature-engineering filter), and only predictions with a
- * resolvable winner are graded here. So the graded set skews toward
- * experienced, more-predictable matchups and EXCLUDES debuts / short-notice
- * fights — the hit rate is optimistic vs the full slate, and is a "recent
- * graded picks" figure, not population accuracy. Gate the headline on
- * `summarizeAccuracy(...).reliable` (min-N) so a handful of picks can't render
- * a meaningless 100%.
+ * SAMPLING NOTE (read the headline accuracy with this in mind): since model
+ * v0.8.0 every scheduled bout gets a prediction — bouts with a UFC debutant
+ * are scored by a dedicated debut specialist (weaker segment: the pipeline
+ * has no pre-UFC record data), everything else by the main ensemble. The
+ * graded hit rate therefore MIXES the two segments; expect it a few points
+ * below the pre-v0.8.0 figure, which silently excluded the hard debut bouts
+ * (older graded rows from those versions still reflect that filter). Only
+ * predictions with a resolvable winner are graded. Gate the headline on
+ * `summarizeAccuracy(...).reliable` (min-N) so a handful of picks can't
+ * render a meaningless 100%.
  */
 export async function getGradedSimulations(
   limit = 60,

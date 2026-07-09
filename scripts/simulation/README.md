@@ -45,7 +45,18 @@ Outputs to `artifacts/`:
 - `ensemble_eval/` — the split-trained twin, kept for out-of-sample evals
 - `metadata.json` — feature columns, params, per-split metrics, model_version
 
-Current model (v0.7.0, 90 features): adds opponent-adjusted ratings
+v0.8.0 adds full-slate coverage: bouts with a UFC debutant (~18 % of
+the slate, previously skipped entirely) are scored by a dedicated
+debut specialist — the same 3-learner ensemble on 92 features
+(90 + per-side debut flags), trained on the full dataset with
+both-experienced rows down-weighted to 0.2 so the debut regime
+dominates. Last-year debut segment: 58.5 % accuracy, log-loss 0.643
+(coin 0.693, "pick the experienced side" 44.2 %; the market is far
+ahead at 75 % — debut probabilities are directional, not sharp, and
+the sportsbook only opens debut markets when a consensus line exists
+for the edge-guard to anchor to).
+
+Main model (v0.7.0 recipe, 90 features): adds opponent-adjusted ratings
 (`src/opponent_ratings.py`) — online attack/defense skill ratings
 (Holmes-style: each performance scored against what THAT opponent
 usually allows, updated bout-by-bout like Elo) and opponent-quality
