@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { ArrowRight, Loader2, Search, X } from "lucide-react";
 
 import { FighterAvatar } from "@/components/fighter/FighterAvatar";
@@ -33,6 +33,7 @@ interface PickerInputProps {
 function PickerInput({ label, slot, onSelect, onClear }: PickerInputProps) {
   const t = useTranslations("compare");
   const tWeight = useTranslations("weight");
+  const locale = useLocale();
   const [query, setQuery] = React.useState("");
   const [results, setResults] = React.useState<FighterCatalogRow[]>([]);
   const [loading, setLoading] = React.useState(false);
@@ -56,7 +57,7 @@ function PickerInput({ label, slot, onSelect, onClear }: PickerInputProps) {
         // otherwise defaults to active-roster only. sort=vertex_all_time
         // surfaces the greats at the top of fuzzy-matched results.
         const r = await fetch(
-          `/api/fighters?q=${encodeURIComponent(trimmed)}&limit=8&status=all&sort=vertex_all_time`,
+          `/api/fighters?q=${encodeURIComponent(trimmed)}&limit=8&status=all&sort=vertex_all_time&locale=${locale}`,
           { signal: ctrl.signal },
         );
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -75,7 +76,7 @@ function PickerInput({ label, slot, onSelect, onClear }: PickerInputProps) {
       ctrl.abort();
       window.clearTimeout(timer);
     };
-  }, [query, slot.slug]);
+  }, [query, slot.slug, locale]);
 
   // Click outside closes dropdown
   React.useEffect(() => {

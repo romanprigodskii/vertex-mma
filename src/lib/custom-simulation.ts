@@ -186,12 +186,16 @@ export type FormPickerBout = {
 };
 
 /** A fighter's completed UFC bouts, newest first — the "take form from this
- *  bout" picker. Result letter is from THIS fighter's perspective. */
+ *  bout" picker. Result letter is from THIS fighter's perspective. `isRu`
+ *  overrides the request-scope locale: /api/* is excluded from the next-intl
+ *  middleware, so the /api/fighters/bouts handler passes the client-supplied
+ *  locale instead. */
 export async function listFighterBoutsForPicker(
   fighterId: string,
+  options: { isRu?: boolean } = {},
 ): Promise<FormPickerBout[]> {
   if (!UUID_RE.test(fighterId)) return [];
-  const isRu = await isRuLocale();
+  const isRu = options.isRu ?? (await isRuLocale());
   const rows = await db.execute<FormPickerBout>(sql`
     SELECT
       b.id::text AS bout_id,

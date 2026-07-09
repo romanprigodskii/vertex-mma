@@ -32,11 +32,12 @@ export type FighterSearchResult = {
 export async function searchFighters(
   query: string,
   limit = 20,
+  options: SearchFightersOptions = {},
 ): Promise<FighterSearchResult[]> {
   const trimmed = query.trim();
   if (!trimmed) return [];
 
-  const isRu = await isRuLocale();
+  const isRu = options.isRu ?? (await isRuLocale());
   // DISTINCT ON requires f.id to be the leftmost ORDER BY key, so the LIMIT
   // can't be applied to the inner query without truncating by random UUID
   // (dropping the actual top-ranked matches). Dedupe per fighter in the
@@ -539,12 +540,22 @@ function buildOrderBy(filters: FighterCatalogFilters): SQL {
   }
 }
 
+export type SearchFightersOptions = {
+  /** Explicit locale override for name localization. Route handlers under
+   *  /api/* are excluded from the next-intl middleware (src/middleware.ts),
+   *  so isRuLocale() always falls back to English there — the API must pass
+   *  the client-supplied locale instead. Server-component callers omit it
+   *  and keep the request-scope fallback. */
+  isRu?: boolean;
+};
+
 /**
  * Combined filter + fuzzy-search query against the fighter catalog.
  * Returns paginated rows plus the unpaginated total for the same WHERE clause.
  */
 export async function searchFightersWithFilters(
   filters: FighterCatalogFilters,
+  options: SearchFightersOptions = {},
 ): Promise<FighterCatalogResponse> {
   const offset = Math.max(0, filters.offset ?? 0);
   const limit = Math.min(
@@ -553,7 +564,7 @@ export async function searchFightersWithFilters(
   );
 
   const trimmedQ = filters.q?.trim();
-  const isRu = await isRuLocale();
+  const isRu = options.isRu ?? (await isRuLocale());
   const where = buildWhere(filters);
   const orderBy = buildOrderBy(filters);
 

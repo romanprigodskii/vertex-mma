@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import Image from "next/image";
 import { Search } from "lucide-react";
 
@@ -18,6 +18,7 @@ type Result = {
 
 export function NewsSidebarSearch() {
   const t = useTranslations("news");
+  const locale = useLocale();
   const [value, setValue] = React.useState("");
   const [results, setResults] = React.useState<Result[]>([]);
   const [loading, setLoading] = React.useState(false);
@@ -34,7 +35,7 @@ export function NewsSidebarSearch() {
       setLoading(true);
       try {
         const res = await fetch(
-          `/api/news-sidebar/search?q=${encodeURIComponent(trimmedQuery)}`,
+          `/api/news-sidebar/search?q=${encodeURIComponent(trimmedQuery)}&locale=${locale}`,
           { signal: controller.signal, cache: "no-store" },
         );
         if (!res.ok) throw new Error(`status ${res.status}`);
@@ -52,7 +53,7 @@ export function NewsSidebarSearch() {
       controller.abort();
       if (timerActive) clearTimeout(timer);
     };
-  }, [trimmedQuery, hasQuery]);
+  }, [trimmedQuery, hasQuery, locale]);
 
   // When the input drops below 2 chars, hide whatever was last fetched so
   // typing "stri" → "s" → "str" doesn't briefly flash the "stri" hits.

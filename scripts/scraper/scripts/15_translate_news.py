@@ -1,8 +1,10 @@
 """Populate news_item.title_ru / body_rephrased_ru via Claude translation.
 
-Resumable: only approved items missing title_ru are touched, and a failed batch
-is left for the next run. The RU site falls back to the English title / body
-wherever the translation is missing, so a partial run is safe.
+Resumable: only approved items needing translation are touched (missing
+title_ru, or missing body_ru while a rephrased body exists — i.e. the title was
+translated before the body was rephrased), and a failed batch is left for the
+next run. The RU site falls back to the English title / body wherever the
+translation is missing, so a partial run is safe.
 
 Usage:
   ./venv/bin/python scripts/15_translate_news.py --dry-run --limit 5
@@ -27,7 +29,10 @@ def run(*, limit: int | None = None, dry_run: bool = False) -> dict[str, int]:
 
     with get_connection() as conn:
         items = fetch_untranslated_news(conn, limit=limit)
-        log.info(f"news translate: {len(items)} approved item(s) without title_ru")
+        log.info(
+            f"news translate: {len(items)} approved item(s) needing translation "
+            "(missing title_ru, or missing body_ru while a rephrased body exists)"
+        )
         if not items:
             return totals
 

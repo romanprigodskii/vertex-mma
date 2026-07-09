@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Search } from "lucide-react";
 
@@ -74,10 +74,42 @@ function useWeightLabel() {
   };
 }
 
+/** Locale-aware country label for the result subtitle (same idea as
+ *  PhysicalInfo's countryName, memoized per locale for the results list).
+ *  style: "short" keeps the CSS-uppercased line compact — "США"/"Британия"
+ *  on ru, "US"/"UK" on en. Falls back to the raw ISO code whenever the
+ *  runtime can't resolve it. */
+function useCountryName() {
+  const locale = useLocale();
+  const displayNames = React.useMemo(() => {
+    try {
+      return new Intl.DisplayNames([locale], {
+        type: "region",
+        style: "short",
+      });
+    } catch {
+      return null;
+    }
+  }, [locale]);
+  return React.useCallback(
+    (code: string | null): string | null => {
+      if (!code) return null;
+      try {
+        return displayNames?.of(code) || code;
+      } catch {
+        return code;
+      }
+    },
+    [displayNames],
+  );
+}
+
 export function FighterSearchPalette() {
   const t = useTranslations("search");
   const tCommon = useTranslations("common");
+  const locale = useLocale();
   const weightLabel = useWeightLabel();
+  const countryName = useCountryName();
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
@@ -140,7 +172,7 @@ export function FighterSearchPalette() {
     const timer = setTimeout(async () => {
       try {
         const res = await fetch(
-          `/api/fighters?q=${encodeURIComponent(q)}&limit=10&status=all&sort=vertex_current`,
+          `/api/fighters?q=${encodeURIComponent(q)}&limit=10&status=all&sort=vertex_current&locale=${locale}`,
           { signal: ctrl.signal },
         );
         if (!res.ok) {
@@ -166,7 +198,7 @@ export function FighterSearchPalette() {
       clearTimeout(timer);
       ctrl.abort();
     };
-  }, [query, open, reloadKey]);
+  }, [query, open, reloadKey, locale]);
 
   function navigateTo(slug: string) {
     setOpen(false);
@@ -308,7 +340,9 @@ export function FighterSearchPalette() {
                       </p>
                       <p className="truncate font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
                         {weightLabel(r.weight_class_primary)}
-                        {r.country_code ? ` · ${r.country_code}` : ""}
+                        {r.country_code
+                          ? ` · ${countryName(r.country_code)}`
+                          : ""}
                       </p>
                     </div>
                     <span className="shrink-0 font-display tabular text-lg leading-none text-foreground-muted">

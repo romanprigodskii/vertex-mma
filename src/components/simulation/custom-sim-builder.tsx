@@ -2,7 +2,7 @@
 
 import { Check, ChevronDown, Loader2, Swords, X } from "lucide-react";
 import { useEffect, useRef, useState, useTransition } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 
 import { createCustomSimulationAction } from "@/app/[locale]/simulation/actions";
 import { Link, useRouter } from "@/i18n/navigation";
@@ -148,6 +148,7 @@ interface SideColumnProps {
 
 function SideColumn({ label, picked, onPick, boutId, onBout }: SideColumnProps) {
   const t = useTranslations("customSim");
+  const locale = useLocale();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<PickedFighter[]>([]);
   const [open, setOpen] = useState(false);
@@ -171,7 +172,7 @@ function SideColumn({ label, picked, onPick, boutId, onBout }: SideColumnProps) 
     const timer = setTimeout(async () => {
       try {
         const res = await fetch(
-          `/api/fighters?q=${encodeURIComponent(q)}&limit=8&status=all&sort=vertex_all_time`,
+          `/api/fighters?q=${encodeURIComponent(q)}&limit=8&status=all&sort=vertex_all_time&locale=${locale}`,
         );
         if (!res.ok) return;
         const data = (await res.json()) as { fighters: PickedFighter[] };
@@ -184,7 +185,7 @@ function SideColumn({ label, picked, onPick, boutId, onBout }: SideColumnProps) 
       }
     }, 200);
     return () => clearTimeout(timer);
-  }, [query]);
+  }, [query, locale]);
 
   // Load the form picker's bout list when a fighter is chosen.
   useEffect(() => {
@@ -195,7 +196,7 @@ function SideColumn({ label, picked, onPick, boutId, onBout }: SideColumnProps) 
     }
     let cancelled = false;
     setBoutsLoading(true);
-    fetch(`/api/fighters/bouts?fighter=${picked.id}`)
+    fetch(`/api/fighters/bouts?fighter=${picked.id}&locale=${locale}`)
       .then((r) => (r.ok ? r.json() : { bouts: [] }))
       .then((data: { bouts: FormPickerBout[] }) => {
         if (!cancelled) setBouts(data.bouts);
@@ -209,7 +210,7 @@ function SideColumn({ label, picked, onPick, boutId, onBout }: SideColumnProps) 
     return () => {
       cancelled = true;
     };
-  }, [picked]);
+  }, [picked, locale]);
 
   return (
     <div className="min-w-0">

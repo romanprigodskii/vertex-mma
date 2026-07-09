@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { AnimatePresence, motion } from "framer-motion";
 
 import { CatalogSkeleton } from "@/components/fighter/CatalogSkeleton";
@@ -93,6 +93,7 @@ export function FighterCatalogClient({
   totalAll,
 }: FighterCatalogClientProps) {
   const t = useTranslations("catalog");
+  const locale = useLocale();
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -147,6 +148,9 @@ export function FighterCatalogClient({
       const params = serializeFilters(filters);
       params.set("limit", String(PAGE_SIZE));
       params.set("offset", "0");
+      // /api/* skips the next-intl middleware, so the handler can't infer
+      // the locale — pass it explicitly for localized fighter names.
+      params.set("locale", locale);
 
       fetch(`/api/fighters?${params.toString()}`, { signal })
         .then(async (res) => {
@@ -170,7 +174,7 @@ export function FighterCatalogClient({
           }
         });
     },
-    [filters, t],
+    [filters, locale, t],
   );
 
   React.useEffect(() => {
@@ -195,6 +199,7 @@ export function FighterCatalogClient({
     const params = serializeFilters(filters);
     params.set("limit", String(PAGE_SIZE));
     params.set("offset", String(offset));
+    params.set("locale", locale);
 
     fetch(`/api/fighters?${params.toString()}`)
       .then(async (res) => {
@@ -209,7 +214,7 @@ export function FighterCatalogClient({
         /* user can retry via the "Load more" button */
       })
       .finally(() => setLoadingMore(false));
-  }, [filters, hasMore, loading, loadingMore, offset]);
+  }, [filters, hasMore, loading, loadingMore, locale, offset]);
 
   React.useEffect(() => {
     const node = sentinelRef.current;

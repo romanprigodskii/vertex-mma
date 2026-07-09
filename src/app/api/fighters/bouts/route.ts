@@ -9,7 +9,13 @@ export const dynamic = "force-dynamic";
  *  "take form from this bout" dropdown. */
 export async function GET(request: NextRequest) {
   const fighterId = request.nextUrl.searchParams.get("fighter") ?? "";
-  const bouts = await listFighterBoutsForPicker(fighterId);
+  // /api/* is excluded from the next-intl middleware, so the client passes
+  // ?locale= explicitly — same contract as /api/fighters.
+  const locale = request.nextUrl.searchParams.get("locale");
+  const bouts = await listFighterBoutsForPicker(
+    fighterId,
+    locale ? { isRu: locale === "ru" } : {},
+  );
   return NextResponse.json(
     { bouts },
     { headers: { "Cache-Control": "no-store" } },

@@ -7,11 +7,14 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   const q = request.nextUrl.searchParams.get("q")?.trim().slice(0, 64) ?? "";
+  // /api/* is excluded from the next-intl middleware, so the client passes
+  // ?locale= explicitly — same contract as /api/fighters.
+  const locale = request.nextUrl.searchParams.get("locale");
   if (q.length < 2) {
     return NextResponse.json({ results: [] }, { headers: { "Cache-Control": "no-store" } });
   }
   try {
-    const rows = await searchFighters(q, 6);
+    const rows = await searchFighters(q, 6, locale ? { isRu: locale === "ru" } : {});
     const results = rows.map((r) => ({
       slug: r.slug,
       name: r.name_en,

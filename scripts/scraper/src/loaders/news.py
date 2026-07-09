@@ -589,12 +589,22 @@ class UntranslatedNewsItem:
 def fetch_untranslated_news(
     conn: psycopg.Connection, limit: int | None = None
 ) -> list[UntranslatedNewsItem]:
-    """Approved items still missing a Russian title, newest first. body is the
-    displayed (rephrased) text — may be null when rephrasing didn't run, in which
-    case only the title gets translated."""
+    """Approved items needing translation, newest first. Two cases:
+    never translated (title_ru IS NULL), or translated title-only before the
+    rephrased body existed — such items are picked up again once body_rephrased
+    appears so the body gets its Russian text. Their title is re-translated too;
+    that is fine and keeps title/body consistent from one model call. body is
+    the displayed (rephrased) text — may be null when rephrasing didn't run, in
+    which case only the title gets translated. The body branch requires a
+    non-blank body_rephrased: a whitespace-only body legitimately translates to
+    an empty body_ru, and without the btrim guard such an item would re-enter
+    the queue every run forever."""
     sql = (
         "SELECT id::text, title, body_rephrased FROM news_item "
-        "WHERE status IN ('approved', 'auto_approved') AND title_ru IS NULL "
+        "WHERE status IN ('approved', 'auto_approved') "
+        "AND (title_ru IS NULL "
+        "     OR (NULLIF(btrim(body_rephrased), '') IS NOT NULL "
+        "         AND NULLIF(body_rephrased_ru, '') IS NULL)) "
         "ORDER BY published_at DESC"
     )
     params: tuple = ()
