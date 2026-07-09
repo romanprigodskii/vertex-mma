@@ -45,6 +45,7 @@ from .db import get_connection
 from .export import (
     FighterHistory,
     _fight_duration_seconds,
+    make_preufc_fight,
     preufc_snapshot,
     stable_hash,
     swap_sides,
@@ -158,7 +159,8 @@ WHERE f.id = %s::uuid
 # Non-UFC career fights (pre-UFC features, v0.9.0) — same shape as
 # export.SHERDOG_SQL but for one fighter.
 PREUFC_SQL = """
-SELECT event_date::date AS event_date, result, method_class
+SELECT event_date::date AS event_date, result, method_class,
+       round, time_seconds, event_name
 FROM fighter_sherdog_bout
 WHERE fighter_id = %s::uuid AND NOT is_ufc AND event_date IS NOT NULL
 ORDER BY event_date ASC
@@ -243,7 +245,7 @@ def build_form_snapshot(
         history_rows = cur.fetchall()
 
         cur.execute(PREUFC_SQL, (fighter_id,))
-        preufc_rows = [(r[0], r[1], r[2]) for r in cur.fetchall()]
+        preufc_rows = [make_preufc_fight(*r) for r in cur.fetchall()]
 
     h = FighterHistory()
     for b in bouts:

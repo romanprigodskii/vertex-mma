@@ -18,6 +18,7 @@ row per completed UFC bout where both fighters had ≥1 prior UFC bout
 from __future__ import annotations
 
 import hashlib
+import re
 from dataclasses import dataclass
 from datetime import date
 from typing import Any
@@ -126,7 +127,10 @@ SELECT
   fighter_id::text AS fighter_id,
   event_date::date AS event_date,
   result,
-  method_class
+  method_class,
+  round,
+  time_seconds,
+  event_name
 FROM fighter_sherdog_bout
 WHERE NOT is_ufc AND event_date IS NOT NULL
 ORDER BY fighter_id, event_date
@@ -219,6 +223,18 @@ PREUFC_KEYS = (
     "preufc_finish_rate",
     "preufc_finish_losses",
     "preufc_career_days",
+    # Recency / trajectory — the record alone barely separates debutants
+    # (nearly every UFC signee arrives 10-2-ish); WHEN and WHERE they
+    # fought carries the sharper signal. days_since_last is the
+    # debutant's REAL layoff (their UFC layoff_days is NaN by
+    # construction); dwcs_fights = Contender Series appearances (UFC-
+    # caliber vetting the market prices in); avg_win_seconds = finish
+    # speed.
+    "preufc_days_since_last",
+    "preufc_fights_last_24mo",
+    "preufc_last3_wins",
+    "preufc_dwcs_fights",
+    "preufc_avg_win_seconds",
 )
 
 _PREUFC_EMPTY: dict[str, Any] = {
@@ -226,16 +242,28 @@ _PREUFC_EMPTY: dict[str, Any] = {
     **{k: None for k in PREUFC_KEYS},
 }
 
+_DWCS_RE = re.compile(r"contender series|dwcs", re.IGNORECASE)
+
+
+@dataclass(frozen=True)
+class PreUfcFight:
+    """One non-UFC career fight, pre-shaped for snapshotting."""
+
+    event_date: date
+    result: str  # 'win' | 'loss' | 'draw' | 'nc'
+    method_class: str | None
+    duration_seconds: int | None  # (round-1)*300 + time, when known
+    is_dwcs: bool
+
 
 def preufc_snapshot(
-    fights: list[tuple[date, str, str | None]],
+    fights: list[PreUfcFight],
     ev_date: date,
     *,
     matched: bool,
 ) -> dict[str, Any]:
     """Non-UFC career record strictly before `ev_date`, from the fighter's
-    Sherdog history rows [(event_date, result, method_class), ...] sorted
-    by date ascending.
+    Sherdog history sorted by date ascending.
 
     `matched=False` (fighter has no verified Sherdog profile) returns all
     None — "we don't know" — while a matched fighter with zero regional
@@ -248,23 +276,36 @@ def preufc_snapshot(
     if not matched:
         return dict(_PREUFC_EMPTY)
     wins = losses = draws = ko_wins = sub_wins = finish_losses = 0
+    dwcs = 0
+    fights_24mo = 0
     first_fight: date | None = None
-    for fight_date, result, method_class in fights:
-        if fight_date >= ev_date:
+    last_fight: date | None = None
+    recent_results: list[str] = []
+    win_seconds: list[int] = []
+    for f in fights:
+        if f.event_date >= ev_date:
             break  # sorted ascending — nothing later can count
-        if result == "nc":
+        if f.result == "nc":
             continue  # NCs never touch history (mirrors FighterHistory)
         if first_fight is None:
-            first_fight = fight_date
-        if result == "win":
+            first_fight = f.event_date
+        last_fight = f.event_date
+        recent_results.append(f.result)
+        if f.is_dwcs:
+            dwcs += 1
+        if (ev_date - f.event_date).days <= 730:
+            fights_24mo += 1
+        if f.result == "win":
             wins += 1
-            if method_class == "ko":
+            if f.method_class == "ko":
                 ko_wins += 1
-            elif method_class == "submission":
+            elif f.method_class == "submission":
                 sub_wins += 1
-        elif result == "loss":
+            if f.duration_seconds is not None:
+                win_seconds.append(f.duration_seconds)
+        elif f.result == "loss":
             losses += 1
-            if method_class in ("ko", "submission"):
+            if f.method_class in ("ko", "submission"):
                 finish_losses += 1
         else:  # draw
             draws += 1
@@ -282,15 +323,51 @@ def preufc_snapshot(
         "preufc_career_days": (
             (ev_date - first_fight).days if first_fight is not None else None
         ),
+        "preufc_days_since_last": (
+            (ev_date - last_fight).days if last_fight is not None else None
+        ),
+        "preufc_fights_last_24mo": fights_24mo,
+        "preufc_last3_wins": sum(1 for r in recent_results[-3:] if r == "win"),
+        "preufc_dwcs_fights": dwcs,
+        "preufc_avg_win_seconds": (
+            sum(win_seconds) / len(win_seconds) if win_seconds else None
+        ),
     }
+
+
+def make_preufc_fight(
+    event_date: date,
+    result: str,
+    method_class: str | None,
+    round_num: Any,
+    time_seconds: Any,
+    event_name: str | None,
+) -> PreUfcFight:
+    """Shape one raw fighter_sherdog_bout row (from SHERDOG_SQL or
+    custom.PREUFC_SQL) into a PreUfcFight."""
+    duration: int | None = None
+    if round_num is not None and not pd.isna(round_num):
+        partial = (
+            int(time_seconds)
+            if time_seconds is not None and not pd.isna(time_seconds)
+            else 300
+        )
+        duration = max(0, int(round_num) - 1) * 300 + partial
+    return PreUfcFight(
+        event_date=event_date,
+        result=result,
+        method_class=method_class,
+        duration_seconds=duration,
+        is_dwcs=bool(_DWCS_RE.search(event_name or "")),
+    )
 
 
 def group_sherdog_fights(
     sherdog: pd.DataFrame,
-) -> dict[str, list[tuple[date, str, str | None]]]:
-    """fighter_id -> [(event_date, result, method_class)] sorted by date
-    (SHERDOG_SQL already orders by fighter_id, event_date)."""
-    out: dict[str, list[tuple[date, str, str | None]]] = {}
+) -> dict[str, list[PreUfcFight]]:
+    """fighter_id -> [PreUfcFight] sorted by date (SHERDOG_SQL already
+    orders by fighter_id, event_date)."""
+    out: dict[str, list[PreUfcFight]] = {}
     if sherdog.empty:
         return out
     for row in sherdog.itertuples(index=False):
@@ -298,7 +375,14 @@ def group_sherdog_fights(
         if not isinstance(d, date):
             d = pd.to_datetime(d).date()
         out.setdefault(row.fighter_id, []).append(
-            (d, row.result, row.method_class)
+            make_preufc_fight(
+                d,
+                row.result,
+                row.method_class,
+                row.round,
+                row.time_seconds,
+                row.event_name,
+            )
         )
     return out
 

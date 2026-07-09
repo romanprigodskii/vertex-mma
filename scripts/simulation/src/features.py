@@ -109,6 +109,16 @@ DIFF_COLUMNS = [
     "preufc_finish_rate",
     "preufc_finish_losses",
     "preufc_career_days",
+    # Recency/trajectory/pedigree — the record alone barely separates
+    # debutants (every signee arrives ~10-2); when and where they fought
+    # is the sharper half of the signal (real layoff for debutants whose
+    # UFC layoff_days is NaN, activity, form, Contender Series vetting,
+    # finish speed).
+    "preufc_days_since_last",
+    "preufc_fights_last_24mo",
+    "preufc_last3_wins",
+    "preufc_dwcs_fights",
+    "preufc_avg_win_seconds",
 ]
 
 # Per-fighter columns we ALSO keep as-is for A and B (sometimes absolute
@@ -128,9 +138,11 @@ ABSOLUTE_KEEP = [
     # depth of résumé).
     "elo",
     # v0.9.0 — absolute pre-UFC volume/quality: a 20-fight regional vet
-    # vs a 4-fight prospect matters even when the diff is the same.
+    # vs a 4-fight prospect matters even when the diff is the same; the
+    # absolute regional layoff is a debutant's only real layoff signal.
     "preufc_bouts",
     "preufc_win_rate",
+    "preufc_days_since_last",
 ]
 
 # Context features kept as-is (not differenced). market_prob_a is NOT here:
