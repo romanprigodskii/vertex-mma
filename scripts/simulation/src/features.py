@@ -74,6 +74,25 @@ DIFF_COLUMNS = [
     "control_absorbed_per_min",
     "reversals_per_fight",
     "elo",
+    # v0.7.0 — opponent-adjusted ratings (src/opponent_ratings.py), the
+    # combo validated in the v0.7 lab: online attack/defense skill ratings
+    # (deviation from league mean, opponent-adjusted bout by bout — fixes
+    # the "5 strikes/min vs elite defense == 5 vs journeymen" blindness of
+    # raw career averages) + opponent-quality Elo aggregates (WHO the
+    # record was compiled against). Diffs only — abs levels added nothing.
+    "str_off",
+    "str_def",
+    "grap_off",
+    "grap_def",
+    "kd_off",
+    "kd_def",
+    "ctrl_off",
+    "ctrl_def",
+    "avg_opp_elo_career",
+    "avg_opp_elo_last5",
+    "max_opp_elo_beaten",
+    "avg_opp_elo_beaten",
+    "sos_weighted_winrate",
 ]
 
 # Per-fighter columns we ALSO keep as-is for A and B (sometimes absolute
