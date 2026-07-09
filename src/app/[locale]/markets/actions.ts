@@ -15,6 +15,7 @@ import {
   type SportsbookSelectionCode,
   combineParlayOdds,
   computeSportsbookOutcomes,
+  debutBoutBettable,
   isBoutBettable,
   isSelectionCode,
   marketProbFromOdds,
@@ -470,11 +471,23 @@ export async function placeFixedOddsBetAction(
     fighter_a_id: string;
     fighter_b_id: string;
     event_date: string;
+    any_debut: boolean;
   }>(sql`
     SELECT b.status::text AS status,
            b.fighter_a_id::text AS fighter_a_id,
            b.fighter_b_id::text AS fighter_b_id,
-           e.date::text AS event_date
+           e.date::text AS event_date,
+           -- v0.8.0: debut bouts are bettable only with a consensus line
+           -- (see debutBoutBettable in sportsbook.ts)
+           (NOT EXISTS (
+             SELECT 1 FROM bout pb
+             WHERE pb.status = 'completed'
+               AND (pb.fighter_a_id = b.fighter_a_id OR pb.fighter_b_id = b.fighter_a_id)
+           ) OR NOT EXISTS (
+             SELECT 1 FROM bout pb
+             WHERE pb.status = 'completed'
+               AND (pb.fighter_a_id = b.fighter_b_id OR pb.fighter_b_id = b.fighter_b_id)
+           )) AS any_debut
     FROM bout b JOIN event e ON e.id = b.event_id
     WHERE b.id = ${boutId}::uuid
     LIMIT 1
@@ -483,6 +496,7 @@ export async function placeFixedOddsBetAction(
     fighter_a_id: string;
     fighter_b_id: string;
     event_date: string;
+    any_debut: boolean;
   }>;
   const boutRow = boutRows[0];
   if (!boutRow) return { error: "BOUT_NOT_FOUND" };
@@ -498,13 +512,20 @@ export async function placeFixedOddsBetAction(
     getBoutExternalOdds(boutId),
   ]);
   if (!sim) return { error: "NO_MODEL_ODDS" };
+  const marketProbA = marketProbFromOdds(
+    externalOdds?.winner_a_decimal ?? null,
+    externalOdds?.winner_b_decimal ?? null,
+  );
+  // v0.8.0: a debut bout without a consensus line is priced by the (weaker)
+  // debut specialist alone — not bettable until the edge-guard has a market
+  // to anchor to. Mirrors the sportsbook-board filter.
+  if (!debutBoutBettable(boutRow.any_debut, marketProbA)) {
+    return { error: "MARKET_NOT_OFFERED" };
+  }
   const outcomes = computeSportsbookOutcomes({
     probA: sim.probA,
     probB: sim.probB,
-    marketProbA: marketProbFromOdds(
-      externalOdds?.winner_a_decimal ?? null,
-      externalOdds?.winner_b_decimal ?? null,
-    ),
+    marketProbA,
     rounds: sim.rounds
       ? {
           probKoA: sim.rounds.probKoA,
@@ -610,11 +631,23 @@ async function priceParlayLeg(
     fighter_a_id: string;
     fighter_b_id: string;
     event_date: string;
+    any_debut: boolean;
   }>(sql`
     SELECT b.status::text AS status,
            b.fighter_a_id::text AS fighter_a_id,
            b.fighter_b_id::text AS fighter_b_id,
-           e.date::text AS event_date
+           e.date::text AS event_date,
+           -- v0.8.0: debut bouts are bettable only with a consensus line
+           -- (see debutBoutBettable in sportsbook.ts)
+           (NOT EXISTS (
+             SELECT 1 FROM bout pb
+             WHERE pb.status = 'completed'
+               AND (pb.fighter_a_id = b.fighter_a_id OR pb.fighter_b_id = b.fighter_a_id)
+           ) OR NOT EXISTS (
+             SELECT 1 FROM bout pb
+             WHERE pb.status = 'completed'
+               AND (pb.fighter_a_id = b.fighter_b_id OR pb.fighter_b_id = b.fighter_b_id)
+           )) AS any_debut
     FROM bout b JOIN event e ON e.id = b.event_id
     WHERE b.id = ${boutId}::uuid
     LIMIT 1
@@ -623,6 +656,7 @@ async function priceParlayLeg(
     fighter_a_id: string;
     fighter_b_id: string;
     event_date: string;
+    any_debut: boolean;
   }>;
   const boutRow = boutRows[0];
   if (!boutRow) return { error: "BOUT_NOT_FOUND" };
@@ -636,13 +670,18 @@ async function priceParlayLeg(
   ]);
   if (!sim) return { error: "PARLAY_NO_ODDS" };
 
+  const marketProbA = marketProbFromOdds(
+    externalOdds?.winner_a_decimal ?? null,
+    externalOdds?.winner_b_decimal ?? null,
+  );
+  // v0.8.0 debut gate — same rule as single bets and the board.
+  if (!debutBoutBettable(boutRow.any_debut, marketProbA)) {
+    return { error: "MARKET_NOT_OFFERED" };
+  }
   const outcomes = computeSportsbookOutcomes({
     probA: sim.probA,
     probB: sim.probB,
-    marketProbA: marketProbFromOdds(
-      externalOdds?.winner_a_decimal ?? null,
-      externalOdds?.winner_b_decimal ?? null,
-    ),
+    marketProbA,
     rounds: sim.rounds
       ? {
           probKoA: sim.rounds.probKoA,

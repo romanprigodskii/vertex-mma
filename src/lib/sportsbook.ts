@@ -225,6 +225,21 @@ export function applyEdgeGuard(
  *  "our model leans harder than the bookmakers here", NOT a guaranteed +EV. */
 export const VALUE_EDGE_THRESHOLD = 0.07;
 
+/** v0.8.0 debut gate: bouts with a UFC debutant are scored by the debut
+ *  specialist, which is clearly WEAKER than the bookmakers on that segment
+ *  (backtest log-loss ~0.64 vs market ~0.59 — books see regional-circuit
+ *  records our pipeline has no data for). Offering house odds from that
+ *  model alone would hand sharp users +EV, so debut bouts are bettable
+ *  ONLY when a consensus line exists for the edge-guard to anchor prices
+ *  to (±MAX_MARKET_EDGE). The same rule must gate BOTH display
+ *  (sportsbook-board) and bet placement (markets/actions) — keep in sync. */
+export function debutBoutBettable(
+  anyDebut: boolean,
+  marketProbA: number | null,
+): boolean {
+  return !anyDebut || (marketProbA != null && Number.isFinite(marketProbA));
+}
+
 /** Signed model-vs-market edge for one winner side, in probability (0–1).
  *  Positive = the model rates this side higher than the bookmaker consensus.
  *  `edgeA` is bout_simulation.edge_a = model_prob_a − market_prob_a; null when

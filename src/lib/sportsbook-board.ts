@@ -9,6 +9,7 @@ import {
 } from "@/lib/i18n-name";
 import {
   computeSportsbookOutcomes,
+  debutBoutBettable,
   marketProbFromOdds,
   MAX_MARKET_EDGE,
   type SportsbookSelectionCode,
@@ -61,6 +62,7 @@ type Row = {
   prob_b: number;
   winner_a_decimal: number | null;
   winner_b_decimal: number | null;
+  any_debut: boolean;
 };
 
 /**
@@ -95,7 +97,18 @@ export async function getSportsbookBoard(limit = 60): Promise<BoardEvent[]> {
       s.prob_a,
       s.prob_b,
       x.winner_a_decimal,
-      x.winner_b_decimal
+      x.winner_b_decimal,
+      -- v0.8.0: debut bouts are bettable only with a consensus line
+      -- (see debutBoutBettable in sportsbook.ts)
+      (NOT EXISTS (
+        SELECT 1 FROM bout pb
+        WHERE pb.status = 'completed'
+          AND (pb.fighter_a_id = b.fighter_a_id OR pb.fighter_b_id = b.fighter_a_id)
+      ) OR NOT EXISTS (
+        SELECT 1 FROM bout pb
+        WHERE pb.status = 'completed'
+          AND (pb.fighter_a_id = b.fighter_b_id OR pb.fighter_b_id = b.fighter_b_id)
+      )) AS any_debut
     FROM bout b
     JOIN event e ON e.id = b.event_id
     JOIN fighter fa ON fa.id = b.fighter_a_id
@@ -127,6 +140,7 @@ export async function getSportsbookBoard(limit = 60): Promise<BoardEvent[]> {
       r.winner_a_decimal,
       r.winner_b_decimal,
     );
+    if (!debutBoutBettable(r.any_debut, marketProbA)) continue;
     const outcomes = computeSportsbookOutcomes({
       probA: r.prob_a,
       probB: r.prob_b,
