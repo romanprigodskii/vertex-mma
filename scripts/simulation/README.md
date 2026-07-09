@@ -47,14 +47,28 @@ Outputs to `artifacts/`:
 
 v0.8.0 adds full-slate coverage: bouts with a UFC debutant (~18 % of
 the slate, previously skipped entirely) are scored by a dedicated
-debut specialist — the same 3-learner ensemble on 92 features
-(90 + per-side debut flags), trained on the full dataset with
-both-experienced rows down-weighted to 0.2 so the debut regime
-dominates. Last-year debut segment: 58.5 % accuracy, log-loss 0.643
-(coin 0.693, "pick the experienced side" 44.2 %; the market is far
-ahead at 75 % — debut probabilities are directional, not sharp, and
+debut specialist — the same 3-learner ensemble trained on the full
+dataset with both-experienced rows down-weighted to 0.2 so the debut
+regime dominates (debut probabilities are directional, not sharp, and
 the sportsbook only opens debut markets when a consensus line exists
 for the edge-guard to anchor to).
+
+v0.9.0 closes the pre-UFC information gap: every fighter's full
+Sherdog career (`fighter_sherdog_bout`, scraper step 17, 99.6 % of
+bout fighters matched) feeds 14 point-in-time `preufc_*` features —
+record/finish rates, career length, REAL regional layoff (a
+debutant's UFC layoff_days is NaN by construction), 24-month
+activity, last-3 form, Contender Series appearances, finish speed —
+plus per-side `sherdog_matched` known-vs-unknown flags. 112 main /
+114 specialist columns. Quarterly rolling backtest on the debut
+segment 2024-01..2026-07 (n=226): accuracy 53.5 % → 55.8 %,
+log-loss 0.677 → 0.676, AUC 0.599 → 0.608 vs the identical recipe
+without pre-UFC features; the market on the odds-covered subset sits
+at 73 % — tape scouting and camp intel it prices are not in any
+record-shaped feature. The single static test split (n=142) is noisy
+(±5 pp between splits); trust the rolling numbers. Main model also
+improved: test acc 65.1 → 65.6 %, log-loss 0.628 → 0.623,
+AUC 0.706 → 0.711 (pre-UFC data fills in 1-2-fight fighters too).
 
 Main model (v0.7.0 recipe, 90 features): adds opponent-adjusted ratings
 (`src/opponent_ratings.py`) — online attack/defense skill ratings
