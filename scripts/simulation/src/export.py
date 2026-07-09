@@ -633,7 +633,13 @@ def build_dataset(
         # have winner_id NULL so we exclude them from training rows but
         # still apply them to history so layoffs etc. stay accurate.
         is_completed = bout.status == "completed"
-        is_draw = is_completed and bout.winner_id is None
+        # NULL winner_id comes back from pandas as NaN (float), NOT None —
+        # `is None` never fired, so completed draws fell through to the
+        # decisive-result branch: emitted as "B wins" training rows (NaN == fa
+        # is False → target 0) and applied to history as losses for BOTH
+        # fighters. Latent since the original draw fix; it only started biting
+        # when the 2026-07 data repair gave real draws their NULL winners back.
+        is_draw = is_completed and pd.isna(bout.winner_id)
         is_nc = (bout.method or "") == "no_contest"
 
         target: int | None = None
