@@ -26,7 +26,7 @@ import numpy as np  # noqa: E402
 from src.config import ARTIFACTS_DIR, CONFIDENCE_BANDS  # noqa: E402
 from src.ensemble import EnsembleModel  # noqa: E402
 from src.export import build_dataset, fetch_raw, symmetrize_for_training  # noqa: E402
-from src.features import build_feature_matrix, feature_names  # noqa: E402
+from src.features import build_feature_matrix  # noqa: E402
 from src.train import evaluate_probs, temporal_split  # noqa: E402
 
 # Evaluate the EVAL (split-trained) model so the test split is genuinely
@@ -43,14 +43,18 @@ def main() -> None:
     # like training did — otherwise the target is trivially 1 and AUC collapses.
     df = symmetrize_for_training(build_dataset(fetch_raw()))
     X, y, meta = build_feature_matrix(df)
-    X = X[feature_names()]
-    Xs, ys, metas = temporal_split(X, y, meta)
 
     if ENSEMBLE_DIR.name != "ensemble_eval":
         print("WARNING: eval_market.py: ensemble_eval/ missing — evaluating the "
               "served (all-data) model; test-split numbers are IN-SAMPLE. "
               "Retrain to regenerate the eval model.")
     ensemble = EnsembleModel.load(ENSEMBLE_DIR)
+    # Slice to the LOADED model's column list, not the in-code
+    # feature_names(): between a feature addition landing and the next
+    # retrain, the code list is wider than the trained artifacts and the
+    # un-sliced frame would crash (or misalign) the base learners.
+    X = X[ensemble.feature_columns]
+    Xs, ys, metas = temporal_split(X, y, meta)
     probs = ensemble.predict_proba_a(Xs["test"])
     y_test = ys["test"].to_numpy()
     # market_prob_a rides on `meta` and is reset_index'd off the same mask as

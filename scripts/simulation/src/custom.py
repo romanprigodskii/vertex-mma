@@ -301,11 +301,20 @@ def build_form_snapshot(
     snapshot = h.snapshot(reference_date)
     # Pre-UFC career columns (v0.9.0). Merged into the snapshot dict so
     # score_pair's `{k}_a` copy carries them into the feature row exactly
-    # like build_dataset does.
+    # like build_dataset does. Cutoff is the ANCHOR date (+1 day so a
+    # same-day regional fight counts, mirroring "up to and including the
+    # anchor bout"), NOT reference_date — an as-of form's reference_date
+    # sits a nominal camp AFTER the anchor, and using it would leak
+    # regional fights from that future window into a past form.
+    preufc_cutoff = (
+        reference_date
+        if as_of_bout_id is None
+        else as_of_date + timedelta(days=1)
+    )
     snapshot.update(
         preufc_snapshot(
             preufc_rows,
-            reference_date,
+            preufc_cutoff,
             matched=bool(info.get("sherdog_matched")),
         )
     )

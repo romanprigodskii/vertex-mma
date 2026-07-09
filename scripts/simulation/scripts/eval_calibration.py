@@ -33,7 +33,7 @@ from sklearn.metrics import brier_score_loss, log_loss  # noqa: E402
 from src.config import ARTIFACTS_DIR  # noqa: E402
 from src.ensemble import EnsembleModel  # noqa: E402
 from src.export import build_dataset, fetch_raw, symmetrize_for_training  # noqa: E402
-from src.features import build_feature_matrix, feature_names  # noqa: E402
+from src.features import build_feature_matrix  # noqa: E402
 from src.train import temporal_split  # noqa: E402
 
 # Evaluate the EVAL (split-trained) model so val/test are genuinely out-of-
@@ -89,10 +89,13 @@ def fit_temperature(p_val: np.ndarray, y_val: np.ndarray) -> float:
 def main() -> None:
     df = symmetrize_for_training(build_dataset(fetch_raw()))
     X, y, meta = build_feature_matrix(df)
-    X = X[feature_names()]
-    Xs, ys, metas = temporal_split(X, y, meta)
 
     ens = EnsembleModel.load(ENSEMBLE_DIR)
+    # Slice to the LOADED model's columns (see eval_market.py) — the
+    # in-code feature_names() runs ahead of the artifacts between a
+    # feature addition and the next retrain.
+    X = X[ens.feature_columns]
+    Xs, ys, metas = temporal_split(X, y, meta)
     # predict_proba_a applies the (currently None) calibrator → this IS the
     # uncalibrated blended prob.
     p_val = ens.predict_proba_a(Xs["val"])
