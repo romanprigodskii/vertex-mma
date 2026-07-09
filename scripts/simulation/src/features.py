@@ -93,6 +93,22 @@ DIFF_COLUMNS = [
     "max_opp_elo_beaten",
     "avg_opp_elo_beaten",
     "sos_weighted_winrate",
+    # v0.9.0 — pre-UFC career record (Sherdog, non-UFC fights strictly
+    # before the bout date). The debut segment's information gap fix:
+    # bookmakers price a debutant's 15-0 regional record, we saw NaN.
+    # Also fills in 1-2-UFC-fight fighters whose UFC-only career columns
+    # are near-empty. NaN when the fighter has no verified Sherdog match
+    # (see sherdog_matched flags); real zeros for matched fighters who
+    # genuinely debuted with no regional record.
+    "preufc_bouts",
+    "preufc_wins",
+    "preufc_losses",
+    "preufc_win_rate",
+    "preufc_ko_rate",
+    "preufc_sub_rate",
+    "preufc_finish_rate",
+    "preufc_finish_losses",
+    "preufc_career_days",
 ]
 
 # Per-fighter columns we ALSO keep as-is for A and B (sometimes absolute
@@ -111,6 +127,10 @@ ABSOLUTE_KEEP = [
     # matchup reads differently from 1450-vs-1420 — division strength,
     # depth of résumé).
     "elo",
+    # v0.9.0 — absolute pre-UFC volume/quality: a 20-fight regional vet
+    # vs a 4-fight prospect matters even when the diff is the same.
+    "preufc_bouts",
+    "preufc_win_rate",
 ]
 
 # Context features kept as-is (not differenced). market_prob_a is NOT here:
@@ -149,7 +169,10 @@ def build_feature_matrix(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series, pd.
     # (debut_feature_names()); the main model's feature list excludes them.
     # Rows without the columns (custom sims — both fighters always have
     # history there) default to 0. They swap correctly as an _a/_b pair.
-    for flag in ("is_debut_a", "is_debut_b"):
+    # sherdog_matched flags (v0.9.0) — "pre-UFC columns are real zeros vs
+    # unknown": a matched fighter with no regional fights is signal, an
+    # unmatched fighter is missing data. Same guard for column-less rows.
+    for flag in ("is_debut_a", "is_debut_b", "sherdog_matched_a", "sherdog_matched_b"):
         out[flag] = (
             df[flag].fillna(False).astype("int8")
             if flag in df.columns
@@ -238,6 +261,11 @@ def feature_names() -> list[str]:
         "is_main_event",
         "scheduled_rounds",
         "is_womens",
+        # v0.9.0 — data-availability flags for the pre-UFC columns (real
+        # zeros vs unknown). In both models, not just the specialist:
+        # low-experience non-debut fighters benefit the same way.
+        "sherdog_matched_a",
+        "sherdog_matched_b",
     ]
     for side in ("stance_a", "stance_b"):
         cols += [f"{side}_orthodox", f"{side}_southpaw", f"{side}_switch"]

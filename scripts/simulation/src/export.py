@@ -108,8 +108,28 @@ SELECT
   f.reach_cm,
   f.leg_reach_cm,
   f.stance::text AS stance,
-  f.gender
+  f.gender,
+  (f.sherdog_id IS NOT NULL) AS sherdog_matched
 FROM fighter f
+"""
+
+# Non-UFC career fights from Sherdog (v0.9.0 — the pre-UFC information
+# gap fix). Only is_ufc=false rows: the fighter's UFC bouts are already
+# covered by the UFCStats-derived running history, counting them twice
+# would double-weight them. Rows without a date can't be placed on the
+# timeline (point-in-time guarantee), so they're skipped — they're rare
+# early-career obscurities. History never changes retroactively, so
+# today's scrape is valid for bouts years in the past: every fight
+# counted for a bout at date D happened strictly before D.
+SHERDOG_SQL = """
+SELECT
+  fighter_id::text AS fighter_id,
+  event_date::date AS event_date,
+  result,
+  method_class
+FROM fighter_sherdog_bout
+WHERE NOT is_ufc AND event_date IS NOT NULL
+ORDER BY fighter_id, event_date
 """
 
 # LATEST (closing) sportsbook line per bout (one row per bout, source
@@ -162,6 +182,7 @@ class RawData:
     fighters: pd.DataFrame
     odds: pd.DataFrame
     score_history: pd.DataFrame
+    sherdog: pd.DataFrame
 
 
 def fetch_raw() -> RawData:
@@ -173,12 +194,113 @@ def fetch_raw() -> RawData:
         fighters = _fetch_df(conn, FIGHTERS_SQL)
         odds = _fetch_df(conn, EXTERNAL_ODDS_SQL)
         score_history = _fetch_df(conn, SCORE_HISTORY_SQL)
+        sherdog = _fetch_df(conn, SHERDOG_SQL)
     console.log(
         f"fetched {len(bouts):,} bouts · {len(round_stats):,} round-stat rows · "
         f"{len(fighters):,} fighters · {len(odds):,} odds rows · "
-        f"{len(score_history):,} score-history rows"
+        f"{len(score_history):,} score-history rows · "
+        f"{len(sherdog):,} sherdog career rows"
     )
-    return RawData(bouts, round_stats, fighters, odds, score_history)
+    return RawData(bouts, round_stats, fighters, odds, score_history, sherdog)
+
+
+# --------------------------------------------------------------------------
+# Pre-UFC career snapshot (Sherdog-derived, v0.9.0)
+# --------------------------------------------------------------------------
+
+# Base names of the per-side pre-UFC columns (suffixed _a/_b on rows).
+PREUFC_KEYS = (
+    "preufc_bouts",
+    "preufc_wins",
+    "preufc_losses",
+    "preufc_win_rate",
+    "preufc_ko_rate",
+    "preufc_sub_rate",
+    "preufc_finish_rate",
+    "preufc_finish_losses",
+    "preufc_career_days",
+)
+
+_PREUFC_EMPTY: dict[str, Any] = {
+    "sherdog_matched": False,
+    **{k: None for k in PREUFC_KEYS},
+}
+
+
+def preufc_snapshot(
+    fights: list[tuple[date, str, str | None]],
+    ev_date: date,
+    *,
+    matched: bool,
+) -> dict[str, Any]:
+    """Non-UFC career record strictly before `ev_date`, from the fighter's
+    Sherdog history rows [(event_date, result, method_class), ...] sorted
+    by date ascending.
+
+    `matched=False` (fighter has no verified Sherdog profile) returns all
+    None — "we don't know" — while a matched fighter with zero regional
+    fights before ev_date returns real zeros (e.g. Olympians who debuted
+    straight into the UFC). The sherdog_matched flag rides along so the
+    model can tell the two apart; that's the same trick as is_debut for
+    the specialist. Rates use bouts as the denominator (ko/sub) except
+    finish_rate (share of WINS that were finishes), mirroring the UFC
+    prior_* semantics."""
+    if not matched:
+        return dict(_PREUFC_EMPTY)
+    wins = losses = draws = ko_wins = sub_wins = finish_losses = 0
+    first_fight: date | None = None
+    for fight_date, result, method_class in fights:
+        if fight_date >= ev_date:
+            break  # sorted ascending — nothing later can count
+        if result == "nc":
+            continue  # NCs never touch history (mirrors FighterHistory)
+        if first_fight is None:
+            first_fight = fight_date
+        if result == "win":
+            wins += 1
+            if method_class == "ko":
+                ko_wins += 1
+            elif method_class == "submission":
+                sub_wins += 1
+        elif result == "loss":
+            losses += 1
+            if method_class in ("ko", "submission"):
+                finish_losses += 1
+        else:  # draw
+            draws += 1
+    bouts = wins + losses + draws
+    return {
+        "sherdog_matched": True,
+        "preufc_bouts": bouts,
+        "preufc_wins": wins,
+        "preufc_losses": losses,
+        "preufc_win_rate": wins / bouts if bouts else None,
+        "preufc_ko_rate": ko_wins / bouts if bouts else None,
+        "preufc_sub_rate": sub_wins / bouts if bouts else None,
+        "preufc_finish_rate": (ko_wins + sub_wins) / wins if wins else None,
+        "preufc_finish_losses": finish_losses,
+        "preufc_career_days": (
+            (ev_date - first_fight).days if first_fight is not None else None
+        ),
+    }
+
+
+def group_sherdog_fights(
+    sherdog: pd.DataFrame,
+) -> dict[str, list[tuple[date, str, str | None]]]:
+    """fighter_id -> [(event_date, result, method_class)] sorted by date
+    (SHERDOG_SQL already orders by fighter_id, event_date)."""
+    out: dict[str, list[tuple[date, str, str | None]]] = {}
+    if sherdog.empty:
+        return out
+    for row in sherdog.itertuples(index=False):
+        d = row.event_date
+        if not isinstance(d, date):
+            d = pd.to_datetime(d).date()
+        out.setdefault(row.fighter_id, []).append(
+            (d, row.result, row.method_class)
+        )
+    return out
 
 
 # --------------------------------------------------------------------------
@@ -517,6 +639,8 @@ def build_dataset(
     rs = raw.round_stats.set_index(["bout_id", "fighter_id"])
     fighters = raw.fighters.set_index("fighter_id")
     odds = raw.odds.set_index("bout_id")
+    # Non-UFC career fights per fighter (pre-UFC features, v0.9.0).
+    preufc_by_fighter = group_sherdog_fights(raw.sherdog)
 
     # Build a per-(fighter, date) ordered list of (vertex_score,
     # vertex_score_all_time) so we can look up the most-recent snapshot
@@ -661,6 +785,23 @@ def build_dataset(
         pre_a = ratings.pre[(bout_id, fa)]
         pre_b = ratings.pre[(bout_id, fb)]
 
+        # Pre-UFC (non-UFC-before-this-date) career snapshots. Static data
+        # scraped today is point-in-time safe: every counted fight happened
+        # strictly before ev_date, and fight histories don't change
+        # retroactively.
+        matched_a = bool(
+            info_a is not None and bool(info_a["sherdog_matched"])
+        )
+        matched_b = bool(
+            info_b is not None and bool(info_b["sherdog_matched"])
+        )
+        preufc_a = preufc_snapshot(
+            preufc_by_fighter.get(fa, []), ev_date, matched=matched_a
+        )
+        preufc_b = preufc_snapshot(
+            preufc_by_fighter.get(fb, []), ev_date, matched=matched_b
+        )
+
         if should_emit:
             row = {
                 "bout_id": bout_id,
@@ -693,6 +834,10 @@ def build_dataset(
             for k, v in snap_a.items():
                 row[f"{k}_a"] = v
             for k, v in snap_b.items():
+                row[f"{k}_b"] = v
+            for k, v in preufc_a.items():
+                row[f"{k}_a"] = v
+            for k, v in preufc_b.items():
                 row[f"{k}_b"] = v
             rows.append(row)
 

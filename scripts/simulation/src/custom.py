@@ -42,7 +42,13 @@ from psycopg.types.json import Jsonb
 from rich.console import Console
 
 from .db import get_connection
-from .export import FighterHistory, _fight_duration_seconds, stable_hash, swap_sides
+from .export import (
+    FighterHistory,
+    _fight_duration_seconds,
+    preufc_snapshot,
+    stable_hash,
+    swap_sides,
+)
 from .features import build_feature_matrix
 from .monte_carlo import FighterMC, simulate_bout
 from .opponent_ratings import (
@@ -143,9 +149,19 @@ SELECT
   f.reach_cm,
   f.stance::text AS stance,
   f.gender,
-  f.photo_thumbnail_url
+  f.photo_thumbnail_url,
+  (f.sherdog_id IS NOT NULL) AS sherdog_matched
 FROM fighter f
 WHERE f.id = %s::uuid
+"""
+
+# Non-UFC career fights (pre-UFC features, v0.9.0) — same shape as
+# export.SHERDOG_SQL but for one fighter.
+PREUFC_SQL = """
+SELECT event_date::date AS event_date, result, method_class
+FROM fighter_sherdog_bout
+WHERE fighter_id = %s::uuid AND NOT is_ufc AND event_date IS NOT NULL
+ORDER BY event_date ASC
 """
 
 SCORE_HISTORY_SQL = """
@@ -226,6 +242,9 @@ def build_form_snapshot(
         cur.execute(SCORE_HISTORY_SQL, (fighter_id,))
         history_rows = cur.fetchall()
 
+        cur.execute(PREUFC_SQL, (fighter_id,))
+        preufc_rows = [(r[0], r[1], r[2]) for r in cur.fetchall()]
+
     h = FighterHistory()
     for b in bouts:
         method = b["method"] or ""
@@ -280,6 +299,16 @@ def build_form_snapshot(
     h.last_vertex_score_all_time = None if vsat is None else int(vsat)
 
     snapshot = h.snapshot(reference_date)
+    # Pre-UFC career columns (v0.9.0). Merged into the snapshot dict so
+    # score_pair's `{k}_a` copy carries them into the feature row exactly
+    # like build_dataset does.
+    snapshot.update(
+        preufc_snapshot(
+            preufc_rows,
+            reference_date,
+            matched=bool(info.get("sherdog_matched")),
+        )
+    )
 
     age = None
     if info.get("dob") is not None:
