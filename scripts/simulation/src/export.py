@@ -495,7 +495,7 @@ class FighterHistory:
 
 
 def build_dataset(
-    raw: RawData, *, include_scheduled: bool = False
+    raw: RawData, *, include_scheduled: bool = False, include_debuts: bool = False
 ) -> pd.DataFrame:
     """Walk bouts in chronological order, snapshot features per fighter
     BEFORE applying each bout's result, then update history. Returns
@@ -504,7 +504,14 @@ def build_dataset(
     When `include_scheduled=True`, rows for upcoming (status != 'completed')
     bouts are emitted with `target_a_wins` set to NaN — used at inference
     time to score future bouts. Their results aren't applied to history
-    since they haven't happened yet."""
+    since they haven't happened yet.
+
+    When `include_debuts=True` (v0.8.0), bouts where a fighter has ZERO
+    prior UFC bouts are emitted too, flagged `is_debut_a`/`is_debut_b` with
+    the debutant's career columns left None/NaN (LightGBM/XGBoost consume
+    NaN natively; the LogReg leg mean-imputes). Anthropometrics, age,
+    stance and the opponent's full profile are still real signal — enough
+    to beat the coin these bouts previously got (no prediction at all)."""
 
     # Index round_stats by (bout_id, fighter_id) for O(1) lookup.
     rs = raw.round_stats.set_index(["bout_id", "fighter_id"])
@@ -645,9 +652,9 @@ def build_dataset(
         # features are non-empty) AND (the bout has a clean winner OR
         # we're in inference mode and this is a scheduled bout).
         is_scheduled = bout.status != "completed"
+        both_experienced = snap_a["prior_bouts"] > 0 and snap_b["prior_bouts"] > 0
         should_emit = (
-            snap_a["prior_bouts"] > 0
-            and snap_b["prior_bouts"] > 0
+            (both_experienced or include_debuts)
             and (target is not None or (include_scheduled and is_scheduled))
         )
         # Pre-bout Elo + opponent-adjusted ratings for both sides.
@@ -674,6 +681,8 @@ def build_dataset(
                 "stance_a": stance_a,
                 "stance_b": stance_b,
                 "gender": gender,
+                "is_debut_a": snap_a["prior_bouts"] == 0,
+                "is_debut_b": snap_b["prior_bouts"] == 0,
                 "market_prob_a": market_prob_a,
                 "target_a_wins": target,
             }

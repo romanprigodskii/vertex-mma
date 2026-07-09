@@ -73,9 +73,14 @@ class EnsembleModel:
     # ── individual training helpers ────────────────────────────────────
 
     def _train_lgb(
-        self, X_tr: pd.DataFrame, y_tr: pd.Series, X_va: pd.DataFrame, y_va: pd.Series
+        self,
+        X_tr: pd.DataFrame,
+        y_tr: pd.Series,
+        X_va: pd.DataFrame,
+        y_va: pd.Series,
+        sample_weight: np.ndarray | None = None,
     ) -> lgb.Booster:
-        dtr = lgb.Dataset(X_tr, label=y_tr)
+        dtr = lgb.Dataset(X_tr, label=y_tr, weight=sample_weight)
         dva = lgb.Dataset(X_va, label=y_va, reference=dtr)
         return lgb.train(
             self.lgb_params,
@@ -112,9 +117,14 @@ class EnsembleModel:
         }
 
     def _train_xgb(
-        self, X_tr: pd.DataFrame, y_tr: pd.Series, X_va: pd.DataFrame, y_va: pd.Series
+        self,
+        X_tr: pd.DataFrame,
+        y_tr: pd.Series,
+        X_va: pd.DataFrame,
+        y_va: pd.Series,
+        sample_weight: np.ndarray | None = None,
     ) -> xgb.Booster:
-        dtr = xgb.DMatrix(X_tr, label=y_tr.astype(int))
+        dtr = xgb.DMatrix(X_tr, label=y_tr.astype(int), weight=sample_weight)
         dva = xgb.DMatrix(X_va, label=y_va.astype(int))
         return xgb.train(
             self._xgb_params(),
@@ -128,22 +138,33 @@ class EnsembleModel:
     # ── fixed-iteration trainers (production refit on ALL data) ─────────
 
     def _train_lgb_fixed(
-        self, X: pd.DataFrame, y: pd.Series, num_rounds: int
+        self,
+        X: pd.DataFrame,
+        y: pd.Series,
+        num_rounds: int,
+        sample_weight: np.ndarray | None = None,
     ) -> lgb.Booster:
         """Train LGB for a FIXED round count (no val / early stopping). Used by
         the production refit: the iteration count comes from the eval-split run,
         so we can train on ALL data without holding any out."""
-        dtr = lgb.Dataset(X, label=y)
+        dtr = lgb.Dataset(X, label=y, weight=sample_weight)
         return lgb.train(self.lgb_params, dtr, num_boost_round=max(1, int(num_rounds)))
 
     def _train_xgb_fixed(
-        self, X: pd.DataFrame, y: pd.Series, num_rounds: int
+        self,
+        X: pd.DataFrame,
+        y: pd.Series,
+        num_rounds: int,
+        sample_weight: np.ndarray | None = None,
     ) -> xgb.Booster:
-        dtr = xgb.DMatrix(X, label=y.astype(int))
+        dtr = xgb.DMatrix(X, label=y.astype(int), weight=sample_weight)
         return xgb.train(self._xgb_params(), dtr, num_boost_round=max(1, int(num_rounds)))
 
     def _train_logreg(
-        self, X_tr: pd.DataFrame, y_tr: pd.Series
+        self,
+        X_tr: pd.DataFrame,
+        y_tr: pd.Series,
+        sample_weight: np.ndarray | None = None,
     ) -> tuple[LogisticRegression, StandardScaler, np.ndarray]:
         # Linear models can't handle NaN natively. Impute with the column
         # mean learned on train (falls back to 0 when the column is
@@ -158,7 +179,7 @@ class EnsembleModel:
         clf = LogisticRegression(
             max_iter=500, C=0.5, solver="liblinear", random_state=42
         )
-        clf.fit(X_scaled, y_tr.astype(int))
+        clf.fit(X_scaled, y_tr.astype(int), sample_weight=sample_weight)
         return clf, scaler, means
 
     # ── full training entrypoint ───────────────────────────────────────
@@ -169,12 +190,17 @@ class EnsembleModel:
         y_train: pd.Series,
         X_val: pd.DataFrame,
         y_val: pd.Series,
+        sample_weight: np.ndarray | None = None,
     ) -> dict[str, Any]:
+        """`sample_weight` (v0.8.0) lets the debut specialist train on the
+        full dataset with both-experienced rows down-weighted — early
+        stopping, the blender and the blend-mode pick stay on the
+        (unweighted) val split."""
         # 1. Train base learners on the full train split.
-        self.lgb_global = self._train_lgb(X_train, y_train, X_val, y_val)
-        self.xgb_global = self._train_xgb(X_train, y_train, X_val, y_val)
+        self.lgb_global = self._train_lgb(X_train, y_train, X_val, y_val, sample_weight)
+        self.xgb_global = self._train_xgb(X_train, y_train, X_val, y_val, sample_weight)
         self.logreg, self.scaler, self.logreg_means = self._train_logreg(
-            X_train, y_train
+            X_train, y_train, sample_weight
         )
 
         # 2. Build val-set base predictions for the blender.
@@ -267,6 +293,7 @@ class EnsembleModel:
         self,
         X_all: pd.DataFrame,
         y_all: pd.Series,
+        sample_weight: np.ndarray | None = None,
     ) -> "EnsembleModel":
         """Return a PRODUCTION ensemble whose base learners are refit on the
         FULL dataset (train+val+test), so the SERVED weights include the most
@@ -290,10 +317,12 @@ class EnsembleModel:
             lgb_early_stopping=self.lgb_early_stopping,
         )
         lgb_rounds = self.lgb_global.best_iteration or self.lgb_num_rounds
-        prod.lgb_global = self._train_lgb_fixed(X_all, y_all, lgb_rounds)
+        prod.lgb_global = self._train_lgb_fixed(X_all, y_all, lgb_rounds, sample_weight)
         xgb_rounds = (self.xgb_global.best_iteration or 1000) + 1
-        prod.xgb_global = self._train_xgb_fixed(X_all, y_all, xgb_rounds)
-        prod.logreg, prod.scaler, prod.logreg_means = self._train_logreg(X_all, y_all)
+        prod.xgb_global = self._train_xgb_fixed(X_all, y_all, xgb_rounds, sample_weight)
+        prod.logreg, prod.scaler, prod.logreg_means = self._train_logreg(
+            X_all, y_all, sample_weight
+        )
         # Transfer the blend config unchanged (meta-params selected on val).
         prod.blender = self.blender
         prod.calibrator = self.calibrator

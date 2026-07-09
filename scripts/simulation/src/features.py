@@ -145,6 +145,16 @@ def build_feature_matrix(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series, pd.
     out["is_title_fight"] = df["is_title_fight"].astype("int8")
     out["is_main_event"] = df["is_main_event"].astype("int8")
     out["scheduled_rounds"] = df["scheduled_rounds"].astype("int8")
+    # Debut flags (v0.8.0) — consumed only by the debut specialist
+    # (debut_feature_names()); the main model's feature list excludes them.
+    # Rows without the columns (custom sims — both fighters always have
+    # history there) default to 0. They swap correctly as an _a/_b pair.
+    for flag in ("is_debut_a", "is_debut_b"):
+        out[flag] = (
+            df[flag].fillna(False).astype("int8")
+            if flag in df.columns
+            else pd.Series(0, index=df.index, dtype="int8")
+        )
     # Women's divisions differ in pace / finish rates — give the model the flag
     # (was fetched but never used). Default to men's when gender is missing.
     gender = df["gender"].fillna("male").astype(str) if "gender" in df.columns else "male"
@@ -249,3 +259,12 @@ def feature_names() -> list[str]:
         "wc_other",
     ]
     return cols
+
+
+def debut_feature_names() -> list[str]:
+    """Feature list for the DEBUT SPECIALIST (v0.8.0): the main model's
+    columns plus the per-side debut flags. The debutant side's career
+    columns arrive as NaN (LGB/XGB consume them natively; the LogReg leg
+    mean-imputes from train), so the flags let the model tell "unknown
+    because debut" apart from ordinary missingness."""
+    return feature_names() + ["is_debut_a", "is_debut_b"]

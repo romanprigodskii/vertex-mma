@@ -29,7 +29,10 @@ console = Console()
 
 def main() -> None:
     raw = fetch_raw()
-    df = build_dataset(raw)
+    # include_debuts (v0.8.0): the frame carries debut bouts for the debut
+    # specialist; run_training still fits the MAIN model on both-experienced
+    # rows only, so its weights are unaffected by this flag.
+    df = build_dataset(raw, include_debuts=True)
     df = symmetrize_for_training(df)
     dataset_path = DATA_DIR / "dataset.parquet"
     df.to_parquet(dataset_path, index=False)

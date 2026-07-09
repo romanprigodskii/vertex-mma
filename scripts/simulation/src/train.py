@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -29,7 +30,7 @@ from .config import (
     VAL_END,
 )
 from .ensemble import EnsembleModel
-from .features import build_feature_matrix, feature_names
+from .features import build_feature_matrix, debut_feature_names, feature_names
 
 console = Console()
 
@@ -39,6 +40,15 @@ ENSEMBLE_DIR = ARTIFACTS_DIR / "ensemble"
 # in ENSEMBLE_DIR is refit on ALL data, so a test-split eval against it would be
 # in-sample (optimistic).
 ENSEMBLE_EVAL_DIR = ARTIFACTS_DIR / "ensemble_eval"
+# v0.8.0 — the debut specialist (serves bouts with >=1 UFC debutant) and its
+# split-trained eval twin.
+ENSEMBLE_DEBUT_DIR = ARTIFACTS_DIR / "ensemble_debut"
+ENSEMBLE_DEBUT_EVAL_DIR = ARTIFACTS_DIR / "ensemble_debut_eval"
+# Transfer weighting for the specialist: both-experienced rows contribute at
+# this weight so the model learns general feature->outcome structure without
+# drowning the ~2k debut rows it exists for (v0.8 lab: 0.2 beat debut-only
+# training and a reduced feature set on debut-val log-loss).
+DEBUT_EXP_ROW_WEIGHT = 0.2
 
 # What each temporal split is actually USED for — so the report doesn't present
 # the val number as a clean generalization estimate. val is consumed 3–4×
@@ -222,7 +232,17 @@ def print_breakdown_table(
 
 
 def run_training(df: pd.DataFrame) -> dict[str, dict[str, float]]:
-    X, y, meta = build_feature_matrix(df)
+    # The dataset may include debut rows (v0.8.0). The MAIN model trains on
+    # both-experienced bouts only — exactly the v0.7.0 recipe — so adding
+    # debut coverage cannot move its weights. The debut specialist below
+    # trains on everything.
+    if "is_debut_a" in df.columns:
+        debut_mask_df = (df["is_debut_a"] | df["is_debut_b"]).astype(bool)
+        exp_df = df[~debut_mask_df].reset_index(drop=True)
+    else:
+        exp_df = df
+
+    X, y, meta = build_feature_matrix(exp_df)
     cols = feature_names()
     X = X[cols]
 
@@ -303,6 +323,72 @@ def run_training(df: pd.DataFrame) -> dict[str, dict[str, float]]:
     ENSEMBLE_DIR.mkdir(exist_ok=True)
     prod.save(ENSEMBLE_DIR)
 
+    # ── Debut specialist (v0.8.0) ───────────────────────────────────────
+    # Serves bouts with >=1 UFC debutant, which the main model never sees.
+    # Transfer recipe (validated in the v0.8 lab as "c_transfer"): train on
+    # ALL rows with both-experienced bouts down-weighted to 0.2 — the 5.5k
+    # extra rows teach what an elo/anthro/age edge is worth while the debut
+    # rows + flags keep the debut regime dominant. Early stopping and the
+    # blend-mode pick use the DEBUT val rows only.
+    debut_metrics: dict[str, Any] | None = None
+    debut_cols: list[str] | None = None
+    if "is_debut_a" in df.columns and bool(debut_mask_df.any()):
+        debut_cols = debut_feature_names()
+        X_d, y_d, meta_d = build_feature_matrix(df)
+        X_d = X_d[debut_cols]
+        weights_all = np.where(debut_mask_df.to_numpy(), 1.0, DEBUT_EXP_ROW_WEIGHT)
+
+        dt_d = pd.to_datetime(meta_d["event_date"])
+        m_tr = dt_d < pd.to_datetime(TRAIN_END)
+        m_va = (dt_d >= pd.to_datetime(TRAIN_END)) & (dt_d < pd.to_datetime(VAL_END))
+        m_te = dt_d >= pd.to_datetime(VAL_END)
+        m_debut = debut_mask_df.to_numpy()
+        # val = debut rows only — the specialist is selected for its segment.
+        va_mask = m_va.to_numpy() & m_debut
+
+        # Same tuned params, but feature_contri must match the specialist's
+        # 92-column layout (the main list is 90 wide).
+        debut_lgb_params = {
+            **lgb_params,
+            "feature_contri": [
+                FEATURE_CONTRI_OVERRIDES.get(col, 1.0) for col in debut_cols
+            ],
+        }
+        specialist = EnsembleModel(
+            feature_columns=debut_cols,
+            lgb_params=debut_lgb_params,
+            lgb_num_rounds=LGB_NUM_ROUNDS,
+            lgb_early_stopping=LGB_EARLY_STOPPING_ROUNDS,
+        )
+        console.log(
+            f"training debut specialist (transfer, exp-row weight {DEBUT_EXP_ROW_WEIGHT}) — "
+            f"{int(m_debut.sum()):,} debut rows · val {int(va_mask.sum())}"
+        )
+        specialist.fit(
+            X_train=X_d.loc[m_tr.to_numpy()].reset_index(drop=True),
+            y_train=y_d.loc[m_tr.to_numpy()].reset_index(drop=True),
+            X_val=X_d.loc[va_mask].reset_index(drop=True),
+            y_val=y_d.loc[va_mask].reset_index(drop=True),
+            sample_weight=weights_all[m_tr.to_numpy()],
+        )
+        te_mask = m_te.to_numpy() & m_debut
+        debut_probs = specialist.predict_proba_a(X_d.loc[te_mask].reset_index(drop=True))
+        debut_metrics = evaluate_probs(
+            debut_probs,
+            y_d.loc[te_mask].reset_index(drop=True),
+            meta_d.loc[te_mask, "market_prob_a"].reset_index(drop=True),
+        )
+        console.log(
+            f"debut specialist test segment: n={debut_metrics['n']} "
+            f"acc={debut_metrics['accuracy']:.3f} ll={debut_metrics['log_loss']:.3f}"
+        )
+
+        ENSEMBLE_DEBUT_EVAL_DIR.mkdir(exist_ok=True)
+        specialist.save(ENSEMBLE_DEBUT_EVAL_DIR)
+        prod_specialist = specialist.refit_on_all(X_d, y_d, sample_weight=weights_all)
+        ENSEMBLE_DEBUT_DIR.mkdir(exist_ok=True)
+        prod_specialist.save(ENSEMBLE_DEBUT_DIR)
+
     metadata = {
         "model_version": MODEL_VERSION,
         "model_kind": "ensemble",
@@ -331,6 +417,17 @@ def run_training(df: pd.DataFrame) -> dict[str, dict[str, float]]:
         "n_train": int(len(Xs["train"])),
         "n_val": int(len(Xs["val"])),
         "n_test": int(len(Xs["test"])),
+        # v0.8.0 — debut specialist (None when the dataset had no debut rows).
+        "debut_specialist": (
+            {
+                "feature_columns": debut_cols,
+                "exp_row_weight": DEBUT_EXP_ROW_WEIGHT,
+                "metrics_test_debut_segment": debut_metrics,
+                "note": "serves bouts with >=1 UFC debutant; selection val = debut rows only; weaker than the market on this segment — probabilities are directional, not sharp",
+            }
+            if debut_metrics is not None
+            else None
+        ),
     }
     (ARTIFACTS_DIR / "metadata.json").write_text(
         json.dumps(metadata, indent=2, default=str)
