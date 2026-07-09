@@ -244,6 +244,14 @@ export const fighter = pgTable(
     tapologyId: text("tapology_id").unique(),
     wikipediaUrl: text("wikipedia_url"),
 
+    // Sherdog full-career sync (pre-UFC record pipeline). match_status:
+    // 'matched' | 'unmatched' | 'ambiguous' | NULL = never attempted.
+    // synced_at = when fight history was last (re)scraped into
+    // fighter_sherdog_bout. Both written only by
+    // scripts/scraper/scripts/17_scrape_sherdog.py.
+    sherdogMatchStatus: text("sherdog_match_status"),
+    sherdogSyncedAt: timestamp("sherdog_synced_at", { withTimezone: true }),
+
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -498,8 +506,50 @@ export const fighterScoreHistory = pgTable(
   ],
 );
 
+export const fighterSherdogBout = pgTable(
+  "fighter_sherdog_bout",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    fighterId: uuid("fighter_id")
+      .notNull()
+      .references(() => fighter.id, { onDelete: "cascade" }),
+    /** 'win' | 'loss' | 'draw' | 'nc' — Sherdog's final_result class. */
+    result: text("result").notNull(),
+    opponentName: text("opponent_name").notNull(),
+    /** Numeric id from the opponent's /fighter/Slug-<id> link. */
+    opponentSherdogId: text("opponent_sherdog_id"),
+    eventName: text("event_name").notNull(),
+    eventDate: date("event_date"),
+    /** Raw method string, e.g. "KO (Punches)". */
+    method: text("method"),
+    /** Normalized: 'ko' | 'submission' | 'decision' | 'other'. */
+    methodClass: text("method_class"),
+    round: smallint("round"),
+    timeSeconds: integer("time_seconds"),
+    /** True when this row is the fighter's UFC bout (event-name pattern OR
+     * date-matched to one of their UFC bouts in our `bout` table). The sim
+     * pipeline counts only is_ufc=false rows toward pre-UFC features — UFC
+     * bouts are already covered by the UFCStats-derived history. */
+    isUfc: boolean("is_ufc").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    // Sync is delete-and-reinsert per fighter (no per-row natural key on
+    // Sherdog's side), so fighter_id is the only lookup path we need.
+    index("fighter_sherdog_bout_fighter_idx").on(table.fighterId),
+    index("fighter_sherdog_bout_fighter_date_idx").on(
+      table.fighterId,
+      table.eventDate,
+    ),
+  ],
+);
+
 export type Fighter = typeof fighter.$inferSelect;
 export type NewFighter = typeof fighter.$inferInsert;
+export type FighterSherdogBout = typeof fighterSherdogBout.$inferSelect;
+export type NewFighterSherdogBout = typeof fighterSherdogBout.$inferInsert;
 export type RankingSnapshot = typeof rankingSnapshot.$inferSelect;
 export type NewRankingSnapshot = typeof rankingSnapshot.$inferInsert;
 export type FighterDivisionalScore = typeof fighterDivisionalScore.$inferSelect;
