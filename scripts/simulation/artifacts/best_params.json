@@ -1,17 +1,17 @@
 {
-  "best_value": 0.645385705627847,
-  "best_trial_number": 61,
+  "best_value": 0.638910999574291,
+  "best_trial_number": 93,
   "best_params": {
-    "learning_rate": 0.06717307494439789,
-    "num_leaves": 63,
-    "max_depth": 3,
-    "min_data_in_leaf": 47,
-    "feature_fraction": 0.8297098249147963,
-    "bagging_fraction": 0.6930156044133179,
-    "bagging_freq": 4,
-    "lambda_l1": 0.005796964799606552,
-    "lambda_l2": 1.7608904121671312,
-    "min_gain_to_split": 0.09526833319973148
+    "learning_rate": 0.06644363985456142,
+    "num_leaves": 117,
+    "max_depth": 4,
+    "min_data_in_leaf": 21,
+    "feature_fraction": 0.9667480561018476,
+    "bagging_fraction": 0.5719717783983863,
+    "bagging_freq": 8,
+    "lambda_l1": 0.002372035653495314,
+    "lambda_l2": 0.0035491038863686864,
+    "min_gain_to_split": 0.11627890935526539
   },
   "n_trials": 100
 }
