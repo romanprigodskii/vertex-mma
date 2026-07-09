@@ -36,6 +36,7 @@ console = Console()
 TOP_N_FEATURES = 8
 
 ENSEMBLE_DIR = ARTIFACTS_DIR / "ensemble"
+ENSEMBLE_DEBUT_DIR = ARTIFACTS_DIR / "ensemble_debut"
 
 
 class LoadedModel:
@@ -49,22 +50,44 @@ class LoadedModel:
         self.ensemble = EnsembleModel.load(ENSEMBLE_DIR)
         self.feature_columns: list[str] = self.metadata["feature_columns"]
         self.model_version: str = self.metadata["model_version"]
+        # v0.8.0 — debut specialist, present when trained with debut rows.
+        # Bouts with a UFC debutant route here; the main ensemble never sees
+        # them (its training set excludes debuts entirely).
+        debut_meta = self.metadata.get("debut_specialist")
+        if debut_meta and ENSEMBLE_DEBUT_DIR.exists():
+            self.debut_ensemble: EnsembleModel | None = EnsembleModel.load(
+                ENSEMBLE_DEBUT_DIR
+            )
+            self.debut_feature_columns: list[str] = debut_meta["feature_columns"]
+        else:
+            self.debut_ensemble = None
+            self.debut_feature_columns = []
 
-    def predict_proba_a(self, X: pd.DataFrame) -> np.ndarray:
+    def predict_proba_a(
+        self, X: pd.DataFrame, *, debut: bool = False
+    ) -> np.ndarray:
+        if debut:
+            assert self.debut_ensemble is not None
+            return self.debut_ensemble.predict_proba_a(X[self.debut_feature_columns])
         X = X[self.feature_columns]
         return self.ensemble.predict_proba_a(X)
 
-    def shap_contributions(self, X: pd.DataFrame) -> np.ndarray:
-        """TreeSHAP values from the ENSEMBLE's global LightGBM. The
-        blended probability comes from 4 learners, but SHAP only makes
-        sense per single tree model — and the global LGB is the most
-        interpretable choice (linear LogReg coefs and XGB-vs-LGB
-        differences would muddle the "why" panel)."""
-        X = X[self.feature_columns]
-        booster = self.ensemble.lgb_global
+    def shap_contributions(
+        self, X: pd.DataFrame, *, debut: bool = False
+    ) -> tuple[np.ndarray, list[str]]:
+        """TreeSHAP values from the serving model's global LightGBM (the
+        debut specialist's for debut bouts). The blended probability comes
+        from 3 learners, but SHAP only makes sense per single tree model —
+        and the global LGB is the most interpretable choice (linear LogReg
+        coefs and XGB-vs-LGB differences would muddle the "why" panel).
+        Returns (contribs, the column list they're indexed by)."""
+        cols = self.debut_feature_columns if debut else self.feature_columns
+        booster = (
+            self.debut_ensemble.lgb_global if debut else self.ensemble.lgb_global
+        )
         assert booster is not None
-        contribs = booster.predict(X, pred_contrib=True)
-        return contribs[:, :-1]
+        contribs = booster.predict(X[cols], pred_contrib=True)
+        return contribs[:, :-1], cols
 
 
 def predict_upcoming(*, force_version: str | None = None) -> int:
@@ -75,12 +98,23 @@ def predict_upcoming(*, force_version: str | None = None) -> int:
     console.log(f"loaded model {version} ({len(model.feature_columns)} features)")
 
     raw = fetch_raw()
-    df_all = build_dataset(raw, include_scheduled=True)
+    # include_debuts only when the specialist exists — otherwise keep the
+    # legacy "both fighters have >=1 prior bout" coverage.
+    with_debuts = model.debut_ensemble is not None
+    df_all = build_dataset(raw, include_scheduled=True, include_debuts=with_debuts)
     upcoming = df_all[df_all["target_a_wins"].isna()].reset_index(drop=True)
     if upcoming.empty:
         console.log("no upcoming bouts with sufficient history to score")
         return 0
-    console.log(f"scoring {len(upcoming):,} upcoming bouts…")
+    debut_mask = (
+        (upcoming["is_debut_a"] | upcoming["is_debut_b"]).to_numpy()
+        if with_debuts
+        else np.zeros(len(upcoming), dtype=bool)
+    )
+    console.log(
+        f"scoring {len(upcoming):,} upcoming bouts "
+        f"({int(debut_mask.sum())} with a debutant → specialist)…"
+    )
 
     # Fill the target column with a dummy 0 so build_feature_matrix
     # (which selects on target) doesn't break — we won't use y.
@@ -92,13 +126,28 @@ def predict_upcoming(*, force_version: str | None = None) -> int:
     # (abs_*_a/_b, stance one-hots), so the raw scrape order would leak into
     # the prediction. Score both orders and average:
     #   P(A wins) = ½·[ predict(A,B) + (1 − predict(B,A)) ].
+    # Bouts with a debutant route to the specialist, everything else to the
+    # main ensemble; both get the same order-averaging.
     X_swapped, _, _ = build_feature_matrix(swap_sides(upcoming_fill))
-    probs_a_orig = model.predict_proba_a(X)
-    probs_a_swapped = model.predict_proba_a(X_swapped)
-    probs_a = 0.5 * (probs_a_orig + (1.0 - probs_a_swapped))
+    probs_a = np.empty(len(upcoming), dtype=float)
+    for mask, is_debut in ((~debut_mask, False), (debut_mask, True)):
+        if not mask.any():
+            continue
+        p = model.predict_proba_a(X.loc[mask], debut=is_debut)
+        p_sw = model.predict_proba_a(X_swapped.loc[mask], debut=is_debut)
+        probs_a[mask] = 0.5 * (p + (1.0 - p_sw))
     # SHAP stays on the original order — it explains this row's inputs as
-    # scraped; the headline prob is the symmetrized one above.
-    shap_matrix = model.shap_contributions(X)  # (n_bouts, n_features)
+    # scraped; the headline prob is the symmetrized one above. Each segment
+    # is explained by the model that actually scored it.
+    shap_cols_by_row: list[list[str]] = [[] for _ in range(len(upcoming))]
+    shap_values_by_row: list[np.ndarray] = [np.array([])] * len(upcoming)
+    for mask, is_debut in ((~debut_mask, False), (debut_mask, True)):
+        if not mask.any():
+            continue
+        contribs, cols = model.shap_contributions(X.loc[mask], debut=is_debut)
+        for j, i in enumerate(np.where(mask)[0]):
+            shap_values_by_row[i] = contribs[j]
+            shap_cols_by_row[i] = cols
     confidences = [confidence_label(max(p, 1 - p)) for p in probs_a]
     pred_winners = [
         row.fighter_a_id if p >= 0.5 else row.fighter_b_id
@@ -134,13 +183,14 @@ def predict_upcoming(*, force_version: str | None = None) -> int:
     # show "Reach +6 cm" without re-fetching the source row.
     feature_rows: list[tuple] = []
     for i, m in enumerate(meta.itertuples(index=False)):
-        shap_row = shap_matrix[i]
+        shap_row = shap_values_by_row[i]
+        row_cols = shap_cols_by_row[i]
         x_row = X.iloc[i]
         abs_order = np.argsort(-np.abs(shap_row))
         for rank, col_idx in enumerate(abs_order[:TOP_N_FEATURES], start=1):
-            feature_name = model.feature_columns[col_idx]
+            feature_name = row_cols[col_idx]
             shap_value = float(shap_row[col_idx])
-            raw_val = x_row.iloc[col_idx]
+            raw_val = x_row[feature_name]
             feature_value = (
                 None
                 if raw_val is None or (isinstance(raw_val, float) and pd.isna(raw_val))
