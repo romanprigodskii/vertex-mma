@@ -114,17 +114,20 @@ def name_similarity(a: str, b: str) -> float:
 
 
 def surnames_match(a: str, b: str) -> bool:
-    """Loose opponent-name check for fight-overlap verification. Last
-    token equality catches "Alex Volkanovski" vs "Alexander Volkanovski";
-    the 0.5 similarity fallback catches reordered/multi-part surnames
-    ("Dos Santos, Junior")."""
+    """Opponent-name check for fight-overlap verification. Last token
+    equality catches "Alex Volkanovski" vs "Alexander Volkanovski"; the
+    0.75 similarity fallback catches reordered multi-part surnames
+    ("Junior Dos Santos" / "Dos Santos Junior"). The bar is deliberately
+    high — an earlier 0.5 fallback let ANY single shared token of a
+    two-token name pass ("Ryan Curtis" ≈ "Curtis Blaydes"), which combined
+    with a same-weekend event date into a real wrong-fighter match."""
     ta = normalize_name(a).split()
     tb = normalize_name(b).split()
     if not ta or not tb:
         return False
     if ta[-1] == tb[-1]:
         return True
-    return name_similarity(a, b) >= 0.5
+    return name_similarity(a, b) >= 0.75
 
 
 # --------------------------------------------------------------------------
@@ -347,21 +350,49 @@ def parse_fighter_page(html: str) -> SherdogProfile:
 def count_fight_overlaps(
     fights: list[SherdogFight],
     db_bouts: list[tuple[date, str]],
-) -> int:
-    """How many of our DB UFC bouts (event date, opponent name) appear in
-    a Sherdog history. Date within ±1 day (timezone skew) + surname match."""
-    overlaps = 0
+) -> tuple[int, int]:
+    """(named, date_only) overlaps between our DB UFC bouts and a Sherdog
+    history. `named` = a history row within ±1 day (timezone skew) whose
+    opponent surname matches — the strong anchor. `date_only` = a row on
+    the right date whose opponent NAME doesn't match: real matches hit
+    this through opponent aliases (married names — 'Amanda Cooper' is
+    'Amanda Bobby Brundage' on Sherdog; nickname-as-surname — 'Patricio
+    Pitbull' vs 'Patricio Freire'; reordered transliterations —
+    'Aoriqileng' vs 'Qileng Aori'), so date-consistency still counts as
+    supporting evidence once at least one named anchor exists."""
+    named = 0
+    date_only = 0
     one_day = timedelta(days=1)
     for db_date, db_opp in db_bouts:
+        found_named = False
+        found_dated = False
         for f in fights:
             if f.event_date is None:
                 continue
-            if abs(f.event_date - db_date) <= one_day and surnames_match(
-                f.opponent_name, db_opp
-            ):
-                overlaps += 1
-                break
-    return overlaps
+            if abs(f.event_date - db_date) <= one_day:
+                if surnames_match(f.opponent_name, db_opp):
+                    found_named = True
+                    break
+                found_dated = True
+        if found_named:
+            named += 1
+        elif found_dated:
+            date_only += 1
+    return named, date_only
+
+
+def overlaps_verify(
+    fights: list[SherdogFight],
+    db_bouts: list[tuple[date, str]],
+    *,
+    required: int,
+) -> bool:
+    """At least one name-anchored overlap, and dates consistent up to the
+    required count. A wrong fighter now needs a surname+date coincidence
+    AND another same-date fight — the loose single-any-token rule this
+    replaces verified a real wrong-fighter pair in testing."""
+    named, date_only = count_fight_overlaps(fights, db_bouts)
+    return named >= 1 and (named + date_only) >= required
 
 
 def mark_ufc_bouts_by_date(

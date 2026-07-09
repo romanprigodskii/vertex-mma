@@ -58,9 +58,9 @@ from src.sherdog import (
     FIGHTER_URL_TEMPLATE,
     SherdogCandidate,
     ascii_fold,
-    count_fight_overlaps,
     mark_ufc_bouts_by_date,
     name_similarity,
+    overlaps_verify,
     parse_fight_finder,
     parse_fighter_page,
     surnames_match,
@@ -77,10 +77,17 @@ DEBUT_DOB_MIN_SIMILARITY = 0.75
 DEBUT_NO_DOB_MIN_SIMILARITY = 0.99  # effectively exact name
 HEIGHT_TOLERANCE_CM = 4
 
+
+def _required_overlaps(db_bouts: list) -> int:
+    """One shared fight verifies a 1-UFC-bout fighter (all we have), but a
+    single date+surname coincidence across ~4,500 fighters and clustered
+    weekend cards is too weak when more evidence exists — require 2."""
+    return 1 if len(db_bouts) < 2 else 2
+
 # Incremental targets: never attempted, or has an upcoming bout and is
-# either unmatched (retry before fight day) or stale-matched. NULLS FIRST
-# on next_event_date is deliberate — has_upcoming_bout DESC already puts
-# bookings first; among them soonest fight first.
+# either unmatched (retry before fight day) or stale-matched.
+# has_upcoming_bout DESC puts bookings first; NULLS LAST keeps booked
+# fighters without a known date behind the soonest-fight ones.
 TARGETS_SQL = """
 SELECT
   f.id::text AS fighter_id,
@@ -246,12 +253,13 @@ def _search_candidates(http: Client, name_en: str) -> list[SherdogCandidate]:
         html = http.get(FIGHT_FINDER_URL.format(query=quote_plus(query)))
         for cand in parse_fight_finder(html):
             candidates.setdefault(cand.sherdog_id, cand)
-        if candidates:
+        # Stop only once a QUALIFYING candidate exists — a page of sub-
+        # threshold noise must not suppress the "first last" fallback query.
+        for cand in candidates.values():
+            cand.similarity = name_similarity(name_en, cand.name)
+        if any(c.similarity >= MIN_SIMILARITY for c in candidates.values()):
             break
-    ranked = list(candidates.values())
-    for cand in ranked:
-        cand.similarity = name_similarity(name_en, cand.name)
-    ranked = [c for c in ranked if c.similarity >= MIN_SIMILARITY]
+    ranked = [c for c in candidates.values() if c.similarity >= MIN_SIMILARITY]
     ranked.sort(key=lambda c: c.similarity, reverse=True)
     return ranked[:MAX_CANDIDATES]
 
@@ -265,8 +273,12 @@ def _verify_candidate(
     n_candidates: int,
 ) -> bool:
     """Decide whether a fetched Sherdog profile is our fighter."""
+    if profile.name is None:
+        return False  # interstitial / homepage / layout drift — not a profile
     if db_bouts:
-        return count_fight_overlaps(profile.fights, db_bouts) >= 1
+        return overlaps_verify(
+            profile.fights, db_bouts, required=_required_overlaps(db_bouts)
+        )
     # True debutant — no UFC bouts in our DB yet.
     if fighter["dob"] is not None and profile.birth_date is not None:
         return (
@@ -344,6 +356,45 @@ def run(
                             FIGHTER_URL_TEMPLATE.format(sherdog_id=sherdog_id)
                         )
                         profile = parse_fighter_page(html)
+                        # Re-verify on every resync. The /fighter/x-{id}
+                        # fetch always redirect-hops; Sherdog profile
+                        # merges/removals can land on a DIFFERENT fighter,
+                        # and a layout change parses to an empty profile —
+                        # committing either would replace a real history
+                        # with a wrong or empty one (and empty + still-set
+                        # sherdog_id reads downstream as confident "zero
+                        # pre-UFC fights", not as missing data).
+                        resync_ok = profile.name is not None
+                        if resync_ok and db_bout_pairs:
+                            resync_ok = overlaps_verify(
+                                profile.fights,
+                                db_bout_pairs,
+                                required=_required_overlaps(db_bout_pairs),
+                            )
+                        elif resync_ok:
+                            resync_ok = (
+                                name_similarity(fighter["name_en"], profile.name)
+                                >= MIN_SIMILARITY
+                            )
+                        if not resync_ok:
+                            record_parse_error(
+                                url=FIGHTER_URL_TEMPLATE.format(
+                                    sherdog_id=sherdog_id
+                                ),
+                                kind="sherdog_resync_verify",
+                                message="resync page failed identity check "
+                                "(redirect drift, layout change or empty "
+                                "parse) — keeping existing history",
+                                extra={"fighter_id": fid, "name": fighter["name_en"]},
+                            )
+                            log.error(
+                                f"sherdog resync verify failed for "
+                                f"{fighter['name_en']} (id {sherdog_id}) — skipped"
+                            )
+                            totals["errors"] += 1
+                            totals["processed"] += 1
+                            progress.advance(task)
+                            continue
                     else:
                         candidates = _search_candidates(http, fighter["name_en"])
                         for cand in candidates:
@@ -376,11 +427,10 @@ def run(
                                     )
                                 )
                                 cand_profile = parse_fighter_page(html)
-                                if (
-                                    count_fight_overlaps(
-                                        cand_profile.fights, db_bout_pairs
-                                    )
-                                    >= 1
+                                if cand_profile.name is not None and overlaps_verify(
+                                    cand_profile.fights,
+                                    db_bout_pairs,
+                                    required=_required_overlaps(db_bout_pairs),
                                 ):
                                     profile = cand_profile
                                     sherdog_id = fallback_id
@@ -444,6 +494,12 @@ def run(
                         extra={"fighter_id": fid, "name": fighter["name_en"]},
                     )
                     log.error(f"sherdog sync failed for {fighter['name_en']}: {exc!r}")
+                    # NOT added to the checkpoint: nothing was written to
+                    # the DB, so a resumed run should retry this fighter
+                    # (transient 5xx/timeouts heal on retry).
+                    totals["processed"] += 1
+                    progress.advance(task)
+                    continue
 
                 totals["processed"] += 1
                 done.add(fid)

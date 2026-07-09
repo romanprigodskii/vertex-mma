@@ -39,6 +39,24 @@ def save_matched_history(
             f"{len(fights)} history rows"
         )
         return len(fights)
+    if not fights:
+        # Never replace a real stored history with an empty parse — a
+        # Sherdog layout change / interstitial page parses to zero fights
+        # without raising, and an empty-but-matched fighter reads
+        # downstream as a confident "zero pre-UFC fights" instead of
+        # missing data. (A genuinely fight-less profile can only occur on
+        # first sync, where there are no rows to protect.)
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT count(*) FROM fighter_sherdog_bout WHERE fighter_id = %s::uuid",
+                (fighter_id,),
+            )
+            existing = cur.fetchone()[0]
+        if existing:
+            raise ValueError(
+                f"refusing to overwrite {existing} stored history rows "
+                f"with an empty parse (fighter {fighter_id})"
+            )
     with conn.cursor() as cur:
         cur.execute(
             """
