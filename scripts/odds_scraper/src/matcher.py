@@ -41,19 +41,28 @@ def normalize_name(name: str) -> str:
     return cleaned
 
 
+# A pair passes only when the AVERAGE clears NAME_SIMILARITY_THRESHOLD
+# AND the weaker side clears this floor. Without the per-side minimum a
+# perfect name (100) carries an opponent as weak as 70 — late-replacement
+# cards ("A vs B" page rows vs the DB's rebooked "A vs C") slip through.
+MIN_SIDE_SIMILARITY = 75
+
+
 def _pair_similarity(
     bfo_a: str, bfo_b: str, db_a: str, db_b: str
-) -> tuple[float, bool]:
+) -> tuple[float, float, bool]:
     """Score the bfo-A/bfo-B pair against the db-A/db-B pair. Returns
-    (best_score, ab_inverted). Swap is needed when bestfightodds lists
-    fighters in opposite order from our DB."""
+    (best_avg_score, min_side_score, ab_inverted). Swap is needed when
+    bestfightodds lists fighters in opposite order from our DB."""
     bna, bnb = normalize_name(bfo_a), normalize_name(bfo_b)
     dna, dnb = normalize_name(db_a), normalize_name(db_b)
-    direct = (fuzz.ratio(bna, dna) + fuzz.ratio(bnb, dnb)) / 2
-    swapped = (fuzz.ratio(bna, dnb) + fuzz.ratio(bnb, dna)) / 2
+    d1, d2 = fuzz.ratio(bna, dna), fuzz.ratio(bnb, dnb)
+    s1, s2 = fuzz.ratio(bna, dnb), fuzz.ratio(bnb, dna)
+    direct, direct_min = (d1 + d2) / 2, min(d1, d2)
+    swapped, swapped_min = (s1 + s2) / 2, min(s1, s2)
     if direct >= swapped:
-        return direct, False
-    return swapped, True
+        return direct, direct_min, False
+    return swapped, swapped_min, True
 
 
 @dataclass
@@ -67,6 +76,12 @@ class MatchedOdds:
     n_books_b: int
     source_url: str
     quality_score: float  # name-similarity score 0–100
+    method_a_ko_decimal: float | None = None
+    method_a_sub_decimal: float | None = None
+    method_a_dec_decimal: float | None = None
+    method_b_ko_decimal: float | None = None
+    method_b_sub_decimal: float | None = None
+    method_b_dec_decimal: float | None = None
 
 
 def match_matchups_to_bouts(
@@ -79,39 +94,52 @@ def match_matchups_to_bouts(
     """For each bfo matchup, find the best-match DBBout by combined
     name similarity + date proximity. Skips matchups with no candidate
     above the similarity threshold."""
-    from .parser import american_to_decimal
-
     out: list[MatchedOdds] = []
     for m in matchups:
-        best: tuple[float, DBBout, bool] | None = None
+        best: tuple[float, float, float, DBBout, bool] | None = None
         for bout in db_bouts:
             # If we know the bfo event's calendar date, filter early.
             if parent_event_date is not None:
                 if abs((bout.event_date - parent_event_date).days) > DATE_TOLERANCE_DAYS:
                     continue
-            score, inverted = _pair_similarity(
+            score, side_min, inverted = _pair_similarity(
                 m.fighter_a_name,
                 m.fighter_b_name,
                 bout.fighter_a_name,
                 bout.fighter_b_name,
             )
-            if best is None or score > best[0]:
-                best = (score, bout, inverted)
+            # Tie-break equal-score candidates (scratched-and-rebooked pairs,
+            # rematches) by date proximity to the page's event when known.
+            date_rank = (
+                -abs((bout.event_date - parent_event_date).days)
+                if parent_event_date is not None
+                else 0.0
+            )
+            if best is None or (score, date_rank) > (best[0], best[1]):
+                best = (score, date_rank, side_min, bout, inverted)
         if best is None or best[0] < NAME_SIMILARITY_THRESHOLD:
             continue
-        score, bout, inverted = best
+        score, _date_rank, side_min, bout, inverted = best
+        if side_min < MIN_SIDE_SIMILARITY:
+            continue
         # Map bfo A/B → db A/B taking the inversion into account.
-        a_amer = m.consensus_a_american if not inverted else m.consensus_b_american
-        b_amer = m.consensus_b_american if not inverted else m.consensus_a_american
+        cons_a = m.consensus_a_decimal if not inverted else m.consensus_b_decimal
+        cons_b = m.consensus_b_decimal if not inverted else m.consensus_a_decimal
         n_a = m.n_books_a if not inverted else m.n_books_b
         n_b = m.n_books_b if not inverted else m.n_books_a
+        if not inverted:
+            meth_a = (m.method_a_ko_decimal, m.method_a_sub_decimal, m.method_a_dec_decimal)
+            meth_b = (m.method_b_ko_decimal, m.method_b_sub_decimal, m.method_b_dec_decimal)
+        else:
+            meth_a = (m.method_b_ko_decimal, m.method_b_sub_decimal, m.method_b_dec_decimal)
+            meth_b = (m.method_a_ko_decimal, m.method_a_sub_decimal, m.method_a_dec_decimal)
         out.append(
             MatchedOdds(
                 bout_id=bout.bout_id,
                 bfo_event_id=m.event_id,
                 bfo_matchup_id=m.matchup_id,
-                consensus_a_decimal=american_to_decimal(a_amer),
-                consensus_b_decimal=american_to_decimal(b_amer),
+                consensus_a_decimal=cons_a,
+                consensus_b_decimal=cons_b,
                 n_books_a=n_a,
                 n_books_b=n_b,
                 source_url=(
@@ -120,6 +148,12 @@ def match_matchups_to_bouts(
                     else f"https://www.bestfightodds.com/events/-{m.event_id}"
                 ),
                 quality_score=score,
+                method_a_ko_decimal=meth_a[0],
+                method_a_sub_decimal=meth_a[1],
+                method_a_dec_decimal=meth_a[2],
+                method_b_ko_decimal=meth_b[0],
+                method_b_sub_decimal=meth_b[1],
+                method_b_dec_decimal=meth_b[2],
             )
         )
     return out
@@ -143,6 +177,8 @@ JOIN event e ON e.id = b.event_id
 JOIN fighter fa ON fa.id = b.fighter_a_id
 JOIN fighter fb ON fb.id = b.fighter_b_id
 WHERE e.promotion = 'ufc'
+  AND b.status = 'completed'
+ORDER BY e.date, b.id
 """
 
 
@@ -181,26 +217,58 @@ def index_bouts_by_event_window(
     return out
 
 
+# Method columns use COALESCE on conflict: a re-scrape of a page whose
+# prop grid is missing (future cards) must not wipe lines captured
+# earlier. Winner odds keep overwrite semantics here (run_backfill's
+# purpose is refreshing lines; also lets a re-run repair bad values).
 UPSERT_SQL = """
 INSERT INTO bout_external_odds
-  (bout_id, source, winner_a_decimal, winner_b_decimal, source_url, fetched_at)
+  (bout_id, source, winner_a_decimal, winner_b_decimal,
+   method_a_kotko_decimal, method_a_sub_decimal, method_a_dec_decimal,
+   method_b_kotko_decimal, method_b_sub_decimal, method_b_dec_decimal,
+   source_url, fetched_at)
 VALUES
-  (%s::uuid, %s, %s, %s, %s, now())
+  (%s::uuid, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, now())
 ON CONFLICT (bout_id, source) DO UPDATE SET
   winner_a_decimal = EXCLUDED.winner_a_decimal,
   winner_b_decimal = EXCLUDED.winner_b_decimal,
+  method_a_kotko_decimal = COALESCE(EXCLUDED.method_a_kotko_decimal, bout_external_odds.method_a_kotko_decimal),
+  method_a_sub_decimal   = COALESCE(EXCLUDED.method_a_sub_decimal, bout_external_odds.method_a_sub_decimal),
+  method_a_dec_decimal   = COALESCE(EXCLUDED.method_a_dec_decimal, bout_external_odds.method_a_dec_decimal),
+  method_b_kotko_decimal = COALESCE(EXCLUDED.method_b_kotko_decimal, bout_external_odds.method_b_kotko_decimal),
+  method_b_sub_decimal   = COALESCE(EXCLUDED.method_b_sub_decimal, bout_external_odds.method_b_sub_decimal),
+  method_b_dec_decimal   = COALESCE(EXCLUDED.method_b_dec_decimal, bout_external_odds.method_b_dec_decimal),
   source_url = EXCLUDED.source_url,
   fetched_at = now()
 """
 
+# Fill-only winner semantics for the METHOD backfill: it exists to add
+# method columns and must not clobber winner lines already captured by
+# the 6h cron (MAX-of-books) with page medians on every run.
+UPSERT_PRESERVE_WINNER_SQL = UPSERT_SQL.replace(
+    "winner_a_decimal = EXCLUDED.winner_a_decimal",
+    "winner_a_decimal = COALESCE(bout_external_odds.winner_a_decimal, EXCLUDED.winner_a_decimal)",
+).replace(
+    "winner_b_decimal = EXCLUDED.winner_b_decimal",
+    "winner_b_decimal = COALESCE(bout_external_odds.winner_b_decimal, EXCLUDED.winner_b_decimal)",
+)
 
-def upsert_matched(conn, matched: Iterable[MatchedOdds]) -> int:
+
+def upsert_matched(
+    conn, matched: Iterable[MatchedOdds], *, preserve_winner: bool = False
+) -> int:
     rows = [
         (
             m.bout_id,
             "bestfightodds",
             m.consensus_a_decimal,
             m.consensus_b_decimal,
+            m.method_a_ko_decimal,
+            m.method_a_sub_decimal,
+            m.method_a_dec_decimal,
+            m.method_b_ko_decimal,
+            m.method_b_sub_decimal,
+            m.method_b_dec_decimal,
             m.source_url,
         )
         for m in matched
@@ -208,7 +276,8 @@ def upsert_matched(conn, matched: Iterable[MatchedOdds]) -> int:
     ]
     if not rows:
         return 0
+    sql = UPSERT_PRESERVE_WINNER_SQL if preserve_winner else UPSERT_SQL
     with conn.cursor() as cur:
-        cur.executemany(UPSERT_SQL, rows)
+        cur.executemany(sql, rows)
     conn.commit()
     return len(rows)

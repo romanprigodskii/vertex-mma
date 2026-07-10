@@ -37,7 +37,10 @@ class RateLimitedClient:
             time.sleep(self.min_interval - elapsed)
         self._last_request_ts = time.monotonic()
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=2, max=10))
+    # reraise=True: after the last attempt the original httpx error
+    # propagates (not tenacity.RetryError), so callers' `except
+    # httpx.HTTPError` handlers actually fire.
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=2, max=10), reraise=True)
     def get(self, path: str) -> httpx.Response:
         self._maybe_sleep()
         return self._client.get(path)

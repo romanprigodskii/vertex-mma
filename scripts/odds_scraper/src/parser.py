@@ -10,8 +10,10 @@ fighter name, e.g. "43510Alessandro Costa". Sportsbook cells follow
 BetMGM, DraftKings) plus a trailing "props" cell. Cells are empty for
 books that don't offer that fight.
 
-We compute the per-fighter "consensus" American moneyline as the MEDIAN
-of all non-empty sportsbook cells. That's robust to:
+We compute the per-fighter consensus as the MEDIAN of all non-empty
+sportsbook cells, taken in DECIMAL space (American odds are
+discontinuous across ±100, so their median is undefined there). That's
+robust to:
   * one book with an extreme line (off-market)
   * not-all-books-covering-this-bout (NULLs)
 and is close enough to true opening line for our ML feature."""
@@ -20,6 +22,7 @@ from __future__ import annotations
 
 import re
 import statistics
+import unicodedata
 from dataclasses import dataclass
 from typing import Iterator
 
@@ -36,14 +39,33 @@ class MatchupOdds:
     fighter_a_slug: str
     fighter_b_name: str
     fighter_b_slug: str
-    consensus_a_american: int | None
-    consensus_b_american: int | None
+    consensus_a_decimal: float | None
+    consensus_b_decimal: float | None
     n_books_a: int
     n_books_b: int
+    # Method props ("X wins by TKO/KO / submission / decision"), median
+    # DECIMAL across books like the winner consensus. None = prop not
+    # offered on the page (common for future cards; past event pages
+    # keep the full prop grid).
+    method_a_ko_decimal: float | None = None
+    method_a_sub_decimal: float | None = None
+    method_a_dec_decimal: float | None = None
+    method_b_ko_decimal: float | None = None
+    method_b_sub_decimal: float | None = None
+    method_b_dec_decimal: float | None = None
 
 
 _AMERICAN_RE = re.compile(r"^\s*([+-]?\d{3,4})\s*$")
 _LEAD_DIGITS_RE = re.compile(r"^(\d+)(.+)$")
+
+# Method prop rows we care about, e.g. "Cutelaba wins by TKO/KO".
+# Anchored at end-of-string so round-specific ("… wins by TKO/KO in
+# round 1") and scorecard-specific ("… wins by unanimous decision")
+# variants do NOT match — only the plain three-way method book does.
+_METHOD_LABEL_RE = re.compile(
+    r"^(?P<who>.+?)\s+wins\s+by\s+(?P<how>TKO/KO|KO/TKO|submission|decision)\s*$",
+    re.IGNORECASE,
+)
 
 
 def american_to_decimal(american: int | None) -> float | None:
@@ -128,6 +150,19 @@ def parse_event_page(html: str) -> list[MatchupOdds]:
                 continue
             cons_a, n_a = _consensus(r1)
             cons_b, n_b = _consensus(r2)
+
+            # Prop rows (<tr class="pr">) trail the fighter pair until
+            # the next fighter row. Harvest the plain method book.
+            methods: dict[str, float] = {}
+            j = i + 2
+            while j < len(rows) and _extract_fighter(rows[j]) is None:
+                key = _method_prop_key(rows[j], name_a, name_b)
+                if key is not None and key not in methods:
+                    med, n_books = _consensus(rows[j])
+                    if med is not None and n_books > 0:
+                        methods[key] = med
+                j += 1
+
             out.append(
                 MatchupOdds(
                     matchup_id=matchup_id,
@@ -138,14 +173,63 @@ def parse_event_page(html: str) -> list[MatchupOdds]:
                     fighter_a_slug=slug_a,
                     fighter_b_name=name_b,
                     fighter_b_slug=slug_b,
-                    consensus_a_american=cons_a,
-                    consensus_b_american=cons_b,
+                    consensus_a_decimal=cons_a,
+                    consensus_b_decimal=cons_b,
                     n_books_a=n_a,
                     n_books_b=n_b,
+                    method_a_ko_decimal=methods.get("a_ko"),
+                    method_a_sub_decimal=methods.get("a_sub"),
+                    method_a_dec_decimal=methods.get("a_dec"),
+                    method_b_ko_decimal=methods.get("b_ko"),
+                    method_b_sub_decimal=methods.get("b_sub"),
+                    method_b_dec_decimal=methods.get("b_dec"),
                 )
             )
-            i += 2
+            i = j
     return out
+
+
+def _name_tokens(s: str) -> set[str]:
+    """Diacritic-stripped lowercase word tokens, for matching a prop
+    label's name fragment ("Du Plessis") against a fighter's display
+    name ("Dricus Du Plessis")."""
+    nfkd = unicodedata.normalize("NFKD", s)
+    no_accents = "".join(c for c in nfkd if not unicodedata.combining(c))
+    return set(re.sub(r"[^a-z0-9]+", " ", no_accents.lower()).split())
+
+
+_HOW_TO_METHOD = {
+    "tko/ko": "ko",
+    "ko/tko": "ko",
+    "submission": "sub",
+    "decision": "dec",
+}
+
+
+def _method_prop_key(row, name_a: str, name_b: str) -> str | None:
+    """If this prop row is a plain "X wins by <method>" book, return its
+    key ('a_ko', 'b_sub', …); otherwise None. The side is resolved by
+    token containment of the label's name fragment in exactly one of
+    the two fighter names — ambiguous labels (shared surname, "Either
+    fighter wins by …") are skipped rather than guessed."""
+    th = row.find("th")
+    if th is None:
+        return None
+    label = th.get_text(strip=True)
+    m = _METHOD_LABEL_RE.match(label)
+    if m is None:
+        return None
+    method = _HOW_TO_METHOD.get(m.group("how").lower())
+    if method is None:
+        return None
+    who = _name_tokens(m.group("who"))
+    if not who:
+        return None
+    in_a = who <= _name_tokens(name_a)
+    in_b = who <= _name_tokens(name_b)
+    if in_a == in_b:
+        return None
+    return f"{'a' if in_a else 'b'}_{method}"
 
 
 def _extract_fighter(row) -> tuple[int | None, str, str] | None:
@@ -198,10 +282,16 @@ def _extract_fighter(row) -> tuple[int | None, str, str] | None:
     return matchup_id, name, slug
 
 
-def _consensus(row) -> tuple[int | None, int]:
-    """Median moneyline across sportsbook cells in this row. Returns
-    (median, n_books_used)."""
-    vals: list[int] = []
+def _consensus(row) -> tuple[float | None, int]:
+    """Median DECIMAL odds across sportsbook cells in this row. Returns
+    (median, n_books_used).
+
+    The median must be taken in decimal space, not American: American
+    odds are discontinuous across the ±100 gap, so an even book count
+    straddling the sign boundary (e.g. [-105, +100]) medians to a
+    meaningless in-gap value (-2 → decimal 51.0). Decimals are
+    continuous, so [-105, +100] → [1.95, 2.00] → 1.976."""
+    decimals: list[float] = []
     for td in row.find_all("td"):
         cls = td.get("class") or []
         if any("prop" in c for c in cls):
@@ -211,12 +301,12 @@ def _consensus(row) -> tuple[int | None, int]:
         text = td.get_text(strip=True)
         if not text:
             continue
-        v = _parse_american(text)
-        if v is not None:
-            vals.append(v)
-    if not vals:
+        dec = american_to_decimal(_parse_american(text))
+        if dec is not None:
+            decimals.append(dec)
+    if not decimals:
         return None, 0
-    return int(round(statistics.median(vals))), len(vals)
+    return round(statistics.median(decimals), 3), len(decimals)
 
 
 def iter_events_on_homepage(html: str) -> Iterator[int]:
