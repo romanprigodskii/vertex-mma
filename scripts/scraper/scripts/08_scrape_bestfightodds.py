@@ -15,11 +15,17 @@ bestfightodds.com structure (probed 2026-05):
   * Event detail (/events/{slug}-{id}) — same table structure with a
     header showing event date.
 
-We pull winner moneylines only. Method odds live in property-rows
-(`<tr class="pr">` with labels like "Over 1½ rounds") that use opaque
-bookmaker prop IDs; decoding those isn't reliable from HTML alone, so
-method columns stay NULL — the seed flow already falls back to uniform
-when they're missing.
+We pull winner moneylines plus the plain method book. Method odds live
+in property-rows (`<tr class="pr">`) trailing each fighter pair; the
+plain "X wins by TKO/KO / submission / decision" labels are matched to
+a side by name-token containment and written into the six
+method_*_decimal columns. bestfightodds embeds the full prop grid on
+the homepage only during fight week, so the 6-hourly upserts converge
+to the closing method lines. Winner consensus stays MAX (best offer,
+feeds the sportsbook edge-guard); method consensus is the MEDIAN
+across books (feeds model-vs-market backtests, matching
+scripts/odds_scraper's convention). Round/distance/scorecard prop
+variants are ignored.
 
 American → decimal conversion:
   +150 → 1 + 150/100 = 2.50
@@ -39,8 +45,10 @@ from __future__ import annotations
 
 import argparse
 import re
+import statistics
 import time
-from dataclasses import dataclass
+import unicodedata
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional
 
@@ -69,6 +77,8 @@ class ScrapedFight:
     fighter_b_slug: str
     winner_a_decimal: Optional[float]
     winner_b_decimal: Optional[float]
+    # keys: a_ko, a_sub, a_dec, b_ko, b_sub, b_dec → median decimal odds
+    method_decimals: dict[str, float] = field(default_factory=dict)
 
 
 @dataclass
@@ -124,6 +134,68 @@ def _best_moneyline(row) -> Optional[float]:
 
 
 _CNADM_MATCHUP_RE = re.compile(r"/cnadm/matchups/(\d+)")
+
+# Plain method book only — anchored so "… wins by TKO/KO in round 1"
+# and "… wins by unanimous decision" variants don't match.
+_METHOD_LABEL_RE = re.compile(
+    r"^(?P<who>.+?)\s+wins\s+by\s+(?P<how>TKO/KO|KO/TKO|submission|decision)\s*$",
+    re.IGNORECASE,
+)
+_HOW_TO_METHOD = {
+    "tko/ko": "ko",
+    "ko/tko": "ko",
+    "submission": "sub",
+    "decision": "dec",
+}
+
+
+def _name_tokens(s: str) -> set[str]:
+    nfkd = unicodedata.normalize("NFKD", s)
+    no_accents = "".join(c for c in nfkd if not unicodedata.combining(c))
+    return set(re.sub(r"[^a-z0-9]+", " ", no_accents.lower()).split())
+
+
+def _median_prop_line(row) -> Optional[float]:
+    """Median decimal odds across `td.but-sgp > span` bookmaker cells of
+    a prop row (movement-arrow spans fail the numeric regex)."""
+    decimals: list[float] = []
+    for span in row.css("td.but-sgp > span"):
+        text = (span.text() or "").strip()
+        if not re.match(r"^[+\-]?\d+$", text):
+            continue
+        dec = american_to_decimal(text)
+        if dec is not None:
+            decimals.append(dec)
+    if not decimals:
+        return None
+    return round(statistics.median(decimals), 3)
+
+
+def _method_prop_key(
+    row, fighter_a_name: str, fighter_b_name: str
+) -> Optional[str]:
+    """'a_ko' / 'b_dec' / … when the row is a plain "X wins by <method>"
+    prop whose name fragment sits in exactly one fighter name; None
+    otherwise (ambiguous labels like "Either fighter wins by …" are
+    skipped rather than guessed)."""
+    th = row.css_first("th")
+    if th is None:
+        return None
+    label = (th.text() or "").strip()
+    m = _METHOD_LABEL_RE.match(label)
+    if m is None:
+        return None
+    method = _HOW_TO_METHOD.get(m.group("how").lower())
+    if method is None:
+        return None
+    who = _name_tokens(m.group("who"))
+    if not who:
+        return None
+    in_a = who <= _name_tokens(fighter_a_name)
+    in_b = who <= _name_tokens(fighter_b_name)
+    if in_a == in_b:
+        return None
+    return f"{'a' if in_a else 'b'}_{method}"
 
 
 def parse_page(html: str, source_url: str) -> list[ScrapedEvent]:
@@ -209,6 +281,24 @@ def parse_page(html: str, source_url: str) -> list[ScrapedEvent]:
             slug_b = (link_b.attributes.get("href") or "").rsplit("/", 1)[-1]
             ml_b = _best_moneyline(row_b)
 
+            # Prop rows trail the fighter pair until the next matchup
+            # (next row whose <th> carries the cnadm admin anchor).
+            # During fight week the plain method book lives here.
+            methods: dict[str, float] = {}
+            j = i + 2
+            while j < len(rows):
+                th_next = rows[j].css_first("th")
+                if th_next is not None and th_next.css_first(
+                    "a[href^='/cnadm/matchups/'], a[href^='/fighters/']"
+                ):
+                    break
+                key = _method_prop_key(rows[j], name_a, name_b)
+                if key is not None and key not in methods:
+                    med = _median_prop_line(rows[j])
+                    if med is not None:
+                        methods[key] = med
+                j += 1
+
             fights.append(
                 ScrapedFight(
                     matchup_id=matchup_id,
@@ -218,9 +308,10 @@ def parse_page(html: str, source_url: str) -> list[ScrapedEvent]:
                     fighter_b_slug=slug_b,
                     winner_a_decimal=ml_a,
                     winner_b_decimal=ml_b,
+                    method_decimals=methods,
                 )
             )
-            i += 2
+            i = j
 
         if fights:
             events.append(
@@ -313,28 +404,46 @@ def upsert_odds(
 ) -> None:
     """If `swapped` is True, write the scrape's A decimal into
     winner_b_decimal (and vice versa) so the row matches the local
-    bout's fighter_a/fighter_b ordering."""
+    bout's fighter_a/fighter_b ordering. Method columns COALESCE on
+    conflict: props leave the homepage once the event starts, and a
+    post-props scrape must not wipe the captured closing lines."""
     winner_a = fight.winner_b_decimal if swapped else fight.winner_a_decimal
     winner_b = fight.winner_a_decimal if swapped else fight.winner_b_decimal
+    meth = fight.method_decimals
+    a_side, b_side = ("b", "a") if swapped else ("a", "b")
     conn.execute(
         """
         INSERT INTO bout_external_odds (
           bout_id, source, fetched_at, winner_a_decimal, winner_b_decimal,
+          method_a_kotko_decimal, method_a_sub_decimal, method_a_dec_decimal,
+          method_b_kotko_decimal, method_b_sub_decimal, method_b_dec_decimal,
           source_url
         )
         VALUES (
-          %s::uuid, 'bestfightodds', NOW(), %s, %s, %s
+          %s::uuid, 'bestfightodds', NOW(), %s, %s, %s, %s, %s, %s, %s, %s, %s
         )
         ON CONFLICT (bout_id, source) DO UPDATE SET
           fetched_at = EXCLUDED.fetched_at,
           winner_a_decimal = EXCLUDED.winner_a_decimal,
           winner_b_decimal = EXCLUDED.winner_b_decimal,
+          method_a_kotko_decimal = COALESCE(EXCLUDED.method_a_kotko_decimal, bout_external_odds.method_a_kotko_decimal),
+          method_a_sub_decimal   = COALESCE(EXCLUDED.method_a_sub_decimal, bout_external_odds.method_a_sub_decimal),
+          method_a_dec_decimal   = COALESCE(EXCLUDED.method_a_dec_decimal, bout_external_odds.method_a_dec_decimal),
+          method_b_kotko_decimal = COALESCE(EXCLUDED.method_b_kotko_decimal, bout_external_odds.method_b_kotko_decimal),
+          method_b_sub_decimal   = COALESCE(EXCLUDED.method_b_sub_decimal, bout_external_odds.method_b_sub_decimal),
+          method_b_dec_decimal   = COALESCE(EXCLUDED.method_b_dec_decimal, bout_external_odds.method_b_dec_decimal),
           source_url = EXCLUDED.source_url
         """,
         (
             bout_id,
             winner_a,
             winner_b,
+            meth.get(f"{a_side}_ko"),
+            meth.get(f"{a_side}_sub"),
+            meth.get(f"{a_side}_dec"),
+            meth.get(f"{b_side}_ko"),
+            meth.get(f"{b_side}_sub"),
+            meth.get(f"{b_side}_dec"),
             source_url,
         ),
     )
@@ -373,10 +482,15 @@ def main() -> int:
         for ev in events:
             print(f"\n[{ev.event_title}] {ev.event_date_label or ''}")
             for f in ev.fights:
+                meth = (
+                    " method " + str(f.method_decimals)
+                    if f.method_decimals
+                    else ""
+                )
                 print(
                     f"  mu-{f.matchup_id}: {f.fighter_a_name} "
                     f"({f.winner_a_decimal}) vs {f.fighter_b_name} "
-                    f"({f.winner_b_decimal})"
+                    f"({f.winner_b_decimal}){meth}"
                 )
         return 0
 
