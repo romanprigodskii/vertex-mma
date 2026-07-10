@@ -4,6 +4,10 @@ Scrapes bestfightodds.com for historical UFC opening lines and writes
 them to `bout_external_odds`. Powers the `market_prob_a` feature in
 the simulation model (`scripts/simulation`).
 
+Also backfills METHOD prop lines ("X wins by TKO/KO / submission /
+decision") into the `method_{a,b}_{kotko,sub,dec}_decimal` columns —
+see `scripts/run_method_backfill.py` below.
+
 ## Why
 
 The simulation model's strongest individual signal would be a
@@ -60,6 +64,29 @@ The backfill is idempotent — re-running upserts on `(bout_id, 'bestfightodds')
 so re-running picks up new bouts and refreshes any moved lines without
 duplicating rows. Polite throttle: ~1 request/second.
 
+## Method prop lines
+
+Past bestfightodds event pages keep the full prop grid in HTML, so the
+method book (KO/Sub/Decision per fighter) can be recovered
+retroactively for backtests (`scripts/simulation/scripts/eval_method_market.py`):
+
+```bash
+source venv/bin/activate
+python scripts/run_method_backfill.py                 # completed UFC events since 2025-01-01
+python scripts/run_method_backfill.py --since 2024-06-01
+python scripts/run_method_backfill.py --dry-run
+```
+
+Event URLs are recovered per event (stored `source_url` when it's a
+real `/events/<slug>-<id>` link, else a small fighter-page discovery
+bounded by BFO's chronological event ids). Discovered pages carry no
+year, so writes are guarded by a majority-event filter and a
+year-agnostic month/day check. Method columns COALESCE on conflict —
+a page without props never wipes previously captured lines. The
+6-hourly cron (`scripts/scraper/scripts/08_scrape_bestfightodds.py`)
+captures the same method book for upcoming cards during fight week, so
+closing method lines accumulate going forward without backfills.
+
 ## After a backfill
 
 Retrain the simulation model so the richer odds coverage flows into
@@ -88,6 +115,7 @@ scripts/odds_scraper/
 │   ├── matcher.py            # name+date fuzzy match → upsert
 │   └── parser.py             # BS4 event-page parser
 ├── scripts/
-│   └── run_backfill.py       # CLI orchestrator
+│   ├── run_backfill.py        # CLI orchestrator (winner moneylines)
+│   └── run_method_backfill.py # method prop lines for a date window
 └── venv/                     # (gitignored)
 ```
