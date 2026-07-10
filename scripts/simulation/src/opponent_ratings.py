@@ -25,7 +25,8 @@ mean) and on every test metric; seed-stable.
 
 from __future__ import annotations
 
-from collections import defaultdict
+import math
+from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -34,6 +35,26 @@ import pandas as pd
 
 ELO_K = 32.0
 ELO_INITIAL = 1500.0
+
+# Glicko-2 (v0.10.0) — uncertainty-aware rating next to plain Elo. Only the
+# CONSERVATIVE rating (rating − 2·RD) ships as a feature: the v0.10 lab showed
+# trees can't learn the rating×uncertainty interaction from raw rating+RD
+# columns on ~5.6k rows, but baking it in beats the baseline seed-stably.
+# Elo stays — the two diffs correlate only ~0.75 and are complementary.
+GLICKO_SCALE = 173.7178
+GLICKO_TAU = 0.5
+GLICKO_INIT_RD = 350.0
+GLICKO_INIT_VOL = 0.06
+GLICKO_EPS = 1e-6
+GLICKO_CONS_INITIAL = ELO_INITIAL - 2.0 * GLICKO_INIT_RD  # debutant default
+
+# Form trajectory (v0.10.0) — mean of the last 3 bout rates minus the career
+# rate, emitted once a fighter has >=2 stat bouts (the validated min-2
+# window). Positive traj_sapm = getting hit MORE than career norm = decline
+# signal the results-only recent-form features miss.
+TRAJ_WINDOW = 3
+TRAJ_MIN_BOUTS = 2
+TRAJ_MIN_MINUTES = 0.5  # clip bout length so 10-second KOs don't give 60 slpm
 
 # Attack/defense engine constants. LR validated on the v0.7.0 lab grid
 # (0.2 beat 0.1/0.3 and an experience-decayed schedule on val).
@@ -62,7 +83,56 @@ OPP_ELO_KEYS = (
     "sos_weighted_winrate",
 )
 RATING_KEYS = tuple(f"{m}_{side}" for m in RATING_METRICS for side in ("off", "def"))
-ALL_KEYS = ("elo",) + RATING_KEYS + OPP_ELO_KEYS
+TRAJ_KEYS = ("traj_slpm", "traj_sapm", "traj_td")
+ALL_KEYS = ("elo", "glicko_cons") + RATING_KEYS + OPP_ELO_KEYS + TRAJ_KEYS
+
+
+def _glicko_g(phi: float) -> float:
+    return 1.0 / math.sqrt(1.0 + 3.0 * phi * phi / (math.pi**2))
+
+
+def _glicko_update(
+    mu: float, phi: float, sigma: float, mu_j: float, phi_j: float, s: float
+) -> tuple[float, float, float]:
+    """One Glicko-2 rating period containing a single game vs (mu_j, phi_j)
+    with score s in {0, 1} (Glickman's paper, steps 3-7; volatility via the
+    Illinois algorithm). Returns (mu', phi', sigma')."""
+    gj = _glicko_g(phi_j)
+    ej = 1.0 / (1.0 + math.exp(-gj * (mu - mu_j)))
+    v = 1.0 / (gj * gj * ej * (1.0 - ej))
+    delta = v * gj * (s - ej)
+
+    a = math.log(sigma * sigma)
+
+    def f(x: float) -> float:
+        ex = math.exp(x)
+        num = ex * (delta * delta - phi * phi - v - ex)
+        den = 2.0 * (phi * phi + v + ex) ** 2
+        return num / den - (x - a) / (GLICKO_TAU * GLICKO_TAU)
+
+    upper = a
+    if delta * delta > phi * phi + v:
+        lower = math.log(delta * delta - phi * phi - v)
+    else:
+        k = 1
+        while f(a - k * GLICKO_TAU) < 0:
+            k += 1
+        lower = a - k * GLICKO_TAU
+    f_upper, f_lower = f(upper), f(lower)
+    while abs(lower - upper) > GLICKO_EPS:
+        mid = upper + (upper - lower) * f_upper / (f_lower - f_upper)
+        f_mid = f(mid)
+        if f_mid * f_lower <= 0:
+            upper, f_upper = lower, f_lower
+        else:
+            f_upper = f_upper / 2.0
+        lower, f_lower = mid, f_mid
+    sigma_p = math.exp(upper / 2.0)
+
+    phi_star = math.sqrt(phi * phi + sigma_p * sigma_p)
+    phi_p = 1.0 / math.sqrt(1.0 / (phi_star * phi_star) + 1.0 / v)
+    mu_p = mu + phi_p * phi_p * gj * (s - ej)
+    return mu_p, phi_p, sigma_p
 
 
 @dataclass
@@ -132,20 +202,51 @@ def compute_rating_snapshots(
     }
 
     elo: dict[str, float] = {}
+    # Glicko-2 state per fighter: (mu, phi, sigma) on the internal scale.
+    glicko_init = (0.0, GLICKO_INIT_RD / GLICKO_SCALE, GLICKO_INIT_VOL)
+    glicko: dict[str, tuple[float, float, float]] = {}
     off = {m: defaultdict(float) for m in RATING_METRICS}
     deff = {m: defaultdict(float) for m in RATING_METRICS}
     league_sum = {m: LEAGUE_PRIOR[m] * LEAGUE_PRIOR_WEIGHT for m in RATING_METRICS}
     league_n = {m: LEAGUE_PRIOR_WEIGHT for m in RATING_METRICS}
     # (opponent_pre_elo, won) per decisive bout, per fighter.
     opp_hist: dict[str, list[tuple[float, bool]]] = defaultdict(list)
+    # Form trajectory: career rate sums + a deque of last-N per-bout rates.
+    traj_career: dict[str, dict[str, float]] = defaultdict(
+        lambda: {"landed": 0.0, "absorbed": 0.0, "td": 0.0, "minutes": 0.0, "n": 0}
+    )
+    traj_recent: dict[str, dict[str, deque]] = defaultdict(
+        lambda: {
+            "slpm": deque(maxlen=TRAJ_WINDOW),
+            "sapm": deque(maxlen=TRAJ_WINDOW),
+            "td15": deque(maxlen=TRAJ_WINDOW),
+        }
+    )
 
     snaps = RatingSnapshots()
 
     def snapshot(fid: str) -> dict[str, Any]:
         vals: dict[str, Any] = {"elo": elo.get(fid, ELO_INITIAL)}
+        g_mu, g_phi, _ = glicko.get(fid, glicko_init)
+        vals["glicko_cons"] = (
+            ELO_INITIAL + GLICKO_SCALE * g_mu
+        ) - 2.0 * (GLICKO_SCALE * g_phi)
         for m in RATING_METRICS:
             vals[f"{m}_off"] = off[m][fid]
             vals[f"{m}_def"] = deff[m][fid]
+        tc, tr = traj_career[fid], traj_recent[fid]
+        if tc["n"] >= TRAJ_MIN_BOUTS and tc["minutes"] > 0:
+            career_rates = {
+                "slpm": tc["landed"] / tc["minutes"],
+                "sapm": tc["absorbed"] / tc["minutes"],
+                "td15": tc["td"] / tc["minutes"] * 15.0,
+            }
+            for key, name in (("slpm", "traj_slpm"), ("sapm", "traj_sapm"), ("td15", "traj_td")):
+                vals[name] = float(np.mean(tr[key])) - career_rates[key]
+        else:
+            vals["traj_slpm"] = None
+            vals["traj_sapm"] = None
+            vals["traj_td"] = None
         hist = opp_hist.get(fid)
         if hist:
             opes = [h[0] for h in hist]
@@ -183,7 +284,7 @@ def compute_rating_snapshots(
                 bout.round_finished, bout.time_finished_seconds, bout.scheduled_rounds
             )
 
-            # Elo + opponent-history updates (decisive results only).
+            # Elo + Glicko-2 + opponent-history updates (decisive results only).
             if decisive:
                 ra, rb = elo.get(fa, ELO_INITIAL), elo.get(fb, ELO_INITIAL)
                 expected_a = 1.0 / (1.0 + 10.0 ** ((rb - ra) / 400.0))
@@ -192,6 +293,9 @@ def compute_rating_snapshots(
                 elo[fb] = rb + ELO_K * ((1.0 - score_a) - (1.0 - expected_a))
                 opp_hist[fa].append((rb, winner == fa))
                 opp_hist[fb].append((ra, winner == fb))
+                ga, gb = glicko.get(fa, glicko_init), glicko.get(fb, glicko_init)
+                glicko[fa] = _glicko_update(*ga, gb[0], gb[1], score_a)
+                glicko[fb] = _glicko_update(*gb, ga[0], ga[1], 1.0 - score_a)
 
             # Attack/defense updates need round stats, not a winner — a draw
             # still tells us who out-landed whom. Both sides' errors are
@@ -215,10 +319,29 @@ def compute_rating_snapshots(
                 league_sum[m] += o
                 league_n[m] += 1.0
 
+            # Form-trajectory history — needs BOTH sides' stats (absorbed =
+            # the opponent's landed), with its own validated duration floor.
+            stat_a = stat_lookup.get((bid, fa))
+            stat_b = stat_lookup.get((bid, fb))
+            if stat_a is not None and stat_b is not None:
+                minutes = max(duration / 60.0, TRAJ_MIN_MINUTES)
+                for me_stat, opp_stat in ((stat_a, stat_b), (stat_b, stat_a)):
+                    fid = me_stat["fighter_id"]
+                    tc = traj_career[fid]
+                    tc["landed"] += me_stat["sig_str_landed"] or 0
+                    tc["absorbed"] += opp_stat["sig_str_landed"] or 0
+                    tc["td"] += me_stat["td_landed"] or 0
+                    tc["minutes"] += minutes
+                    tc["n"] += 1
+                    tr = traj_recent[fid]
+                    tr["slpm"].append((me_stat["sig_str_landed"] or 0) / minutes)
+                    tr["sapm"].append((opp_stat["sig_str_landed"] or 0) / minutes)
+                    tr["td15"].append((me_stat["td_landed"] or 0) / minutes * 15.0)
+
         snaps.post[(bid, fa)] = snapshot(fa)
         snaps.post[(bid, fb)] = snapshot(fb)
 
-    all_fighters = set(elo) | set(opp_hist)
+    all_fighters = set(elo) | set(opp_hist) | set(glicko) | set(traj_career)
     for m in RATING_METRICS:
         all_fighters |= set(off[m]) | set(deff[m])
     for fid in all_fighters:

@@ -55,6 +55,7 @@ from .monte_carlo import FighterMC, simulate_bout
 from .opponent_ratings import (
     ALL_KEYS as RATING_ALL_KEYS,
     ELO_INITIAL,
+    GLICKO_CONS_INITIAL,
     RatingSnapshots,
     compute_from_connection,
 )
@@ -86,11 +87,16 @@ _STD_WC = {
 
 # Neutral rating values for a fighter absent from the timeline replay
 # (shouldn't happen for anyone with a completed bout, but keeps the worker
-# total-function). Ratings are league-mean deviations, so 0.0 = average.
-_DEFAULT_RATINGS: dict[str, Any] = {"elo": ELO_INITIAL} | {
-    k: (0.0 if not k.startswith(("avg_opp", "max_opp", "sos")) else None)
+# total-function). Attack/defense ratings are league-mean deviations, so
+# 0.0 = average; opp-quality and trajectory values are unknown (None);
+# glicko_cons defaults to the debutant value (1500 − 2·350).
+_DEFAULT_RATINGS: dict[str, Any] = {
+    "elo": ELO_INITIAL,
+    "glicko_cons": GLICKO_CONS_INITIAL,
+} | {
+    k: (None if k.startswith(("avg_opp", "max_opp", "sos", "traj_")) else 0.0)
     for k in RATING_ALL_KEYS
-    if k != "elo"
+    if k not in ("elo", "glicko_cons")
 }
 
 
