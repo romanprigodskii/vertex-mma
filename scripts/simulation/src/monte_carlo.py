@@ -107,13 +107,24 @@ DECISION_TEMPERATURE = 0.45
 # taken at face value). rate' = (rate*n + anchor*k)/(n+k).
 SHRINK_PSEUDO_COUNTS = 4.0
 
-# Light method-mix anchor toward real UFC base rates — preserves each fighter's
-# win prob, only reshapes how they win. Now that the per-fight scales do most of
-# the calibration, this is a small tail safety net (0 = raw, 1 = pure base).
-METHOD_BASE_KO = 0.33
-METHOD_BASE_SUB = 0.17
-METHOD_BASE_DEC = 0.50
-METHOD_ANCHOR_LAMBDA = 0.08
+# Method-mix anchor toward UFC base rates — preserves each fighter's win
+# prob, only reshapes how they win (0 = raw, 1 = pure base).
+#
+# Calibrated 2026-07-10 (scripts/calibrate_method_mix.py, 1,646 bouts
+# 2021-01-01..2024-12-31, strictly pre-test): the raw per-fight conditional
+# mix "method | this fighter wins" was far too finish-heavy — cond
+# log-loss 1.38 vs 1.018 for a CONSTANT base-rate predictor. The lambda
+# sweep has an interior optimum at 0.80 (1.0119): the per-fight mix
+# carries real but SMALL signal (~20% weight), the rest is noise the old
+# 0.08 let straight through — that's why the method-market backtest
+# (eval_method_market.py) saw KO predicted 38.7% vs 31.0% actual. Hazard
+# scales were re-validated in the same sweep: (1.0, 1.0) multipliers stay
+# best for the marginals, do NOT compensate here. Base rates below are the
+# measured modern-era mix (31.2/18.2/50.6), not the folklore 33/17/50.
+METHOD_BASE_KO = 0.31
+METHOD_BASE_SUB = 0.18
+METHOD_BASE_DEC = 0.51
+METHOD_ANCHOR_LAMBDA = 0.80
 
 # Neutral anchors used by the lift formulas (lift = 1.0 at these values).
 _KO_OFF_ANCHOR = 0.35
