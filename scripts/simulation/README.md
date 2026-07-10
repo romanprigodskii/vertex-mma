@@ -70,15 +70,25 @@ record-shaped feature. The single static test split (n=142) is noisy
 improved: test acc 65.1 → 65.6 %, log-loss 0.628 → 0.623,
 AUC 0.706 → 0.711 (pre-UFC data fills in 1-2-fight fighters too).
 
-Main model (v0.7.0 recipe, 90 features): adds opponent-adjusted ratings
+v0.10.0 (small-lever batch, all val-gated + adversarially verified):
+Glicko-2 conservative rating (rating − 2·RD — uncertainty baked into
+the rating; complements Elo, corr ~0.75), form-trajectory features
+(last-3 performance rates vs career baseline — live decline/improve
+signal that results-only recent-form misses), and CatBoost replacing
+XGBoost in the blend (strongest individual learner on every eval).
+Tested and rejected honestly: KO-damage recency (val tie = luck at
+the 0.5 threshold). Rolling-retrain backtest 2025-07..2026-07, main
+segment (n=417): **66.9 % accuracy, log-loss 0.623, AUC 0.717**;
+market on the odds subset 69.3 % / 0.593 — the accuracy gap to the
+closing line is down to ~2.4 pp.
+
+Main model core (v0.7.0 recipe): opponent-adjusted ratings
 (`src/opponent_ratings.py`) — online attack/defense skill ratings
 (Holmes-style: each performance scored against what THAT opponent
 usually allows, updated bout-by-bout like Elo) and opponent-quality
-Elo aggregates (who the record was compiled against). Rolling-retrain
-backtest over 2025-07..2026-07 (draw-fix-clean data, n=417):
-65.7 % accuracy, log-loss 0.627, AUC 0.711. The bookmaker closing
-line on the same bouts: 69.5 % / 0.589 — the market stays the honest
-upper bound for a fundamentals-only model.
+Elo aggregates (who the record was compiled against). The bookmaker
+closing line stays the honest upper bound for a fundamentals-only
+model.
 
 ## Predict upcoming bouts
 
