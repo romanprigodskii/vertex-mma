@@ -3,7 +3,9 @@ feature matrix.
 
 Base learners (always trained on the global dataset):
   - LightGBM (Optuna-tuned hyperparameters)
-  - XGBoost  (modest defaults — different bias/variance vs LGB)
+  - CatBoost (v0.10.0, replaced XGBoost — ordered boosting / oblivious
+    trees give a different bias profile; it was the strongest individual
+    learner on every eval and the swap beat the XGB blend on val AND test)
   - LogisticRegression on standardized features (linear baseline so the
     blend has both tree and linear viewpoints — these disagree on
     extrapolation cases the GBTs overfit on small data)
@@ -37,7 +39,7 @@ import joblib
 import lightgbm as lgb
 import numpy as np
 import pandas as pd
-import xgboost as xgb
+from catboost import CatBoostClassifier
 from sklearn.isotonic import IsotonicRegression
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
@@ -61,7 +63,7 @@ class EnsembleModel:
         self.lgb_early_stopping = lgb_early_stopping
 
         self.lgb_global: lgb.Booster | None = None
-        self.xgb_global: xgb.Booster | None = None
+        self.cb_global: CatBoostClassifier | None = None
         self.logreg: LogisticRegression | None = None
         self.scaler: StandardScaler | None = None
         # Imputer values learned on train for logreg (mean per column).
@@ -96,44 +98,38 @@ class EnsembleModel:
         )
 
     @staticmethod
-    def _xgb_params() -> dict[str, Any]:
-        # XGBoost params chosen to be a deliberate twin of the LGB config but
-        # with different regularization defaults — the ensemble benefits when
-        # its members disagree on edge cases. `seed` pins subsample/colsample
-        # draws (reproducibility; LightGBM is pinned via LGB_PARAMS).
+    def _cb_params() -> dict[str, Any]:
+        # CatBoost config from the v0.10 lab winner (d6 / lr 0.05 beat the
+        # more-regularized d4 / lr 0.03 everywhere). random_seed pins the
+        # ordered-boosting permutations; allow_writing_files kills the
+        # catboost_info/ litter.
         return {
-            "objective": "binary:logistic",
-            "eval_metric": "logloss",
+            "iterations": 2000,
             "learning_rate": 0.05,
-            "max_depth": 5,
-            "min_child_weight": 5,
-            "subsample": 0.85,
-            "colsample_bytree": 0.85,
-            "reg_lambda": 1.5,
-            "reg_alpha": 0.1,
-            "verbosity": 0,
-            "tree_method": "hist",
-            "seed": 42,
+            "depth": 6,
+            "loss_function": "Logloss",
+            "eval_metric": "Logloss",
+            "random_seed": 42,
+            "verbose": 0,
+            "allow_writing_files": False,
         }
 
-    def _train_xgb(
+    def _train_cb(
         self,
         X_tr: pd.DataFrame,
         y_tr: pd.Series,
         X_va: pd.DataFrame,
         y_va: pd.Series,
         sample_weight: np.ndarray | None = None,
-    ) -> xgb.Booster:
-        dtr = xgb.DMatrix(X_tr, label=y_tr.astype(int), weight=sample_weight)
-        dva = xgb.DMatrix(X_va, label=y_va.astype(int))
-        return xgb.train(
-            self._xgb_params(),
-            dtr,
-            num_boost_round=1000,
-            evals=[(dva, "val")],
-            early_stopping_rounds=50,
-            verbose_eval=False,
+    ) -> CatBoostClassifier:
+        model = CatBoostClassifier(**self._cb_params(), early_stopping_rounds=100)
+        model.fit(
+            X_tr,
+            y_tr.astype(int),
+            sample_weight=sample_weight,
+            eval_set=(X_va, y_va.astype(int)),
         )
+        return model
 
     # ── fixed-iteration trainers (production refit on ALL data) ─────────
 
@@ -150,15 +146,17 @@ class EnsembleModel:
         dtr = lgb.Dataset(X, label=y, weight=sample_weight)
         return lgb.train(self.lgb_params, dtr, num_boost_round=max(1, int(num_rounds)))
 
-    def _train_xgb_fixed(
+    def _train_cb_fixed(
         self,
         X: pd.DataFrame,
         y: pd.Series,
         num_rounds: int,
         sample_weight: np.ndarray | None = None,
-    ) -> xgb.Booster:
-        dtr = xgb.DMatrix(X, label=y.astype(int), weight=sample_weight)
-        return xgb.train(self._xgb_params(), dtr, num_boost_round=max(1, int(num_rounds)))
+    ) -> CatBoostClassifier:
+        params = {**self._cb_params(), "iterations": max(1, int(num_rounds))}
+        model = CatBoostClassifier(**params)
+        model.fit(X, y.astype(int), sample_weight=sample_weight)
+        return model
 
     def _train_logreg(
         self,
@@ -198,7 +196,7 @@ class EnsembleModel:
         (unweighted) val split."""
         # 1. Train base learners on the full train split.
         self.lgb_global = self._train_lgb(X_train, y_train, X_val, y_val, sample_weight)
-        self.xgb_global = self._train_xgb(X_train, y_train, X_val, y_val, sample_weight)
+        self.cb_global = self._train_cb(X_train, y_train, X_val, y_val, sample_weight)
         self.logreg, self.scaler, self.logreg_means = self._train_logreg(
             X_train, y_train, sample_weight
         )
@@ -270,7 +268,7 @@ class EnsembleModel:
             "weighted_mean_weights": {
                 name: float(w)
                 for name, w in zip(
-                    ["p_lgb_global", "p_xgb_global", "p_logreg"],
+                    ["p_lgb_global", "p_cb_global", "p_logreg"],
                     self._blend_weights,
                     strict=False,
                 )
@@ -279,7 +277,7 @@ class EnsembleModel:
             "blender_coefs": {
                 name: float(c)
                 for name, c in zip(
-                    ["p_lgb_global", "p_xgb_global", "p_logreg"],
+                    ["p_lgb_global", "p_cb_global", "p_logreg"],
                     blender.coef_[0],
                     strict=False,
                 )
@@ -306,7 +304,7 @@ class EnsembleModel:
         + weights are TRANSFERRED unchanged — they're meta-parameters selected on
         val and can't be re-fit without a holdout, and they're stable.
         """
-        assert self.lgb_global is not None and self.xgb_global is not None
+        assert self.lgb_global is not None and self.cb_global is not None
         X_all = X_all.reset_index(drop=True)
         y_all = y_all.reset_index(drop=True)
 
@@ -318,8 +316,9 @@ class EnsembleModel:
         )
         lgb_rounds = self.lgb_global.best_iteration or self.lgb_num_rounds
         prod.lgb_global = self._train_lgb_fixed(X_all, y_all, lgb_rounds, sample_weight)
-        xgb_rounds = (self.xgb_global.best_iteration or 1000) + 1
-        prod.xgb_global = self._train_xgb_fixed(X_all, y_all, xgb_rounds, sample_weight)
+        cb_best = self.cb_global.get_best_iteration()
+        cb_rounds = (cb_best + 1) if cb_best is not None else 2000
+        prod.cb_global = self._train_cb_fixed(X_all, y_all, cb_rounds, sample_weight)
         prod.logreg, prod.scaler, prod.logreg_means = self._train_logreg(
             X_all, y_all, sample_weight
         )
@@ -335,23 +334,21 @@ class EnsembleModel:
     # ── prediction ─────────────────────────────────────────────────────
 
     def _base_predict_matrix(self, X: pd.DataFrame) -> np.ndarray:
-        """Stack base predictions as [p_lgb, p_xgb, p_logreg] with one row
+        """Stack base predictions as [p_lgb, p_cb, p_logreg] with one row
         per input bout."""
         assert self.lgb_global is not None
-        assert self.xgb_global is not None
+        assert self.cb_global is not None
         assert self.logreg is not None
         assert self.scaler is not None
         assert self.logreg_means is not None
         X_filled = X.fillna(pd.Series(self.logreg_means, index=X.columns)).fillna(0.0)
         p_lgb = self.lgb_global.predict(X, num_iteration=self.lgb_global.best_iteration)
-        # `best_iteration` only exists when early stopping was used (the eval
-        # model). The production refit trains a FIXED round count → no best_
-        # iteration; iteration_range=(0, 0) tells XGBoost to use all trees.
-        xgb_best = getattr(self.xgb_global, "best_iteration", None)
-        xgb_range = (0, int(xgb_best) + 1) if xgb_best is not None else (0, 0)
-        p_xgb = self.xgb_global.predict(xgb.DMatrix(X), iteration_range=xgb_range)
+        # CatBoost's predict_proba respects best_iteration automatically when
+        # early stopping was used; the fixed-round production refit simply
+        # uses all trees.
+        p_cb = self.cb_global.predict_proba(X)[:, 1]
         p_log = self.logreg.predict_proba(self.scaler.transform(X_filled.values))[:, 1]
-        return np.column_stack([p_lgb, p_xgb, p_log])
+        return np.column_stack([p_lgb, p_cb, p_log])
 
     def predict_proba_a(self, X: pd.DataFrame) -> np.ndarray:
         """Final P(A wins). Blend mode is picked at fit() time on val
@@ -376,7 +373,7 @@ class EnsembleModel:
         base = self._base_predict_matrix(X)
         return {
             "p_lgb_global": base[:, 0],
-            "p_xgb_global": base[:, 1],
+            "p_cb_global": base[:, 1],
             "p_logreg": base[:, 2],
             "p_blended": self.predict_proba_a(X),
         }
@@ -386,9 +383,13 @@ class EnsembleModel:
     def save(self, dir_path: Path) -> None:
         dir_path.mkdir(parents=True, exist_ok=True)
         assert self.lgb_global is not None
-        assert self.xgb_global is not None
+        assert self.cb_global is not None
         self.lgb_global.save_model(str(dir_path / "lgb_global.lgb"))
-        self.xgb_global.save_model(str(dir_path / "xgb_global.json"))
+        self.cb_global.save_model(str(dir_path / "cb_global.cbm"))
+        # v0.10.0 swapped XGBoost out — drop its stale artifact if present.
+        stale_xgb = dir_path / "xgb_global.json"
+        if stale_xgb.exists():
+            stale_xgb.unlink()
         # v0.6.0 dropped the weight-class specialists — clear out any
         # lgb_specialist_*.lgb files a previous version left in this dir so
         # the artifact set on disk always matches the loaded model.
@@ -419,8 +420,8 @@ class EnsembleModel:
         feature_columns = json.loads((dir_path / "feature_columns.json").read_text())
         m = cls(feature_columns=feature_columns, lgb_params={}, lgb_num_rounds=0, lgb_early_stopping=0)
         m.lgb_global = lgb.Booster(model_file=str(dir_path / "lgb_global.lgb"))
-        m.xgb_global = xgb.Booster()
-        m.xgb_global.load_model(str(dir_path / "xgb_global.json"))
+        m.cb_global = CatBoostClassifier()
+        m.cb_global.load_model(str(dir_path / "cb_global.cbm"))
         m.logreg = joblib.load(dir_path / "logreg.pkl")
         m.scaler = joblib.load(dir_path / "logreg_scaler.pkl")
         m.logreg_means = np.load(dir_path / "logreg_means.npy")
