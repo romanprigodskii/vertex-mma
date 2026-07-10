@@ -119,6 +119,20 @@ DIFF_COLUMNS = [
     "preufc_last3_wins",
     "preufc_dwcs_fights",
     "preufc_avg_win_seconds",
+    # v0.10.0 — validated small levers (both val-gated + adversarially
+    # verified, seed-stable in sign on val AND test):
+    #   * glicko_cons — Glicko-2 conservative rating (rating − 2·RD). RD
+    #     carries signal only baked INTO the rating; raw rating+RD columns
+    #     and the textbook E-term all failed val selection. Complements
+    #     Elo (diff correlation ~0.75), does not replace it.
+    #   * traj_* — last-3-bout performance rates minus career baseline
+    #     (min 2 stat bouts): the performance-rate trajectory that
+    #     results-only recent-form (recent3_wins, streak) misses. Positive
+    #     traj_sapm = absorbing more than career norm = live decline.
+    "glicko_cons",
+    "traj_slpm",
+    "traj_sapm",
+    "traj_td",
 ]
 
 # Per-fighter columns we ALSO keep as-is for A and B (sometimes absolute
@@ -143,6 +157,10 @@ ABSOLUTE_KEEP = [
     "preufc_bouts",
     "preufc_win_rate",
     "preufc_days_since_last",
+    # v0.10.0 — absolute conservative Glicko: the winning lab variant kept
+    # diff + both absolute levels (a proven-1600 vs proven-1570 matchup
+    # reads differently from two uncertain 1500s).
+    "glicko_cons",
 ]
 
 # Context features kept as-is (not differenced). market_prob_a is NOT here:
