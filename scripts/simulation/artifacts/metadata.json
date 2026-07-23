@@ -1,7 +1,7 @@
 {
   "model_version": "v0.11.0",
   "model_kind": "ensemble",
-  "trained_at": "2026-07-23T10:07:16.459039Z",
+  "trained_at": "2026-07-23T10:27:24.716623Z",
   "feature_columns": [
     "diff_height",
     "diff_reach",
