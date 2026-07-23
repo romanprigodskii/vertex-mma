@@ -11,6 +11,13 @@ import psycopg
 from ..parsers.news import NewsEntry
 from ..utils.logger import log
 from ..utils.slugify import slugify
+from .change_events import (
+    KIND_DATE_MOVED,
+    KIND_STATUS_CANCELLED,
+    KIND_WEIGHT_CLASS_CHANGED,
+    SOURCE_NEWS,
+    record_change,
+)
 
 
 @dataclass
@@ -183,6 +190,10 @@ class UnprocessedItem:
     # Article publish date (ISO 'YYYY-MM-DD'), used to anchor the classifier's
     # event-year inference so a backlog item doesn't get a wrong-year date.
     published_at: str | None
+    # The same moment as a real timestamp. Used as `observed_at` for anything
+    # this item makes us record: the classifier runs hourly and can pick up a
+    # backlog item days after publication, so now() would misdate the change.
+    published_at_ts: datetime | None = None
 
 
 def fetch_unprocessed(
@@ -194,7 +205,8 @@ def fetch_unprocessed(
             """
             SELECT ni.id::text, ni.title, ni.body,
                    ns.base_confidence, ns.is_trusted,
-                   to_char(ni.published_at, 'YYYY-MM-DD')
+                   to_char(ni.published_at, 'YYYY-MM-DD'),
+                   ni.published_at
             FROM news_item ni
             JOIN news_source ns ON ns.id = ni.source_id
             WHERE ni.processed_at IS NULL
@@ -211,6 +223,7 @@ def fetch_unprocessed(
                 source_base_confidence=float(r[3]),
                 source_is_trusted=bool(r[4]),
                 published_at=r[5],
+                published_at_ts=r[6],
             )
             for r in cur.fetchall()
         ]
@@ -437,22 +450,63 @@ def auto_create_bout(
         return cur.fetchone()[0], True
 
 
-def cancel_bout_if_provisional(conn: psycopg.Connection, bout_id: str) -> bool:
+def cancel_bout_if_provisional(
+    conn: psycopg.Connection,
+    bout_id: str,
+    *,
+    news_item_id: str | None = None,
+    observed_at: datetime | None = None,
+    confidence: float | None = None,
+) -> bool:
     """Mark a bout 'cancelled' ONLY if it's a still-scheduled provisional row
     (ufc_stats_id IS NULL) — i.e. one we auto-created from a news announcement.
     Never touches an official UFCStats-scraped bout (those are owned by the
     scrape). Returns True if a row was cancelled. Closes the loop so a
     'bout_cancelled' news item retires the phantom card it would otherwise
-    leave behind."""
+    leave behind.
+
+    The cancellation is also recorded in bout_change_event — a withdrawal
+    reported by the press, which is precisely the booking circumstance the
+    model has no access to. `observed_at` is the article's published_at, not
+    now(): the classifier runs hourly and a backlog item can be days old.
+    """
     with conn.cursor() as cur:
         cur.execute(
             """
             UPDATE bout SET status = 'cancelled'::bout_status, updated_at = now()
             WHERE id = %s::uuid AND ufc_stats_id IS NULL AND status = 'scheduled'
+            RETURNING event_id::text, fighter_a_id::text, fighter_b_id::text,
+                      weight_class::text
             """,
             (bout_id,),
         )
-        return cur.rowcount > 0
+        row = cur.fetchone()
+        if row is None:
+            return False
+        event_id, fa, fb, weight_class = row
+        record_change(
+            cur,
+            bout_id=bout_id,
+            event_id=event_id,
+            kind=KIND_STATUS_CANCELLED,
+            source=SOURCE_NEWS,
+            # Per news item: two outlets reporting the same withdrawal are two
+            # observations of one event, but a bout cancelled, re-booked and
+            # cancelled again is two events.
+            signature=news_item_id or "news_cancellation",
+            observed_at=observed_at,
+            payload={
+                "news_item_id": news_item_id,
+                "classification": "bout_cancelled",
+                "confidence": confidence,
+                "fighter_a_id": fa,
+                "fighter_b_id": fb,
+                "weight_class": weight_class,
+                "previous_status": "scheduled",
+                "was_provisional": True,
+            },
+        )
+        return True
 
 
 def update_provisional_bout(
@@ -461,14 +515,30 @@ def update_provisional_bout(
     *,
     weight_class: str | None = None,
     event_date: str | None = None,
+    news_item_id: str | None = None,
+    observed_at: datetime | None = None,
+    confidence: float | None = None,
 ) -> bool:
     """Apply a `bout_changed` announcement to a still-provisional bout
     (ufc_stats_id NULL, scheduled): a weight-class change, and/or a card date
     change on its provisional event. Never touches official scraped rows (those
-    are owned by the UFCStats scrape). Returns True if anything changed."""
+    are owned by the UFCStats scrape). Returns True if anything changed.
+
+    Both kinds of change are recorded in bout_change_event with their BEFORE
+    value, which is why each is read before it is written: a date move tells us
+    how much the fighters' preparation window shifted, and that is only legible
+    against the date it moved from. Recording follows the same rule as the
+    update — only actual differences, so a re-reported change is silent.
+    """
     changed = False
     with conn.cursor() as cur:
         if weight_class:
+            cur.execute(
+                "SELECT weight_class::text, event_id::text FROM bout "
+                "WHERE id = %s::uuid AND ufc_stats_id IS NULL AND status = 'scheduled'",
+                (bout_id,),
+            )
+            before = cur.fetchone()
             cur.execute(
                 """
                 UPDATE bout SET weight_class = %s::weight_class, updated_at = now()
@@ -477,7 +547,25 @@ def update_provisional_bout(
                 """,
                 (weight_class, bout_id, weight_class),
             )
-            changed = changed or cur.rowcount > 0
+            if cur.rowcount > 0:
+                changed = True
+                record_change(
+                    cur,
+                    bout_id=bout_id,
+                    event_id=before[1] if before else None,
+                    kind=KIND_WEIGHT_CLASS_CHANGED,
+                    source=SOURCE_NEWS,
+                    signature=f"{before[0] if before else None}->{weight_class}",
+                    observed_at=observed_at,
+                    payload={
+                        "news_item_id": news_item_id,
+                        "classification": "bout_changed",
+                        "confidence": confidence,
+                        "old_weight_class": before[0] if before else None,
+                        "new_weight_class": weight_class,
+                        "was_provisional": True,
+                    },
+                )
         if event_date:
             try:
                 when = datetime.strptime(event_date, "%Y-%m-%d").replace(
@@ -486,6 +574,16 @@ def update_provisional_bout(
             except ValueError:
                 when = None
             if when is not None:
+                cur.execute(
+                    """
+                    SELECT e.id::text, e.date FROM event e
+                    JOIN bout b ON b.event_id = e.id
+                    WHERE b.id = %s::uuid AND b.ufc_stats_id IS NULL
+                      AND e.ufc_stats_id IS NULL
+                    """,
+                    (bout_id,),
+                )
+                before_event = cur.fetchone()
                 # Move the (provisional) event's date — shifts the whole card,
                 # which is correct for a date change. Only if the event itself
                 # is still provisional.
@@ -501,7 +599,39 @@ def update_provisional_bout(
                     """,
                     (when, bout_id, when),
                 )
-                changed = changed or cur.rowcount > 0
+                if cur.rowcount > 0:
+                    changed = True
+                    old_date = before_event[1] if before_event else None
+                    # Filed against the bout that triggered it, but the move is
+                    # event-scoped: every other bout on the card shifted too.
+                    # Expand via event_id when analysing, don't assume one row
+                    # per affected fight.
+                    record_change(
+                        cur,
+                        bout_id=bout_id,
+                        event_id=before_event[0] if before_event else None,
+                        kind=KIND_DATE_MOVED,
+                        source=SOURCE_NEWS,
+                        signature=(
+                            f"{old_date.date().isoformat() if old_date else None}"
+                            f"->{when.date().isoformat()}"
+                        ),
+                        observed_at=observed_at,
+                        payload={
+                            "news_item_id": news_item_id,
+                            "classification": "bout_changed",
+                            "confidence": confidence,
+                            "old_event_date": old_date,
+                            "new_event_date": when,
+                            "days_shifted": (
+                                (when.date() - old_date.date()).days
+                                if old_date
+                                else None
+                            ),
+                            "scope": "event",
+                            "was_provisional": True,
+                        },
+                    )
     return changed
 
 

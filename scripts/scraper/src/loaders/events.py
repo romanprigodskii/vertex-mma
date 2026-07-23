@@ -15,6 +15,7 @@ from .change_events import (
     KIND_BOUT_REMOVED,
     KIND_OPPONENT_SWAPPED,
     KIND_PROVISIONAL_MERGED,
+    KIND_STATUS_CANCELLED,
     SOURCE_UFCSTATS,
     pair_signature,
     record_change,
@@ -351,6 +352,13 @@ def cancel_past_scheduled_bouts(conn: psycopg.Connection) -> int:
     Idempotent; runs each events scrape. A 1-day grace avoids touching a card
     that's mid-event. If a real result lands later, the bout upsert flips the
     status back to 'completed' (EXCLUDED.status wins), so this is reversible.
+
+    Each flip is recorded in bout_change_event. A fight that was on the card
+    and produced no result is a scratch, which is the same class of signal as
+    a removal — worth keeping even though, unlike a removal, the row survives
+    to be inspected later. RETURNING drives the logging so only rows this
+    statement actually changed are recorded; a second run updates nothing and
+    therefore logs nothing.
     """
     with conn.cursor() as cur:
         cur.execute(
@@ -360,9 +368,29 @@ def cancel_past_scheduled_bouts(conn: psycopg.Connection) -> int:
               AND event_id IN (
                 SELECT id FROM event WHERE date < CURRENT_DATE - INTERVAL '1 day'
               )
+            RETURNING id::text, event_id::text, ufc_stats_id,
+                      fighter_a_id::text, fighter_b_id::text, weight_class::text
             """
         )
-        return cur.rowcount or 0
+        cancelled = cur.fetchall()
+        for bout_id, event_id, ufc_id, fa, fb, weight_class in cancelled:
+            record_change(
+                cur,
+                bout_id=bout_id,
+                event_id=event_id,
+                kind=KIND_STATUS_CANCELLED,
+                source=SOURCE_UFCSTATS,
+                signature="past_event_sweep",
+                payload={
+                    "ufc_stats_id": ufc_id,
+                    "fighter_a_id": fa,
+                    "fighter_b_id": fb,
+                    "weight_class": weight_class,
+                    "previous_status": "scheduled",
+                    "reason": "event_passed_without_result",
+                },
+            )
+        return len(cancelled)
 
 
 def upsert_event_details(

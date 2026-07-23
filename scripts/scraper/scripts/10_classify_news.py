@@ -223,7 +223,13 @@ def run() -> dict[str, int]:
                     and item.source_is_trusted
                     and res.confidence >= AUTO_CREATE_BOUT_MIN_CONFIDENCE
                 ):
-                    if cancel_bout_if_provisional(conn, bout_id):
+                    if cancel_bout_if_provisional(
+                        conn,
+                        bout_id,
+                        news_item_id=item.id,
+                        observed_at=item.published_at_ts,
+                        confidence=res.confidence,
+                    ):
                         totals["bouts_cancelled"] += 1
                         log.info(f"  provisional bout cancelled: {bout_id}")
 
@@ -242,6 +248,9 @@ def run() -> dict[str, int]:
                         bout_id,
                         weight_class=(primary[4] if primary else None),
                         event_date=res.event_date,
+                        news_item_id=item.id,
+                        observed_at=item.published_at_ts,
+                        confidence=res.confidence,
                     ):
                         totals["bouts_updated"] += 1
                         log.info(f"  provisional bout updated (changed): {bout_id}")
