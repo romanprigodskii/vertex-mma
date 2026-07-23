@@ -48,6 +48,13 @@ export const event = pgTable(
     ufcStatsId: text("ufc_stats_id").unique(),
     sherdogId: text("sherdog_id").unique(),
 
+    /** When this card was FIRST observed — by the UFCStats listing, or (for a
+     *  card the news announced before UFCStats listed it) the announcing
+     *  article's published_at. Same contract as bout.firstSeenAt: nullable,
+     *  no database default, NULL for every row that predates the column, set
+     *  explicitly on INSERT and never on conflict. Do not backfill. */
+    firstSeenAt: timestamp("first_seen_at", { withTimezone: true }),
+
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -95,6 +102,23 @@ export const bout = pgTable(
     ufcStatsId: text("ufc_stats_id").unique(),
     sherdogId: text("sherdog_id").unique(),
     mmadecisionsId: text("mmadecisions_id").unique(),
+
+    /** When this matchup was FIRST observed — by the UFCStats scrape, or (for
+     *  a news-announced booking) the article's published_at. The nearest thing
+     *  we will ever have to a booking date, and the denominator for "how much
+     *  notice did these two get".
+     *
+     *  NULLABLE, AND NULL FOR EVERY ROW THAT PREDATES IT. That is the point:
+     *  `createdAt` below is worthless precisely because a bulk import stamped
+     *  8 736 bouts with 2026-05-12, 8 695 of them AFTER their own event, and a
+     *  timestamp that lies is worse than one that admits it doesn't know.
+     *  There is deliberately NO database default — a nullable column with
+     *  `DEFAULT now()` would have Postgres backfill every existing row on
+     *  ADD COLUMN, repeating exactly that mistake. The two writers
+     *  (scripts/scraper/src/loaders/{events,news}.py) set it explicitly on
+     *  INSERT and never on conflict, so it only ever describes rows we
+     *  actually watched appear. Do not backfill it. */
+    firstSeenAt: timestamp("first_seen_at", { withTimezone: true }),
 
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()

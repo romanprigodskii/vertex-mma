@@ -346,6 +346,7 @@ def resolve_or_create_event(
     *,
     event_date: str | None,
     cache: dict[str, str | None] | None = None,
+    first_seen_at: datetime | None = None,
 ) -> str | None:
     """Resolve an event hint to an event_id, CREATING a provisional event when
     the hint names a card we don't track yet — the common case for a freshly
@@ -362,6 +363,10 @@ def resolve_or_create_event(
     never invent a date, so when the LLM didn't extract one this degrades to the
     old resolve-only behaviour (returns None → no bout created). Returns the
     event_id, or None when nothing resolves and we can't create.
+
+    `first_seen_at` is the announcing article's published_at — when the card
+    was first reported, which for a provisional event is the only honest
+    answer. Falls back to now() when the caller has nothing better.
     """
     if not event_hint:
         return None
@@ -389,12 +394,14 @@ def resolve_or_create_event(
         cur.execute(
             """
             INSERT INTO event (
-                slug, name, short_name, promotion, date, status, ufc_stats_id
+                slug, name, short_name, promotion, date, status, ufc_stats_id,
+                first_seen_at
             )
-            VALUES (%s, %s, %s, 'ufc', %s, 'upcoming'::event_status, NULL)
+            VALUES (%s, %s, %s, 'ufc', %s, 'upcoming'::event_status, NULL,
+                    COALESCE(%s, now()))
             RETURNING id::text
             """,
-            (slug, name, name, when),
+            (slug, name, name, when, first_seen_at),
         )
         eid = cur.fetchone()[0]
     if cache is not None:
@@ -412,10 +419,22 @@ def auto_create_bout(
     fighter_b_id: str,
     event_id: str,
     weight_class: str,
+    first_seen_at: datetime | None = None,
 ) -> tuple[str, bool]:
     """Insert a scheduled bout between two fighters at an event, or return
     the existing one if a row already links the same pair to the same event.
-    Returns (bout_id, created). Idempotent on (event_id, fighter pair)."""
+    Returns (bout_id, created). Idempotent on (event_id, fighter pair).
+
+    `first_seen_at` should be the announcing article's published_at — for a
+    news-born booking that IS the announcement date, and it is the earliest
+    such mark anywhere in the database. Passing None falls back to now(),
+    which the hourly classifier makes wrong by up to the age of the backlog;
+    callers that have the timestamp must pass it.
+
+    The row survives adoption by the UFCStats scrape (which only sets
+    ufc_stats_id on the existing row), so this timestamp is what the bout
+    keeps for the rest of its life.
+    """
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -440,12 +459,14 @@ def auto_create_bout(
         cur.execute(
             """
             INSERT INTO bout (event_id, fighter_a_id, fighter_b_id,
-                              weight_class, status, scheduled_rounds)
+                              weight_class, status, scheduled_rounds,
+                              first_seen_at)
             VALUES (%s::uuid, %s::uuid, %s::uuid,
-                    %s::weight_class, 'scheduled', 3)
+                    %s::weight_class, 'scheduled', 3,
+                    COALESCE(%s, now()))
             RETURNING id::text
             """,
-            (event_id, fighter_a_id, fighter_b_id, weight_class),
+            (event_id, fighter_a_id, fighter_b_id, weight_class, first_seen_at),
         )
         return cur.fetchone()[0], True
 

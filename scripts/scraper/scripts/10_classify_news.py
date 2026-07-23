@@ -194,6 +194,7 @@ def run() -> dict[str, int]:
                             res.event_hint,
                             event_date=res.event_date,
                             cache=event_cache,
+                            first_seen_at=item.published_at_ts,
                         )
                         if not event_id:
                             continue
@@ -203,6 +204,12 @@ def run() -> dict[str, int]:
                             fighter_b_id=fb_id,
                             event_id=event_id,
                             weight_class=wc,
+                            # The announcement date, not the moment we got
+                            # round to classifying it — this row's
+                            # first_seen_at is the earliest booking evidence
+                            # we will ever have for this fight, and it
+                            # survives adoption by the UFCStats scrape.
+                            first_seen_at=item.published_at_ts,
                         )
                         if bout_id is None:
                             bout_id = new_bout_id
