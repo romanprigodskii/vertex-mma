@@ -1,8 +1,11 @@
+import { sql } from "drizzle-orm";
 import {
+  bigserial,
   boolean,
   char,
   index,
   integer,
+  jsonb,
   pgTable,
   real,
   text,
@@ -105,6 +108,89 @@ export const bout = pgTable(
     index("bout_fighter_a_idx").on(table.fighterAId),
     index("bout_fighter_b_idx").on(table.fighterBId),
     index("bout_status_idx").on(table.status),
+  ],
+);
+
+// Append-only log of everything that HAPPENS to a booking between the
+// announcement and the walk to the cage: a fight vanishing off a card, an
+// opponent being swapped, a cancellation, a date or weight-class move.
+//
+// Why a separate table rather than columns on `bout`: none of this is
+// reconstructable after the fact. The UFCStats event page shows the card as it
+// stands TODAY — a fight pulled last month simply isn't there, and our own
+// scrape used to hard-DELETE the row that proved it existed. Booking
+// circumstance (short notice, replacement opponent) is the one plausible
+// missing input for the model's remaining gap to the closing line, and it is
+// forward-only: every week we don't record it is a week of signal gone for
+// good. The table exists so that a year from now there is something to model.
+//
+// DELIBERATELY NO FOREIGN KEYS. `bout_id` and `event_id` are bare uuids:
+// half the point is to outlive `DELETE FROM bout` (the removal log would
+// cascade itself away at the exact moment it became interesting) and the
+// provisional-event merges that drop `event` rows. Join on them by hand and
+// expect misses.
+//
+// Written by the scraper (scripts/scraper/src/loaders/{events,news}.py) —
+// see scripts/scraper/docs/change_accrual.md. Nothing reads it yet.
+export const boutChangeEvent = pgTable(
+  "bout_change_event",
+  {
+    // bigserial, not a random uuid: rows are deduped against the LAST one
+    // written for a (bout, kind), and insertion order is the only ordering
+    // that can't be perturbed by a backdated observed_at.
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+
+    boutId: uuid("bout_id").notNull(),
+    /** May be null when the bout's event is unknown or already gone. */
+    eventId: uuid("event_id"),
+
+    /** When the change HAPPENED, as best we can tell. For news-sourced rows
+     *  this is the article's published_at, not the moment we parsed it — the
+     *  classifier runs hourly and can pick up a backlog item days late. For
+     *  scrape-sourced rows it is the observation time, which is an upper
+     *  bound: we learn a fight is off up to 6 h after it comes off the page. */
+    observedAt: timestamp("observed_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    /** When WE wrote the row. Differs from observedAt whenever the source
+     *  carries its own timestamp; keeps "when did the pipeline learn this"
+     *  answerable without trusting the source clock. */
+    recordedAt: timestamp("recorded_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+
+    /** 'ufcstats' | 'news' | 'odds' — which pipeline observed it. */
+    source: text("source").notNull(),
+    /** 'bout_removed_from_card' | 'opponent_swapped' | 'status_cancelled'
+     *  | 'date_moved' | 'weight_class_changed' | 'provisional_merged'.
+     *  Free text on purpose: a new observation should be cheap to start
+     *  recording, and an enum here would need a migration to add one. */
+    kind: text("kind").notNull(),
+
+    /** Deterministic fingerprint of the observed CHANGE (not of the
+     *  observation). A row is written only when this differs from the most
+     *  recent row with the same (bout_id, kind) — the scrape re-reads every
+     *  upcoming card every 6 h, and without this an unrepaired opponent swap
+     *  would log itself four times a day forever. */
+    signature: text("signature").notNull(),
+
+    /** Old and new values, ufc_stats_id, fighter names/ids, the news item and
+     *  its confidence — whatever the writer had. Shape varies by kind and is
+     *  documented in scripts/scraper/docs/change_accrual.md. */
+    payload: jsonb("payload")
+      .$type<Record<string, unknown>>()
+      .default(sql`'{}'::jsonb`)
+      .notNull(),
+  },
+  (table) => [
+    index("bout_change_event_bout_idx").on(table.boutId, table.observedAt),
+    index("bout_change_event_observed_idx").on(table.observedAt),
+    // Serves the dedupe lookup: latest row for a (bout, kind).
+    index("bout_change_event_dedupe_idx").on(
+      table.boutId,
+      table.kind,
+      sql`${table.id} DESC`,
+    ),
   ],
 );
 
@@ -269,6 +355,8 @@ export type Event = typeof event.$inferSelect;
 export type NewEvent = typeof event.$inferInsert;
 export type Bout = typeof bout.$inferSelect;
 export type NewBout = typeof bout.$inferInsert;
+export type BoutChangeEvent = typeof boutChangeEvent.$inferSelect;
+export type NewBoutChangeEvent = typeof boutChangeEvent.$inferInsert;
 export type BoutScorecard = typeof boutScorecard.$inferSelect;
 export type NewBoutScorecard = typeof boutScorecard.$inferInsert;
 export type BoutExternalOdds = typeof boutExternalOdds.$inferSelect;
