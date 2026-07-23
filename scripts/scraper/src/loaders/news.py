@@ -13,6 +13,7 @@ from ..utils.logger import log
 from ..utils.slugify import slugify
 from .change_events import (
     KIND_DATE_MOVED,
+    KIND_NEWS_SIGNAL,
     KIND_STATUS_CANCELLED,
     KIND_WEIGHT_CLASS_CHANGED,
     SOURCE_NEWS,
@@ -654,6 +655,55 @@ def update_provisional_bout(
                         },
                     )
     return changed
+
+
+def record_news_signal(
+    conn: psycopg.Connection,
+    *,
+    bout_id: str,
+    news_item_id: str,
+    classification: str,
+    confidence: float,
+    published_at: datetime | None,
+    source_is_trusted: bool,
+    acted: bool,
+) -> bool:
+    """Keep a withdrawal / booking-change / weigh-in report against the bout it
+    is about, whether or not it changed anything in the database.
+
+    The classifier has been emitting these three categories all along, and
+    almost all of them were then dropped: `bout_cancelled` and `bout_changed`
+    only ever materialise on PROVISIONAL rows (an official bout is owned by
+    the UFCStats scrape and must not be flipped by a headline), and `weigh_in`
+    materialised nowhere at all. But "a trusted outlet reported that this
+    fighter withdrew, eleven days out" is exactly the booking circumstance the
+    model has no access to, and it is worth the same whether or not we felt
+    entitled to touch the row.
+
+    `acted` records which of the two it was, so a later analysis can tell a
+    report we merely observed from one that also changed our data.
+
+    Deduped by news item across ALL rows for the bout (`dedupe_scope='any'`):
+    an article reports a given thing once no matter how often it is
+    reprocessed, and unlike a recurring state it can't legitimately repeat.
+    """
+    with conn.cursor() as cur:
+        return record_change(
+            cur,
+            bout_id=bout_id,
+            kind=KIND_NEWS_SIGNAL,
+            source=SOURCE_NEWS,
+            signature=news_item_id,
+            dedupe_scope="any",
+            observed_at=published_at,
+            payload={
+                "news_item_id": news_item_id,
+                "classification": classification,
+                "confidence": confidence,
+                "source_is_trusted": source_is_trusted,
+                "acted": acted,
+            },
+        )
 
 
 def apply_classification(

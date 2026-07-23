@@ -47,9 +47,20 @@ KIND_DATE_MOVED = "date_moved"
 KIND_WEIGHT_CLASS_CHANGED = "weight_class_changed"
 #: A provisional (news-created) twin was folded into the official row.
 KIND_PROVISIONAL_MERGED = "provisional_merged"
-#: A news item classified as a withdrawal / change / weigh-in that we could
-#: attribute to a bout but could not (or deliberately did not) act on.
+#: A news item classified as a withdrawal, a booking change or weigh-in
+#: coverage, attributed to a bout. Recorded whether or not it caused a
+#: database change — most don't, because the loaders only ever mutate
+#: provisional rows, and "an outlet reported a withdrawal" is the observation
+#: worth keeping either way.
 KIND_NEWS_SIGNAL = "news_signal"
+
+#: The classifications that produce a KIND_NEWS_SIGNAL row. These three are the
+#: booking-circumstance categories the classifier already emits; they were
+#: being used for display and (for provisional rows) a status flip, and then
+#: discarded.
+NEWS_SIGNAL_CLASSIFICATIONS = frozenset(
+    {"bout_cancelled", "bout_changed", "weigh_in"}
+)
 
 SOURCE_UFCSTATS = "ufcstats"
 SOURCE_NEWS = "news"
@@ -71,6 +82,7 @@ def record_change(
     payload: dict[str, Any],
     event_id: str | None = None,
     observed_at: datetime | None = None,
+    dedupe_scope: str = "latest",
 ) -> bool:
     """Append one row unless the most recent row for this (bout, kind) already
     carries the same `signature`. Returns True when a row was written.
@@ -89,20 +101,45 @@ def record_change(
     backdated to their article's published_at and would otherwise sort behind
     a scrape row written later.
 
+    `dedupe_scope` picks which rows the signature is compared against:
+
+      * 'latest' (default) — only the most recent row for this (bout, kind).
+        Right for a CONDITION that can recur: a bout pulled, re-added and
+        pulled again really did happen twice, and a weight class that moves
+        back and forth is two changes, not one.
+      * 'any' — every row for this (bout, kind). Right when the signature
+        names a one-off FACT rather than a state, e.g. a specific news item:
+        a given article reports a given thing exactly once, however many times
+        it is reprocessed, and however many other articles landed in between.
+
     `observed_at=None` means "now" — correct only for a source with no clock
     of its own. Pass the source's timestamp whenever there is one.
     """
-    cur.execute(
-        """
-        SELECT signature FROM bout_change_event
-        WHERE bout_id = %s::uuid AND kind = %s
-        ORDER BY id DESC LIMIT 1
-        """,
-        (bout_id, kind),
-    )
-    row = cur.fetchone()
-    if row is not None and row[0] == signature:
-        return False
+    if dedupe_scope == "any":
+        cur.execute(
+            """
+            SELECT 1 FROM bout_change_event
+            WHERE bout_id = %s::uuid AND kind = %s AND signature = %s
+            LIMIT 1
+            """,
+            (bout_id, kind, signature),
+        )
+        if cur.fetchone() is not None:
+            return False
+    elif dedupe_scope == "latest":
+        cur.execute(
+            """
+            SELECT signature FROM bout_change_event
+            WHERE bout_id = %s::uuid AND kind = %s
+            ORDER BY id DESC LIMIT 1
+            """,
+            (bout_id, kind),
+        )
+        row = cur.fetchone()
+        if row is not None and row[0] == signature:
+            return False
+    else:
+        raise ValueError(f"unknown dedupe_scope {dedupe_scope!r}")
 
     cur.execute(
         """
