@@ -77,10 +77,38 @@ the rating; complements Elo, corr ~0.75), form-trajectory features
 signal that results-only recent-form misses), and CatBoost replacing
 XGBoost in the blend (strongest individual learner on every eval).
 Tested and rejected honestly: KO-damage recency (val tie = luck at
-the 0.5 threshold). Rolling-retrain backtest 2025-07..2026-07, main
-segment (n=417): **66.9 % accuracy, log-loss 0.623, AUC 0.717**;
-market on the odds subset 69.3 % / 0.593 — the accuracy gap to the
-closing line is down to ~2.4 pp.
+the 0.5 threshold).
+
+Where the model stands against the closing line. Every number below
+names the basis it was measured on, because the two bases disagree by
+more than the effect anyone is arguing about — an earlier version of
+this README quoted 66.9 % against a rolling window that does not
+produce it, and a ~2.4 pp gap that no basis produces.
+
+* **Static test split** (event date ≥ 2025-01-01, averaged over both
+  fighter orderings, n=568 bouts that have a closing line):
+  model **0.6690 accuracy / 0.6198 log-loss**, market **0.6796 /
+  0.5968**. The 1.1 pp accuracy difference is NOT established —
+  McNemar exact p = 0.72, i.e. the two disagree on individual fights
+  about as often in each direction as chance predicts.
+* **Rolling retrain**, 2025-07..2026-07, main segment (n=417):
+  model **0.6475 accuracy / 0.6218 log-loss**; market 0.6929 on the
+  394 of those with a line. Rolling is the honest number for "how
+  would this have performed week to week"; the static split is the
+  one every earlier metric in this README was measured on.
+
+The log-loss gap decomposes cleanly, and this is the useful part:
+calibration is at **parity** (reliability 0.00296 model vs 0.00303
+market — lower is better), while **resolution** is 0.03812 vs
+0.04580. The entire deficit is sharpness on lopsided matchups: the
+book knows which mismatches are real and we don't. Three attempts to
+close it by tuning — post-blender recalibration, re-selecting the
+blend on the tail bucket, removing the age throttle — all failed
+their gate (`docs/tail_resolution.md`). The remaining lever is
+information, not fitting: booking circumstance (short notice,
+replacement opponent, missed weight), which the scraper began
+accruing in `bout_change_event` / `first_seen_at` and which cannot be
+backfilled.
 
 Main model core (v0.7.0 recipe): opponent-adjusted ratings
 (`src/opponent_ratings.py`) — online attack/defense skill ratings
