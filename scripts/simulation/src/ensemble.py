@@ -27,6 +27,30 @@ Isotonic on the ~430 val rows double-dipped noise and pushed test log-loss
 `weighted_mean` mode AVERAGES the learners' probabilities, which is mildly
 UNDER-DISPERSED (Jensen — pulled toward 0.5), so the output is NOT guaranteed
 calibrated. Don't describe these probabilities as "calibrated" downstream.
+
+The `calibrator` slot below is real and wired into predict_proba_a, but the
+tail-resolution lab left it EMPTY on purpose (docs/tail_resolution.md). What
+it measured, on the 568 test bouts with a closing line:
+
+  * The under-dispersion is genuine — the model says 0.68 in the market's
+    0.72+ bucket where the truth is 0.84 — but a monotone transform is worth
+    only ~0.002-0.003 of the 0.023 log-loss gap, because it cannot sharpen
+    the heavy favourites without also sharpening the coin-flips, which is
+    where we already beat the book.
+  * Fitting 2-3 parameters on the 429-row val split is not affordable:
+    bootstrapped over val, 1-param temperature beats the uncalibrated model
+    in 90% of resamples, 2-param families in 55-62%, the 3-param piecewise
+    in 37%. Val PICKS the piecewise family, which is the worst of them on
+    test — the same failure that killed isotonic, at three parameters
+    instead of unbounded.
+  * Fitting on ~3.1k walk-forward out-of-fold rows instead makes every family
+    agree on the same mild map (T≈0.89) and makes it robust (91% of
+    bootstraps), but the honest effect is then only +0.0022 — it never
+    approaches the tail bucket's 0.4850 mechanical ceiling, so it fails the
+    lab's gate and is not shipped.
+
+Anything fitted into this slot is applied PER FIGHTER ORDERING, inside the
+order-averaging that predict.py / custom.py wrap around predict_proba_a.
 """
 
 from __future__ import annotations
@@ -40,9 +64,122 @@ import lightgbm as lgb
 import numpy as np
 import pandas as pd
 from catboost import CatBoostClassifier
-from sklearn.isotonic import IsotonicRegression
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
+
+_CAL_EPS = 1e-6
+# Logit range the monotonicity check sweeps. The blend has never produced a
+# probability outside ~[0.10, 0.90] (|z| <= 2.2); 4.0 leaves headroom so a
+# transform that would fold back on itself just outside the observed range is
+# still rejected.
+_CAL_Z_MAX = 4.0
+
+# Monotone recalibration families and their Nelder-Mead starting points.
+# Two free parameters is the honest budget on 429 val rows: one (temperature)
+# can only sharpen everything uniformly, and isotonic (unbounded) already
+# failed here — it double-dipped val noise and pushed test log-loss 0.65→0.72.
+CALIBRATOR_FAMILIES: dict[str, dict[str, Any]] = {
+    # sigmoid(z / T) — uniform sharpening. Symmetric.
+    "temperature": {"n_params": 1, "starts": [[1.0], [0.8], [1.2]]},
+    # sigmoid(a·z + b·z³) — symmetric by construction; z³ vanishes near
+    # p=0.5 so the middle is left alone while the tails stretch.
+    "cubic": {"n_params": 2, "starts": [[1.0, 0.0], [1.0, 0.05], [1.2, 0.10]]},
+    # sigmoid(a·log p − b·log(1−p) + c) — Kull et al. beta calibration.
+    # Only symmetric when a=b and c=0, so a≠b on a symmetrized frame is
+    # noise-fitting by construction.
+    "beta": {"n_params": 3, "starts": [[1.0, 1.0, 0.0], [1.2, 1.2, 0.0]]},
+    "beta_c0": {"n_params": 2, "starts": [[1.0, 1.0], [1.2, 1.2], [0.9, 1.1]]},
+    # Slope s_in inside |z| <= kink, s_out beyond it, continuous at the kink
+    # (so it stays monotone) and symmetric in sign. params = [s_in, s_out, kink].
+    "piecewise": {"n_params": 3, "starts": [[1.0, 1.0, 0.5], [1.0, 1.6, 0.5]]},
+}
+
+
+class ProbabilityCalibrator:
+    """A monotone two-ish-parameter map applied to the blended probability.
+
+    Lives in EnsembleModel.calibrator and is applied inside predict_proba_a,
+    i.e. PER FIGHTER ORDERING — production averages the two orderings around
+    it (predict.py / custom.py), so anything fit against the served quantity
+    is fit against this placement.
+
+    Serialized as plain JSON (family + params), not a pickle: it is three
+    floats and a name, and a JSON artifact stays readable and diffable in the
+    git-committed artifact set.
+    """
+
+    def __init__(self, family: str, params: list[float]) -> None:
+        if family not in CALIBRATOR_FAMILIES:
+            raise ValueError(f"unknown calibrator family {family!r}")
+        self.family = family
+        self.params = [float(p) for p in params]
+
+    # ── the map ────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _logit(p: np.ndarray) -> np.ndarray:
+        p = np.clip(np.asarray(p, dtype=float), _CAL_EPS, 1 - _CAL_EPS)
+        return np.log(p / (1 - p))
+
+    @staticmethod
+    def _sigmoid(z: np.ndarray) -> np.ndarray:
+        return 1.0 / (1.0 + np.exp(-np.clip(z, -50, 50)))
+
+    def _map_logit(self, z: np.ndarray) -> np.ndarray:
+        pr = self.params
+        if self.family == "temperature":
+            return z / pr[0]
+        if self.family == "cubic":
+            return pr[0] * z + pr[1] * z**3
+        if self.family == "piecewise":
+            s_in, s_out, kink = pr[0], pr[1], abs(pr[2])
+            a = np.abs(z)
+            return np.sign(z) * (s_in * np.minimum(a, kink) + s_out * np.maximum(a - kink, 0.0))
+        raise AssertionError(f"{self.family} is not a logit-space family")
+
+    def transform(self, p: np.ndarray) -> np.ndarray:
+        p = np.clip(np.asarray(p, dtype=float), _CAL_EPS, 1 - _CAL_EPS)
+        if self.family in ("beta", "beta_c0"):
+            a, b = self.params[0], self.params[1]
+            c = self.params[2] if self.family == "beta" else 0.0
+            return self._sigmoid(a * np.log(p) - b * np.log(1 - p) + c)
+        return self._sigmoid(self._map_logit(self._logit(p)))
+
+    def is_monotone(self) -> bool:
+        """Reject parameter vectors whose map is non-increasing anywhere in
+        the reachable range — the optimizer explores freely, and a transform
+        that inverts an ordering is not a recalibration."""
+        pr = self.params
+        if self.family == "temperature":
+            return pr[0] > 1e-3
+        if self.family in ("beta", "beta_c0"):
+            # d/dp = a/p + b/(1−p) > 0 for p in (0,1) iff a,b >= 0, not both 0.
+            return pr[0] >= 0 and pr[1] >= 0 and (pr[0] + pr[1]) > 1e-6
+        if self.family == "piecewise":
+            return pr[0] > 1e-3 and pr[1] > 1e-3 and abs(pr[2]) > 1e-3
+        # cubic: a + 3b·z² > 0 across the sweep (a<0 or b<0 can still be fine
+        # over a bounded range, so check rather than constrain).
+        z = np.linspace(-_CAL_Z_MAX, _CAL_Z_MAX, 601)
+        return bool(np.all(pr[0] + 3.0 * pr[1] * z**2 > 1e-6))
+
+    def describe(self) -> str:
+        names = {
+            "temperature": ["T"],
+            "cubic": ["a", "b"],
+            "beta": ["a", "b", "c"],
+            "beta_c0": ["a", "b"],
+            "piecewise": ["s_in", "s_out", "kink"],
+        }[self.family]
+        return " ".join(f"{n}={v:+.4f}" for n, v in zip(names, self.params, strict=False))
+
+    # ── persistence ────────────────────────────────────────────────────
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"family": self.family, "params": self.params}
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> ProbabilityCalibrator:
+        return cls(payload["family"], payload["params"])
 
 
 class EnsembleModel:
@@ -69,7 +206,7 @@ class EnsembleModel:
         # Imputer values learned on train for logreg (mean per column).
         self.logreg_means: np.ndarray | None = None
         self.blender: LogisticRegression | None = None
-        self.calibrator: IsotonicRegression | None = None
+        self.calibrator: ProbabilityCalibrator | None = None
         self.training_meta: dict[str, Any] = {}
 
     # ── individual training helpers ────────────────────────────────────
@@ -353,19 +490,27 @@ class EnsembleModel:
     def predict_proba_a(self, X: pd.DataFrame) -> np.ndarray:
         """Final P(A wins). Blend mode is picked at fit() time on val
         log-loss — see EnsembleModel.fit for the three options
-        (logreg / mean / weighted_mean)."""
+        (logreg / mean / weighted_mean).
+
+        The calibrator (when one is fitted) is applied HERE, so it is inside
+        the order-averaging that predict.py / custom.py wrap around this
+        call: the served number is ½·[g(f(A,B)) + 1 − g(f(B,A))]."""
         assert self.blender is not None
         base = self._base_predict_matrix(X)
         mode = getattr(self, "_blend_mode", None)
         if mode == "mean":
-            return base.mean(axis=1)
-        if mode == "weighted_mean":
+            blended = base.mean(axis=1)
+        elif mode == "weighted_mean":
             weights = np.array(getattr(self, "_blend_weights", []))
             if weights.size != base.shape[1]:
                 weights = np.ones(base.shape[1]) / base.shape[1]
-            return base @ weights
-        # Default / "logreg" mode.
-        return self.blender.predict_proba(base)[:, 1]
+            blended = base @ weights
+        else:
+            # Default / "logreg" mode.
+            blended = self.blender.predict_proba(base)[:, 1]
+        if self.calibrator is not None:
+            return self.calibrator.transform(blended)
+        return blended
 
     def predict_proba_breakdown(self, X: pd.DataFrame) -> dict[str, np.ndarray]:
         """Per-learner predictions — handy for debugging blender weights
@@ -399,9 +544,18 @@ class EnsembleModel:
         joblib.dump(self.scaler, dir_path / "logreg_scaler.pkl")
         np.save(dir_path / "logreg_means.npy", self.logreg_means)
         joblib.dump(self.blender, dir_path / "blender.pkl")
-        # calibrator may be None (Phase 5 dropped post-blender isotonic).
+        # calibrator may be None. Written as JSON (family + params) so the
+        # git-committed artifact set stays diffable; a stale pickle from the
+        # abandoned isotonic experiment is cleared so what's on disk always
+        # matches the loaded model.
+        stale_cal = dir_path / "calibrator.pkl"
+        if stale_cal.exists():
+            stale_cal.unlink()
+        cal_json = dir_path / "calibrator.json"
         if self.calibrator is not None:
-            joblib.dump(self.calibrator, dir_path / "calibrator.pkl")
+            cal_json.write_text(json.dumps(self.calibrator.to_dict(), indent=2))
+        elif cal_json.exists():
+            cal_json.unlink()
         (dir_path / "feature_columns.json").write_text(
             json.dumps(self.feature_columns)
         )
@@ -426,8 +580,12 @@ class EnsembleModel:
         m.scaler = joblib.load(dir_path / "logreg_scaler.pkl")
         m.logreg_means = np.load(dir_path / "logreg_means.npy")
         m.blender = joblib.load(dir_path / "blender.pkl")
-        cal_path = dir_path / "calibrator.pkl"
-        m.calibrator = joblib.load(cal_path) if cal_path.exists() else None
+        cal_path = dir_path / "calibrator.json"
+        m.calibrator = (
+            ProbabilityCalibrator.from_dict(json.loads(cal_path.read_text()))
+            if cal_path.exists()
+            else None
+        )
         blend_mode_path = dir_path / "blend_mode.json"
         if blend_mode_path.exists():
             payload = json.loads(blend_mode_path.read_text())
