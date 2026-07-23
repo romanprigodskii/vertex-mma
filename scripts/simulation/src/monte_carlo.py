@@ -35,9 +35,12 @@ from KO timing. The hazard shape is a deterministic function of the fighters
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import numpy as np
+
+from .config import ARTIFACTS_DIR
 
 # Roster-mean fallbacks for missing per-fighter stats. Loosely calibrated
 # against the dataset; precise values matter less than having a sensible
@@ -100,6 +103,67 @@ POWER_MIN, POWER_MAX = 0.6, 1.6
 
 # Decision-time scoring softness.
 DECISION_TEMPERATURE = 0.45
+
+# === Fitted finish-hazard timing (round lab, Stage 1) ========================
+# When `artifacts/finish_hazard.json` is present the WHEN of a finish comes
+# from the fitted cause-specific hazards in src/finish_hazard.py instead of the
+# DAMAGE_GAMMA / DAMAGE_FLOOR / ROUND_RAMP / POWER_TILT shape above. Two things
+# the hand shape structurally could not express, both measured in the fit:
+#
+#   * KO and submission have DIFFERENT time shapes. `_timing_weights` produces
+#     one curve per direction and applies it to both causes.
+#   * The within-round ramp is +0.11 in log-hazard — about an 11% rise across a
+#     round, where ROUND_RAMP=0.55 asserts 55%.
+#
+# The hand-set constants below stay module-level floats and stay live as the
+# fallback path: they are what runs on a checkout with no artifact, and
+# calibrate_method_mix.py monkey-patches KO_TOTAL_SCALE / SUB_TOTAL_SCALE /
+# METHOD_ANCHOR_LAMBDA by module attribute, which only works while they are
+# plain module-level floats read at call time.
+#
+# This wires the SHAPE only. The per-fight TOTALS still come from
+# _ko_total_loghaz / _sub_total_loghaz, so the marginal KO/sub/decision mix
+# this run produces is unchanged by construction and the existing calibration
+# of those scales is not invalidated.
+HAZARD_ARTIFACT_PATH = ARTIFACTS_DIR / "finish_hazard.json"
+_hazard_model: Any = None
+_hazard_source: str | None = None  # None = nothing loaded yet
+
+
+def set_hazard_model(model: Any) -> None:
+    """Override the timing model (or clear it with None to force the legacy
+    hand-set shape)."""
+    global _hazard_model, _hazard_source
+    _hazard_model = model
+    _hazard_source = "<explicit>"
+
+
+def load_hazard_model(path: Path | None = None) -> Any:
+    """Lazily load the fitted hazard artifact, caching by source path.
+
+    The eval scripts pass `finish_hazard_eval.json` (split-trained) so their
+    numbers stay out-of-sample, and they do so from inside joblib workers,
+    which are separate processes with their own module globals — hence the
+    idempotent path check rather than a one-shot flag.
+
+    A missing or unreadable artifact is not an error: the simulator falls back
+    to the hand-set damage shape, which is what a fresh checkout gets."""
+    global _hazard_model, _hazard_source
+    target = path or HAZARD_ARTIFACT_PATH
+    key = str(target)
+    if _hazard_source == key:
+        return _hazard_model
+    model = None
+    if target.exists():
+        try:
+            from .finish_hazard import FinishHazardModel
+
+            model = FinishHazardModel.load(target)
+        except Exception:  # noqa: BLE001 — never let a bad artifact break serving
+            model = None
+    _hazard_model = model
+    _hazard_source = key
+    return model
 
 # === Calibration guards ======================================================
 # Bayesian shrinkage: blend a fighter's raw finish/durability rate toward the
@@ -247,6 +311,33 @@ def _timing_weights(att_power: float, total_seconds: int) -> np.ndarray:
     return shape / s
 
 
+def _normalize_shape(v: np.ndarray, total_seconds: int) -> np.ndarray:
+    s = float(v.sum())
+    if not s > 0 or not np.isfinite(s):
+        return np.full(total_seconds, 1.0 / max(total_seconds, 1))
+    return v / s
+
+
+def _fitted_timing_shapes(
+    model: Any,
+    att: FighterMC,
+    deff: FighterMC,
+    scheduled_rounds: int,
+    total_seconds: int,
+    is_main_event: bool,
+    is_title_fight: bool,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Per-second (ko_shape, sub_shape) for att finishing def, each summing to
+    1. Normalizing discards the fitted LEVEL on purpose: the per-fight totals
+    still come from the calibrated `_ko_total_loghaz` / `_sub_total_loghaz`, so
+    only the WHEN changes here."""
+    ko, sub = model.predict_rates(
+        att, deff, scheduled_rounds, is_main_event, is_title_fight,
+        total_seconds=total_seconds,
+    )
+    return _normalize_shape(ko, total_seconds), _normalize_shape(sub, total_seconds)
+
+
 def _decision_logit(a: FighterMC, b: FighterMC) -> float:
     """Bradley-Terry-ish logit of A winning the decision. Uses the same
     inputs that real-life judges weight: more sig strikes per minute,
@@ -306,7 +397,14 @@ def simulate_bout(
     scheduled_rounds: int,
     n_simulations: int = 10_000,
     seed: int | None = None,
+    is_main_event: bool = False,
+    is_title_fight: bool = False,
 ) -> MCResult:
+    """`is_main_event` / `is_title_fight` are covariates of the fitted timing
+    model (finish_hazard.py) — a title fight carries a genuinely higher finish
+    hazard once fighter quality is controlled for. They default to False so
+    every existing caller keeps working unchanged; predict.py and custom.py
+    pass the real values."""
     rng = np.random.default_rng(seed)
     total_seconds = scheduled_rounds * SECONDS_PER_ROUND
 
@@ -330,15 +428,28 @@ def simulate_bout(
         H_ko_b *= s
         H_sub_b *= s
 
-    # Accumulated-damage timing: A finishing B is shaped by A's power (how fast A
-    # breaks B down), and vice versa. Each schedule sums to 1, so the totals
-    # above (and thus P(finish)) are unchanged — only the WHEN moves.
-    w_b = _timing_weights(_power(a), total_seconds)  # timing of B being finished
-    w_a = _timing_weights(_power(b), total_seconds)  # timing of A being finished
-    haz_ko_a = H_ko_a * w_b
-    haz_sub_a = H_sub_a * w_b
-    haz_ko_b = H_ko_b * w_a
-    haz_sub_b = H_sub_b * w_a
+    # Timing: each schedule sums to 1, so the totals above (and thus P(finish))
+    # are unchanged — only the WHEN moves. With the fitted hazard artifact
+    # present, KO and submission get SEPARATE shapes per direction; the legacy
+    # fallback is the accumulated-damage curve, one shape per direction shaped
+    # by the attacker's power.
+    hazard = load_hazard_model()
+    if hazard is not None:
+        w_ko_ab, w_sub_ab = _fitted_timing_shapes(
+            hazard, a, b, scheduled_rounds, total_seconds, is_main_event, is_title_fight
+        )
+        w_ko_ba, w_sub_ba = _fitted_timing_shapes(
+            hazard, b, a, scheduled_rounds, total_seconds, is_main_event, is_title_fight
+        )
+    else:
+        w_b = _timing_weights(_power(a), total_seconds)  # timing of B being finished
+        w_a = _timing_weights(_power(b), total_seconds)  # timing of A being finished
+        w_ko_ab = w_sub_ab = w_b
+        w_ko_ba = w_sub_ba = w_a
+    haz_ko_a = H_ko_a * w_ko_ab
+    haz_sub_a = H_sub_a * w_sub_ab
+    haz_ko_b = H_ko_b * w_ko_ba
+    haz_sub_b = H_sub_b * w_sub_ba
 
     # Vectorize across simulations: each sim keeps a "remaining" mask. At each
     # tick draw 4 Bernoullis (KO_a, KO_b, SUB_a, SUB_b) at that tick's hazard.

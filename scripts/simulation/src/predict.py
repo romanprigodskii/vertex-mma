@@ -214,7 +214,17 @@ def predict_upcoming(*, force_version: str | None = None) -> int:
         a = FighterMC.from_snapshot(snap_a)
         b = FighterMC.from_snapshot(snap_b)
         scheduled_rounds = int(row["scheduled_rounds"])
-        mc = simulate_bout(a, b, scheduled_rounds, seed=stable_hash(m.bout_id))
+        mc = simulate_bout(
+            a,
+            b,
+            scheduled_rounds,
+            seed=stable_hash(m.bout_id),
+            # Covariates of the fitted finish-hazard timing model. Both ride on
+            # the upcoming row already (export.build_dataset writes them), so
+            # this needs no extra fetch.
+            is_main_event=bool(row["is_main_event"]),
+            is_title_fight=bool(row["is_title_fight"]),
+        )
         mc_rows.append(
             (
                 m.bout_id,

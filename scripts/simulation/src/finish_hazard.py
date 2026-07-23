@@ -366,6 +366,27 @@ def integrate_outcomes(lam: dict[str, np.ndarray]) -> dict[str, float]:
     }
 
 
+def round_distribution(
+    lam: dict[str, np.ndarray], scheduled_rounds: int
+) -> np.ndarray:
+    """P(finish lands in round r | a finish happens), r = 1..scheduled_rounds.
+
+    This is what `bout_simulation_rounds.prob_finish_round_*` reports and what
+    `src/lib/sportsbook.ts` prices the round markets off, so it is worth
+    grading on its own rather than only through the KO/sub/decision mix."""
+    total = sum(lam.values())
+    surv = np.exp(-np.concatenate([[0.0], np.cumsum(total)[:-1]]))
+    density = surv * total
+    per_round = np.array(
+        [
+            density[r * SECONDS_PER_ROUND:(r + 1) * SECONDS_PER_ROUND].sum()
+            for r in range(scheduled_rounds)
+        ]
+    )
+    s = per_round.sum()
+    return per_round / s if s > 0 else np.full(scheduled_rounds, 1.0 / scheduled_rounds)
+
+
 def fitted_hazard_arrays(
     model: FinishHazardModel, b: BoutSurvival
 ) -> dict[str, np.ndarray]:

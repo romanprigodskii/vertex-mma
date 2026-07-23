@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-23T09:30:09.949424Z",
+  "generated_at": "2026-07-23T09:35:06.285994Z",
   "bin_seconds": 15,
   "skipped": {
     "no_db_row": 0,
@@ -74,7 +74,9 @@
       },
       "cond_method_logloss": 0.8687524891530286,
       "constant_baseline_logloss": 0.984988870017846,
-      "n_conditional": 506
+      "n_conditional": 506,
+      "round_logloss": 1.1126734782954497,
+      "n_finishes": 229
     },
     "val|fitted|current": {
       "segment": "val",
@@ -93,7 +95,9 @@
       },
       "cond_method_logloss": 3.4327924303557045,
       "constant_baseline_logloss": 0.984988870017846,
-      "n_conditional": 506
+      "n_conditional": 506,
+      "round_logloss": 1.1126734782954497,
+      "n_finishes": 229
     },
     "val|current_mc|neutral": {
       "segment": "val",
@@ -112,7 +116,9 @@
       },
       "cond_method_logloss": 0.9729680854817667,
       "constant_baseline_logloss": 0.984988870017846,
-      "n_conditional": 506
+      "n_conditional": 506,
+      "round_logloss": 1.3776414610135452,
+      "n_finishes": 229
     },
     "val|current_mc|current": {
       "segment": "val",
@@ -131,7 +137,9 @@
       },
       "cond_method_logloss": 3.522463608894997,
       "constant_baseline_logloss": 0.984988870017846,
-      "n_conditional": 506
+      "n_conditional": 506,
+      "round_logloss": 1.3776414610135452,
+      "n_finishes": 229
     },
     "test|fitted|neutral": {
       "segment": "test",
@@ -150,7 +158,9 @@
       },
       "cond_method_logloss": 0.9077281316854223,
       "constant_baseline_logloss": 1.0246158969096453,
-      "n_conditional": 797
+      "n_conditional": 797,
+      "round_logloss": 1.021777915896235,
+      "n_finishes": 410
     },
     "test|fitted|current": {
       "segment": "test",
@@ -169,7 +179,9 @@
       },
       "cond_method_logloss": 3.418976172664205,
       "constant_baseline_logloss": 1.0246158969096453,
-      "n_conditional": 797
+      "n_conditional": 797,
+      "round_logloss": 1.021777915896235,
+      "n_finishes": 410
     },
     "test|current_mc|neutral": {
       "segment": "test",
@@ -188,7 +200,9 @@
       },
       "cond_method_logloss": 0.9771051399359022,
       "constant_baseline_logloss": 1.0246158969096453,
-      "n_conditional": 797
+      "n_conditional": 797,
+      "round_logloss": 1.4584925612073236,
+      "n_finishes": 410
     },
     "test|current_mc|current": {
       "segment": "test",
@@ -207,7 +221,9 @@
       },
       "cond_method_logloss": 3.4752413794171537,
       "constant_baseline_logloss": 1.0246158969096453,
-      "n_conditional": 797
+      "n_conditional": 797,
+      "round_logloss": 1.4584925612073236,
+      "n_finishes": 410
     }
   }
 }

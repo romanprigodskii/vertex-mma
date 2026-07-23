@@ -49,6 +49,7 @@ from src.finish_hazard import (  # noqa: E402
     expand_person_periods,
     fitted_hazard_arrays,
     integrate_outcomes,
+    round_distribution,
     survival_loglik,
     time_basis_names,
 )
@@ -275,6 +276,7 @@ def main() -> None:
         subset: list[BoutSurvival], label: str, source: str, dec_split: str
     ) -> dict:
         rows = []
+        round_terms: list[float] = []
         for b in subset:
             lam = (
                 fitted_hazard_arrays(best, b)
@@ -282,6 +284,13 @@ def main() -> None:
                 else current_mc_hazard_arrays(b)
             )
             p = integrate_outcomes(lam)
+            # Round-of-finish log-loss, graded only on bouts that DID finish.
+            # Independent of the method mix and of the decision split — it is
+            # purely a verdict on the timing shape.
+            if b.cause is not None:
+                dist = round_distribution(lam, b.scheduled_rounds)
+                r_idx = min(int(b.end_seconds // SECONDS_PER_ROUND), len(dist) - 1)
+                round_terms.append(-np.log(max(dist[r_idx], 1e-12)))
             if dec_split == "neutral":
                 p_dec_a = 0.5
             else:
@@ -344,6 +353,8 @@ def main() -> None:
             "cond_method_logloss": float(np.mean(cond_terms)) if cond_terms else None,
             "constant_baseline_logloss": float(const_ll),
             "n_conditional": len(cond_terms),
+            "round_logloss": float(np.mean(round_terms)) if round_terms else None,
+            "n_finishes": len(round_terms),
         }
 
     report["grading"] = {
@@ -436,6 +447,20 @@ def main() -> None:
                 f"{gf['constant_baseline_logloss']:.4f}",
             )
     console.print(cm)
+
+    rl = Table(title="Round-of-finish log-loss (finishes only — pure timing verdict)")
+    rl.add_column("Split")
+    rl.add_column("N finishes", justify="right")
+    rl.add_column("fitted", justify="right")
+    rl.add_column("current MC", justify="right")
+    for k in ("val", "test"):
+        gf = report["grading"][f"{k}|fitted|neutral"]
+        gc = report["grading"][f"{k}|current_mc|neutral"]
+        rl.add_row(
+            k, f"{gf['n_finishes']:,}",
+            f"{gf['round_logloss']:.4f}", f"{gc['round_logloss']:.4f}",
+        )
+    console.print(rl)
 
     c = Table(title="Coefficients (standardized covariates)")
     c.add_column("Term")
