@@ -1,0 +1,129 @@
+{
+  "generated_at": "2026-07-23T09:17:02.502544Z",
+  "min_year": null,
+  "n_bout_rounds_total": 20604,
+  "n_judged_rounds": 10472,
+  "n_tied_dropped": 41,
+  "n_split_rounds": 2237,
+  "baselines": {
+    "bout_winner_baseline": {
+      "n": 10336,
+      "accuracy": 0.8185952012383901
+    },
+    "hand_rule": {
+      "all_judged": {
+        "n": 10472,
+        "accuracy": 0.8276355996944232
+      },
+      "split_rounds": {
+        "n": 2237,
+        "accuracy": 0.605274921770228
+      }
+    },
+    "always_a": {
+      "n": 10472,
+      "accuracy": 0.8128342245989305
+    }
+  },
+  "scorer": {
+    "base_rate": 0.5,
+    "n_rounds": 10472,
+    "groupkfold": [
+      {
+        "segment": "all judged rounds",
+        "n": 10472,
+        "accuracy": 0.8430099312452254,
+        "accuracy_se": 0.0035549837388937876,
+        "log_loss": 0.3535755594951176
+      },
+      {
+        "segment": "unanimous rounds",
+        "n": 8235,
+        "accuracy": 0.9022465088038859,
+        "accuracy_se": 0.0032726302606188675,
+        "log_loss": 0.24757288246481424
+      },
+      {
+        "segment": "split rounds (judges disagree)",
+        "n": 2237,
+        "accuracy": 0.6249441215914171,
+        "accuracy_se": 0.010236125218571566,
+        "log_loss": 0.7437999874542363
+      },
+      {
+        "segment": "10-8 rounds",
+        "n": 326,
+        "accuracy": 0.9877300613496932,
+        "accuracy_se": 0.006097215309226746,
+        "log_loss": 0.03844268369469429
+      }
+    ],
+    "temporal_holdout": {
+      "train_before": "2024-01-01",
+      "test_from": "2025-01-01",
+      "n_train_rounds": 8401,
+      "n_test_rounds": 1190,
+      "accuracy": 0.8369747899159664,
+      "accuracy_se": 0.01070804264458389,
+      "split_round_accuracy": 0.6313559322033898,
+      "n_split_rounds": 236
+    },
+    "top_features": [
+      {
+        "feature": "d_total_str_landed",
+        "gain_share": 0.282620834060841
+      },
+      {
+        "feature": "d_sig_str_landed",
+        "gain_share": 0.2131879206757464
+      },
+      {
+        "feature": "d_control_time_seconds",
+        "gain_share": 0.15147184464081676
+      },
+      {
+        "feature": "d_sig_str_head_landed",
+        "gain_share": 0.06211731826531288
+      },
+      {
+        "feature": "d_takedowns_landed",
+        "gain_share": 0.031377973308413326
+      },
+      {
+        "feature": "d_sig_str_acc",
+        "gain_share": 0.020589436647394387
+      },
+      {
+        "feature": "d_head_share",
+        "gain_share": 0.020252414984006577
+      },
+      {
+        "feature": "d_total_str_acc",
+        "gain_share": 0.02011075431814516
+      },
+      {
+        "feature": "d_sub_attempts",
+        "gain_share": 0.019276064070701968
+      },
+      {
+        "feature": "d_knockdowns",
+        "gain_share": 0.018478483312163934
+      },
+      {
+        "feature": "d_sig_str_ground_landed",
+        "gain_share": 0.018132653611170325
+      },
+      {
+        "feature": "d_total_str_attempted",
+        "gain_share": 0.015158632598810918
+      }
+    ]
+  },
+  "gate": {
+    "threshold_accuracy": 0.86,
+    "scorer_accuracy": 0.8430099312452254,
+    "scorer_split_accuracy": 0.6249441215914171,
+    "hand_rule_split_accuracy": 0.605274921770228,
+    "passed": false
+  }
+}

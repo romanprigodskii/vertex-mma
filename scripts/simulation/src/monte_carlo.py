@@ -13,18 +13,29 @@ bouts rack up finishes purely on tick count):
   number of scheduled rounds — so P(finish) ≈ 1 − exp(−H) no longer balloons for
   5-round bouts (a small, non-proportional championship-round bonus is the only
   length effect). This is the core fix for "5-rounders over-finish 3-rounders".
-* That total hazard is distributed across the fight by an ACCUMULATED-DAMAGE
-  timing shape: per-second finish weight rises as (floor + τ^γ) with τ the
-  fraction of the fight elapsed, so finishes cluster in the later rounds as
-  damage piles up, instead of front-loading. A within-round ramp adds the
-  end-of-round push, and a power tilt shifts a heavy hitter's finishes earlier
-  (flash-KO capable) vs a point-fighter's later.
+* That total hazard is distributed across the fight by a FITTED timing shape
+  (src/finish_hazard.py, artifacts/finish_hazard.json): cause-specific KO and
+  submission hazards estimated by Poisson regression with exposure on a
+  discrete-time person-period expansion, so KO and submission get separate
+  time curves and the within-round ramp is measured rather than assumed.
+  The old ACCUMULATED-DAMAGE shape (per-second weight rising as floor + τ^γ,
+  clustering finishes LATE) remains as the no-artifact fallback, and it was
+  backwards: empirically 54% of finishes in 3-round bouts land in round 1 and
+  15% in round 3, while that shape produced 17% / 49%. Held-out
+  round-of-finish log-loss 1.02 fitted vs 1.46 for the damage curve.
+* The decision winner among survivors comes from a FITTED logistic model
+  (src/decision_model.py, artifacts/decision_winner.json) on A−B differences
+  of the pre-fight career fields, with no intercept so it is exactly
+  antisymmetric. The hand-weighted `_decision_logit` it replaces scored a
+  held-out log-loss of 4.22 against 0.69 for a coin flip; it is the
+  no-artifact fallback.
 * A per-fight finish CAP bounds P(any finish) so a puncher-vs-weak-chin bout
   can't asymptote toward a near-certain finish.
 * Career rates are still SHRUNK toward roster means (tiny denominators), lift
-  multipliers CLAMPED, and the final KO/sub/decision mix lightly ANCHORED toward
-  real UFC base rates — but the per-fight scales now do most of the calibration,
-  so the anchor is only a tail safety net.
+  multipliers CLAMPED, and the final KO/sub/decision mix ANCHORED toward real
+  UFC base rates — but with both fitted models in place the anchor weight
+  dropped from 0.80 to 0.40, because the per-fight mix now beats the base
+  rates on its own instead of needing to be mostly replaced by them.
 
 Still simplified vs reality (noted, not modelled): explicit per-strike damage
 state, takedown→ground position chains, true sub-from-grappling timing distinct
@@ -35,9 +46,12 @@ from KO timing. The hazard shape is a deterministic function of the fighters
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import numpy as np
+
+from .config import ARTIFACTS_DIR
 
 # Roster-mean fallbacks for missing per-fighter stats. Loosely calibrated
 # against the dataset; precise values matter less than having a sensible
@@ -98,8 +112,127 @@ ROUND_RAMP = 0.55
 POWER_TILT = 0.35
 POWER_MIN, POWER_MAX = 0.6, 1.6
 
-# Decision-time scoring softness.
+# Decision-time scoring softness. Applies to the LEGACY hand-set
+# `_decision_logit` only; the fitted model (decision_winner.json) carries its
+# own swept temperature. Kept at 0.45 so a checkout without the artifact
+# behaves exactly as before.
+#
+# For the record, because it is the largest single defect the round lab found:
+# on 387 held-out decisions the hand-set logit at this temperature scores a
+# log-loss of 4.2238 against 0.6931 for a coin flip and 0.6496 for the fitted
+# model, and prices 88.6% of decisions outside [0.05, 0.95]. A weight of 0.80
+# on a control_per_min difference, divided by a temperature of 0.45, is a 1.8x
+# multiplier on a quantity that routinely differs by more than 1.0 between two
+# fighters. METHOD_ANCHOR_LAMBDA=0.80 exists to absorb this.
 DECISION_TEMPERATURE = 0.45
+
+# === Fitted decision-winner model (round lab, Stage 2) =======================
+DECISION_ARTIFACT_PATH = ARTIFACTS_DIR / "decision_winner.json"
+
+# Sentinel stored in the *_source globals by set_*_model(). load_*_model()
+# must treat it as "an override is in force" and return the cached value
+# untouched; comparing it against a path (which it never equals) silently
+# reloaded from disk and threw the override away — which meant
+# eval_method_market.py --legacy was measuring the fitted models against
+# themselves.
+_EXPLICIT = "<explicit>"
+
+_decision_model: Any = None
+_decision_source: str | None = None
+
+
+def set_decision_model(model: Any) -> None:
+    """Override the decision-winner model (None forces the legacy logit)."""
+    global _decision_model, _decision_source
+    _decision_model = model
+    _decision_source = _EXPLICIT
+
+
+def load_decision_model(path: Path | None = None) -> Any:
+    """Lazily load the fitted decision-winner artifact, cached by source path.
+    Same joblib-worker reasoning as `load_hazard_model`. A missing artifact
+    falls back to the legacy hand-set logit."""
+    global _decision_model, _decision_source
+    if _decision_source == _EXPLICIT:
+        return _decision_model
+    target = path or DECISION_ARTIFACT_PATH
+    key = str(target)
+    if _decision_source == key:
+        return _decision_model
+    model = None
+    if target.exists():
+        try:
+            from .decision_model import DecisionWinnerModel
+
+            model = DecisionWinnerModel.load(target)
+        except Exception:  # noqa: BLE001 — never let a bad artifact break serving
+            model = None
+    _decision_model = model
+    _decision_source = key
+    return model
+
+# === Fitted finish-hazard timing (round lab, Stage 1) ========================
+# When `artifacts/finish_hazard.json` is present the WHEN of a finish comes
+# from the fitted cause-specific hazards in src/finish_hazard.py instead of the
+# DAMAGE_GAMMA / DAMAGE_FLOOR / ROUND_RAMP / POWER_TILT shape above. Two things
+# the hand shape structurally could not express, both measured in the fit:
+#
+#   * KO and submission have DIFFERENT time shapes. `_timing_weights` produces
+#     one curve per direction and applies it to both causes.
+#   * The within-round ramp is +0.11 in log-hazard — about an 11% rise across a
+#     round, where ROUND_RAMP=0.55 asserts 55%.
+#
+# The hand-set constants below stay module-level floats and stay live as the
+# fallback path: they are what runs on a checkout with no artifact, and
+# calibrate_method_mix.py monkey-patches KO_TOTAL_SCALE / SUB_TOTAL_SCALE /
+# METHOD_ANCHOR_LAMBDA by module attribute, which only works while they are
+# plain module-level floats read at call time.
+#
+# This wires the SHAPE only. The per-fight TOTALS still come from
+# _ko_total_loghaz / _sub_total_loghaz, so the marginal KO/sub/decision mix
+# this run produces is unchanged by construction and the existing calibration
+# of those scales is not invalidated.
+HAZARD_ARTIFACT_PATH = ARTIFACTS_DIR / "finish_hazard.json"
+_hazard_model: Any = None
+_hazard_source: str | None = None  # None = nothing loaded yet
+
+
+def set_hazard_model(model: Any) -> None:
+    """Override the timing model (or clear it with None to force the legacy
+    hand-set shape)."""
+    global _hazard_model, _hazard_source
+    _hazard_model = model
+    _hazard_source = _EXPLICIT
+
+
+def load_hazard_model(path: Path | None = None) -> Any:
+    """Lazily load the fitted hazard artifact, caching by source path.
+
+    The eval scripts pass `finish_hazard_eval.json` (split-trained) so their
+    numbers stay out-of-sample, and they do so from inside joblib workers,
+    which are separate processes with their own module globals — hence the
+    idempotent path check rather than a one-shot flag.
+
+    A missing or unreadable artifact is not an error: the simulator falls back
+    to the hand-set damage shape, which is what a fresh checkout gets."""
+    global _hazard_model, _hazard_source
+    if _hazard_source == _EXPLICIT:
+        return _hazard_model
+    target = path or HAZARD_ARTIFACT_PATH
+    key = str(target)
+    if _hazard_source == key:
+        return _hazard_model
+    model = None
+    if target.exists():
+        try:
+            from .finish_hazard import FinishHazardModel
+
+            model = FinishHazardModel.load(target)
+        except Exception:  # noqa: BLE001 — never let a bad artifact break serving
+            model = None
+    _hazard_model = model
+    _hazard_source = key
+    return model
 
 # === Calibration guards ======================================================
 # Bayesian shrinkage: blend a fighter's raw finish/durability rate toward the
@@ -110,21 +243,43 @@ SHRINK_PSEUDO_COUNTS = 4.0
 # Method-mix anchor toward UFC base rates — preserves each fighter's win
 # prob, only reshapes how they win (0 = raw, 1 = pure base).
 #
-# Calibrated 2026-07-10 (scripts/calibrate_method_mix.py, 1,646 bouts
-# 2021-01-01..2024-12-31, strictly pre-test): the raw per-fight conditional
-# mix "method | this fighter wins" was far too finish-heavy — cond
-# log-loss 1.38 vs 1.018 for a CONSTANT base-rate predictor. The lambda
-# sweep has an interior optimum at 0.80 (1.0119): the per-fight mix
-# carries real but SMALL signal (~20% weight), the rest is noise the old
-# 0.08 let straight through — that's why the method-market backtest
-# (eval_method_market.py) saw KO predicted 38.7% vs 31.0% actual. Hazard
-# scales were re-validated in the same sweep: (1.0, 1.0) multipliers stay
-# best for the marginals, do NOT compensate here. Base rates below are the
-# measured modern-era mix (31.2/18.2/50.6), not the folklore 33/17/50.
+# Base rates are the measured modern-era mix (31.2/18.2/50.6), not the
+# folklore 33/17/50.
+#
+# Calibrated 2026-07-10 at 0.80 (1,646 bouts 2021-01-01..2024-12-31): the raw
+# per-fight mix scored a conditional log-loss of 1.38 against 1.018 for a
+# CONSTANT base-rate predictor, so 80% of the per-fight signal had to be
+# thrown away to beat the base rates at all.
+#
+# RE-SWEPT 2026-07-23 to 0.40, after the round lab replaced the finish timing
+# (finish_hazard.py) and the decision-winner split (decision_model.py) with
+# fitted models. The anchor was mostly compensating for the hand-set decision
+# logit, which scored 4.22 on held-out decisions against 0.69 for a coin flip.
+# With that fixed the raw mix stands on its own: at lambda=0 the conditional
+# log-loss is 0.9993 vs 1.0183 for the constant predictor, where before it was
+# 4.1236.
+#
+# Two windows, both agreeing on 0.40:
+#   2021-01-01..2024-12-31, n=1,646 — 1.0103 (old) -> 0.9799 at 0.40
+#   2024-01-01..2024-12-31, n=428, STRICTLY out-of-sample for both fitted
+#     models (train cut = TRAIN_END) — 0.9613 at 0.80 -> 0.9456 at 0.40,
+#     constant 0.9769
+# The curve is flat between 0.35 and 0.45 (0.9800 / 0.9799 / 0.9802), so 0.40
+# is an interior optimum rather than a boundary artefact. Hazard scale
+# multipliers stay at (1.0, 1.0); do NOT compensate here.
 METHOD_BASE_KO = 0.31
 METHOD_BASE_SUB = 0.18
 METHOD_BASE_DEC = 0.51
-METHOD_ANCHOR_LAMBDA = 0.80
+METHOD_ANCHOR_LAMBDA = 0.40
+
+# The 0.40 above is only valid WITH the fitted decision model. 0.80 was
+# calibrated against the hand-set `_decision_logit`, and that logit is still
+# what runs on the fallback path, so a checkout (or a deploy) whose artifacts
+# fail to load must keep the anchor that was swept for it. Serving 0.40 on top
+# of a 4.22-log-loss decision split pushes the losing side's decision cell far
+# enough to hit the MAX_ODDS ceiling in sportsbook.ts — a standing +EV line.
+# `_anchor_methods` selects between the two at call time.
+LEGACY_ANCHOR_LAMBDA = 0.80
 
 # Neutral anchors used by the lift formulas (lift = 1.0 at these values).
 _KO_OFF_ANCHOR = 0.35
@@ -247,6 +402,33 @@ def _timing_weights(att_power: float, total_seconds: int) -> np.ndarray:
     return shape / s
 
 
+def _normalize_shape(v: np.ndarray, total_seconds: int) -> np.ndarray:
+    s = float(v.sum())
+    if not s > 0 or not np.isfinite(s):
+        return np.full(total_seconds, 1.0 / max(total_seconds, 1))
+    return v / s
+
+
+def _fitted_timing_shapes(
+    model: Any,
+    att: FighterMC,
+    deff: FighterMC,
+    scheduled_rounds: int,
+    total_seconds: int,
+    is_main_event: bool,
+    is_title_fight: bool,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Per-second (ko_shape, sub_shape) for att finishing def, each summing to
+    1. Normalizing discards the fitted LEVEL on purpose: the per-fight totals
+    still come from the calibrated `_ko_total_loghaz` / `_sub_total_loghaz`, so
+    only the WHEN changes here."""
+    ko, sub = model.predict_rates(
+        att, deff, scheduled_rounds, is_main_event, is_title_fight,
+        total_seconds=total_seconds,
+    )
+    return _normalize_shape(ko, total_seconds), _normalize_shape(sub, total_seconds)
+
+
 def _decision_logit(a: FighterMC, b: FighterMC) -> float:
     """Bradley-Terry-ish logit of A winning the decision. Uses the same
     inputs that real-life judges weight: more sig strikes per minute,
@@ -280,10 +462,16 @@ def _anchor_methods(
     ko_a: float, ko_b: float, sub_a: float, sub_b: float, dec_a: float, dec_b: float
 ) -> tuple[float, float, float, float, float, float]:
     """Blend each fighter's CONDITIONAL method mix (method given THIS fighter
-    wins) toward the UFC base rate (METHOD_BASE_*) with weight
-    METHOD_ANCHOR_LAMBDA. Preserves P(each fighter wins) exactly — only how
-    they win is reshaped. Returns (ko_a, ko_b, sub_a, sub_b, dec_a, dec_b)."""
-    lam = METHOD_ANCHOR_LAMBDA
+    wins) toward the UFC base rate (METHOD_BASE_*). Preserves P(each fighter
+    wins) exactly — only how they win is reshaped. Returns
+    (ko_a, ko_b, sub_a, sub_b, dec_a, dec_b).
+
+    The weight depends on which decision split produced the mix:
+    METHOD_ANCHOR_LAMBDA (0.40) was swept against the fitted model,
+    LEGACY_ANCHOR_LAMBDA (0.80) against the hand-set logit. Reading the
+    globals here rather than at import time is also what keeps
+    calibrate_method_mix.py's monkey-patching working."""
+    lam = METHOD_ANCHOR_LAMBDA if load_decision_model() is not None else LEGACY_ANCHOR_LAMBDA
 
     def anchor_side(ko: float, sub: float, dec: float) -> tuple[float, float, float]:
         win = ko + sub + dec
@@ -306,7 +494,26 @@ def simulate_bout(
     scheduled_rounds: int,
     n_simulations: int = 10_000,
     seed: int | None = None,
+    is_main_event: bool = False,
+    is_title_fight: bool = False,
 ) -> MCResult:
+    """`is_main_event` / `is_title_fight` are covariates of the fitted timing
+    model (finish_hazard.py). They default to False so every existing caller
+    keeps working unchanged; predict.py and custom.py pass the real values.
+
+    Be clear about what they do at SERVE time, because it is not what the fit
+    suggests: every covariate in the hazard model is time-CONSTANT, so it
+    contributes a constant factor to exp(eta), and `_normalize_shape` divides
+    that factor straight back out. The served timing is therefore two fixed
+    curves per scheduled length (one KO, one submission), identical for every
+    bout on the card; the only per-bout variation in WHEN a finish lands comes
+    from how those two curves get mixed by the per-fight KO/sub totals, which
+    still come from `_ko_total_loghaz` / `_sub_total_loghaz`.
+
+    The parameters are kept rather than dropped because they are threaded
+    correctly and would start to bite the moment the fit gains a
+    time-interacted term (e.g. covariate x round index). Anyone adding one
+    should re-verify against this note rather than assume they already work."""
     rng = np.random.default_rng(seed)
     total_seconds = scheduled_rounds * SECONDS_PER_ROUND
 
@@ -330,15 +537,28 @@ def simulate_bout(
         H_ko_b *= s
         H_sub_b *= s
 
-    # Accumulated-damage timing: A finishing B is shaped by A's power (how fast A
-    # breaks B down), and vice versa. Each schedule sums to 1, so the totals
-    # above (and thus P(finish)) are unchanged — only the WHEN moves.
-    w_b = _timing_weights(_power(a), total_seconds)  # timing of B being finished
-    w_a = _timing_weights(_power(b), total_seconds)  # timing of A being finished
-    haz_ko_a = H_ko_a * w_b
-    haz_sub_a = H_sub_a * w_b
-    haz_ko_b = H_ko_b * w_a
-    haz_sub_b = H_sub_b * w_a
+    # Timing: each schedule sums to 1, so the totals above (and thus P(finish))
+    # are unchanged — only the WHEN moves. With the fitted hazard artifact
+    # present, KO and submission get SEPARATE shapes per direction; the legacy
+    # fallback is the accumulated-damage curve, one shape per direction shaped
+    # by the attacker's power.
+    hazard = load_hazard_model()
+    if hazard is not None:
+        w_ko_ab, w_sub_ab = _fitted_timing_shapes(
+            hazard, a, b, scheduled_rounds, total_seconds, is_main_event, is_title_fight
+        )
+        w_ko_ba, w_sub_ba = _fitted_timing_shapes(
+            hazard, b, a, scheduled_rounds, total_seconds, is_main_event, is_title_fight
+        )
+    else:
+        w_b = _timing_weights(_power(a), total_seconds)  # timing of B being finished
+        w_a = _timing_weights(_power(b), total_seconds)  # timing of A being finished
+        w_ko_ab = w_sub_ab = w_b
+        w_ko_ba = w_sub_ba = w_a
+    haz_ko_a = H_ko_a * w_ko_ab
+    haz_sub_a = H_sub_a * w_sub_ab
+    haz_ko_b = H_ko_b * w_ko_ba
+    haz_sub_b = H_sub_b * w_sub_ba
 
     # Vectorize across simulations: each sim keeps a "remaining" mask. At each
     # tick draw 4 Bernoullis (KO_a, KO_b, SUB_a, SUB_b) at that tick's hazard.
@@ -386,11 +606,16 @@ def simulate_bout(
     # because real judging is noisy.
     survivors = np.where(remaining)[0]
     if survivors.size > 0:
-        logit = _decision_logit(a, b)
-        # Bradley-Terry: P(A wins) = sigmoid(logit / temperature). Per-sim
-        # noise added so each survivor is an independent coin flip with
-        # the same mean.
-        p_a_wins = 1.0 / (1.0 + np.exp(-(logit / DECISION_TEMPERATURE)))
+        # Fitted decision-winner model when its artifact is present, else the
+        # legacy hand-set logit. Both are Bradley-Terry:
+        # P(A wins) = sigmoid(logit / temperature). Per-sim noise is added so
+        # each survivor is an independent coin flip with the same mean.
+        decision_model = load_decision_model()
+        if decision_model is not None:
+            p_a_wins = decision_model.prob_a(a, b)
+        else:
+            logit = _decision_logit(a, b)
+            p_a_wins = 1.0 / (1.0 + np.exp(-(logit / DECISION_TEMPERATURE)))
         draws = rng.random(survivors.size)
         for local, sim_i in enumerate(survivors):
             finish_method[sim_i] = "dec_a" if draws[local] < p_a_wins else "dec_b"

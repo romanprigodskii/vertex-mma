@@ -424,6 +424,12 @@ def score_pair(
         FighterMC.from_snapshot(b.snapshot),
         5,
         seed=stable_hash(sim_id),
+        # Dream fights are framed as 5-round main events (see the row built
+        # above, which sets is_main_event=True / is_title_fight=False); the
+        # fitted timing model takes both as covariates, so keep them in sync
+        # with that row rather than letting them default.
+        is_main_event=True,
+        is_title_fight=False,
     )
 
     def side_payload(s: FormSnapshot) -> dict[str, Any]:

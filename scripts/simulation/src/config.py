@@ -15,7 +15,7 @@ DATA_DIR.mkdir(exist_ok=True)
 # Bumped on every retrain. Stored alongside each prediction so the UI can
 # distinguish "made by old model" vs "fresh prediction" and a future
 # version can do clean side-by-side comparison.
-MODEL_VERSION = "v0.10.0"
+MODEL_VERSION = "v0.11.0"
 
 # Temporal split anchors. Bouts strictly before TRAIN_END go into training,
 # bouts in [TRAIN_END, VAL_END) into validation (used for early-stopping

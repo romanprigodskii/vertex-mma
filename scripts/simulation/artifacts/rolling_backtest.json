@@ -1,0 +1,221 @@
+{
+  "generated_at": "2026-07-23T09:15:29.515473Z",
+  "model_version": "v0.10.0",
+  "window": {
+    "start": "2025-07-01",
+    "end": "2026-07-01",
+    "step_months": 3,
+    "val_months": 12
+  },
+  "scoring": "order-invariant: 0.5*(p(A,B) + 1 - p(B,A))",
+  "overall": {
+    "main": {
+      "n": 417,
+      "accuracy": 0.6474820143884892,
+      "log_loss": 0.6217889567753805,
+      "brier": 0.21581098606618745,
+      "roc_auc": 0.7167864381794731,
+      "market_accuracy": 0.6928934010152284,
+      "market_log_loss": 0.5927926122005973,
+      "market_brier": 0.20397757334968114,
+      "market_n": 394,
+      "model_accuracy_on_market": 0.649746192893401,
+      "model_log_loss_on_market": 0.6183102679113709,
+      "model_brier_on_market": 0.21424003325061441,
+      "accuracy_se": 0.023395722796281885,
+      "market_accuracy_se": 0.023239654968562094,
+      "model_accuracy_on_market_se": 0.02403339880577004,
+      "raw_order_diagnostic": {
+        "accuracy": 0.6546762589928058,
+        "log_loss": 0.6291980663423571,
+        "roc_auc": 0.7008015478164732,
+        "picks_differing_from_order_invariant": 35
+      }
+    },
+    "debut": {
+      "n": 94,
+      "accuracy": 0.6170212765957447,
+      "log_loss": 0.6534017658326109,
+      "brier": 0.23050739051029356,
+      "roc_auc": 0.6520938794293604,
+      "market_accuracy": 0.7261904761904762,
+      "market_log_loss": 0.5377830206162337,
+      "market_brier": 0.1799256952546761,
+      "market_n": 84,
+      "model_accuracy_on_market": 0.6309523809523809,
+      "model_log_loss_on_market": 0.641198812338055,
+      "model_brier_on_market": 0.2247475602230369,
+      "accuracy_se": 0.050138745881325664,
+      "market_accuracy_se": 0.048653031579886166,
+      "model_accuracy_on_market_se": 0.052650179071158244,
+      "raw_order_diagnostic": {
+        "accuracy": 0.5957446808510638,
+        "log_loss": 0.6630260960452874,
+        "roc_auc": 0.6369075011504832,
+        "picks_differing_from_order_invariant": 4
+      }
+    }
+  },
+  "per_origin": [
+    {
+      "origin": "2025-07-01",
+      "score_window": [
+        "2025-07-01",
+        "2025-10-01"
+      ],
+      "train_end": "2024-07-01",
+      "n_train": 7588,
+      "n_val": 503,
+      "segments": {
+        "main": {
+          "n": 106,
+          "accuracy": 0.6886792452830188,
+          "log_loss": 0.6153655154521994,
+          "brier": 0.21258954466213945,
+          "roc_auc": 0.7329768270944741,
+          "market_accuracy": 0.6344086021505376,
+          "market_log_loss": 0.6087314602802989,
+          "market_brier": 0.21243014071979166,
+          "market_n": 93,
+          "model_accuracy_on_market": 0.6989247311827957,
+          "model_log_loss_on_market": 0.5978934609307142,
+          "model_brier_on_market": 0.20468835762766568
+        },
+        "debut": {
+          "n": 20,
+          "accuracy": 0.6,
+          "log_loss": 0.6304158152843262,
+          "brier": 0.22002267489080468,
+          "roc_auc": 0.7395833333333334,
+          "market_accuracy": 0.5882352941176471,
+          "market_log_loss": 0.6506199733429813,
+          "market_brier": 0.23132916906433293,
+          "market_n": 17,
+          "model_accuracy_on_market": 0.5882352941176471,
+          "model_log_loss_on_market": 0.6332318296334362,
+          "model_brier_on_market": 0.22139748062012682
+        }
+      }
+    },
+    {
+      "origin": "2025-10-01",
+      "score_window": [
+        "2025-10-01",
+        "2026-01-01"
+      ],
+      "train_end": "2024-10-01",
+      "n_train": 7706,
+      "n_val": 511,
+      "segments": {
+        "main": {
+          "n": 106,
+          "accuracy": 0.6415094339622641,
+          "log_loss": 0.6200564774379297,
+          "brier": 0.2153394560506941,
+          "roc_auc": 0.7205459770114943,
+          "market_accuracy": 0.7128712871287128,
+          "market_log_loss": 0.5958042096470396,
+          "market_brier": 0.2047629685831704,
+          "market_n": 101,
+          "model_accuracy_on_market": 0.6336633663366337,
+          "model_log_loss_on_market": 0.6238407143486923,
+          "model_brier_on_market": 0.21723362262426663
+        },
+        "debut": {
+          "n": 22,
+          "accuracy": 0.6363636363636364,
+          "log_loss": 0.6429606026970759,
+          "brier": 0.2263162816589503,
+          "roc_auc": 0.6446280991735538,
+          "market_accuracy": 0.8095238095238095,
+          "market_log_loss": 0.5300379790660515,
+          "market_brier": 0.1752003511687587,
+          "market_n": 21,
+          "model_accuracy_on_market": 0.6190476190476191,
+          "model_log_loss_on_market": 0.6518759435329703,
+          "model_brier_on_market": 0.23071368045415958
+        }
+      }
+    },
+    {
+      "origin": "2026-01-01",
+      "score_window": [
+        "2026-01-01",
+        "2026-04-01"
+      ],
+      "train_end": "2025-01-01",
+      "n_train": 7830,
+      "n_val": 515,
+      "segments": {
+        "main": {
+          "n": 89,
+          "accuracy": 0.6741573033707865,
+          "log_loss": 0.5900851510971326,
+          "brier": 0.20085503073296443,
+          "roc_auc": 0.7707070707070707,
+          "market_accuracy": 0.7471264367816092,
+          "market_log_loss": 0.5253083107212833,
+          "market_brier": 0.17427453971515702,
+          "market_n": 87,
+          "model_accuracy_on_market": 0.6781609195402298,
+          "model_log_loss_on_market": 0.5882872093366621,
+          "model_brier_on_market": 0.19995523872053628
+        },
+        "debut": {
+          "n": 25,
+          "accuracy": 0.68,
+          "log_loss": 0.6086022576720219,
+          "brier": 0.20953712179129816,
+          "roc_auc": 0.7794117647058825,
+          "market_accuracy": 0.7727272727272727,
+          "market_log_loss": 0.4778223710176357,
+          "market_brier": 0.15372621877222395,
+          "market_n": 22,
+          "model_accuracy_on_market": 0.6818181818181818,
+          "model_log_loss_on_market": 0.5971424071874858,
+          "model_brier_on_market": 0.20405416973305102
+        }
+      }
+    },
+    {
+      "origin": "2026-04-01",
+      "score_window": [
+        "2026-04-01",
+        "2026-07-01"
+      ],
+      "train_end": "2025-04-01",
+      "n_train": 7961,
+      "n_val": 498,
+      "segments": {
+        "main": {
+          "n": 116,
+          "accuracy": 0.5948275862068966,
+          "log_loss": 0.6535662524253032,
+          "brier": 0.23066042567936187,
+          "roc_auc": 0.6617122473246134,
+          "market_accuracy": 0.6814159292035398,
+          "market_log_loss": 0.6289399574678312,
+          "market_brier": 0.21918775248420233,
+          "market_n": 113,
+          "model_accuracy_on_market": 0.6017699115044248,
+          "model_log_loss_on_market": 0.6532854365399664,
+          "model_brier_on_market": 0.23042348838612026
+        },
+        "debut": {
+          "n": 27,
+          "accuracy": 0.5555555555555556,
+          "log_loss": 0.720417036349729,
+          "brier": 0.2611057395878571,
+          "roc_auc": 0.5705882352941176,
+          "market_accuracy": 0.7083333333333334,
+          "market_log_loss": 0.5195976859232448,
+          "market_brier": 0.17166576415692802,
+          "market_n": 24,
+          "model_accuracy_on_market": 0.625,
+          "model_log_loss_on_market": 0.6778846400129647,
+          "model_brier_on_market": 0.24086911935535285
+        }
+      }
+    }
+  ]
+}

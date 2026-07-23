@@ -1,0 +1,44 @@
+{
+  "generated_at": "2026-07-23T09:19:22.039535Z",
+  "n_bouts_with_judged_share": 3283,
+  "target_variance": 0.1355102808319937,
+  "aggregate_coverage": 0.746407046824293,
+  "variants": {
+    "rating diffs only (8 cols)": {
+      "n_features": 8,
+      "cv_r2": 0.0769917360454101,
+      "residual_variance": 0.12507710905873745
+    },
+    "round aggregate only (3 cols)": {
+      "n_features": 3,
+      "cv_r2": 0.05288841715145576,
+      "residual_variance": 0.12834335657104032
+    },
+    "production features (118 cols)": {
+      "n_features": 118,
+      "cv_r2": 0.11684959417538199,
+      "residual_variance": 0.1196759595101832
+    },
+    "production + round aggregate": {
+      "n_features": 121,
+      "cv_r2": 0.1173477523718105,
+      "residual_variance": 0.1196084539530864
+    },
+    "production MINUS rating diffs": {
+      "n_features": 110,
+      "cv_r2": 0.10473672296286529,
+      "residual_variance": 0.12131737808987311
+    },
+    "production MINUS rating diffs + round aggregate": {
+      "n_features": 113,
+      "cv_r2": 0.1094682868809913,
+      "residual_variance": 0.12067620253455333
+    }
+  },
+  "gate": {
+    "threshold_delta_r2": 0.02,
+    "delta_r2_over_production": 0.0004981581964285109,
+    "delta_r2_without_rating_diffs": 0.004731563918126014,
+    "passed": false
+  }
+}

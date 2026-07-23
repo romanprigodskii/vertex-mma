@@ -38,6 +38,7 @@ Usage (from scripts/simulation, venv active):
 
 from __future__ import annotations
 
+import argparse
 import sys
 from pathlib import Path
 
@@ -48,6 +49,7 @@ if str(PACKAGE_ROOT) not in sys.path:
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
+import src.monte_carlo as _mc  # noqa: E402
 from src.config import ARTIFACTS_DIR, VAL_END  # noqa: E402
 from src.db import get_connection  # noqa: E402
 from src.ensemble import EnsembleModel  # noqa: E402
@@ -63,6 +65,16 @@ from src.monte_carlo import FighterMC, simulate_bout  # noqa: E402
 
 _EVAL_DIR = ARTIFACTS_DIR / "ensemble_eval"
 ENSEMBLE_DIR = _EVAL_DIR if _EVAL_DIR.exists() else ARTIFACTS_DIR / "ensemble"
+
+# The MC's finish timing and decision-winner split are fitted artifacts. Load
+# the SPLIT-TRAINED twins (train < TRAIN_END) rather than the served all-data
+# ones, so this backtest stays out-of-sample on every moving part, not just the
+# ensemble weights.
+_HAZARD_EVAL_PATH = ARTIFACTS_DIR / "finish_hazard_eval.json"
+_DECISION_EVAL_PATH = ARTIFACTS_DIR / "decision_winner_eval.json"
+# What METHOD_ANCHOR_LAMBDA was before the round lab re-swept it, so --legacy
+# reproduces the whole pre-lab configuration and not just part of it.
+LEGACY_ANCHOR_LAMBDA = 0.80
 
 MAX_MARKET_EDGE = 0.15  # keep in sync with src/lib/sportsbook.ts
 CELLS = ["a_ko", "a_sub", "a_dec", "b_ko", "b_sub", "b_dec"]
@@ -206,12 +218,44 @@ def run_roi(
 
 
 def main() -> None:
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument(
+        "--legacy",
+        action="store_true",
+        help="force the pre-round-lab Monte Carlo: hand-set damage timing, "
+             "hand-weighted decision logit, METHOD_ANCHOR_LAMBDA=0.80. Use to "
+             "measure the fitted models' effect on THIS test set rather than "
+             "against a remembered number.",
+    )
+    args = ap.parse_args()
+
+    if args.legacy:
+        _mc.set_hazard_model(None)
+        _mc.set_decision_model(None)
+        _mc.METHOD_ANCHOR_LAMBDA = LEGACY_ANCHOR_LAMBDA
+        print(
+            "LEGACY MODE: hand-set damage timing + hand-weighted decision logit "
+            f"+ METHOD_ANCHOR_LAMBDA={LEGACY_ANCHOR_LAMBDA}"
+        )
+
     df = symmetrize_for_training(build_dataset(fetch_raw()))
     X, _, meta = build_feature_matrix(df)
 
     if ENSEMBLE_DIR.name != "ensemble_eval":
         print("WARNING: ensemble_eval/ missing — falling back to the served "
               "(all-data) model; numbers below are IN-SAMPLE.")
+    for label, path, loader in (
+        ("finish timing", _HAZARD_EVAL_PATH, _mc.load_hazard_model),
+        ("decision winner", _DECISION_EVAL_PATH, _mc.load_decision_model),
+    ):
+        if args.legacy:
+            continue
+        if path.exists():
+            loader(path)
+            print(f"{label}: split-trained {path.name}")
+        else:
+            print(f"{label}: legacy hand-set constants (no artifact)")
+
     ensemble = EnsembleModel.load(ENSEMBLE_DIR)
     X = X[ensemble.feature_columns]
     X_sw, _, _ = build_feature_matrix(swap_sides(df))
@@ -239,6 +283,8 @@ def main() -> None:
             FighterMC.from_snapshot(snap_b),
             int(row["scheduled_rounds"]),
             seed=stable_hash(row["bout_id"]),
+            is_main_event=bool(row["is_main_event"]),
+            is_title_fight=bool(row["is_title_fight"]),
         )
         mc_cells_rows.append(
             {

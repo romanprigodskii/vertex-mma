@@ -45,7 +45,7 @@ import pandas as pd  # noqa: E402
 from joblib import Parallel, delayed  # noqa: E402
 
 import src.monte_carlo as mc  # noqa: E402
-from src.config import VAL_END  # noqa: E402
+from src.config import ARTIFACTS_DIR, VAL_END  # noqa: E402
 from src.db import get_connection  # noqa: E402
 from src.export import (  # noqa: E402
     build_dataset,
@@ -58,6 +58,22 @@ N_SIMS = 2000
 BASE_KO = mc.KO_TOTAL_SCALE
 BASE_SUB = mc.SUB_TOTAL_SCALE
 BASE_LAM = mc.METHOD_ANCHOR_LAMBDA
+
+# The MC's finish TIMING comes from a fitted hazard artifact. Use the
+# split-trained twin, never the served all-data one, so the timing model has
+# not seen the bouts being calibrated on. Same reasoning as
+# eval_market.py's ensemble_eval resolution.
+#
+# CAVEAT, and it is a real one: the default calibration window starts
+# 2021-01-01 while the hazard's train split ends at TRAIN_END=2024-01-01, so
+# three of the four years here ARE in the hazard's training data. A lambda
+# swept on this window is optimistic about the per-fight mix. Run with
+# --start 2024-01-01 for a window that is fully out-of-sample for the timing
+# model; the wider window is kept because it is what the recorded
+# METHOD_ANCHOR_LAMBDA=0.80 was measured on and comparability matters.
+_HAZARD_EVAL_PATH = ARTIFACTS_DIR / "finish_hazard_eval.json"
+_DECISION_EVAL_PATH = ARTIFACTS_DIR / "decision_winner_eval.json"
+_EXPECT_OOS_START = "2024-01-01"
 
 OUTCOME_SQL = """
 SELECT b.id::text, b.fighter_a_id::text, b.winner_id::text, b.method::text
@@ -84,18 +100,29 @@ def _sim_one(
     ko_scale: float,
     sub_scale: float,
     lam: float,
+    is_main_event: bool = False,
+    is_title_fight: bool = False,
 ) -> tuple[float, float, float, float, float, float]:
     """Run one bout's MC with overridden constants; return the six
     anchored cells (ko_a, sub_a, dec_a, ko_b, sub_b, dec_b)."""
     mc.KO_TOTAL_SCALE = ko_scale
     mc.SUB_TOTAL_SCALE = sub_scale
     mc.METHOD_ANCHOR_LAMBDA = lam
+    # Runs inside a joblib worker process, which has its own module globals —
+    # load here, not in main(). Cached by path, so this is a dict lookup after
+    # the first call in each worker.
+    if _HAZARD_EVAL_PATH.exists():
+        mc.load_hazard_model(_HAZARD_EVAL_PATH)
+    if _DECISION_EVAL_PATH.exists():
+        mc.load_decision_model(_DECISION_EVAL_PATH)
     r = mc.simulate_bout(
         mc.FighterMC.from_snapshot(snap_a),
         mc.FighterMC.from_snapshot(snap_b),
         scheduled_rounds,
         n_simulations=N_SIMS,
         seed=seed,
+        is_main_event=is_main_event,
+        is_title_fight=is_title_fight,
     )
     return (r.prob_ko_a, r.prob_sub_a, r.prob_decision_a,
             r.prob_ko_b, r.prob_sub_b, r.prob_decision_b)
@@ -110,8 +137,8 @@ def evaluate_point(
     lam: float,
 ) -> dict:
     cells = Parallel(n_jobs=-1, batch_size=64)(
-        delayed(_sim_one)(sa, sb, rd, seed, ko_scale, sub_scale, lam)
-        for (sa, sb, rd, seed) in jobs
+        delayed(_sim_one)(sa, sb, rd, seed, ko_scale, sub_scale, lam, me, tf)
+        for (sa, sb, rd, seed, me, tf) in jobs
     )
     cells = np.asarray(cells)  # (n, 6): ko_a, sub_a, dec_a, ko_b, sub_b, dec_b
     eps = 1e-9
@@ -153,6 +180,25 @@ def main() -> None:
     window = (dt >= pd.to_datetime(args.start)) & (dt < pd.to_datetime(VAL_END))
     df_cal = df.loc[window.to_numpy()].reset_index(drop=True)
     print(f"calibration window {args.start} → {VAL_END}: {len(df_cal)} bouts")
+    if _HAZARD_EVAL_PATH.exists():
+        print(f"finish timing: split-trained {_HAZARD_EVAL_PATH.name}")
+        print(
+            "decision winner: "
+            + (
+                f"split-trained {_DECISION_EVAL_PATH.name}"
+                if _DECISION_EVAL_PATH.exists()
+                else "legacy hand-set logit"
+            )
+        )
+        if args.start < _EXPECT_OOS_START:
+            print(
+                f"WARNING: window starts before {_EXPECT_OOS_START}, so part of it "
+                "is inside the hazard model's training data — the lambda picked "
+                "here is optimistic. Re-run with --start "
+                f"{_EXPECT_OOS_START} for a fully out-of-sample sweep."
+            )
+    else:
+        print("finish timing: legacy hand-set damage shape (no hazard artifact)")
 
     with get_connection() as conn, conn.cursor() as cur:
         cur.execute(OUTCOME_SQL, (df_cal["bout_id"].tolist(),))
@@ -181,7 +227,10 @@ def main() -> None:
             continue
         snap_a = {k[:-2]: row[k] for k in row.index if k.endswith("_a") and k != "fighter_a_id"}
         snap_b = {k[:-2]: row[k] for k in row.index if k.endswith("_b") and k != "fighter_b_id"}
-        jobs.append((snap_a, snap_b, int(row["scheduled_rounds"]), stable_hash(row["bout_id"])))
+        jobs.append((
+            snap_a, snap_b, int(row["scheduled_rounds"]), stable_hash(row["bout_id"]),
+            bool(row["is_main_event"]), bool(row["is_title_fight"]),
+        ))
         winner_side.append(side)
         actual_bucket.append(bucket_ids[bucket])
 
