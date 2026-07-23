@@ -101,8 +101,53 @@ ROUND_RAMP = 0.55
 POWER_TILT = 0.35
 POWER_MIN, POWER_MAX = 0.6, 1.6
 
-# Decision-time scoring softness.
+# Decision-time scoring softness. Applies to the LEGACY hand-set
+# `_decision_logit` only; the fitted model (decision_winner.json) carries its
+# own swept temperature. Kept at 0.45 so a checkout without the artifact
+# behaves exactly as before.
+#
+# For the record, because it is the largest single defect the round lab found:
+# on 387 held-out decisions the hand-set logit at this temperature scores a
+# log-loss of 4.2238 against 0.6931 for a coin flip and 0.6496 for the fitted
+# model, and prices 88.6% of decisions outside [0.05, 0.95]. A weight of 0.80
+# on a control_per_min difference, divided by a temperature of 0.45, is a 1.8x
+# multiplier on a quantity that routinely differs by more than 1.0 between two
+# fighters. METHOD_ANCHOR_LAMBDA=0.80 exists to absorb this.
 DECISION_TEMPERATURE = 0.45
+
+# === Fitted decision-winner model (round lab, Stage 2) =======================
+DECISION_ARTIFACT_PATH = ARTIFACTS_DIR / "decision_winner.json"
+_decision_model: Any = None
+_decision_source: str | None = None
+
+
+def set_decision_model(model: Any) -> None:
+    """Override the decision-winner model (None forces the legacy logit)."""
+    global _decision_model, _decision_source
+    _decision_model = model
+    _decision_source = "<explicit>"
+
+
+def load_decision_model(path: Path | None = None) -> Any:
+    """Lazily load the fitted decision-winner artifact, cached by source path.
+    Same joblib-worker reasoning as `load_hazard_model`. A missing artifact
+    falls back to the legacy hand-set logit."""
+    global _decision_model, _decision_source
+    target = path or DECISION_ARTIFACT_PATH
+    key = str(target)
+    if _decision_source == key:
+        return _decision_model
+    model = None
+    if target.exists():
+        try:
+            from .decision_model import DecisionWinnerModel
+
+            model = DecisionWinnerModel.load(target)
+        except Exception:  # noqa: BLE001 — never let a bad artifact break serving
+            model = None
+    _decision_model = model
+    _decision_source = key
+    return model
 
 # === Fitted finish-hazard timing (round lab, Stage 1) ========================
 # When `artifacts/finish_hazard.json` is present the WHEN of a finish comes
@@ -497,11 +542,16 @@ def simulate_bout(
     # because real judging is noisy.
     survivors = np.where(remaining)[0]
     if survivors.size > 0:
-        logit = _decision_logit(a, b)
-        # Bradley-Terry: P(A wins) = sigmoid(logit / temperature). Per-sim
-        # noise added so each survivor is an independent coin flip with
-        # the same mean.
-        p_a_wins = 1.0 / (1.0 + np.exp(-(logit / DECISION_TEMPERATURE)))
+        # Fitted decision-winner model when its artifact is present, else the
+        # legacy hand-set logit. Both are Bradley-Terry:
+        # P(A wins) = sigmoid(logit / temperature). Per-sim noise is added so
+        # each survivor is an independent coin flip with the same mean.
+        decision_model = load_decision_model()
+        if decision_model is not None:
+            p_a_wins = decision_model.prob_a(a, b)
+        else:
+            logit = _decision_logit(a, b)
+            p_a_wins = 1.0 / (1.0 + np.exp(-(logit / DECISION_TEMPERATURE)))
         draws = rng.random(survivors.size)
         for local, sim_i in enumerate(survivors):
             finish_method[sim_i] = "dec_a" if draws[local] < p_a_wins else "dec_b"

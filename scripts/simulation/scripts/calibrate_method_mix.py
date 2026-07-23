@@ -72,6 +72,7 @@ BASE_LAM = mc.METHOD_ANCHOR_LAMBDA
 # model; the wider window is kept because it is what the recorded
 # METHOD_ANCHOR_LAMBDA=0.80 was measured on and comparability matters.
 _HAZARD_EVAL_PATH = ARTIFACTS_DIR / "finish_hazard_eval.json"
+_DECISION_EVAL_PATH = ARTIFACTS_DIR / "decision_winner_eval.json"
 _EXPECT_OOS_START = "2024-01-01"
 
 OUTCOME_SQL = """
@@ -112,6 +113,8 @@ def _sim_one(
     # the first call in each worker.
     if _HAZARD_EVAL_PATH.exists():
         mc.load_hazard_model(_HAZARD_EVAL_PATH)
+    if _DECISION_EVAL_PATH.exists():
+        mc.load_decision_model(_DECISION_EVAL_PATH)
     r = mc.simulate_bout(
         mc.FighterMC.from_snapshot(snap_a),
         mc.FighterMC.from_snapshot(snap_b),
@@ -179,6 +182,14 @@ def main() -> None:
     print(f"calibration window {args.start} → {VAL_END}: {len(df_cal)} bouts")
     if _HAZARD_EVAL_PATH.exists():
         print(f"finish timing: split-trained {_HAZARD_EVAL_PATH.name}")
+        print(
+            "decision winner: "
+            + (
+                f"split-trained {_DECISION_EVAL_PATH.name}"
+                if _DECISION_EVAL_PATH.exists()
+                else "legacy hand-set logit"
+            )
+        )
         if args.start < _EXPECT_OOS_START:
             print(
                 f"WARNING: window starts before {_EXPECT_OOS_START}, so part of it "

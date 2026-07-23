@@ -1,0 +1,171 @@
+{
+  "generated_at": "2026-07-23T09:39:50.838921Z",
+  "n_decisions": 4014,
+  "n_train": 3350,
+  "n_val": 277,
+  "n_test": 387,
+  "C_sweep": [
+    {
+      "C": 0.01,
+      "val_logloss": 0.6635345424095148
+    },
+    {
+      "C": 0.03,
+      "val_logloss": 0.6629552833692236
+    },
+    {
+      "C": 0.1,
+      "val_logloss": 0.662744659617018
+    },
+    {
+      "C": 0.3,
+      "val_logloss": 0.6626837023038458
+    },
+    {
+      "C": 1.0,
+      "val_logloss": 0.6626622844329305
+    },
+    {
+      "C": 3.0,
+      "val_logloss": 0.6626561571254328
+    },
+    {
+      "C": 10.0,
+      "val_logloss": 0.6626540117356268
+    }
+  ],
+  "temperature_sweep": [
+    {
+      "temperature": 0.4,
+      "val_logloss": 0.6858317233978843
+    },
+    {
+      "temperature": 0.5,
+      "val_logloss": 0.6708578319056705
+    },
+    {
+      "temperature": 0.6,
+      "val_logloss": 0.6645473276834043
+    },
+    {
+      "temperature": 0.7,
+      "val_logloss": 0.6621104206258852
+    },
+    {
+      "temperature": 0.8,
+      "val_logloss": 0.6615278826509682
+    },
+    {
+      "temperature": 0.9,
+      "val_logloss": 0.6618636485356953
+    },
+    {
+      "temperature": 1.0,
+      "val_logloss": 0.6626540117356268
+    },
+    {
+      "temperature": 1.1,
+      "val_logloss": 0.6636584253649879
+    },
+    {
+      "temperature": 1.2,
+      "val_logloss": 0.6647483523333299
+    },
+    {
+      "temperature": 1.3,
+      "val_logloss": 0.6658541446387759
+    },
+    {
+      "temperature": 1.4,
+      "val_logloss": 0.6669382252359817
+    },
+    {
+      "temperature": 1.5,
+      "val_logloss": 0.6679809378734081
+    },
+    {
+      "temperature": 1.6,
+      "val_logloss": 0.668972809685603
+    },
+    {
+      "temperature": 1.7,
+      "val_logloss": 0.6699101972272963
+    },
+    {
+      "temperature": 1.8,
+      "val_logloss": 0.6707927805936592
+    },
+    {
+      "temperature": 1.9,
+      "val_logloss": 0.6716220967610262
+    },
+    {
+      "temperature": 2.0,
+      "val_logloss": 0.6724006716571148
+    },
+    {
+      "temperature": 2.1,
+      "val_logloss": 0.6731315041415283
+    },
+    {
+      "temperature": 2.2,
+      "val_logloss": 0.6738177601604218
+    },
+    {
+      "temperature": 2.3,
+      "val_logloss": 0.6744625939506654
+    },
+    {
+      "temperature": 2.4,
+      "val_logloss": 0.6750690466614795
+    },
+    {
+      "temperature": 2.5,
+      "val_logloss": 0.6756399923116867
+    },
+    {
+      "temperature": 2.6,
+      "val_logloss": 0.6761781126270747
+    }
+  ],
+  "selected_C": 10.0,
+  "selected_temperature": 0.8,
+  "coefficients": {
+    "slpm": 0.227703517239797,
+    "sapm": -0.29208397092436833,
+    "kd_per_fight": 0.011518620050906857,
+    "sub_per15": -0.1320900481440606,
+    "td_per15": 0.20956809683412858,
+    "td_def": 0.0830989795249677,
+    "control_per_min": 0.11044647247406071,
+    "losses_ko_rate": 0.038570159832871785,
+    "losses_sub_rate": 0.04185830471028278,
+    "finish_rate_for": -0.030343217064133596
+  },
+  "grading": {
+    "val": {
+      "n": 277,
+      "fitted_logloss": 0.6615278826509683,
+      "fitted_logloss_temperature_1": 0.6626540117356267,
+      "incumbent_logloss": 3.996660161161326,
+      "coin_flip_logloss": 0.6931471805599453,
+      "fitted_accuracy": 0.5812274368231047,
+      "incumbent_accuracy": 0.5595667870036101,
+      "accuracy_se": 0.030042088406305484,
+      "fitted_p_below_0.05_or_above_0.95": 0.0,
+      "incumbent_p_below_0.05_or_above_0.95": 0.8339350180505415
+    },
+    "test": {
+      "n": 387,
+      "fitted_logloss": 0.6496082270782755,
+      "fitted_logloss_temperature_1": 0.6530821391846998,
+      "incumbent_logloss": 4.223772952556796,
+      "coin_flip_logloss": 0.6931471805599453,
+      "fitted_accuracy": 0.6253229974160207,
+      "incumbent_accuracy": 0.5529715762273901,
+      "accuracy_se": 0.025416428388767447,
+      "fitted_p_below_0.05_or_above_0.95": 0.0,
+      "incumbent_p_below_0.05_or_above_0.95": 0.8863049095607235
+    }
+  }
+}
