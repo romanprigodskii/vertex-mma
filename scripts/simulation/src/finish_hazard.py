@@ -219,7 +219,37 @@ class FinishHazardModel:
 
     @classmethod
     def load(cls, path: Path) -> FinishHazardModel:
-        return cls(**json.loads(Path(path).read_text()))
+        model = cls(**json.loads(Path(path).read_text()))
+        model.validate()
+        return model
+
+    def validate(self) -> None:
+        """Raise if the artifact's vectors disagree with each other or with the
+        design this code builds. An artifact from a different revision parses
+        into the dataclass fine and only raises a broadcast error deep inside
+        `predict_rates` — past the loader's fallback guard, mid-run, killing
+        the predict cron for the whole slate. Fail at load so the caller falls
+        back to the hand-set damage shape instead."""
+        expect_cov = design_columns()
+        n_cov = len(expect_cov)
+        if not (len(self.cov_mean) == len(self.cov_std) == len(self.cov_names) == n_cov):
+            raise ValueError(
+                f"hazard artifact covariate shape mismatch: mean={len(self.cov_mean)} "
+                f"std={len(self.cov_std)} names={len(self.cov_names)} expected={n_cov}"
+            )
+        if list(self.cov_names) != expect_cov:
+            raise ValueError("hazard artifact cov_names do not match design_columns()")
+        if any(not np.isfinite(s) or s == 0.0 for s in self.cov_std):
+            raise ValueError("hazard artifact has a zero or non-finite cov_std entry")
+        width = len(self.time_names) + n_cov
+        for cause in ("ko", "sub"):
+            if cause not in self.coef or cause not in self.intercept:
+                raise ValueError(f"hazard artifact is missing the '{cause}' cause")
+            if len(self.coef[cause]) != width:
+                raise ValueError(
+                    f"hazard artifact coef['{cause}'] has {len(self.coef[cause])} "
+                    f"entries, expected {width}"
+                )
 
 
 # --------------------------------------------------------------------------

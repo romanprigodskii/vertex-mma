@@ -128,6 +128,15 @@ DECISION_TEMPERATURE = 0.45
 
 # === Fitted decision-winner model (round lab, Stage 2) =======================
 DECISION_ARTIFACT_PATH = ARTIFACTS_DIR / "decision_winner.json"
+
+# Sentinel stored in the *_source globals by set_*_model(). load_*_model()
+# must treat it as "an override is in force" and return the cached value
+# untouched; comparing it against a path (which it never equals) silently
+# reloaded from disk and threw the override away — which meant
+# eval_method_market.py --legacy was measuring the fitted models against
+# themselves.
+_EXPLICIT = "<explicit>"
+
 _decision_model: Any = None
 _decision_source: str | None = None
 
@@ -136,7 +145,7 @@ def set_decision_model(model: Any) -> None:
     """Override the decision-winner model (None forces the legacy logit)."""
     global _decision_model, _decision_source
     _decision_model = model
-    _decision_source = "<explicit>"
+    _decision_source = _EXPLICIT
 
 
 def load_decision_model(path: Path | None = None) -> Any:
@@ -144,6 +153,8 @@ def load_decision_model(path: Path | None = None) -> Any:
     Same joblib-worker reasoning as `load_hazard_model`. A missing artifact
     falls back to the legacy hand-set logit."""
     global _decision_model, _decision_source
+    if _decision_source == _EXPLICIT:
+        return _decision_model
     target = path or DECISION_ARTIFACT_PATH
     key = str(target)
     if _decision_source == key:
@@ -191,7 +202,7 @@ def set_hazard_model(model: Any) -> None:
     hand-set shape)."""
     global _hazard_model, _hazard_source
     _hazard_model = model
-    _hazard_source = "<explicit>"
+    _hazard_source = _EXPLICIT
 
 
 def load_hazard_model(path: Path | None = None) -> Any:
@@ -205,6 +216,8 @@ def load_hazard_model(path: Path | None = None) -> Any:
     A missing or unreadable artifact is not an error: the simulator falls back
     to the hand-set damage shape, which is what a fresh checkout gets."""
     global _hazard_model, _hazard_source
+    if _hazard_source == _EXPLICIT:
+        return _hazard_model
     target = path or HAZARD_ARTIFACT_PATH
     key = str(target)
     if _hazard_source == key:
@@ -258,6 +271,15 @@ METHOD_BASE_KO = 0.31
 METHOD_BASE_SUB = 0.18
 METHOD_BASE_DEC = 0.51
 METHOD_ANCHOR_LAMBDA = 0.40
+
+# The 0.40 above is only valid WITH the fitted decision model. 0.80 was
+# calibrated against the hand-set `_decision_logit`, and that logit is still
+# what runs on the fallback path, so a checkout (or a deploy) whose artifacts
+# fail to load must keep the anchor that was swept for it. Serving 0.40 on top
+# of a 4.22-log-loss decision split pushes the losing side's decision cell far
+# enough to hit the MAX_ODDS ceiling in sportsbook.ts — a standing +EV line.
+# `_anchor_methods` selects between the two at call time.
+LEGACY_ANCHOR_LAMBDA = 0.80
 
 # Neutral anchors used by the lift formulas (lift = 1.0 at these values).
 _KO_OFF_ANCHOR = 0.35
@@ -440,10 +462,16 @@ def _anchor_methods(
     ko_a: float, ko_b: float, sub_a: float, sub_b: float, dec_a: float, dec_b: float
 ) -> tuple[float, float, float, float, float, float]:
     """Blend each fighter's CONDITIONAL method mix (method given THIS fighter
-    wins) toward the UFC base rate (METHOD_BASE_*) with weight
-    METHOD_ANCHOR_LAMBDA. Preserves P(each fighter wins) exactly — only how
-    they win is reshaped. Returns (ko_a, ko_b, sub_a, sub_b, dec_a, dec_b)."""
-    lam = METHOD_ANCHOR_LAMBDA
+    wins) toward the UFC base rate (METHOD_BASE_*). Preserves P(each fighter
+    wins) exactly — only how they win is reshaped. Returns
+    (ko_a, ko_b, sub_a, sub_b, dec_a, dec_b).
+
+    The weight depends on which decision split produced the mix:
+    METHOD_ANCHOR_LAMBDA (0.40) was swept against the fitted model,
+    LEGACY_ANCHOR_LAMBDA (0.80) against the hand-set logit. Reading the
+    globals here rather than at import time is also what keeps
+    calibrate_method_mix.py's monkey-patching working."""
+    lam = METHOD_ANCHOR_LAMBDA if load_decision_model() is not None else LEGACY_ANCHOR_LAMBDA
 
     def anchor_side(ko: float, sub: float, dec: float) -> tuple[float, float, float]:
         win = ko + sub + dec
@@ -470,10 +498,22 @@ def simulate_bout(
     is_title_fight: bool = False,
 ) -> MCResult:
     """`is_main_event` / `is_title_fight` are covariates of the fitted timing
-    model (finish_hazard.py) — a title fight carries a genuinely higher finish
-    hazard once fighter quality is controlled for. They default to False so
-    every existing caller keeps working unchanged; predict.py and custom.py
-    pass the real values."""
+    model (finish_hazard.py). They default to False so every existing caller
+    keeps working unchanged; predict.py and custom.py pass the real values.
+
+    Be clear about what they do at SERVE time, because it is not what the fit
+    suggests: every covariate in the hazard model is time-CONSTANT, so it
+    contributes a constant factor to exp(eta), and `_normalize_shape` divides
+    that factor straight back out. The served timing is therefore two fixed
+    curves per scheduled length (one KO, one submission), identical for every
+    bout on the card; the only per-bout variation in WHEN a finish lands comes
+    from how those two curves get mixed by the per-fight KO/sub totals, which
+    still come from `_ko_total_loghaz` / `_sub_total_loghaz`.
+
+    The parameters are kept rather than dropped because they are threaded
+    correctly and would start to bite the moment the fit gains a
+    time-interacted term (e.g. covariate x round index). Anyone adding one
+    should re-verify against this note rather than assume they already work."""
     rng = np.random.default_rng(seed)
     total_seconds = scheduled_rounds * SECONDS_PER_ROUND
 

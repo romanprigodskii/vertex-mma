@@ -98,7 +98,11 @@ class DecisionWinnerModel:
     def prob_a(self, a: Any, b: Any, temperature: float | None = None) -> float:
         t = self.temperature if temperature is None else temperature
         z = self.logit(a, b) / max(t, 1e-6)
-        # Guard the exp so an extreme matchup can't overflow.
+        # Guard the exp so an extreme matchup can't overflow. NaN is handled
+        # first: min/max propagate it as the clamp BOUND (Python's min(30, nan)
+        # returns 30), which would turn "no information" into a 0.9999 call.
+        if not math.isfinite(z):
+            return 0.5
         z = max(-30.0, min(30.0, z))
         return 1.0 / (1.0 + math.exp(-z))
 
@@ -119,4 +123,25 @@ class DecisionWinnerModel:
 
     @classmethod
     def load(cls, path: Path) -> DecisionWinnerModel:
-        return cls(**json.loads(Path(path).read_text()))
+        model = cls(**json.loads(Path(path).read_text()))
+        model.validate()
+        return model
+
+    def validate(self) -> None:
+        """Raise if the artifact's vectors disagree with each other or with the
+        feature list this code builds. An artifact written by a different
+        revision parses into the dataclass happily and only explodes inside
+        `simulate_bout` — i.e. mid-run, after the loader's fallback guard has
+        already been passed, taking the whole predict cron down with it. Fail
+        at load so the caller degrades to the legacy logit instead."""
+        n = len(DECISION_FEATURES)
+        if not (len(self.coef) == len(self.scale) == len(self.feature_names) == n):
+            raise ValueError(
+                f"decision artifact shape mismatch: coef={len(self.coef)} "
+                f"scale={len(self.scale)} names={len(self.feature_names)} "
+                f"expected={n}"
+            )
+        if tuple(self.feature_names) != DECISION_FEATURES:
+            raise ValueError("decision artifact feature_names do not match DECISION_FEATURES")
+        if any(not np.isfinite(s) or s == 0.0 for s in self.scale):
+            raise ValueError("decision artifact has a zero or non-finite scale entry")
