@@ -13,18 +13,29 @@ bouts rack up finishes purely on tick count):
   number of scheduled rounds — so P(finish) ≈ 1 − exp(−H) no longer balloons for
   5-round bouts (a small, non-proportional championship-round bonus is the only
   length effect). This is the core fix for "5-rounders over-finish 3-rounders".
-* That total hazard is distributed across the fight by an ACCUMULATED-DAMAGE
-  timing shape: per-second finish weight rises as (floor + τ^γ) with τ the
-  fraction of the fight elapsed, so finishes cluster in the later rounds as
-  damage piles up, instead of front-loading. A within-round ramp adds the
-  end-of-round push, and a power tilt shifts a heavy hitter's finishes earlier
-  (flash-KO capable) vs a point-fighter's later.
+* That total hazard is distributed across the fight by a FITTED timing shape
+  (src/finish_hazard.py, artifacts/finish_hazard.json): cause-specific KO and
+  submission hazards estimated by Poisson regression with exposure on a
+  discrete-time person-period expansion, so KO and submission get separate
+  time curves and the within-round ramp is measured rather than assumed.
+  The old ACCUMULATED-DAMAGE shape (per-second weight rising as floor + τ^γ,
+  clustering finishes LATE) remains as the no-artifact fallback, and it was
+  backwards: empirically 54% of finishes in 3-round bouts land in round 1 and
+  15% in round 3, while that shape produced 17% / 49%. Held-out
+  round-of-finish log-loss 1.02 fitted vs 1.46 for the damage curve.
+* The decision winner among survivors comes from a FITTED logistic model
+  (src/decision_model.py, artifacts/decision_winner.json) on A−B differences
+  of the pre-fight career fields, with no intercept so it is exactly
+  antisymmetric. The hand-weighted `_decision_logit` it replaces scored a
+  held-out log-loss of 4.22 against 0.69 for a coin flip; it is the
+  no-artifact fallback.
 * A per-fight finish CAP bounds P(any finish) so a puncher-vs-weak-chin bout
   can't asymptote toward a near-certain finish.
 * Career rates are still SHRUNK toward roster means (tiny denominators), lift
-  multipliers CLAMPED, and the final KO/sub/decision mix lightly ANCHORED toward
-  real UFC base rates — but the per-fight scales now do most of the calibration,
-  so the anchor is only a tail safety net.
+  multipliers CLAMPED, and the final KO/sub/decision mix ANCHORED toward real
+  UFC base rates — but with both fitted models in place the anchor weight
+  dropped from 0.80 to 0.40, because the per-fight mix now beats the base
+  rates on its own instead of needing to be mostly replaced by them.
 
 Still simplified vs reality (noted, not modelled): explicit per-strike damage
 state, takedown→ground position chains, true sub-from-grappling timing distinct
@@ -219,21 +230,34 @@ SHRINK_PSEUDO_COUNTS = 4.0
 # Method-mix anchor toward UFC base rates — preserves each fighter's win
 # prob, only reshapes how they win (0 = raw, 1 = pure base).
 #
-# Calibrated 2026-07-10 (scripts/calibrate_method_mix.py, 1,646 bouts
-# 2021-01-01..2024-12-31, strictly pre-test): the raw per-fight conditional
-# mix "method | this fighter wins" was far too finish-heavy — cond
-# log-loss 1.38 vs 1.018 for a CONSTANT base-rate predictor. The lambda
-# sweep has an interior optimum at 0.80 (1.0119): the per-fight mix
-# carries real but SMALL signal (~20% weight), the rest is noise the old
-# 0.08 let straight through — that's why the method-market backtest
-# (eval_method_market.py) saw KO predicted 38.7% vs 31.0% actual. Hazard
-# scales were re-validated in the same sweep: (1.0, 1.0) multipliers stay
-# best for the marginals, do NOT compensate here. Base rates below are the
-# measured modern-era mix (31.2/18.2/50.6), not the folklore 33/17/50.
+# Base rates are the measured modern-era mix (31.2/18.2/50.6), not the
+# folklore 33/17/50.
+#
+# Calibrated 2026-07-10 at 0.80 (1,646 bouts 2021-01-01..2024-12-31): the raw
+# per-fight mix scored a conditional log-loss of 1.38 against 1.018 for a
+# CONSTANT base-rate predictor, so 80% of the per-fight signal had to be
+# thrown away to beat the base rates at all.
+#
+# RE-SWEPT 2026-07-23 to 0.40, after the round lab replaced the finish timing
+# (finish_hazard.py) and the decision-winner split (decision_model.py) with
+# fitted models. The anchor was mostly compensating for the hand-set decision
+# logit, which scored 4.22 on held-out decisions against 0.69 for a coin flip.
+# With that fixed the raw mix stands on its own: at lambda=0 the conditional
+# log-loss is 0.9993 vs 1.0183 for the constant predictor, where before it was
+# 4.1236.
+#
+# Two windows, both agreeing on 0.40:
+#   2021-01-01..2024-12-31, n=1,646 — 1.0103 (old) -> 0.9799 at 0.40
+#   2024-01-01..2024-12-31, n=428, STRICTLY out-of-sample for both fitted
+#     models (train cut = TRAIN_END) — 0.9613 at 0.80 -> 0.9456 at 0.40,
+#     constant 0.9769
+# The curve is flat between 0.35 and 0.45 (0.9800 / 0.9799 / 0.9802), so 0.40
+# is an interior optimum rather than a boundary artefact. Hazard scale
+# multipliers stay at (1.0, 1.0); do NOT compensate here.
 METHOD_BASE_KO = 0.31
 METHOD_BASE_SUB = 0.18
 METHOD_BASE_DEC = 0.51
-METHOD_ANCHOR_LAMBDA = 0.80
+METHOD_ANCHOR_LAMBDA = 0.40
 
 # Neutral anchors used by the lift formulas (lift = 1.0 at these values).
 _KO_OFF_ANCHOR = 0.35
