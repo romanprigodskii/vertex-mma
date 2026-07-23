@@ -137,6 +137,10 @@ def prepare_splits(use_cache: bool = False, ensemble_dir: Path | None = None) ->
             "X_swapped": Xsw_s[name],
             "y": ys[name].to_numpy().astype(int),
             "market": metas[name]["market_prob_a"].to_numpy(dtype=float),
+            # bout_id / fighter_a_id / fighter_b_id in the SYMMETRIZED frame's
+            # orientation, so a lab can join a per-bout DB fact back onto these
+            # rows and know which side "A" is. Positionally aligned with X/y.
+            "meta": metas[name].reset_index(drop=True),
         }
     return out
 
