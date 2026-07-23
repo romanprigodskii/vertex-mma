@@ -66,10 +66,12 @@ from eval_tail_buckets import (  # noqa: E402
     print_bucket_table,
     resolve_ensemble_dir,
 )
+from sklearn.linear_model import LogisticRegression  # noqa: E402
 from sklearn.metrics import log_loss  # noqa: E402
 
 from src.config import (  # noqa: E402
     ARTIFACTS_DIR,
+    FEATURE_CONTRI_OVERRIDES,
     LGB_EARLY_STOPPING_ROUNDS,
     LGB_NUM_ROUNDS,
     LGB_PARAMS,
@@ -527,12 +529,331 @@ def stage_0b_controls(seeds: list[int], weights: list[float], use_cache: bool) -
     return {"shuffle": shuffle, "propensity_auc": prop_auc, "style": style, "w_mid": w_mid}
 
 
+# ── Stage 2 — does the union record leg help the SERVED ensemble? ────────
+
+
+def train_full_ensemble(
+    X_tr: pd.DataFrame, y_tr: pd.Series, X_va: pd.DataFrame, y_va: pd.Series, seed: int
+) -> EnsembleModel:
+    """The served 3-leg recipe (feature_names(), tuned params, age throttle) on
+    the UFC train split — the baseline the union leg must improve on."""
+    cols = feature_names()
+    tuned = _load_tuned_params()
+    lgb_params = {
+        **LGB_PARAMS, **tuned,
+        "feature_contri": [FEATURE_CONTRI_OVERRIDES.get(c, 1.0) for c in cols],
+        "seed": seed,
+    }
+    m = EnsembleModel(cols, lgb_params, LGB_NUM_ROUNDS, LGB_EARLY_STOPPING_ROUNDS)
+    if seed != 42:
+        m._cb_params = staticmethod(  # type: ignore[method-assign]
+            lambda: {**EnsembleModel._cb_params(), "random_seed": seed}
+        ).__func__
+    m.fit(X_train=X_tr.reset_index(drop=True), y_train=y_tr.reset_index(drop=True),
+          X_val=X_va.reset_index(drop=True), y_val=y_va.reset_index(drop=True))
+    return m
+
+
+def _select_blend(base_va: np.ndarray, y_va: np.ndarray) -> dict:
+    """Pick the blend the served EnsembleModel would: best of logreg / mean /
+    softmax-weighted-mean on BINARY val log-loss, over an N-leg base matrix."""
+    blender = LogisticRegression(max_iter=500, C=0.1, solver="liblinear", random_state=42)
+    blender.fit(base_va, y_va)
+    p_lr = blender.predict_proba(base_va)[:, 1]
+    p_mean = base_va.mean(axis=1)
+    per_ll = np.array([log_loss(y_va, base_va[:, j].clip(1e-4, 1 - 1e-4))
+                       for j in range(base_va.shape[1])])
+    scaled = -per_ll / max(per_ll.std(), 1e-6)
+    e = np.exp(scaled - scaled.max())
+    weights = e / e.sum()
+    p_w = base_va @ weights
+    opts = {
+        "logreg": log_loss(y_va, p_lr.clip(1e-4, 1 - 1e-4)),
+        "mean": log_loss(y_va, p_mean.clip(1e-4, 1 - 1e-4)),
+        "weighted_mean": log_loss(y_va, p_w.clip(1e-4, 1 - 1e-4)),
+    }
+    best = min(opts, key=lambda k: opts[k])
+    return {"mode": best, "weights": weights, "blender": blender, "val_opts": opts}
+
+
+def _apply_blend(base: np.ndarray, sel: dict) -> np.ndarray:
+    if sel["mode"] == "mean":
+        return base.mean(axis=1)
+    if sel["mode"] == "weighted_mean":
+        return base @ sel["weights"]
+    return sel["blender"].predict_proba(base)[:, 1]
+
+
+def _order_avg_blend(base: np.ndarray, base_sw: np.ndarray, sel: dict) -> np.ndarray:
+    return 0.5 * (_apply_blend(base, sel) + (1.0 - _apply_blend(base_sw, sel)))
+
+
+def stage_2a(seeds: list[int], weights: list[float], use_cache: bool) -> dict:
+    """4th-leg blend: the union-trained record-only model joins lgb/cb/logreg on
+    the FULL feature set, the blender picks its weight on binary val log-loss.
+    Baseline = the served 3-leg ensemble. GATE 1 = all of a-g."""
+    rec_cols = record_only_columns()
+    full_cols = feature_names()
+    ufc, nonufc = build_union_frames(use_cache)
+
+    X, y, meta = build_feature_matrix(ufc)
+    X_sw, _, _ = build_feature_matrix(swap_sides(ufc))
+    dt = pd.to_datetime(meta["event_date"])
+    m_tr = (dt < TRAIN_END).to_numpy()
+    m_va = ((dt >= TRAIN_END) & (dt < VAL_END)).to_numpy()
+    m_te = (dt >= VAL_END).to_numpy()
+    y_te = y[m_te].to_numpy().astype(int)
+    y_va_arr = y[m_va].to_numpy().astype(int)
+    market_te = meta.loc[m_te, "market_prob_a"].to_numpy(dtype=float)
+    has_te = ~np.isnan(market_te)
+
+    Xn, yn, _ = build_feature_matrix(nonufc)
+    Xr_tr = pd.concat([X[rec_cols][m_tr], Xn[rec_cols]], ignore_index=True)
+    yr_tr = pd.concat([y[m_tr], yn], ignore_index=True)
+
+    def eval_probs(probs: np.ndarray) -> dict:
+        return {
+            "headline_odds": headline(probs[has_te], y_te[has_te]),
+            "buckets": bucket_table(probs, market_te, y_te),
+            "murphy": murphy(probs[has_te], y_te[has_te]),
+        }
+
+    out: dict = {"seeds": {}}
+    for seed in seeds:
+        full = train_full_ensemble(X[full_cols][m_tr], y[m_tr], X[full_cols][m_va], y[m_va], seed)
+        # full 3-leg base matrices (val single-orientation for selection; test
+        # both orientations for order-averaged eval).
+        bf_va = full._base_predict_matrix(X[full_cols][m_va].reset_index(drop=True))
+        bf_te = full._base_predict_matrix(X[full_cols][m_te].reset_index(drop=True))
+        bf_te_sw = full._base_predict_matrix(X_sw[full_cols][m_te].reset_index(drop=True))
+        bf_va_sw = full._base_predict_matrix(X_sw[full_cols][m_va].reset_index(drop=True))
+
+        sel3 = _select_blend(bf_va, y_va_arr)
+        p3_te = _order_avg_blend(bf_te, bf_te_sw, sel3)
+        p3_va = _order_avg_blend(bf_va, bf_va_sw, sel3)
+        seed_res: dict = {
+            "baseline_3leg": {
+                **eval_probs(p3_te),
+                "val_logloss": float(log_loss(y_va_arr, np.clip(p3_va, EPS, 1 - EPS))),
+                "blend_mode": sel3["mode"],
+            },
+        }
+        for w in weights:
+            sw = np.concatenate([np.ones(int(m_tr.sum())), np.full(len(Xn), w)])
+            union = fit_record_only(Xr_tr, yr_tr, X[rec_cols][m_va], y[m_va], rec_cols, seed, sample_weight=sw)
+            pu_va = union.predict_proba_a(X[rec_cols][m_va].reset_index(drop=True))
+            pu_te = union.predict_proba_a(X[rec_cols][m_te].reset_index(drop=True))
+            pu_te_sw = union.predict_proba_a(X_sw[rec_cols][m_te].reset_index(drop=True))
+            pu_va_sw = union.predict_proba_a(X_sw[rec_cols][m_va].reset_index(drop=True))
+
+            b4_va = np.column_stack([bf_va, pu_va])
+            b4_te = np.column_stack([bf_te, pu_te])
+            b4_te_sw = np.column_stack([bf_te_sw, pu_te_sw])
+            b4_va_sw = np.column_stack([bf_va_sw, pu_va_sw])
+            sel4 = _select_blend(b4_va, y_va_arr)
+            p4_te = _order_avg_blend(b4_te, b4_te_sw, sel4)
+            p4_va = _order_avg_blend(b4_va, b4_va_sw, sel4)
+            # union leg weight: softmax weight if weighted_mean, else blender coef.
+            if sel4["mode"] == "weighted_mean":
+                leg_w = float(sel4["weights"][-1])
+            elif sel4["mode"] == "logreg":
+                leg_w = float(sel4["blender"].coef_[0][-1])
+            else:
+                leg_w = 0.25
+            seed_res[f"union4_w{w}"] = {
+                **eval_probs(p4_te),
+                "val_logloss": float(log_loss(y_va_arr, np.clip(p4_va, EPS, 1 - EPS))),
+                "blend_mode": sel4["mode"],
+                "union_leg_weight": leg_w,
+            }
+        out["seeds"][str(seed)] = seed_res
+    return out
+
+
+def _gate1_row(d: dict, base: dict) -> str:
+    def tail(x):
+        return next(r for r in x["buckets"] if r["lo"] == 0.72)["model"]
+
+    def coin(x):
+        return next(r for r in x["buckets"] if r["lo"] == 0.50)["model"]
+    return (f"{d['headline_odds']['logloss']:>8.4f}{d['val_logloss']:>8.4f}"
+            f"{tail(d):>9.4f}{tail(d) - tail(base):>+8.4f}{coin(d):>8.4f}"
+            f"{coin(d) - coin(base):>+8.4f}{d['headline_odds']['acc']:>8.4f}"
+            f"{d['murphy']['reliability']:>9.5f}")
+
+
+def print_stage_2a(res: dict, seeds: list[int], weights: list[float]) -> None:
+    print("\n=== STAGE 2a — union record leg as 4th leg of the served ensemble ===")
+    print("baseline = served 3-leg ensemble (target: overall 0.6198, tail 0.5152, "
+          "coin 0.6688, acc 0.6690, reliab 0.00296, market tail 0.4392)\n")
+    for seed in seeds:
+        s = res["seeds"][str(seed)]
+        base = s["baseline_3leg"]
+        print(f"-- seed {seed} --")
+        print(f"  {'config':<14}{'overall':>8}{'val':>8}{'tail':>9}{'Δtail':>8}"
+              f"{'coin':>8}{'Δcoin':>8}{'acc':>8}{'reliab':>9}{'legW':>7}{'mode':>14}")
+        print(f"  {'3leg base':<14}{_gate1_row(base, base)}{'—':>7}{base['blend_mode']:>14}")
+        for w in weights:
+            u = s[f"union4_w{w}"]
+            print(f"  {'union4 w' + str(w):<14}{_gate1_row(u, base)}"
+                  f"{u['union_leg_weight']:>7.3f}{u['blend_mode']:>14}")
+        print()
+
+    print("-- GATE 1(c,g) read: tail Δ sign across seeds --")
+
+    def tailv(x):
+        return next(r for r in x["buckets"] if r["lo"] == 0.72)["model"]
+    for w in weights:
+        ds = [tailv(res["seeds"][str(s)][f"union4_w{w}"]) - tailv(res["seeds"][str(s)]["baseline_3leg"])
+              for s in seeds]
+        sign = "stable-BETTER" if all(d < 0 for d in ds) else (
+            "stable-WORSE" if all(d > 0 for d in ds) else "FLIPS")
+        print(f"  w{w}: Δtail " + " ".join(f"{d:+.4f}" for d in ds) + f"  → {sign}")
+
+
+# ── Stage 2b — transfer: non-UFC as a prior, then fine-tune on UFC ───────
+
+
+def fit_record_transfer(
+    union_model: EnsembleModel,
+    X_ufc: pd.DataFrame, y_ufc: pd.Series,
+    X_va: pd.DataFrame, y_va: pd.Series,
+    seed: int, ft_rounds: int = 300,
+) -> EnsembleModel:
+    """Continue the union-pretrained record legs on UFC-only (LGB/CB via
+    init_model, logreg refit) — the non-UFC region as a PRIOR the UFC data then
+    corrects, rather than as equal-weight rows. The blend is re-selected on the
+    UFC val split, so the returned model's predict_proba_a serves as a leg."""
+    import lightgbm as lgb
+    from catboost import CatBoostClassifier
+
+    m = EnsembleModel(union_model.feature_columns, union_model.lgb_params,
+                      LGB_NUM_ROUNDS, LGB_EARLY_STOPPING_ROUNDS)
+    dtr = lgb.Dataset(X_ufc, label=y_ufc)
+    dva = lgb.Dataset(X_va, label=y_va, reference=dtr)
+    m.lgb_global = lgb.train(union_model.lgb_params, dtr, num_boost_round=ft_rounds,
+                             valid_sets=[dva], valid_names=["val"],
+                             init_model=union_model.lgb_global,
+                             callbacks=[lgb.early_stopping(LGB_EARLY_STOPPING_ROUNDS, verbose=False)])
+    cbp = {**EnsembleModel._cb_params(), "random_seed": seed, "iterations": ft_rounds}
+    cb = CatBoostClassifier(**cbp, early_stopping_rounds=100)
+    cb.fit(X_ufc, y_ufc.astype(int), eval_set=(X_va, y_va.astype(int)),
+           init_model=union_model.cb_global)
+    m.cb_global = cb
+    m.logreg, m.scaler, m.logreg_means = m._train_logreg(X_ufc, y_ufc)
+    # re-select the internal 3-leg blend on UFC val so predict_proba_a works.
+    base_va = m._base_predict_matrix(X_va.reset_index(drop=True))
+    sel = _select_blend(base_va, y_va.to_numpy().astype(int))
+    m.blender = sel["blender"]
+    m._blend_mode = sel["mode"]
+    m._blend_weights = sel["weights"].tolist()
+    m._val_blend_logloss = sel["val_opts"]
+    return m
+
+
+def stage_2b(seeds: list[int], weights: list[float], use_cache: bool) -> dict:
+    """Transfer variant of Stage 2: the record leg is union-pretrained then
+    fine-tuned on UFC, blended as the 4th leg. Reports each record model's OWN
+    tail (the ceiling for any record-leg approach) alongside the blend result."""
+    rec_cols = record_only_columns()
+    full_cols = feature_names()
+    ufc, nonufc = build_union_frames(use_cache)
+    X, y, meta = build_feature_matrix(ufc)
+    X_sw, _, _ = build_feature_matrix(swap_sides(ufc))
+    dt = pd.to_datetime(meta["event_date"])
+    m_tr = (dt < TRAIN_END).to_numpy()
+    m_va = ((dt >= TRAIN_END) & (dt < VAL_END)).to_numpy()
+    m_te = (dt >= VAL_END).to_numpy()
+    y_te = y[m_te].to_numpy().astype(int)
+    y_va_arr = y[m_va].to_numpy().astype(int)
+    market_te = meta.loc[m_te, "market_prob_a"].to_numpy(dtype=float)
+    has_te = ~np.isnan(market_te)
+    Xn, yn, _ = build_feature_matrix(nonufc)
+    w = weights[len(weights) // 2]  # one representative down-weight
+    Xr_tr = pd.concat([X[rec_cols][m_tr], Xn[rec_cols]], ignore_index=True)
+    yr_tr = pd.concat([y[m_tr], yn], ignore_index=True)
+    sw = np.concatenate([np.ones(int(m_tr.sum())), np.full(len(Xn), w)])
+
+    def rec_tail(model) -> float:
+        p = order_averaged_probs(model, X[rec_cols][m_te], X_sw[rec_cols][m_te])
+        return next(r for r in bucket_table(p, market_te, y_te) if r["lo"] == 0.72)["model"]
+
+    def leg_and_blend(union_leg, full, bf_va, bf_te, bf_te_sw, bf_va_sw, sel3):
+        pu_va = union_leg.predict_proba_a(X[rec_cols][m_va].reset_index(drop=True))
+        pu_te = union_leg.predict_proba_a(X[rec_cols][m_te].reset_index(drop=True))
+        pu_te_sw = union_leg.predict_proba_a(X_sw[rec_cols][m_te].reset_index(drop=True))
+        pu_va_sw = union_leg.predict_proba_a(X_sw[rec_cols][m_va].reset_index(drop=True))
+        b4_va = np.column_stack([bf_va, pu_va])
+        sel4 = _select_blend(b4_va, y_va_arr)
+        p4_te = _order_avg_blend(np.column_stack([bf_te, pu_te]),
+                                 np.column_stack([bf_te_sw, pu_te_sw]), sel4)
+        p4_va = _order_avg_blend(b4_va, np.column_stack([bf_va_sw, pu_va_sw]), sel4)
+        tl = next(r for r in bucket_table(p4_te, market_te, y_te) if r["lo"] == 0.72)["model"]
+        cn = next(r for r in bucket_table(p4_te, market_te, y_te) if r["lo"] == 0.50)["model"]
+        return {
+            "headline_odds": headline(p4_te[has_te], y_te[has_te]),
+            "tail": tl, "coin": cn,
+            "val_logloss": float(log_loss(y_va_arr, np.clip(p4_va, EPS, 1 - EPS))),
+            "murphy": murphy(p4_te[has_te], y_te[has_te]),
+            "mode": sel4["mode"],
+        }, sel4
+
+    out: dict = {"weight": w, "seeds": {}}
+    for seed in seeds:
+        full = train_full_ensemble(X[full_cols][m_tr], y[m_tr], X[full_cols][m_va], y[m_va], seed)
+        bf_va = full._base_predict_matrix(X[full_cols][m_va].reset_index(drop=True))
+        bf_te = full._base_predict_matrix(X[full_cols][m_te].reset_index(drop=True))
+        bf_te_sw = full._base_predict_matrix(X_sw[full_cols][m_te].reset_index(drop=True))
+        bf_va_sw = full._base_predict_matrix(X_sw[full_cols][m_va].reset_index(drop=True))
+        sel3 = _select_blend(bf_va, y_va_arr)
+        p3_te = _order_avg_blend(bf_te, bf_te_sw, sel3)
+        base3_tail = next(r for r in bucket_table(p3_te, market_te, y_te) if r["lo"] == 0.72)["model"]
+
+        union = fit_record_only(Xr_tr, yr_tr, X[rec_cols][m_va], y[m_va], rec_cols, seed, sample_weight=sw)
+        transfer = fit_record_transfer(union, X[rec_cols][m_tr].reset_index(drop=True),
+                                       y[m_tr].reset_index(drop=True),
+                                       X[rec_cols][m_va].reset_index(drop=True),
+                                       y[m_va].reset_index(drop=True), seed)
+        blend_union, _ = leg_and_blend(union, full, bf_va, bf_te, bf_te_sw, bf_va_sw, sel3)
+        blend_transfer, _ = leg_and_blend(transfer, full, bf_va, bf_te, bf_te_sw, bf_va_sw, sel3)
+        out["seeds"][str(seed)] = {
+            "full_tail": base3_tail,
+            "union_standalone_tail": rec_tail(union),
+            "transfer_standalone_tail": rec_tail(transfer),
+            "blend_union": blend_union,
+            "blend_transfer": blend_transfer,
+            "base3_val": float(log_loss(y_va_arr, np.clip(_order_avg_blend(bf_va, bf_va_sw, sel3), EPS, 1 - EPS))),
+        }
+    return out
+
+
+def print_stage_2b(res: dict, seeds: list[int]) -> None:
+    print(f"\n=== STAGE 2b — transfer record leg (down-weight {res['weight']}) ===")
+    print("standalone tails (the ceiling: a record leg can never out-sharpen the "
+          "full model's tail) and the 4th-leg blend result:\n")
+    print(f"  {'seed':<6}{'full tail':>10}{'union tail':>12}{'transf tail':>12}"
+          f"{'blendU tail':>12}{'blendT tail':>12}{'blendT val':>12}")
+    for seed in seeds:
+        s = res["seeds"][str(seed)]
+        print(f"  {seed:<6}{s['full_tail']:>10.4f}{s['union_standalone_tail']:>12.4f}"
+              f"{s['transfer_standalone_tail']:>12.4f}{s['blend_union']['tail']:>12.4f}"
+              f"{s['blend_transfer']['tail']:>12.4f}{s['blend_transfer']['val_logloss']:>12.4f}")
+    print("\n-- GATE 1 read (transfer vs 3-leg baseline) --")
+    for seed in seeds:
+        s = res["seeds"][str(seed)]
+        dt_tail = s["blend_transfer"]["tail"] - s["full_tail"]
+        dv = s["blend_transfer"]["val_logloss"] - s["base3_val"]
+        print(f"  seed {seed}: transfer-blend Δtail {dt_tail:+.4f}  Δval {dv:+.4f}  "
+              f"acc {s['blend_transfer']['headline_odds']['acc']:.4f}  "
+              f"reliab {s['blend_transfer']['murphy']['reliability']:.5f}")
+
+
 # ── entrypoint ───────────────────────────────────────────────────────────
 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--stage", required=True, choices=("0a", "0b", "0bx"))
+    ap.add_argument("--stage", required=True, choices=("0a", "0b", "0bx", "2a", "2b"))
     ap.add_argument("--cache", action="store_true")
     ap.add_argument("--seeds", default="42,7,13")
     ap.add_argument("--weights", default="0.1,0.2,0.4")
@@ -556,6 +877,16 @@ def main() -> None:
         weights = [float(w) for w in args.weights.split(",")]
         res = stage_0b_controls(seeds, weights, args.cache)
         payload = {"stage_0b_controls": res}
+    elif args.stage == "2a":
+        weights = [float(w) for w in args.weights.split(",")]
+        res = stage_2a(seeds, weights, args.cache)
+        print_stage_2a(res, seeds, weights)
+        payload = {"stage_2a": res}
+    elif args.stage == "2b":
+        weights = [float(w) for w in args.weights.split(",")]
+        res = stage_2b(seeds, weights, args.cache)
+        print_stage_2b(res, seeds)
+        payload = {"stage_2b": res}
 
     existing = json.loads(OUT_PATH.read_text()) if OUT_PATH.exists() else {}
     existing.update(payload)
