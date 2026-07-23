@@ -27,6 +27,7 @@ import pandas as pd
 from rich.console import Console
 
 from .db import get_connection
+from .dominance import SCORECARDS_SQL, add_dominance, attach_round_share
 from .opponent_ratings import ALL_KEYS as RATING_ALL_KEYS
 from .opponent_ratings import compute_rating_snapshots
 
@@ -187,6 +188,9 @@ class RawData:
     odds: pd.DataFrame
     score_history: pd.DataFrame
     sherdog: pd.DataFrame
+    # Judges' round-by-round cards, for the graded `dominance_a` LABEL only
+    # (src/dominance.py). Never a feature — see the ban documented there.
+    scorecards: pd.DataFrame
 
 
 def fetch_raw() -> RawData:
@@ -199,13 +203,15 @@ def fetch_raw() -> RawData:
         odds = _fetch_df(conn, EXTERNAL_ODDS_SQL)
         score_history = _fetch_df(conn, SCORE_HISTORY_SQL)
         sherdog = _fetch_df(conn, SHERDOG_SQL)
+        scorecards = _fetch_df(conn, SCORECARDS_SQL)
     console.log(
         f"fetched {len(bouts):,} bouts · {len(round_stats):,} round-stat rows · "
         f"{len(fighters):,} fighters · {len(odds):,} odds rows · "
         f"{len(score_history):,} score-history rows · "
-        f"{len(sherdog):,} sherdog career rows"
+        f"{len(sherdog):,} sherdog career rows · "
+        f"{len(scorecards):,} judge scorecard rows"
     )
-    return RawData(bouts, round_stats, fighters, odds, score_history, sherdog)
+    return RawData(bouts, round_stats, fighters, odds, score_history, sherdog, scorecards)
 
 
 # --------------------------------------------------------------------------
@@ -700,6 +706,21 @@ class FighterHistory:
 # --------------------------------------------------------------------------
 
 
+def _dominance_map(raw: RawData) -> dict[str, float]:
+    """bout_id → `dominance_a`, over completed bouts only.
+
+    Draws and no-contests are scored (0.5) rather than dropped, but they never
+    reach a training row: `target_a_wins` is None for them and `should_emit`
+    already requires a target. Kept in the map so the column is populated for
+    anyone who does emit them, and so the count is auditable.
+    """
+    completed = raw.bouts[raw.bouts["status"] == "completed"].copy()
+    if completed.empty:
+        return {}
+    scored = add_dominance(attach_round_share(completed, raw.scorecards))
+    return dict(zip(scored["bout_id"], scored["dominance_a"].astype(float), strict=True))
+
+
 def build_dataset(
     raw: RawData, *, include_scheduled: bool = False, include_debuts: bool = False
 ) -> pd.DataFrame:
@@ -725,6 +746,10 @@ def build_dataset(
     odds = raw.odds.set_index("bout_id")
     # Non-UFC career fights per fighter (pre-UFC features, v0.9.0).
     preufc_by_fighter = group_sherdog_fights(raw.sherdog)
+    # Graded outcome LABEL per bout (src/dominance.py), keyed by bout_id in
+    # the raw scrape orientation — same orientation the row is built in, so
+    # symmetrize_for_training flips it alongside target_a_wins.
+    dominance_by_bout = _dominance_map(raw)
 
     # Build a per-(fighter, date) ordered list of (vertex_score,
     # vertex_score_all_time) so we can look up the most-recent snapshot
@@ -910,6 +935,10 @@ def build_dataset(
                 "is_debut_b": snap_b["prior_bouts"] == 0,
                 "market_prob_a": market_prob_a,
                 "target_a_wins": target,
+                # Graded twin of target_a_wins — how convincingly A won, in
+                # [0,1] with 0.5 = draw (src/dominance.py). Alongside, never
+                # instead: target_a_wins remains the evaluation label.
+                "dominance_a": dominance_by_bout.get(bout_id),
             }
             # elo + attack/defense + opponent-quality columns per side.
             for key in RATING_ALL_KEYS:
@@ -1014,6 +1043,11 @@ def swap_sides(df: pd.DataFrame) -> pd.DataFrame:
     if "market_prob_a" in df.columns:
         notna = df["market_prob_a"].notna()
         df.loc[notna, "market_prob_a"] = 1.0 - df.loc[notna, "market_prob_a"]
+    # dominance_a has no `dominance_b` partner, so _ab_column_pairs does not
+    # see it — it has to be mirrored by hand, exactly like market_prob_a.
+    if "dominance_a" in df.columns:
+        notna = df["dominance_a"].notna()
+        df.loc[notna, "dominance_a"] = 1.0 - df.loc[notna, "dominance_a"]
     return df
 
 
@@ -1055,4 +1089,26 @@ def symmetrize_for_training(df: pd.DataFrame) -> pd.DataFrame:
     df.loc[mask, "target_a_wins"] = 1 - df.loc[mask, "target_a_wins"]
     # Keep nullable Int dtype so inference rows can carry NaN through.
     df["target_a_wins"] = pd.array(df["target_a_wins"].values, dtype="Int8")
+
+    # The graded label MUST flip on exactly the same mask. `dominance_a` is
+    # not an `_a`/`_b` pair so the loop above does not touch it, and getting
+    # this wrong is the one mistake that would not announce itself: the raw
+    # scrape puts the winner in slot A ~95% of the time, so a label left
+    # unflipped would lock onto the winner slot and produce a brilliant
+    # backtest with nothing behind it on serving.
+    if "dominance_a" in df.columns:
+        flip = mask & df["dominance_a"].notna()
+        df.loc[flip, "dominance_a"] = 1.0 - df.loc[flip, "dominance_a"]
+        dom = pd.to_numeric(df["dominance_a"], errors="coerce")
+        tgt = pd.to_numeric(df["target_a_wins"], errors="coerce")
+        both = dom.notna() & tgt.notna()
+        if both.any():
+            assert abs(float(dom[both].mean()) - 0.5) < 0.05, (
+                f"mean dominance_a {dom[both].mean():.4f} — the graded label did not "
+                "symmetrize with the binary one"
+            )
+            assert float(dom[both].corr(tgt[both])) > 0.5, (
+                "dominance_a and target_a_wins disagree on direction after "
+                "symmetrization"
+            )
     return df
