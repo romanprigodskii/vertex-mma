@@ -221,6 +221,16 @@ def index_bouts_by_event_window(
 # prop grid is missing (future cards) must not wipe lines captured
 # earlier. Winner odds keep overwrite semantics here (run_backfill's
 # purpose is refreshing lines; also lets a re-run repair bad values).
+#
+# INVARIANT — `created_at` MUST NEVER appear in the DO UPDATE SET below.
+# It is the moment this bout FIRST got a sportsbook line, and it is the only
+# announcement-date proxy anywhere in the schema: nothing else records when a
+# fight was booked. `bout.created_at` cannot serve (stamped en masse at import)
+# and `fetched_at` is deliberately overwritten every run. Adding
+# `created_at = now()` here would silently collapse every lead time to zero and
+# destroy accumulated history that CANNOT be reconstructed. Same invariant in
+# the 6-hourly cron's upsert (scripts/scraper/scripts/08_scrape_bestfightodds.py);
+# both are pinned by scripts/scraper/tests/test_odds_first_seen.py.
 UPSERT_SQL = """
 INSERT INTO bout_external_odds
   (bout_id, source, winner_a_decimal, winner_b_decimal,

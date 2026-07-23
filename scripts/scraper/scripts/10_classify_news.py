@@ -3,12 +3,14 @@ from __future__ import annotations
 import _path  # noqa: F401
 
 from src.db import get_connection
+from src.loaders.change_events import NEWS_SIGNAL_CLASSIFICATIONS
 from src.loaders.news import (
     apply_classification,
     auto_create_bout,
     cancel_bout_if_provisional,
     fetch_unprocessed,
     find_bout,
+    record_news_signal,
     resolve_fighter_ids,
     resolve_or_create_event,
     update_provisional_bout,
@@ -67,6 +69,7 @@ def run() -> dict[str, int]:
         "bouts_auto_created": 0,
         "bouts_cancelled": 0,
         "bouts_updated": 0,
+        "news_signals": 0,
     }
 
     with get_connection() as conn:
@@ -169,6 +172,13 @@ def run() -> dict[str, int]:
                     else None
                 )
 
+                # Did this item actually change anything, or did we only read
+                # it? Recorded alongside the news signal below, because
+                # "reported but not acted on" is the common case — we never
+                # flip an official row on the strength of a headline — and the
+                # report is worth keeping either way.
+                acted = False
+
                 # If Haiku tagged this as a freshly-announced booking AND we have
                 # everything needed (two known fighters, a weight class, a
                 # trusted source, high confidence) AND no existing bout links the
@@ -194,6 +204,7 @@ def run() -> dict[str, int]:
                             res.event_hint,
                             event_date=res.event_date,
                             cache=event_cache,
+                            first_seen_at=item.published_at_ts,
                         )
                         if not event_id:
                             continue
@@ -203,6 +214,12 @@ def run() -> dict[str, int]:
                             fighter_b_id=fb_id,
                             event_id=event_id,
                             weight_class=wc,
+                            # The announcement date, not the moment we got
+                            # round to classifying it — this row's
+                            # first_seen_at is the earliest booking evidence
+                            # we will ever have for this fight, and it
+                            # survives adoption by the UFCStats scrape.
+                            first_seen_at=item.published_at_ts,
                         )
                         if bout_id is None:
                             bout_id = new_bout_id
@@ -223,7 +240,14 @@ def run() -> dict[str, int]:
                     and item.source_is_trusted
                     and res.confidence >= AUTO_CREATE_BOUT_MIN_CONFIDENCE
                 ):
-                    if cancel_bout_if_provisional(conn, bout_id):
+                    if cancel_bout_if_provisional(
+                        conn,
+                        bout_id,
+                        news_item_id=item.id,
+                        observed_at=item.published_at_ts,
+                        confidence=res.confidence,
+                    ):
+                        acted = True
                         totals["bouts_cancelled"] += 1
                         log.info(f"  provisional bout cancelled: {bout_id}")
 
@@ -242,9 +266,38 @@ def run() -> dict[str, int]:
                         bout_id,
                         weight_class=(primary[4] if primary else None),
                         event_date=res.event_date,
+                        news_item_id=item.id,
+                        observed_at=item.published_at_ts,
+                        confidence=res.confidence,
                     ):
+                        acted = True
                         totals["bouts_updated"] += 1
                         log.info(f"  provisional bout updated (changed): {bout_id}")
+
+                # Keep the report itself. The three booking-circumstance
+                # categories the classifier already emits — a withdrawal, a
+                # changed booking, weigh-in coverage — were being used for
+                # display and then thrown away, because acting on them is only
+                # ever safe for provisional rows. The observation is the point;
+                # whether we were entitled to touch the row is a separate
+                # matter, and `acted` records which it was. Needs a bout to
+                # attach to: an unattributable report is not a signal about
+                # anything we can model.
+                if (
+                    res.classification in NEWS_SIGNAL_CLASSIFICATIONS
+                    and bout_id is not None
+                    and record_news_signal(
+                        conn,
+                        bout_id=bout_id,
+                        news_item_id=item.id,
+                        classification=res.classification,
+                        confidence=res.confidence,
+                        published_at=item.published_at_ts,
+                        source_is_trusted=item.source_is_trusted,
+                        acted=acted,
+                    )
+                ):
+                    totals["news_signals"] += 1
 
                 status = decide_status(
                     res.classification,
@@ -275,7 +328,8 @@ def run() -> dict[str, int]:
         f"rejected={totals['rejected']} failed_batches={totals['failed_batches']} "
         f"bouts_auto_created={totals['bouts_auto_created']} "
         f"bouts_cancelled={totals['bouts_cancelled']} "
-        f"bouts_updated={totals['bouts_updated']}"
+        f"bouts_updated={totals['bouts_updated']} "
+        f"news_signals={totals['news_signals']}"
     )
     return totals
 

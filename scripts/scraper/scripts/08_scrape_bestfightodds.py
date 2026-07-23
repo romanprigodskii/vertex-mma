@@ -406,7 +406,20 @@ def upsert_odds(
     winner_b_decimal (and vice versa) so the row matches the local
     bout's fighter_a/fighter_b ordering. Method columns COALESCE on
     conflict: props leave the homepage once the event starts, and a
-    post-props scrape must not wipe the captured closing lines."""
+    post-props scrape must not wipe the captured closing lines.
+
+    INVARIANT — `created_at` MUST NEVER appear in the DO UPDATE SET below.
+    It is the moment this bout FIRST got a sportsbook line, and it is the
+    only announcement-date proxy we have anywhere in the schema: nothing
+    else records when a fight was booked. `bout.created_at` cannot serve
+    (it was stamped en masse at import), and `fetched_at` is deliberately
+    overwritten on every 6-hourly pass. A single `created_at = now()` added
+    to the SET clause would silently collapse every lead time to zero and
+    destroy accumulated history that CANNOT be reconstructed. The same
+    invariant holds for the backfill's UPSERT_SQL in
+    scripts/odds_scraper/src/matcher.py; both are pinned by
+    scripts/scraper/tests/test_odds_first_seen.py.
+    """
     winner_a = fight.winner_b_decimal if swapped else fight.winner_a_decimal
     winner_b = fight.winner_a_decimal if swapped else fight.winner_b_decimal
     meth = fight.method_decimals

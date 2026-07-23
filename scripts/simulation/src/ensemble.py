@@ -206,6 +206,26 @@ class EnsembleModel:
         # Imputer values learned on train for logreg (mean per column).
         self.logreg_means: np.ndarray | None = None
         self.blender: LogisticRegression | None = None
+        # SHIPPED EMPTY ON PURPOSE — this is not an unfinished slot.
+        #
+        # The machinery below it is complete and wired into predict_proba_a;
+        # what is missing is a reason to fill it. The tail-resolution lab
+        # (docs/tail_resolution.md) measured recalibration end to end: fitted
+        # on ~3.1k walk-forward out-of-fold rows every family agrees on the
+        # same mild map (T ~ 0.89) and it is robust (91 % of bootstraps), but
+        # the honest effect is +0.0022 of the 0.0229 log-loss gap to the
+        # closing line. That fails the lab's gate.
+        #
+        # It fails because the gap is RESOLUTION, not calibration: reliability
+        # is already at parity with the book (0.00296 vs 0.00303) while
+        # resolution is 0.03812 vs 0.04580. A monotone map cannot sharpen the
+        # heavy favourites without equally sharpening the coin-flips, which is
+        # the region where we already win. Fitting on the 429-row val split
+        # instead is worse than useless — val PICKS the 3-parameter piecewise
+        # family, which is the worst of them on test.
+        #
+        # So: filling this in is a measured dead end, not an oversight. If you
+        # are here to add a calibrator, read the lab first.
         self.calibrator: ProbabilityCalibrator | None = None
         self.training_meta: dict[str, Any] = {}
 

@@ -11,6 +11,15 @@ from ..parsers.events import EventListItem
 from ..utils.countries import map_country
 from ..utils.logger import log
 from ..utils.slugify import slug_with_id
+from .change_events import (
+    KIND_BOUT_REMOVED,
+    KIND_OPPONENT_SWAPPED,
+    KIND_PROVISIONAL_MERGED,
+    KIND_STATUS_CANCELLED,
+    SOURCE_UFCSTATS,
+    pair_signature,
+    record_change,
+)
 
 
 @dataclass
@@ -131,9 +140,15 @@ def upsert_event_listing(
                 """
                 INSERT INTO event (
                     slug, name, short_name, promotion, date,
-                    location_city, location_country, venue, status, ufc_stats_id
+                    location_city, location_country, venue, status, ufc_stats_id,
+                    first_seen_at
                 )
-                VALUES (%s, %s, %s, 'ufc', %s, %s, %s, NULL, %s::event_status, %s)
+                VALUES (%s, %s, %s, 'ufc', %s, %s, %s, NULL, %s::event_status, %s,
+                        now())
+                -- first_seen_at is INSERT-only and must never appear below:
+                -- it records when this card first showed up, and the listing
+                -- is re-read every scrape. See the note on bout.first_seen_at
+                -- in upsert_bouts.
                 ON CONFLICT (ufc_stats_id) DO UPDATE SET
                     name = EXCLUDED.name,
                     date = EXCLUDED.date,
@@ -280,6 +295,53 @@ def reconcile_duplicate_events(conn: psycopg.Connection) -> int:
                         "WHERE related_bout_id = %s::uuid",
                         (off_bout, prov_bout),
                     )
+                    # Same reasoning as the cross-event twin merge in
+                    # upsert_bouts: the provisional row is the earliest record
+                    # that this fight was booked, so its creation mark is
+                    # carried over to the surviving row before it is dropped.
+                    cur.execute(
+                        "SELECT created_at, weight_class::text, first_seen_at "
+                        "FROM bout WHERE id = %s::uuid",
+                        (prov_bout,),
+                    )
+                    prov_row = cur.fetchone()
+                    # Carry the earlier first-seen onto the survivor: the
+                    # provisional row dates from the announcement, the official
+                    # one only from when UFCStats listed the fight.
+                    cur.execute(
+                        """
+                        UPDATE bout SET first_seen_at = %s
+                        WHERE id = %s::uuid
+                          AND %s IS NOT NULL
+                          AND (first_seen_at IS NULL OR first_seen_at > %s)
+                        """,
+                        (
+                            prov_row[2] if prov_row else None,
+                            off_bout,
+                            prov_row[2] if prov_row else None,
+                            prov_row[2] if prov_row else None,
+                        ),
+                    )
+                    record_change(
+                        cur,
+                        bout_id=off_bout,
+                        event_id=official_id,
+                        kind=KIND_PROVISIONAL_MERGED,
+                        source=SOURCE_UFCSTATS,
+                        signature=prov_bout,
+                        payload={
+                            "provisional_bout_id": prov_bout,
+                            "provisional_event_id": provisional_id,
+                            "provisional_event_name": p_name,
+                            "provisional_created_at": prov_row[0] if prov_row else None,
+                            "provisional_weight_class": prov_row[1] if prov_row else None,
+                            "provisional_first_seen_at": prov_row[2] if prov_row else None,
+                            "surviving_bout_id": off_bout,
+                            "official_event_name": o_name,
+                            "first_seen_at_carried_over": bool(prov_row and prov_row[2]),
+                            "reason": "duplicate_event_merge",
+                        },
+                    )
                     cur.execute(
                         "DELETE FROM bout WHERE id = %s::uuid", (prov_bout,)
                     )
@@ -315,6 +377,13 @@ def cancel_past_scheduled_bouts(conn: psycopg.Connection) -> int:
     Idempotent; runs each events scrape. A 1-day grace avoids touching a card
     that's mid-event. If a real result lands later, the bout upsert flips the
     status back to 'completed' (EXCLUDED.status wins), so this is reversible.
+
+    Each flip is recorded in bout_change_event. A fight that was on the card
+    and produced no result is a scratch, which is the same class of signal as
+    a removal — worth keeping even though, unlike a removal, the row survives
+    to be inspected later. RETURNING drives the logging so only rows this
+    statement actually changed are recorded; a second run updates nothing and
+    therefore logs nothing.
     """
     with conn.cursor() as cur:
         cur.execute(
@@ -324,9 +393,29 @@ def cancel_past_scheduled_bouts(conn: psycopg.Connection) -> int:
               AND event_id IN (
                 SELECT id FROM event WHERE date < CURRENT_DATE - INTERVAL '1 day'
               )
+            RETURNING id::text, event_id::text, ufc_stats_id,
+                      fighter_a_id::text, fighter_b_id::text, weight_class::text
             """
         )
-        return cur.rowcount or 0
+        cancelled = cur.fetchall()
+        for bout_id, event_id, ufc_id, fa, fb, weight_class in cancelled:
+            record_change(
+                cur,
+                bout_id=bout_id,
+                event_id=event_id,
+                kind=KIND_STATUS_CANCELLED,
+                source=SOURCE_UFCSTATS,
+                signature="past_event_sweep",
+                payload={
+                    "ufc_stats_id": ufc_id,
+                    "fighter_a_id": fa,
+                    "fighter_b_id": fb,
+                    "weight_class": weight_class,
+                    "previous_status": "scheduled",
+                    "reason": "event_passed_without_result",
+                },
+            )
+        return len(cancelled)
 
 
 def upsert_event_details(
@@ -360,6 +449,182 @@ def upsert_event_details(
             """,
             (city, country, details.date, ufc_stats_id),
         )
+
+
+def _record_removed_bouts(cur, event_id: str, seen_ids: list[str]) -> int:
+    """Log every scheduled bout that is about to be DELETEd for having
+    disappeared off its UFCStats event page.
+
+    This runs immediately before the delete and is the whole reason
+    bout_change_event exists. A fight coming off a card is a withdrawal, an
+    injury or a scratch — the booking circumstance we have no other record of —
+    and the delete that follows destroys the only evidence it was ever booked.
+    Everything a later analysis could want is copied into the payload, because
+    after the DELETE the bout row is not there to join to.
+    """
+    cur.execute(
+        """
+        SELECT b.id::text, b.ufc_stats_id,
+               b.fighter_a_id::text, b.fighter_b_id::text,
+               fa.name_en, fb.name_en,
+               b.weight_class::text, b.bout_order,
+               b.is_title_fight, b.is_main_event, e.date, b.first_seen_at
+        FROM bout b
+        JOIN fighter fa ON fa.id = b.fighter_a_id
+        JOIN fighter fb ON fb.id = b.fighter_b_id
+        LEFT JOIN event e ON e.id = b.event_id
+        WHERE b.event_id = %s::uuid AND b.status = 'scheduled'
+          AND b.ufc_stats_id IS NOT NULL AND NOT (b.ufc_stats_id = ANY(%s))
+        """,
+        (event_id, seen_ids),
+    )
+    doomed = cur.fetchall()
+    today = datetime.now(timezone.utc).date()
+    written = 0
+    for (
+        bout_id, ufc_id, fa_id, fb_id, fa_name, fb_name,
+        weight_class, bout_order, is_title, is_main, event_date, first_seen_at,
+    ) in doomed:
+        # Days of notice left on the clock when the fight came off. Negative
+        # would mean the card has already happened, which the 'scheduled'
+        # filter mostly rules out; kept as-is rather than clamped, since a
+        # surprising value should look surprising.
+        days_to_event = (event_date.date() - today).days if event_date else None
+        if record_change(
+            cur,
+            bout_id=bout_id,
+            event_id=event_id,
+            kind=KIND_BOUT_REMOVED,
+            source=SOURCE_UFCSTATS,
+            # The bout's own id: pulled → re-added → pulled again is two real
+            # events and gets two rows; one removal re-observed gets one.
+            signature=ufc_id,
+            payload={
+                "ufc_stats_id": ufc_id,
+                "fighter_a_id": fa_id,
+                "fighter_b_id": fb_id,
+                "fighter_a_name": fa_name,
+                "fighter_b_name": fb_name,
+                "weight_class": weight_class,
+                "bout_order": bout_order,
+                "is_title_fight": is_title,
+                "is_main_event": is_main,
+                "event_date": event_date,
+                "days_to_event": days_to_event,
+                # How long the booking stood before it came off, when we know
+                # when it appeared. NULL for anything booked before
+                # first_seen_at existed — an honest gap, not a zero.
+                "first_seen_at": first_seen_at,
+                "days_booked": (
+                    (today - first_seen_at.date()).days if first_seen_at else None
+                ),
+                "previous_status": "scheduled",
+            },
+        ):
+            written += 1
+            log.info(
+                f"  bout removed from card: {fa_name} vs {fb_name} "
+                f"(ufc={ufc_id}, {days_to_event}d out)"
+            )
+    return written
+
+
+def _record_provisional_merges(cur, event_id: str) -> int:
+    """Log the cross-event provisional twins that are about to be DELETEd in
+    favour of the official row for the same pair at `event_id`.
+
+    Predicate is identical to the DELETE that follows. The row is filed under
+    the SURVIVING bout so it stays joinable, and carries the twin's created_at
+    — a news-born provisional bout was created when the announcement was
+    published, which is the earliest evidence of the booking anywhere in the
+    database.
+    """
+    # Carry the earlier first_seen_at across BEFORE the twin is deleted. This
+    # is not deduplication housekeeping: the provisional row was created when
+    # the announcement was published, so it holds a first-seen the official
+    # row cannot have, and dropping it would replace a real announcement date
+    # with the date UFCStats got round to listing the fight.
+    cur.execute(
+        """
+        UPDATE bout real SET first_seen_at = prov.first_seen_at
+        FROM bout prov
+        WHERE prov.ufc_stats_id IS NULL AND prov.status = 'scheduled'
+          AND prov.event_id <> %s::uuid
+          AND real.event_id = %s::uuid AND real.ufc_stats_id IS NOT NULL
+          AND (
+            (real.fighter_a_id = prov.fighter_a_id AND real.fighter_b_id = prov.fighter_b_id)
+            OR (real.fighter_a_id = prov.fighter_b_id AND real.fighter_b_id = prov.fighter_a_id)
+          )
+          AND prov.first_seen_at IS NOT NULL
+          AND (real.first_seen_at IS NULL OR prov.first_seen_at < real.first_seen_at)
+        """,
+        (event_id, event_id),
+    )
+    cur.execute(
+        """
+        SELECT prov.id::text, prov.event_id::text, prov.created_at,
+               prov.weight_class::text, prov.first_seen_at,
+               real.id::text, real.ufc_stats_id
+        FROM bout prov, bout real
+        WHERE prov.ufc_stats_id IS NULL AND prov.status = 'scheduled'
+          AND prov.event_id <> %s::uuid
+          AND real.event_id = %s::uuid AND real.ufc_stats_id IS NOT NULL
+          AND (
+            (real.fighter_a_id = prov.fighter_a_id AND real.fighter_b_id = prov.fighter_b_id)
+            OR (real.fighter_a_id = prov.fighter_b_id AND real.fighter_b_id = prov.fighter_a_id)
+          )
+        """,
+        (event_id, event_id),
+    )
+    written = 0
+    for (
+        prov_id, prov_event_id, prov_created_at, prov_weight, prov_first_seen,
+        real_id, real_ufc_id,
+    ) in cur.fetchall():
+        if record_change(
+            cur,
+            bout_id=real_id,
+            event_id=event_id,
+            kind=KIND_PROVISIONAL_MERGED,
+            source=SOURCE_UFCSTATS,
+            signature=prov_id,
+            payload={
+                "provisional_bout_id": prov_id,
+                "provisional_event_id": prov_event_id,
+                "provisional_created_at": prov_created_at,
+                "provisional_first_seen_at": prov_first_seen,
+                "provisional_weight_class": prov_weight,
+                "surviving_bout_id": real_id,
+                "surviving_ufc_stats_id": real_ufc_id,
+                "first_seen_at_carried_over": prov_first_seen is not None,
+                "reason": "cross_event_twin",
+            },
+        ):
+            written += 1
+    return written
+
+
+def _existing_pairs(cur, ufc_ids: list[str]) -> dict[str, tuple[str, str, str, str, str]]:
+    """Current (bout_id, fighter_a_id, fighter_b_id, name_a, name_b) for each
+    already-stored ufc_stats_id, so the upsert can tell an opponent swap from
+    a routine re-scrape. Read BEFORE any provisional row is adopted: adoption
+    only ever matches on an identical pair, so a freshly adopted bout has no
+    prior state to differ from and correctly logs nothing."""
+    if not ufc_ids:
+        return {}
+    cur.execute(
+        """
+        SELECT b.ufc_stats_id, b.id::text,
+               b.fighter_a_id::text, b.fighter_b_id::text,
+               fa.name_en, fb.name_en
+        FROM bout b
+        JOIN fighter fa ON fa.id = b.fighter_a_id
+        JOIN fighter fb ON fb.id = b.fighter_b_id
+        WHERE b.ufc_stats_id = ANY(%s)
+        """,
+        (ufc_ids,),
+    )
+    return {r[0]: (r[1], r[2], r[3], r[4], r[5]) for r in cur.fetchall()}
 
 
 def _resolve_fighter_ids(conn: psycopg.Connection, ufc_ids: list[str]) -> dict[str, str]:
@@ -403,6 +668,15 @@ def upsert_bouts(
     bout_status_map = {"completed": "completed", "scheduled": "scheduled"}
 
     with conn.cursor() as cur:
+        # Snapshot the stored matchups before anything in this pass touches
+        # them — the only chance to notice that a fight-details id now lists a
+        # different pair of fighters.
+        prior_pairs = (
+            {}
+            if dry_run
+            else _existing_pairs(cur, [b.ufc_stats_id for b in bouts if b.ufc_stats_id])
+        )
+
         for b in bouts:
             f_a = fighter_map.get(b.fighter_a_ufc_id)
             f_b = fighter_map.get(b.fighter_b_ufc_id)
@@ -437,6 +711,55 @@ def upsert_bouts(
                 counts.inserted += 1
                 continue
 
+            # An opponent swap on the SAME fight-details id: UFCStats edited
+            # the matchup in place instead of retiring the id. Compared as
+            # unordered pairs — the page routinely renders the two fighters in
+            # the other order, and that is a rendering detail, not a booking
+            # change.
+            #
+            # We LOG it and deliberately DO NOT update fighter_a_id /
+            # fighter_b_id on the row (which is also what the loader has always
+            # done — the columns are absent from the DO UPDATE SET below, so
+            # until now the swap was simply ignored in silence). Rewriting the
+            # fighters would retro-fit a different matchup onto a row that
+            # already carries a prediction, a market and any placed bets, and
+            # the model's whole point-in-time discipline rests on rows not
+            # changing their meaning after the fact. The log records what
+            # happened; repairing the row is a separate, deliberate decision.
+            prior = prior_pairs.get(b.ufc_stats_id)
+            if prior is not None:
+                prior_bout_id, prior_a, prior_b, prior_a_name, prior_b_name = prior
+                old_sig = pair_signature(prior_a, prior_b)
+                new_sig = pair_signature(f_a, f_b)
+                if old_sig != new_sig and record_change(
+                    cur,
+                    bout_id=prior_bout_id,
+                    event_id=event_id,
+                    kind=KIND_OPPONENT_SWAPPED,
+                    source=SOURCE_UFCSTATS,
+                    signature=f"{old_sig}->{new_sig}",
+                    payload={
+                        "ufc_stats_id": b.ufc_stats_id,
+                        "old_fighter_a_id": prior_a,
+                        "old_fighter_b_id": prior_b,
+                        "old_fighter_a_name": prior_a_name,
+                        "old_fighter_b_name": prior_b_name,
+                        "new_fighter_a_id": f_a,
+                        "new_fighter_b_id": f_b,
+                        "new_fighter_a_name": b.fighter_a_name,
+                        "new_fighter_b_name": b.fighter_b_name,
+                        "weight_class": weight_class,
+                        "bout_order": b.bout_order,
+                        "row_updated": False,
+                    },
+                ):
+                    log.info(
+                        f"  opponent swapped on ufc={b.ufc_stats_id}: "
+                        f"{prior_a_name} vs {prior_b_name} -> "
+                        f"{b.fighter_a_name} vs {b.fighter_b_name} "
+                        f"(logged, bout row left as booked)"
+                    )
+
             # Reconcile a news-created provisional bout (ufc_stats_id IS NULL)
             # for the same pair at this event: claim it so the upsert updates it
             # in place (keeping its id and any linked markets/predictions)
@@ -461,14 +784,32 @@ def upsert_bouts(
                     weight_class, is_title_fight, is_main_event, is_co_main_event,
                     scheduled_rounds, bout_order,
                     status, winner_id, method, method_detail, round_finished, time_finished_seconds,
-                    ufc_stats_id
+                    ufc_stats_id,
+                    first_seen_at
                 ) VALUES (
                     %s, %s, %s,
                     %s::weight_class, %s, %s, %s,
                     %s, %s,
                     %s::bout_status, %s, %s::bout_method, %s, %s, %s,
-                    %s
+                    %s,
+                    now()
                 )
+                -- INVARIANT: first_seen_at is INSERT-ONLY and must NEVER be
+                -- added to the DO UPDATE SET below. It is the moment this
+                -- matchup first appeared, and this statement runs against
+                -- every upcoming card every 6 hours — one line in the SET
+                -- clause would move all of them to today and reproduce
+                -- exactly what made bout.created_at worthless. Pinned by
+                -- scripts/scraper/tests/test_first_seen_at.py.
+                --
+                -- `now()` here is the observation time, an upper bound on the
+                -- booking: a fight announced between two scrapes is stamped up
+                -- to 6 h late, and one announced before this column existed
+                -- keeps NULL rather than a flattering guess. A bout the news
+                -- pipeline created first carries the article's published_at
+                -- (loaders/news.auto_create_bout) and keeps it — adoption sets
+                -- ufc_stats_id on the existing row and this INSERT never runs
+                -- for it.
                 ON CONFLICT (ufc_stats_id) DO UPDATE SET
                     weight_class = EXCLUDED.weight_class,
                     is_title_fight = EXCLUDED.is_title_fight,
@@ -538,6 +879,13 @@ def upsert_bouts(
                 # (B) A real SCHEDULED bout no longer on the page = opponent
                 # swap / fight moved off this card. Drop it so it doesn't linger
                 # with a stale date. Never touches completed or provisional bouts.
+                #
+                # RECORD IT FIRST. The DELETE below is the single most
+                # informative thing the scraper does and, until this call
+                # existed, the least recoverable: a fight coming off a card is
+                # the withdrawal signal, and deleting the row erased the fact
+                # that the booking had ever been made.
+                _record_removed_bouts(cur, event_id, seen_ids)
                 cur.execute(
                     """
                     UPDATE news_item SET related_bout_id = NULL
@@ -577,6 +925,12 @@ def upsert_bouts(
                 """,
                 (event_id, event_id),
             )
+            # Record the merge against the SURVIVING row before the twin goes.
+            # The provisional row was born from a news announcement, so its
+            # created_at is the earliest mark we have of this fight existing —
+            # older than anything the UFCStats scrape can offer. Deleting it
+            # unrecorded throws that away.
+            _record_provisional_merges(cur, event_id)
             cur.execute(
                 """
                 DELETE FROM bout prov USING bout real
