@@ -552,6 +552,12 @@ def stage_decompose(df: pd.DataFrame, *, cache: bool) -> dict:
 GATE0_MARGIN = 0.02  # nats the fit must take off the MC mix on val, per seed
 SEEDS = (42, 7, 13)
 
+# Margin a post-hoc correction must clear on val before it is allowed to
+# ship. 428 val bouts put roughly 0.005 nats of noise on a conditional
+# log-loss, so anything smaller is a coin landing the right way up — and a
+# correction is exactly the kind of change that will find that coin.
+VAL_SELECT_MARGIN = 0.005
+
 
 def _fit_variant(
     X: pd.DataFrame,
@@ -784,10 +790,17 @@ def _settle(cell: str, winner_side: str, bucket: str) -> str:
     return "won" if (side == winner_side and method == bucket) else "lost"
 
 
-def _roi(cells: np.ndarray, book: np.ndarray, winner_side, bucket, thr: float) -> dict:
+def _roi(
+    cells: np.ndarray, book: np.ndarray, winner_side, bucket, thr: float,
+    *, n_boot: int = 4000, seed: int = 42,
+) -> dict:
     """Flat 1u on every cell whose EV clears `thr`, graded against the closing
-    method line. Mirrors eval_method_market.run_roi."""
-    n_bets = pnl = 0.0
+    method line. Mirrors eval_method_market.run_roi, including its bootstrap:
+    resampling is BY BOUT, because up to six cells of the same bout are
+    mutually exclusive and resampling bets independently would understate the
+    variance badly enough to turn noise into a result."""
+    per_bout_pnl = np.zeros(len(cells))
+    per_bout_n = np.zeros(len(cells))
     won = 0
     for i in range(len(cells)):
         for j, c in enumerate(CELLS):
@@ -796,16 +809,29 @@ def _roi(cells: np.ndarray, book: np.ndarray, winner_side, bucket, thr: float) -
                 continue
             if cells[i, j] * odds - 1.0 <= thr:
                 continue
-            n_bets += 1
+            per_bout_n[i] += 1
             if _settle(c, winner_side[i], bucket[i]) == "won":
-                pnl += odds - 1.0
+                per_bout_pnl[i] += odds - 1.0
                 won += 1
             else:
-                pnl -= 1.0
-    return {
+                per_bout_pnl[i] -= 1.0
+
+    n_bets = float(per_bout_n.sum())
+    pnl = float(per_bout_pnl.sum())
+    out = {
         "threshold": thr, "bets": int(n_bets), "won": won,
-        "pnl": float(pnl), "roi": float(pnl / n_bets) if n_bets else 0.0,
+        "pnl": pnl, "roi": float(pnl / n_bets) if n_bets else 0.0,
     }
+    if n_bets:
+        rng = np.random.default_rng(seed)
+        idx = rng.integers(0, len(cells), size=(n_boot, len(cells)))
+        sums = per_bout_pnl[idx].sum(axis=1)
+        counts = np.maximum(1.0, per_bout_n[idx].sum(axis=1))
+        rois = sums / counts
+        out["roi_lo95"] = float(np.quantile(rois, 0.025))
+        out["roi_hi95"] = float(np.quantile(rois, 0.975))
+        out["frac_profitable"] = float((rois > 0).mean())
+    return out
 
 
 def stage_gate1(df: pd.DataFrame, *, cache: bool) -> dict:
@@ -957,10 +983,15 @@ def stage_gate1(df: pd.DataFrame, *, cache: bool) -> dict:
     for label, cells in (("production_guarded", variants["production_guarded"]),
                          ("new_guarded", variants["new_guarded"])):
         roi[label] = [_roi(cells, book_odds[c], ws, bk, t) for t in (0.0, 0.05, 0.10, 0.20)]
-        line = "  ".join(
-            f"EV>{r['threshold']:.2f}: {r['roi']*100:+.1f}% ({r['bets']})" for r in roi[label]
-        )
-        print(f"    {label:20s} {line}")
+        print(f"    {label}:")
+        for r in roi[label]:
+            ci = (
+                f"[{r.get('roi_lo95', float('nan'))*100:+.1f}%, "
+                f"{r.get('roi_hi95', float('nan'))*100:+.1f}%]  "
+                f"P(profitable) {r.get('frac_profitable', float('nan')):.3f}"
+            )
+            print(f"      EV>{r['threshold']:.2f}  bets {r['bets']:5d}  won {r['won']:4d}  "
+                  f"ROI {r['roi']*100:+6.1f}%  {ci}")
 
     passed = (
         legs["new_pure"]["ll_6cell"] < legs["production_pure"]["ll_6cell"]
@@ -985,13 +1016,153 @@ def stage_gate1(df: pd.DataFrame, *, cache: bool) -> dict:
     }
 
 
+# ── GATE 2 — is the marginal regression a defect or drift? ─────────────
+
+
+def _prior_correct(mix: np.ndarray, w: np.ndarray) -> np.ndarray:
+    out = mix * w[None, None, :]
+    return out / out.sum(axis=2, keepdims=True)
+
+
+def stage_gate2(df: pd.DataFrame, *, cache: bool) -> dict:
+    """Removing the anchor hands back the marginal accuracy it was buying:
+    the new mix predicts 15.6 % submissions against 18.4 % actual on test.
+    This stage asks whether that is a model defect (fixable) or year-to-year
+    base-rate drift (not forecastable), and tries the three corrections that
+    would fix it if it were a defect."""
+    masks = split_masks(df)
+    grade = gradeable_mask(df)
+    tr_m, va_m, te_m = masks["train"] & grade, masks["val"] & grade, masks["test"] & grade
+
+    fit_sel = tr_m | va_m
+    fit_sub = df.loc[fit_sel].reset_index(drop=True)
+    fit_or = orient_winner_first(fit_sub)
+    y = method_index(fit_sub["method_bucket"].to_numpy())
+    base_fit, _, _ = build_feature_matrix(fit_or)
+    X = build_method_features(base_fit, fit_or, levels=False)
+    tr, va = tr_m[fit_sel], va_m[fit_sel]
+
+    va_sub = fit_sub.loc[va].reset_index(drop=True)
+    te = df.loc[te_m].reset_index(drop=True)
+    ws_va, bk_va = va_sub["winner_side"].to_numpy(), va_sub["method_bucket"].to_numpy()
+    ws_te, bk_te = te["winner_side"].to_numpy(), te["method_bucket"].to_numpy()
+
+    def _ll(mix, ws, bk):
+        return cond_ll_from_mix(mix, ws, bk)
+
+    def _at_winner(mix, ws):
+        return mix[np.arange(len(mix)), np.where(ws == "a", 0, 1), :]
+
+    model, _ = _fit_variant(X, y, tr, va, seed=42)
+    mix_va = model_mix(model, va_sub, levels=False)
+    mix_te = model_mix(model, te, levels=False)
+    ll_va, ll_te = _ll(mix_va, ws_va, bk_va), _ll(mix_te, ws_te, bk_te)
+
+    p_tr = model.predict_cond(X.loc[tr].reset_index(drop=True))
+    tr_rate = np.array([(y[tr] == j).mean() for j in range(3)])
+    va_rate = np.array([(y[va] == j).mean() for j in range(3)])
+    te_rate = np.array([(bk_te == m).mean() for m in METHODS])
+
+    print("\n=== GATE 2 — marginal calibration ===")
+    print(f"  {'window':>7} {'':>4} {'ko':>7} {'sub':>7} {'dec':>7}")
+    for label, pred, actual in (
+        ("train", p_tr.mean(axis=0), tr_rate),
+        ("val", _at_winner(mix_va, ws_va).mean(axis=0), va_rate),
+        ("test", _at_winner(mix_te, ws_te).mean(axis=0), te_rate),
+    ):
+        print(f"  {label:>7} pred {pred[0]:7.3f} {pred[1]:7.3f} {pred[2]:7.3f}")
+        print(f"  {'':>7} act  {actual[0]:7.3f} {actual[1]:7.3f} {actual[2]:7.3f}")
+
+    # Year-by-year actual mix — the band any correction has to beat.
+    d_all = pd.to_datetime(df.loc[grade, "event_date"])
+    bk_all = df.loc[grade, "method_bucket"].to_numpy()
+    years = {}
+    for yr in range(2019, 2027):
+        s = (d_all.dt.year == yr).to_numpy()
+        if s.sum() < 20:
+            continue
+        years[str(yr)] = {
+            "n": int(s.sum()),
+            **{m: float((bk_all[s] == m).mean()) for m in METHODS},
+        }
+    print("\n  actual method mix by year:")
+    for yr, d in years.items():
+        print(f"    {yr}  n={d['n']:4d}  ko {d['ko']:.3f}  sub {d['sub']:.3f}  dec {d['dec']:.3f}")
+
+    attempts: dict[str, Any] = {}
+
+    # A — class-prior correction fitted on VAL. Recorded, but it can never be
+    # SELECTED by val: the weights are chosen to make the val marginal exact,
+    # so a val improvement is arithmetic, not evidence. It is here to show
+    # what the correction does to a window it was not fitted on.
+    w_val = va_rate / _at_winner(mix_va, ws_va).mean(axis=0)
+    attempts["prior_correction_val_fitted"] = {
+        "weights": [float(x) for x in w_val],
+        "val": _ll(_prior_correct(mix_va, w_val), ws_va, bk_va),
+        "test": _ll(_prior_correct(mix_te, w_val), ws_te, bk_te),
+        "fitted_on_val": True,
+    }
+
+    # B — class-prior correction fitted on TRAIN (no val double-dip).
+    w_tr = tr_rate / p_tr.mean(axis=0)
+    attempts["prior_correction_train_fitted"] = {
+        "weights": [float(x) for x in w_tr],
+        "val": _ll(_prior_correct(mix_va, w_tr), ws_va, bk_va),
+        "test": _ll(_prior_correct(mix_te, w_tr), ws_te, bk_te),
+    }
+
+    # C — recency-weighted training, so the fit tracks the modern era.
+    d_fit = pd.to_datetime(fit_sub["event_date"])
+    age_yr = (pd.Timestamp(TRAIN_END) - d_fit).dt.days.to_numpy() / 365.25
+    for hl in (4.0, 6.0, 8.0, 12.0):
+        w = np.exp(-np.log(2.0) * np.maximum(0.0, age_yr) / hl)
+        m_hl, _ = _fit_variant(X, y, tr, va, seed=42, sample_weight=w)
+        attempts[f"recency_halflife_{hl:g}y"] = {
+            "val": _ll(model_mix(m_hl, va_sub, levels=False), ws_va, bk_va),
+            "test": _ll(model_mix(m_hl, te, levels=False), ws_te, bk_te),
+        }
+
+    print(f"\n  corrections (conditional log-loss; baseline val {ll_va:.4f} test {ll_te:.4f}):")
+    print(f"    {'attempt':32s} {'val':>8} {'test':>8}  {'val gate':>12}")
+    for name, d in attempts.items():
+        if d.get("fitted_on_val"):
+            selected, why = False, "circular"
+        elif d["val"] < ll_va - VAL_SELECT_MARGIN:
+            selected, why = True, "selects"
+        else:
+            selected, why = False, "—"
+        print(f"    {name:32s} {d['val']:8.4f} {d['test']:8.4f}  {why:>12}")
+        d["selected_by_val"] = selected
+        d["helps_test"] = bool(d["test"] < ll_te)
+
+    selected = [k for k, v in attempts.items() if v["selected_by_val"]]
+    verdict = {
+        "baseline": {"val": ll_va, "test": ll_te},
+        "marginals": {
+            "train": {"pred": [float(x) for x in p_tr.mean(axis=0)],
+                      "actual": [float(x) for x in tr_rate]},
+            "val": {"pred": [float(x) for x in _at_winner(mix_va, ws_va).mean(axis=0)],
+                    "actual": [float(x) for x in va_rate]},
+            "test": {"pred": [float(x) for x in _at_winner(mix_te, ws_te).mean(axis=0)],
+                     "actual": [float(x) for x in te_rate]},
+        },
+        "actual_mix_by_year": years,
+        "attempts": attempts,
+        "selected_by_val": selected,
+        "shipped_correction": None,
+    }
+    print(f"\n  GATE 2 verdict: {len(selected)} correction(s) selected by val "
+          f"{'— ' + ', '.join(selected) if selected else '— none ship'}")
+    return verdict
+
+
 # ── entrypoint ─────────────────────────────────────────────────────────
 
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--stage", default="decompose",
-                    choices=["decompose", "gate0", "gate1", "all"])
+                    choices=["decompose", "gate0", "gate1", "gate2", "all"])
     ap.add_argument("--no-cache", action="store_true",
                     help="rebuild the dataset and Monte Carlo caches from the DB")
     args = ap.parse_args()
@@ -1012,6 +1183,8 @@ def main() -> None:
         report["gate0"] = stage_gate0(df, cache=cache)
     if args.stage in ("gate1", "all"):
         report["gate1"] = stage_gate1(df, cache=cache)
+    if args.stage in ("gate2", "all"):
+        report["gate2"] = stage_gate2(df, cache=cache)
 
     existing = json.loads(REPORT_PATH.read_text()) if REPORT_PATH.exists() else {}
     existing.update(report)
