@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import json
 from datetime import datetime
-from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -26,10 +25,11 @@ from .config import (
     LGB_NUM_ROUNDS,
     LGB_PARAMS,
     MODEL_VERSION,
+    RESIDUAL_CORRECTION,
     TRAIN_END,
     VAL_END,
 )
-from .ensemble import EnsembleModel
+from .ensemble import EnsembleModel, ResidualCorrector
 from .features import build_feature_matrix, debut_feature_names, feature_names
 from .method_model import (
     METHOD_MODEL_DIR,
@@ -353,6 +353,18 @@ def run_training(df: pd.DataFrame) -> dict[str, dict[str, float]]:
         "blender coefs: "
         + " ".join(f"{k}={v:+.2f}" for k, v in train_meta["blender_coefs"].items())
     )
+
+    # v0.13.0 — attach the residual corrector BEFORE any metric below is
+    # computed, so the reported numbers are the ones production serves. It is a
+    # fixed set of coefficients from config, not something fitted here: fitting
+    # it needs walk-forward out-of-fold predictions (32 refits), which belongs
+    # in the lab and not in a retrain that runs from cron.
+    corrector = (
+        ResidualCorrector.from_dict(RESIDUAL_CORRECTION) if RESIDUAL_CORRECTION else None
+    )
+    ensemble.corrector = corrector
+    if corrector is not None:
+        console.log(f"residual corrector attached — {corrector.describe()}")
 
     # Headline blended metrics per split.
     metrics: dict[str, dict[str, float]] = {}

@@ -58,8 +58,9 @@ from src.config import (  # noqa: E402
     LGB_NUM_ROUNDS,
     LGB_PARAMS,
     MODEL_VERSION,
+    RESIDUAL_CORRECTION,
 )
-from src.ensemble import EnsembleModel  # noqa: E402
+from src.ensemble import EnsembleModel, ResidualCorrector  # noqa: E402
 from src.export import (  # noqa: E402
     build_dataset,
     fetch_raw,
@@ -107,6 +108,7 @@ def _fit_ensemble(
     y_va: pd.Series,
     cols: list[str],
     sample_weight: np.ndarray | None = None,
+    corrected: bool = True,
 ) -> EnsembleModel:
     tuned = _load_tuned_params()
     lgb_params = {
@@ -126,6 +128,24 @@ def _fit_ensemble(
         X_val=X_va.reset_index(drop=True),
         y_val=y_va.reset_index(drop=True),
         sample_weight=sample_weight,
+    )
+    # v0.13.0 — the served path applies the residual corrector inside
+    # predict_proba_a, so a rolling backtest without it would be measuring a
+    # model production does not run. The coefficients are fixed in config, not
+    # refit per origin: they were fitted once on walk-forward OOF ending at
+    # VAL_END, which is strictly before this backtest's first origin.
+    #
+    # `corrected=False` for the DEBUT specialist, because train.py attaches the
+    # corrector to the main ensemble only. The correction was fitted on the
+    # both-experienced population and has never been gated on the debut one;
+    # applying it there in the backtest but not in production would report a
+    # number nothing serves. (An accidental run that did apply it moved the
+    # debut segment 0.6534 -> 0.6380 on 94 bouts — suggestive, ungated, and
+    # written down in docs/winner_batch.md rather than acted on.)
+    model.corrector = (
+        ResidualCorrector.from_dict(RESIDUAL_CORRECTION)
+        if (RESIDUAL_CORRECTION and corrected)
+        else None
     )
     return model
 
@@ -258,6 +278,7 @@ def run(
                 X_all.loc[va_d, dbt_cols], y_all.loc[va_d],
                 dbt_cols,
                 sample_weight=weights[m_train],
+                corrected=False,
             )
             probs_d, probs_d_raw = _score_both_orders(
                 spec, X_all.loc[sc_d, dbt_cols], X_all_sw.loc[sc_d, dbt_cols]
