@@ -43,8 +43,24 @@ from catboost import CatBoostClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
 
+from .config import ARTIFACTS_DIR
+from .export import swap_sides
+from .features import build_feature_matrix
+
 METHODS = ("ko", "sub", "dec")
 EPS = 1e-12
+
+# Served artifact and its split-trained twin, mirroring ensemble/ and
+# ensemble_eval/: the twin is what the backtests score, so every moving part
+# of a held-out number stays out-of-sample and not just the ensemble weights.
+METHOD_MODEL_DIR = ARTIFACTS_DIR / "method_model"
+METHOD_MODEL_EVAL_DIR = ARTIFACTS_DIR / "method_model_eval"
+
+# Whether the per-side absolute levels below are added to the matrix. The
+# GATE 0 sweep found them a tie on val (0.7633 vs 0.7627 over three seeds)
+# against 65 extra columns, so the diffs-only matrix wins on parsimony.
+# Flipping this is a model change: refit both artifacts, do not hand-edit.
+USE_LEVELS = False
 
 # Per-fighter columns whose ABSOLUTE level (not just the winner-loser gap)
 # drives how a fight ends. The winner-model feature matrix keeps most of
@@ -127,6 +143,69 @@ def build_method_features(
         d = pd.to_numeric(df_oriented.get(f"{den}_{side}"), errors="coerce")
         with np.errstate(divide="ignore", invalid="ignore"):
             out[f"mrate_{name}"] = np.where(d.to_numpy() > 0, n.to_numpy() / d.to_numpy(), np.nan)
+    return out
+
+
+def orient_winner_first(
+    df: pd.DataFrame, *, extra_pairs: tuple[tuple[str, str], ...] = ()
+) -> pd.DataFrame:
+    """Flip every bout the B side won, so slot A is always the winner.
+
+    `swap_sides` handles the `*_a`/`*_b` schema and `market_prob_a`; anything
+    else that carries a side has to be named in `extra_pairs`, and
+    `target_a_wins` is flipped here because it is not an `_a`/`_b` pair
+    either. `method_bucket` is deliberately NOT flipped — it is a property of
+    the bout, not of a side.
+
+    Row order and index are preserved, so row i of the result is still bout i
+    of the input."""
+    b_wins = (df["target_a_wins"].fillna(-1).astype(int).to_numpy() == 0)
+    if not b_wins.any():
+        return df.copy()
+    kept = df.loc[~b_wins].copy()
+    flipped = swap_sides(df.loc[b_wins])
+    for a_col, b_col in extra_pairs:
+        a_vals = df.loc[b_wins, a_col].to_numpy()
+        flipped[a_col] = df.loc[b_wins, b_col].to_numpy()
+        flipped[b_col] = a_vals
+    flipped["target_a_wins"] = 1
+    return pd.concat([kept, flipped]).sort_index()
+
+
+def gradeable_rows(df: pd.DataFrame) -> np.ndarray:
+    """Bouts whose outcome lands in the three settled buckets. DQ, draws,
+    no-contests and missing methods drop out — the same rows the method
+    market voids, so the model is never fitted on a payout it cannot make."""
+    return (
+        df["method_bucket"].isin(METHODS).to_numpy()
+        & df["target_a_wins"].notna().to_numpy()
+    )
+
+
+def training_matrix(df: pd.DataFrame) -> tuple[pd.DataFrame, np.ndarray, pd.Series]:
+    """`build_dataset` frame → (X, y, event_date) for the conditional fit,
+    winner-first oriented and restricted to gradeable bouts."""
+    sub = df.loc[gradeable_rows(df)].reset_index(drop=True)
+    oriented = orient_winner_first(sub)
+    base, _, _ = build_feature_matrix(oriented)
+    X = build_method_features(base, oriented, levels=USE_LEVELS)
+    y = np.array([METHODS.index(m) for m in sub["method_bucket"]], dtype=int)
+    return X, y, pd.to_datetime(sub["event_date"])
+
+
+def conditional_mix(model: MethodModel, df: pd.DataFrame) -> np.ndarray:
+    """(n, 2, 3) — P(ko, sub, dec) given slot A wins, and given slot B wins.
+
+    The model is called once per orientation, so the two conditionals are
+    independent estimates rather than one distribution split by a shared
+    rule. That is the failure the round lab found in `_decision_logit`: a
+    single hand-weighted number decided both sides at once, and when it was
+    wrong it was wrong on both."""
+    out = np.empty((len(df), 2, 3))
+    for s, frame in enumerate((df, swap_sides(df))):
+        base, _, _ = build_feature_matrix(frame)
+        X = build_method_features(base, frame, levels=model.use_levels)
+        out[:, s, :] = model.predict_cond(X[model.feature_columns])
     return out
 
 
