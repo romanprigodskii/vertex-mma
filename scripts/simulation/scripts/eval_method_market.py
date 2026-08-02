@@ -61,6 +61,8 @@ from src.export import (  # noqa: E402
     symmetrize_for_training,
 )
 from src.features import build_feature_matrix  # noqa: E402
+from src.method_model import METHOD_MODEL_EVAL_DIR, MethodModel  # noqa: E402
+from src.method_model import conditional_mix as method_conditional_mix  # noqa: E402
 from src.monte_carlo import FighterMC, simulate_bout  # noqa: E402
 
 _EVAL_DIR = ARTIFACTS_DIR / "ensemble_eval"
@@ -235,7 +237,7 @@ def main() -> None:
         _mc.METHOD_ANCHOR_LAMBDA = LEGACY_ANCHOR_LAMBDA
         print(
             "LEGACY MODE: hand-set damage timing + hand-weighted decision logit "
-            f"+ METHOD_ANCHOR_LAMBDA={LEGACY_ANCHOR_LAMBDA}"
+            f"+ METHOD_ANCHOR_LAMBDA={LEGACY_ANCHOR_LAMBDA}, no method model"
         )
 
     df = symmetrize_for_training(build_dataset(fetch_raw()))
@@ -272,6 +274,19 @@ def main() -> None:
     n = len(df_test)
     print(f"TEST split (>= {VAL_END}), n={n} bouts — running Monte Carlo…")
 
+    # v0.12.0 — the conditional method model supplies the MIX that production
+    # now prices from. The SPLIT-trained twin is loaded for the same reason
+    # the hazard/decision twins are: everything on the held-out window has to
+    # be out-of-sample, not just the ensemble weights. --legacy skips it, so
+    # the flag still reproduces one whole pre-model configuration.
+    method_mixes = None
+    if not args.legacy and METHOD_MODEL_EVAL_DIR.exists():
+        method_model = MethodModel.load(METHOD_MODEL_EVAL_DIR)
+        method_mixes = method_conditional_mix(method_model, df_test)
+        print(f"method mix: split-trained {METHOD_MODEL_EVAL_DIR.name}/")
+    elif not args.legacy:
+        print("method mix: simulator hazards (no method_model_eval artifact)")
+
     # Monte Carlo per bout — deterministic production seed.
     mc_cells_rows: list[dict[str, float]] = []
     for i in range(n):
@@ -285,6 +300,11 @@ def main() -> None:
             seed=stable_hash(row["bout_id"]),
             is_main_event=bool(row["is_main_event"]),
             is_title_fight=bool(row["is_title_fight"]),
+            method_mix=(
+                (tuple(method_mixes[i, 0]), tuple(method_mixes[i, 1]))
+                if method_mixes is not None
+                else None
+            ),
         )
         mc_cells_rows.append(
             {
