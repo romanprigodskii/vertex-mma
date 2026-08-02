@@ -969,6 +969,39 @@ def stage_gate1(df: pd.DataFrame, *, cache: bool, report: dict | None = None) ->
     print(f"    new(guarded) − market:    {b['delta']:+.4f} nats  "
           f"[{b['lo95']:+.4f}, {b['hi95']:+.4f}]  (positive = still behind the book)")
 
+    # ── Where the residual gap to the book lives ───────────────────────
+    # Stage 0 ran this on the simulator and found the deficit was entirely
+    # in the two finish cells. Re-running it on the shipped mix says whether
+    # another lab has anywhere to go.
+    mix_mkt = conditional_mix(sub_market)
+    residual = {}
+    print("\n  residual conditional loss vs the book, by the method that landed:")
+    print(f"    {'method':>6} {'n':>4} {'new ll':>8} {'mkt ll':>8} {'gap':>8} "
+          f"{'new p':>7} {'mkt p':>7} {'actual':>7}")
+    for m in METHODS:
+        m_sel = bk == m
+        if not m_sel.any():
+            continue
+        ll_new = cond_ll_from_mix(mix_model[c][m_sel], ws[m_sel], bk[m_sel])
+        ll_mkt = cond_ll_from_mix(mix_mkt[m_sel], ws[m_sel], bk[m_sel])
+        j = METHODS.index(m)
+        rows_all = np.arange(int(c.sum()))
+        side_idx = np.where(ws == "a", 0, 1)
+        p_new = float(mix_model[c][rows_all, side_idx, j][m_sel].mean())
+        p_mkt = float(mix_mkt[rows_all, side_idx, j][m_sel].mean())
+        residual[m] = {
+            "n": int(m_sel.sum()), "new_ll": ll_new, "market_ll": ll_mkt,
+            "gap": ll_new - ll_mkt, "new_mean_p": p_new, "market_mean_p": p_mkt,
+            "share_of_total_gap": float(
+                (ll_new - ll_mkt) * m_sel.sum() / int(c.sum())
+            ),
+        }
+        print(f"    {m:>6} {int(m_sel.sum()):4d} {ll_new:8.4f} {ll_mkt:8.4f} "
+              f"{ll_new - ll_mkt:+8.4f} {p_new:7.3f} {p_mkt:7.3f} "
+              f"{float(m_sel.mean()):7.3f}")
+    total_gap = sum(d["share_of_total_gap"] for d in residual.values())
+    print(f"    {'total':>6} {int(c.sum()):4d} {'':8} {'':8} {total_gap:+8.4f}")
+
     # ── GATE 2 — calibration must not degrade ──────────────────────────
     print("\n  marginal method calibration (all gradeable test bouts):")
     print(f"    {'method':>6} {'actual':>8} {'mc':>8} {'new':>8}")
@@ -1031,6 +1064,7 @@ def stage_gate1(df: pd.DataFrame, *, cache: bool, report: dict | None = None) ->
         "conditional_all_gradeable": {"mc_production": ll_cond_mc, "discriminative": ll_cond_new},
         "legs": legs,
         "bootstrap": boot,
+        "residual_gap_by_method": residual,
         "marginal_calibration": marg,
         "reliability": reliability,
         "roi": roi,
