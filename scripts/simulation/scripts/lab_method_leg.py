@@ -731,6 +731,260 @@ def stage_gate0(df: pd.DataFrame, *, cache: bool) -> dict:
     }
 
 
+# ── GATE 1 — held-out test window ──────────────────────────────────────
+
+
+def model_mix(model: MethodModel, frame: pd.DataFrame, *, levels: bool) -> np.ndarray:
+    """(n, 2, 3) conditional mix from the discriminative model, called once
+    per orientation: slot A's conditional from (A, B) and slot B's from
+    (B, A). The two are independent estimates — there is no shared "decision
+    logit" splitting one number between the sides, which is what the round
+    lab found to be the simulator's failure mode."""
+    out = np.empty((len(frame), 2, 3))
+    for s, f in enumerate((frame, swap_sides(frame))):
+        base, _, _ = build_feature_matrix(f)
+        X = build_method_features(base, f, levels=levels)
+        out[:, s, :] = model.predict_cond(X[model.feature_columns])
+    return out
+
+
+def _shrink_mix(mix: np.ndarray, lam: float, base: np.ndarray) -> np.ndarray:
+    """Blend a conditional mix toward the base rates — the same operation
+    `_anchor_methods` performs on the simulator's cells, applied to whatever
+    mix is passed so the two are comparable at equal lambda."""
+    if lam <= 0.0:
+        return mix
+    return (1.0 - lam) * mix + lam * base[None, None, :]
+
+
+def _paired_bootstrap(
+    loss_a: np.ndarray, loss_b: np.ndarray, *, n_boot: int = 4000, seed: int = 42
+) -> dict[str, float]:
+    """95 % CI for mean(loss_a) − mean(loss_b), resampled by bout."""
+    rng = np.random.default_rng(seed)
+    d = loss_a - loss_b
+    idx = rng.integers(0, len(d), size=(n_boot, len(d)))
+    means = d[idx].mean(axis=1)
+    return {
+        "delta": float(d.mean()),
+        "lo95": float(np.quantile(means, 0.025)),
+        "hi95": float(np.quantile(means, 0.975)),
+        "frac_positive": float((means > 0).mean()),
+    }
+
+
+def _cellwise_loss(cells: np.ndarray, winner_side: np.ndarray, bucket: np.ndarray) -> np.ndarray:
+    side_idx = np.where(winner_side == "a", 0, 1)
+    meth_idx = method_index(bucket)
+    return -np.log(np.clip(cells[np.arange(len(cells)), side_idx * 3 + meth_idx], EPS, 1.0))
+
+
+def _settle(cell: str, winner_side: str, bucket: str) -> str:
+    side, method = cell.split("_", 1)
+    return "won" if (side == winner_side and method == bucket) else "lost"
+
+
+def _roi(cells: np.ndarray, book: np.ndarray, winner_side, bucket, thr: float) -> dict:
+    """Flat 1u on every cell whose EV clears `thr`, graded against the closing
+    method line. Mirrors eval_method_market.run_roi."""
+    n_bets = pnl = 0.0
+    won = 0
+    for i in range(len(cells)):
+        for j, c in enumerate(CELLS):
+            odds = book[i, j]
+            if not np.isfinite(odds) or odds <= 1.0:
+                continue
+            if cells[i, j] * odds - 1.0 <= thr:
+                continue
+            n_bets += 1
+            if _settle(c, winner_side[i], bucket[i]) == "won":
+                pnl += odds - 1.0
+                won += 1
+            else:
+                pnl -= 1.0
+    return {
+        "threshold": thr, "bets": int(n_bets), "won": won,
+        "pnl": float(pnl), "roi": float(pnl / n_bets) if n_bets else 0.0,
+    }
+
+
+def stage_gate1(df: pd.DataFrame, *, cache: bool) -> dict:
+    masks = split_masks(df)
+    grade = gradeable_mask(df)
+    prev = json.loads(REPORT_PATH.read_text()) if REPORT_PATH.exists() else {}
+    levels = prev.get("gate0", {}).get("best_variant", "diffs_only") == "with_levels"
+
+    print("\nloading production Monte Carlo artifacts:")
+    load_split_trained_mc()
+
+    tr_mask = masks["train"] & grade
+    va_mask = masks["val"] & grade
+    te_mask = masks["test"] & grade
+
+    fit_sel = tr_mask | va_mask
+    fit_sub = df.loc[fit_sel].reset_index(drop=True)
+    fit_oriented = orient_winner_first(fit_sub)
+    y_fit = method_index(fit_sub["method_bucket"].to_numpy())
+    base_fit, _, _ = build_feature_matrix(fit_oriented)
+    X_fit = build_method_features(base_fit, fit_oriented, levels=levels)
+    tr, va = tr_mask[fit_sel], va_mask[fit_sel]
+
+    te = df.loc[te_mask].reset_index(drop=True)
+    winner_side = te["winner_side"].to_numpy()
+    bucket = te["method_bucket"].to_numpy()
+    market, coherent_te = book_probs(te)
+    book_odds = np.column_stack([te[f"book_{c}"].to_numpy(dtype=float) for c in CELLS])
+
+    cells_mc = mc_cells(df, te_mask, cache=cache).loc[te["bout_id"]]
+    mix_mc = conditional_mix(cells_mc[CELLS].to_numpy(dtype=float))
+    prob_a = ensemble_prob_a(te)
+    market_prob_a = np.where(coherent_te, market[:, :3].sum(axis=1), np.nan)
+    guarded_a = apply_edge_guard(prob_a, market_prob_a)
+
+    base_rates = np.array([_mc.METHOD_BASE_KO, _mc.METHOD_BASE_SUB, _mc.METHOD_BASE_DEC])
+    base_rates = base_rates / base_rates.sum()
+
+    print(f"\n=== GATE 1 — held-out test (>= {VAL_END}), n={len(te)} gradeable "
+          f"({int(coherent_te.sum())} with a coherent 6-cell book) ===")
+
+    per_seed: list[dict] = []
+    mixes: list[np.ndarray] = []
+    for seed in SEEDS:
+        model = MethodModel().fit(
+            X_fit.loc[tr].reset_index(drop=True), y_fit[tr],
+            X_fit.loc[va].reset_index(drop=True), y_fit[va], seed=seed,
+        )
+        # Anchor sweep on VAL, using the same shrink the simulator applies.
+        va_sub = fit_sub.loc[va].reset_index(drop=True)
+        mix_va = model_mix(model, va_sub, levels=levels)
+        lam_grid = np.arange(0.0, 0.61, 0.05)
+        lam_ll = {
+            float(lam): cond_ll_from_mix(
+                _shrink_mix(mix_va, float(lam), base_rates),
+                va_sub["winner_side"].to_numpy(), va_sub["method_bucket"].to_numpy(),
+            )
+            for lam in lam_grid
+        }
+        lam_star = min(lam_ll, key=lam_ll.get)
+
+        mix_te = _shrink_mix(model_mix(model, te, levels=levels), lam_star, base_rates)
+        mixes.append(mix_te)
+        ll_cond = cond_ll_from_mix(mix_te, winner_side, bucket)
+        per_seed.append({
+            "seed": seed, "lambda_star": lam_star,
+            "val_lambda_curve": {f"{k:.2f}": v for k, v in lam_ll.items()},
+            "test_cond_logloss": ll_cond,
+            "weights": model.weights, "best_iters": model.best_iters,
+        })
+        print(f"  seed {seed:2d}  lambda*={lam_star:.2f}  test conditional LL {ll_cond:.4f}")
+
+    mix_model = np.mean(mixes, axis=0)  # seed-averaged, the served behaviour
+
+    ll_cond_mc = cond_ll_from_mix(mix_mc, winner_side, bucket)
+    ll_cond_new = cond_ll_from_mix(mix_model, winner_side, bucket)
+    print(f"\n  conditional mix on ALL {len(te)} gradeable test bouts:")
+    print(f"    MC production   {ll_cond_mc:.4f}")
+    print(f"    discriminative  {ll_cond_new:.4f}   (seed-averaged)")
+
+    # ── 6-cell, on the bouts that carry a coherent book ────────────────
+    c = coherent_te
+    sub_market = market[c]
+    ws, bk = winner_side[c], bucket[c]
+    variants = {
+        "production_pure": reconcile(mix_mc[c], prob_a[c]),
+        "production_guarded": reconcile(mix_mc[c], guarded_a[c]),
+        "new_pure": reconcile(mix_model[c], prob_a[c]),
+        "new_guarded": reconcile(mix_model[c], guarded_a[c]),
+        "market": sub_market,
+        "market_mix_on_our_level": reconcile(conditional_mix(sub_market), prob_a[c]),
+    }
+    legs = {k: leg_losses(v, ws, bk) for k, v in variants.items()}
+    print(f"\n  6-cell log-loss (n={int(c.sum())}):")
+    for k, d in legs.items():
+        print(f"    {k:26s} {_fmt(d)}")
+
+    boot = {
+        "new_pure_vs_production_pure": _paired_bootstrap(
+            _cellwise_loss(variants["production_pure"], ws, bk),
+            _cellwise_loss(variants["new_pure"], ws, bk),
+        ),
+        "market_vs_new_guarded": _paired_bootstrap(
+            _cellwise_loss(variants["new_guarded"], ws, bk),
+            _cellwise_loss(sub_market, ws, bk),
+        ),
+    }
+    print("\n  paired bootstrap by bout (4000 resamples):")
+    b = boot["new_pure_vs_production_pure"]
+    print(f"    production − new (pure):  {b['delta']:+.4f} nats  "
+          f"[{b['lo95']:+.4f}, {b['hi95']:+.4f}]  P(improves) {b['frac_positive']:.3f}")
+    b = boot["market_vs_new_guarded"]
+    print(f"    new(guarded) − market:    {b['delta']:+.4f} nats  "
+          f"[{b['lo95']:+.4f}, {b['hi95']:+.4f}]  (positive = still behind the book)")
+
+    # ── GATE 2 — calibration must not degrade ──────────────────────────
+    print("\n  marginal method calibration (all gradeable test bouts):")
+    print(f"    {'method':>6} {'actual':>8} {'mc':>8} {'new':>8}")
+    marg = {}
+    for j, m in enumerate(METHODS):
+        actual = float((bucket == m).mean())
+        p_mc = float((mix_mc[:, 0, j] * prob_a + mix_mc[:, 1, j] * (1 - prob_a)).mean())
+        p_new = float((mix_model[:, 0, j] * prob_a + mix_model[:, 1, j] * (1 - prob_a)).mean())
+        marg[m] = {"actual": actual, "mc": p_mc, "new": p_new}
+        print(f"    {m:>6} {actual:8.3f} {p_mc:8.3f} {p_new:8.3f}")
+
+    print("\n  per-cell reliability, new mix (pure), coherent-book bouts:")
+    flat_p = variants["new_pure"].ravel()
+    onehot = np.zeros_like(variants["new_pure"])
+    onehot[np.arange(int(c.sum())), np.where(ws == "a", 0, 1) * 3 + method_index(bk)] = 1.0
+    flat_y = onehot.ravel()
+    bins = [0.0, 0.05, 0.10, 0.15, 0.20, 0.30, 0.40, 0.60, 1.0]
+    reliability = []
+    print(f"    {'bin':>11} {'n':>5} {'pred%':>7} {'actual%':>8}")
+    for lo, hi in zip(bins[:-1], bins[1:], strict=True):
+        s = (flat_p >= lo) & (flat_p < hi)
+        if not s.any():
+            continue
+        reliability.append({
+            "lo": lo, "hi": hi, "n": int(s.sum()),
+            "pred": float(flat_p[s].mean()), "actual": float(flat_y[s].mean()),
+        })
+        print(f"    {lo:.2f}-{hi:.2f} {int(s.sum()):5d} "
+              f"{flat_p[s].mean()*100:6.1f}% {flat_y[s].mean()*100:7.1f}%")
+
+    # ── ROI against the closing method lines ───────────────────────────
+    print("\n  ROI vs closing method lines (flat 1u, coherent-book bouts):")
+    roi = {}
+    for label, cells in (("production_guarded", variants["production_guarded"]),
+                         ("new_guarded", variants["new_guarded"])):
+        roi[label] = [_roi(cells, book_odds[c], ws, bk, t) for t in (0.0, 0.05, 0.10, 0.20)]
+        line = "  ".join(
+            f"EV>{r['threshold']:.2f}: {r['roi']*100:+.1f}% ({r['bets']})" for r in roi[label]
+        )
+        print(f"    {label:20s} {line}")
+
+    passed = (
+        legs["new_pure"]["ll_6cell"] < legs["production_pure"]["ll_6cell"]
+        and legs["new_guarded"]["ll_6cell"] < legs["production_guarded"]["ll_6cell"]
+        and all(r["test_cond_logloss"] < ll_cond_mc for r in per_seed)
+        and boot["new_pure_vs_production_pure"]["lo95"] > 0
+    )
+    print(f"\n  GATE 1: {'PASS' if passed else 'FAIL'}")
+
+    return {
+        "n_test_gradeable": int(len(te)),
+        "n_coherent_book": int(c.sum()),
+        "levels": levels,
+        "per_seed": per_seed,
+        "conditional_all_gradeable": {"mc_production": ll_cond_mc, "discriminative": ll_cond_new},
+        "legs": legs,
+        "bootstrap": boot,
+        "marginal_calibration": marg,
+        "reliability": reliability,
+        "roi": roi,
+        "passed": bool(passed),
+    }
+
+
 # ── entrypoint ─────────────────────────────────────────────────────────
 
 
@@ -756,6 +1010,8 @@ def main() -> None:
         report["decompose"] = stage_decompose(df, cache=cache)
     if args.stage in ("gate0", "all"):
         report["gate0"] = stage_gate0(df, cache=cache)
+    if args.stage in ("gate1", "all"):
+        report["gate1"] = stage_gate1(df, cache=cache)
 
     existing = json.loads(REPORT_PATH.read_text()) if REPORT_PATH.exists() else {}
     existing.update(report)
