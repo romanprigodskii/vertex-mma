@@ -15,7 +15,7 @@ DATA_DIR.mkdir(exist_ok=True)
 # Bumped on every retrain. Stored alongside each prediction so the UI can
 # distinguish "made by old model" vs "fresh prediction" and a future
 # version can do clean side-by-side comparison.
-MODEL_VERSION = "v0.11.0"
+MODEL_VERSION = "v0.13.0"
 
 # Temporal split anchors. Bouts strictly before TRAIN_END go into training,
 # bouts in [TRAIN_END, VAL_END) into validation (used for early-stopping
@@ -59,6 +59,31 @@ FEATURE_CONTRI_OVERRIDES: dict[str, float] = {
     "diff_age": 0.45,
     "abs_age_a": 0.5,
     "abs_age_b": 0.5,
+}
+
+# v0.13.0 — post-blend residual correction (src/ensemble.py ResidualCorrector),
+# attached by train.py to both the served and eval models.
+#
+# One coefficient: the blend under-uses the age difference in a measurable,
+# one-directional way. The winner-batch lab (docs/winner_batch.md) found it
+# gives a 35-year-old facing a 28-year-old a 0.371 chance where the truth is
+# 0.164, and — importantly — that RAISING the throttle above does not fix it.
+# The signal is present and diluted, not absent, so the fix belongs after the
+# blend rather than inside it. Fitted on 3,087 walk-forward OOF bouts:
+#   cross-fitted OOF -0.0026 (97 % of bootstraps), forward split (fit pre-2022,
+#   score after) -0.0029 (94 %), held-out test -0.0054 (97 %).
+#
+# `scale` keeps the coefficient readable: -0.2939 per TEN years of age
+# advantage, i.e. about -0.03 logits per year. No intercept and an (A − B)
+# input, so the correction negates on a side swap and composes cleanly with
+# the order averaging in predict.py.
+#
+# Set to None to serve uncorrected. REFIT when the recipe changes:
+#   python scripts/lab_winner_batch.py --stage oof --arms baseline --cache
+#   python scripts/lab_winner_batch.py --stage correct --cache
+RESIDUAL_CORRECTION: dict | None = {
+    "terms": [{"column": "diff_age", "weight": -0.2939, "scale": 10.0}],
+    "slope": 1.0,
 }
 
 # Confidence bands derived from |prob - 0.5|.

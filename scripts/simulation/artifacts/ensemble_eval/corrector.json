@@ -1,0 +1,10 @@
+{
+  "terms": [
+    {
+      "column": "diff_age",
+      "weight": -0.2939,
+      "scale": 10.0
+    }
+  ],
+  "slope": 1.0
+}

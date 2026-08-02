@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import json
 from datetime import datetime
-from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -26,11 +25,20 @@ from .config import (
     LGB_NUM_ROUNDS,
     LGB_PARAMS,
     MODEL_VERSION,
+    RESIDUAL_CORRECTION,
     TRAIN_END,
     VAL_END,
 )
-from .ensemble import EnsembleModel
+from .ensemble import EnsembleModel, ResidualCorrector
 from .features import build_feature_matrix, debut_feature_names, feature_names
+from .method_model import (
+    METHOD_MODEL_DIR,
+    METHOD_MODEL_EVAL_DIR,
+    METHODS,
+    MethodModel,
+    _multiclass_logloss,
+    training_matrix,
+)
 
 console = Console()
 
@@ -231,6 +239,75 @@ def print_breakdown_table(
     console.print(table)
 
 
+def train_method_model(exp_df: pd.DataFrame) -> dict[str, Any]:
+    """Fit the conditional method model on the same both-experienced
+    population the main ensemble uses, and save both twins.
+
+    Same two-artifact discipline as the ensemble: the split-trained model
+    goes to method_model_eval/ so `eval_method_market.py` stays out-of-sample,
+    and the served model is refit on ALL gradeable rows for the iteration
+    counts the split run selected. Debut bouts are excluded here and skipped
+    at serve time — the model has never been fitted on a row where one side's
+    career columns are entirely NaN, and the debut segment already has its
+    own specialist rather than a shared one.
+
+    Method-leg lab: docs/method_leg.md."""
+    X, y, dates = training_matrix(exp_df)
+    tr = (dates < pd.Timestamp(TRAIN_END)).to_numpy()
+    va = ((dates >= pd.Timestamp(TRAIN_END)) & (dates < pd.Timestamp(VAL_END))).to_numpy()
+    if not tr.any() or not va.any():
+        raise RuntimeError("empty method-model train or val split — check TRAIN_END/VAL_END")
+
+    console.log(
+        f"training conditional method model on {int(tr.sum()):,} rows "
+        f"(val {int(va.sum()):,}, {X.shape[1]} features)…"
+    )
+    split = MethodModel().fit(
+        X.loc[tr].reset_index(drop=True), y[tr],
+        X.loc[va].reset_index(drop=True), y[va],
+    )
+    p_va = split.predict_cond(X.loc[va].reset_index(drop=True))
+    va_ll = _multiclass_logloss(y[va], p_va)
+    base = np.array([(y[tr] == j).mean() for j in range(3)])
+    const_ll = float(-np.log(np.clip(np.tile(base, (int(va.sum()), 1))[
+        np.arange(int(va.sum())), y[va]], 1e-12, 1.0)).mean())
+    console.log(
+        f"method model val log-loss {va_ll:.4f} vs {const_ll:.4f} for the "
+        f"constant base rates · weights "
+        + " ".join(f"{k}={v:.2f}" for k, v in split.weights.items())
+    )
+    split.save(METHOD_MODEL_EVAL_DIR)
+
+    served = MethodModel(
+        feature_columns=split.feature_columns,
+        use_levels=split.use_levels,
+        weights=split.weights,
+        best_iters=split.best_iters,
+        val_metrics=split.val_metrics,
+    ).refit_fixed(X, y)
+    served.save(METHOD_MODEL_DIR)
+    console.log(f"method model refit on ALL {len(X):,} gradeable rows (served)")
+
+    return {
+        "n_train": int(tr.sum()),
+        "n_val": int(va.sum()),
+        "n_served_rows": int(len(X)),
+        "n_features": int(X.shape[1]),
+        "use_levels": split.use_levels,
+        "val_logloss": va_ll,
+        "val_logloss_constant_base_rates": const_ll,
+        "val_solo_logloss": split.val_metrics.get("solo_logloss", {}),
+        "blend_weights": split.weights,
+        "best_iters": split.best_iters,
+        "train_base_rates": dict(zip(METHODS, [float(x) for x in base], strict=True)),
+        "note": (
+            "conditional P(method | this side wins); serves via "
+            "monte_carlo.simulate_bout(method_mix=...) and replaces "
+            "METHOD_ANCHOR_LAMBDA on the non-debut segment"
+        ),
+    }
+
+
 def run_training(df: pd.DataFrame) -> dict[str, dict[str, float]]:
     # The dataset may include debut rows (v0.8.0). The MAIN model trains on
     # both-experienced bouts only — exactly the v0.7.0 recipe — so adding
@@ -276,6 +353,18 @@ def run_training(df: pd.DataFrame) -> dict[str, dict[str, float]]:
         "blender coefs: "
         + " ".join(f"{k}={v:+.2f}" for k, v in train_meta["blender_coefs"].items())
     )
+
+    # v0.13.0 — attach the residual corrector BEFORE any metric below is
+    # computed, so the reported numbers are the ones production serves. It is a
+    # fixed set of coefficients from config, not something fitted here: fitting
+    # it needs walk-forward out-of-fold predictions (32 refits), which belongs
+    # in the lab and not in a retrain that runs from cron.
+    corrector = (
+        ResidualCorrector.from_dict(RESIDUAL_CORRECTION) if RESIDUAL_CORRECTION else None
+    )
+    ensemble.corrector = corrector
+    if corrector is not None:
+        console.log(f"residual corrector attached — {corrector.describe()}")
 
     # Headline blended metrics per split.
     metrics: dict[str, dict[str, float]] = {}
@@ -389,6 +478,12 @@ def run_training(df: pd.DataFrame) -> dict[str, dict[str, float]]:
         ENSEMBLE_DEBUT_DIR.mkdir(exist_ok=True)
         prod_specialist.save(ENSEMBLE_DEBUT_DIR)
 
+    # ── Conditional method model (v0.12.0) ──────────────────────────────
+    # Prices the method and round legs. Trained on the same both-experienced
+    # population as the main ensemble, on rows whose outcome the method
+    # market actually settles.
+    method_meta = train_method_model(exp_df)
+
     metadata = {
         "model_version": MODEL_VERSION,
         "model_kind": "ensemble",
@@ -428,6 +523,9 @@ def run_training(df: pd.DataFrame) -> dict[str, dict[str, float]]:
             if debut_metrics is not None
             else None
         ),
+        # v0.12.0 — conditional method model. Prices the method/round legs;
+        # the winner leg is untouched, so every metric above is unaffected.
+        "method_model": method_meta,
     }
     (ARTIFACTS_DIR / "metadata.json").write_text(
         json.dumps(metadata, indent=2, default=str)

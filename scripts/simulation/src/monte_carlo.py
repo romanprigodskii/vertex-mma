@@ -488,6 +488,20 @@ def _anchor_methods(
     return ka, kb, sa, sb, da, db
 
 
+def _apply_method_mix(
+    win_level: float, mix: tuple[float, float, float]
+) -> tuple[float, float, float]:
+    """Split one side's win probability across (ko, sub, dec) by `mix`.
+    Normalizing rather than trusting the caller keeps the win level exact
+    even if the mix arrives a float-epsilon off 1.0, which matters because
+    sportsbook.ts reconciles against these sums."""
+    total = float(sum(mix))
+    if not total > 0:
+        third = win_level / 3.0
+        return third, third, third
+    return tuple(win_level * float(m) / total for m in mix)  # type: ignore[return-value]
+
+
 def simulate_bout(
     a: FighterMC,
     b: FighterMC,
@@ -496,10 +510,26 @@ def simulate_bout(
     seed: int | None = None,
     is_main_event: bool = False,
     is_title_fight: bool = False,
+    method_mix: tuple[
+        tuple[float, float, float], tuple[float, float, float]
+    ] | None = None,
 ) -> MCResult:
     """`is_main_event` / `is_title_fight` are covariates of the fitted timing
     model (finish_hazard.py). They default to False so every existing caller
     keeps working unchanged; predict.py and custom.py pass the real values.
+
+    `method_mix`, when given, is ((ko, sub, dec) | A wins, (ko, sub, dec) |
+    B wins) from `method_model.MethodModel` — a discriminative fit on the
+    winner model's full feature matrix, which the simulator's ten `FighterMC`
+    fields cannot see (no weight class, no gender, no ratings). It replaces
+    the hazard-derived MIX and the `_anchor_methods` shrink; everything else
+    the simulator produces is untouched, including each side's win level and
+    the per-round finish SHAPE. `docs/method_leg.md` has the measurements —
+    conditional log-loss 0.9856 → 0.8716 on the held-out window, which is
+    below the closing method line's own 0.8977.
+
+    Passing None keeps the pre-v0.12.0 behaviour exactly, which is what the
+    no-artifact fallback path and `eval_method_market.py --legacy` rely on.
 
     Be clear about what they do at SERVE time, because it is not what the fit
     suggests: every covariate in the hazard model is time-CONSTANT, so it
@@ -634,10 +664,20 @@ def simulate_bout(
     raw_sub_b = share("sub_b")
     raw_dec_a = share("dec_a")
     raw_dec_b = share("dec_b")
-    # Anchor the method mix toward UFC base rates (preserves each win prob).
-    prob_ko_a, prob_ko_b, prob_sub_a, prob_sub_b, prob_dec_a, prob_dec_b = _anchor_methods(
-        raw_ko_a, raw_ko_b, raw_sub_a, raw_sub_b, raw_dec_a, raw_dec_b
-    )
+    if method_mix is None:
+        # Anchor the method mix toward UFC base rates (preserves each win prob).
+        prob_ko_a, prob_ko_b, prob_sub_a, prob_sub_b, prob_dec_a, prob_dec_b = _anchor_methods(
+            raw_ko_a, raw_ko_b, raw_sub_a, raw_sub_b, raw_dec_a, raw_dec_b
+        )
+    else:
+        # Model mix REPLACES the anchor. Each side's win level is taken from
+        # the simulator exactly as `_anchor_methods` would have preserved it,
+        # so this is a pure reshape of HOW each side wins — the same
+        # invariant, sourced from a model instead of a shrink.
+        (prob_ko_a, prob_sub_a, prob_dec_a), (prob_ko_b, prob_sub_b, prob_dec_b) = (
+            _apply_method_mix(raw_ko_a + raw_sub_a + raw_dec_a, method_mix[0]),
+            _apply_method_mix(raw_ko_b + raw_sub_b + raw_dec_b, method_mix[1]),
+        )
     win_a = prob_ko_a + prob_sub_a + prob_dec_a
     win_b = prob_ko_b + prob_sub_b + prob_dec_b
 
