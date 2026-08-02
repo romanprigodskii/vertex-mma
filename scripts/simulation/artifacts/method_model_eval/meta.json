@@ -186,6 +186,7 @@
     "mrate_l_sub_win_rate"
   ],
   "use_levels": true,
+  "use_sub_axis": true,
   "weights": {
     "lgb": 0.0,
     "cb": 0.8,

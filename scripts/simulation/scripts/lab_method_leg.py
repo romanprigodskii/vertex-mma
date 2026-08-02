@@ -1674,13 +1674,154 @@ def stage_rounds(df: pd.DataFrame, *, cache: bool, report: dict | None = None) -
     }
 
 
+# ── Stage 6 — the submission cell ──────────────────────────────────────
+
+
+def stage_submission(df: pd.DataFrame, *, cache: bool, report: dict | None = None) -> dict:
+    """The whole residual gap to the closing method line is submissions
+    (§4: +0.2141 nats on the 105 bouts one ended, against KO at +0.0802 and
+    decisions at −0.0920). This stage asks the question the six winner-leg
+    labs answered the hard way: is it the SHAPE of the model or the
+    INFORMATION in it?
+
+    GATE A re-shapes and adds nothing — a hierarchical P(finish) × P(sub |
+    finish) factorisation instead of a flat 3-class softmax, which is the
+    natural decomposition if "will it end early" and "on the mat or on the
+    feet" are separate questions. If a re-shape closes the gap, the
+    information was always there.
+
+    GATE B adds information: an opponent-adjusted SUBMISSION rating (the
+    existing `grap_*` pair is takedowns) and submission attempts CONCEDED.
+    Both are computed from `bout_round_stats.sub_attempts`, a column that has
+    been in the database since the first scrape and has never reached a model
+    from the defensive side.
+
+    The gate metric is the OVERALL conditional log-loss on val (n=428), not
+    the submission cell alone: val carries ~71 submissions, and a gate on 71
+    rows selects noise. The sub cell is reported as a diagnostic."""
+    levels = _best_variant(report)
+    masks = split_masks(df)
+    grade = gradeable_mask(df)
+    tr_m, va_m = masks["train"] & grade, masks["val"] & grade
+    fit_sel = tr_m | va_m
+    sub_df = df.loc[fit_sel].reset_index(drop=True)
+    oriented = orient_winner_first(sub_df)
+    y = method_index(sub_df["method_bucket"].to_numpy())
+    tr, va = tr_m[fit_sel], va_m[fit_sel]
+    y_va = y[va]
+    is_sub_va = y_va == METHODS.index("sub")
+
+    base, _, _ = build_feature_matrix(oriented)
+    X_without = build_method_features(base, oriented, levels=levels, sub_axis=False)
+    X_with = build_method_features(base, oriented, levels=levels, sub_axis=True)
+
+    n_new = X_with.shape[1] - X_without.shape[1]
+    print(f"\n=== Stage 6 — the submission cell (train {int(tr.sum()):,}, "
+          f"val {int(va.sum())}, {int(is_sub_va.sum())} of them submissions) ===")
+    print(f"  submission axis adds {n_new} columns "
+          f"({X_without.shape[1]} -> {X_with.shape[1]})")
+
+    def _diag(p: np.ndarray) -> dict[str, float]:
+        return {
+            "overall": _multiclass_logloss(y_va, p),
+            "sub_cell": _multiclass_logloss(y_va[is_sub_va], p[is_sub_va]),
+            "mean_p_sub_when_sub": float(p[is_sub_va, METHODS.index("sub")].mean()),
+            "mean_p_sub_all": float(p[:, METHODS.index("sub")].mean()),
+        }
+
+    # ── baseline: the shipped matrix ──────────────────────────────────
+    arms: dict[str, Any] = {}
+    for tag, X in (("shipped", X_without), ("gate_b_sub_axis", X_with)):
+        per_seed = []
+        for seed in SEEDS:
+            _, p_va = _fit_variant(X, y, tr, va, seed=seed)
+            per_seed.append({"seed": seed, **_diag(p_va)})
+        arms[tag] = {
+            "per_seed": per_seed,
+            "median_overall": float(np.median([r["overall"] for r in per_seed])),
+            "median_sub_cell": float(np.median([r["sub_cell"] for r in per_seed])),
+            "n_features": int(X.shape[1]),
+        }
+
+    # ── GATE A: re-shape only, no new columns ─────────────────────────
+    # Stage 1: P(finish) binary. Stage 2: P(sub | finish) binary. Recombined
+    # into the 3-cell distribution, so it is scored by the same metric.
+    y_fin = (y != METHODS.index("dec")).astype(int)
+    y_sub_given_fin = (y == METHODS.index("sub")).astype(int)
+    fin_rows = y_fin == 1
+    per_seed_a = []
+    for seed in SEEDS:
+        params = {**LGB_MULTI_PARAMS, "objective": "binary", "seed": seed}
+        params.pop("num_class", None)
+        params["metric"] = "binary_logloss"
+
+        def _binary(mask_tr: np.ndarray, mask_va: np.ndarray, target: np.ndarray,
+                    p: dict = params) -> np.ndarray:
+            dtr = lgb.Dataset(X_without.loc[mask_tr].reset_index(drop=True),
+                              label=target[mask_tr])
+            dva = lgb.Dataset(X_without.loc[mask_va].reset_index(drop=True),
+                              label=target[mask_va], reference=dtr)
+            bst = lgb.train(p, dtr, num_boost_round=2000, valid_sets=[dva],
+                            callbacks=[lgb.early_stopping(120, verbose=False)])
+            return bst.predict(X_without.loc[va].reset_index(drop=True),
+                               num_iteration=bst.best_iteration or None)
+
+        p_fin = _binary(tr, va, y_fin)
+        p_sub_g = _binary(tr & fin_rows, va & fin_rows, y_sub_given_fin)
+        p_hier = np.column_stack([
+            p_fin * (1.0 - p_sub_g),  # ko
+            p_fin * p_sub_g,          # sub
+            1.0 - p_fin,              # dec
+        ])
+        p_hier = np.clip(p_hier, EPS, None)
+        p_hier /= p_hier.sum(axis=1, keepdims=True)
+        per_seed_a.append({"seed": seed, **_diag(p_hier)})
+    arms["gate_a_hierarchical"] = {
+        "per_seed": per_seed_a,
+        "median_overall": float(np.median([r["overall"] for r in per_seed_a])),
+        "median_sub_cell": float(np.median([r["sub_cell"] for r in per_seed_a])),
+        "n_features": int(X_without.shape[1]),
+    }
+
+    base_overall = arms["shipped"]["median_overall"]
+    print(f"\n  {'arm':22s} {'val overall':>12} {'val sub cell':>13} "
+          f"{'p(sub|sub)':>11} {'gate':>10}")
+    for tag in ("shipped", "gate_a_hierarchical", "gate_b_sub_axis"):
+        d = arms[tag]
+        p_sub = float(np.median([r["mean_p_sub_when_sub"] for r in d["per_seed"]]))
+        if tag == "shipped":
+            verdict = "baseline"
+        else:
+            lls = [r["overall"] for r in d["per_seed"]]
+            verdict = (
+                "PASS" if all(v < base_overall - VAL_SELECT_MARGIN for v in lls) else "FAIL"
+            )
+            d["passed"] = verdict == "PASS"
+        print(f"  {tag:22s} {d['median_overall']:12.4f} {d['median_sub_cell']:13.4f} "
+              f"{p_sub:11.3f} {verdict:>10}")
+
+    print(f"\n  gate: beat the shipped matrix by >= {VAL_SELECT_MARGIN} nats "
+          f"on val OVERALL, every seed. The sub cell alone is "
+          f"{int(is_sub_va.sum())} rows and selects noise.")
+
+    return {
+        "n_train": int(tr.sum()), "n_val": int(va.sum()),
+        "n_val_submissions": int(is_sub_va.sum()),
+        "sub_axis_columns": n_new,
+        "arms": arms,
+        "gate_margin": VAL_SELECT_MARGIN,
+        "gate_a_passed": bool(arms["gate_a_hierarchical"].get("passed", False)),
+        "gate_b_passed": bool(arms["gate_b_sub_axis"].get("passed", False)),
+    }
+
+
 # ── entrypoint ─────────────────────────────────────────────────────────
 
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--stage", default="decompose",
-                    choices=["decompose", "gate0", "gate1", "gate2", "legs", "leak", "rounds", "all"])
+                    choices=["decompose", "gate0", "gate1", "gate2", "legs", "leak", "rounds", "submission", "all"])
     ap.add_argument("--no-cache", action="store_true",
                     help="rebuild the dataset and Monte Carlo caches from the DB")
     args = ap.parse_args()
@@ -1709,6 +1850,8 @@ def main() -> None:
         report["leak"] = stage_leak(df, cache=cache)
     if args.stage in ("rounds", "all"):
         report["rounds"] = stage_rounds(df, cache=cache, report=report)
+    if args.stage in ("submission", "all"):
+        report["submission"] = stage_submission(df, cache=cache, report=report)
 
     existing = json.loads(REPORT_PATH.read_text()) if REPORT_PATH.exists() else {}
     existing.update(report)

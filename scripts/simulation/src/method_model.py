@@ -68,6 +68,13 @@ METHOD_MODEL_EVAL_DIR = ARTIFACTS_DIR / "method_model_eval"
 # Flipping this is a model change: refit both artifacts, do not hand-edit.
 USE_LEVELS = True
 
+# Whether the v0.12.1 submission axis is in the matrix. It is NOT: Stage 6 of
+# the method-leg lab gated it and it failed, moving val by −0.0033 / +0.0038 /
+# −0.0081 across seeds 42/7/13 — not even consistent in sign. The columns are
+# still exported and still built, because the plumbing is the expensive part
+# and a future lab should not have to redo it; see METHOD_SUB_COLUMNS.
+USE_SUB_AXIS = False
+
 # Per-fighter columns whose ABSOLUTE level (not just the winner-loser gap)
 # drives how a fight ends. The winner-model feature matrix keeps most of
 # these as diffs only — a diff of zero reads the same for two knockout
@@ -104,6 +111,26 @@ METHOD_LEVEL_COLUMNS = [
     "preufc_finish_rate",
     "preufc_finish_losses",
 ]
+
+# v0.12.1 — the submission axis. `docs/method_leg.md` §4 shows the entire
+# residual gap to the closing method line is the submission cell (+0.214 nats
+# on the bouts a submission actually ended), while KO is two thirds closed and
+# decisions are ahead. These three columns are the only ones in the matrix
+# that are new INFORMATION rather than a re-shape of what was already there:
+#
+#   sub_off / sub_def         opponent-adjusted submission-attempt rating.
+#                             The existing `grap_*` pair is TAKEDOWNS; a
+#                             wrestler and a jiu-jitsu player are not the same
+#                             fighter, and nothing separated them.
+#   sub_att_absorbed_per15    submission attempts CONCEDED. `prior_losses_sub`
+#                             counts only completed submissions — far too
+#                             sparse to tell "hard to submit" from "never met
+#                             a grappler". Every attempt survived is a datum.
+#
+# Kept out of `features.DIFF_COLUMNS` deliberately: the winner leg is at its
+# information ceiling and re-opening its feature set is a different lab. These
+# reach the method matrix only.
+METHOD_SUB_COLUMNS = ["sub_off", "sub_def", "sub_att_absorbed_per15"]
 
 # Columns dropped from the method matrix because they are not known before
 # the fight, whatever their name says.
@@ -147,8 +174,23 @@ _RATE_FEATURES = [
 ]
 
 
+def _add_sub_axis(out: pd.DataFrame, df_oriented: pd.DataFrame) -> pd.DataFrame:
+    """Winner-minus-loser diff plus both absolute levels for each submission
+    column. The diff carries "who is the better grappler", the levels carry
+    "is either of them one at all" — a 0-0 matchup of strikers and a
+    0-0 matchup of black belts have the same diff and very different mixes."""
+    for col in METHOD_SUB_COLUMNS:
+        a = pd.to_numeric(df_oriented.get(f"{col}_a"), errors="coerce")
+        b = pd.to_numeric(df_oriented.get(f"{col}_b"), errors="coerce")
+        out[f"msub_diff_{col}"] = a - b
+        out[f"msub_{col}_w"] = a
+        out[f"msub_{col}_l"] = b
+    return out
+
+
 def build_method_features(
-    base_X: pd.DataFrame, df_oriented: pd.DataFrame, *, levels: bool = True
+    base_X: pd.DataFrame, df_oriented: pd.DataFrame, *, levels: bool = True,
+    sub_axis: bool = True,
 ) -> pd.DataFrame:
     """`base_X` is `features.build_feature_matrix(df_oriented)[0]` — the winner
     model's matrix on a WINNER-FIRST frame. When `levels` is True, append the
@@ -161,7 +203,8 @@ def build_method_features(
     saved `feature_columns` list is a stable contract."""
     base_X = base_X.drop(columns=list(LEAKING_COLUMNS), errors="ignore")
     if not levels:
-        return base_X.copy()
+        out = base_X.copy()
+        return _add_sub_axis(out, df_oriented) if sub_axis else out
 
     out = base_X.copy()
     for col in METHOD_LEVEL_COLUMNS:
@@ -180,7 +223,7 @@ def build_method_features(
         d = pd.to_numeric(df_oriented.get(f"{den}_{side}"), errors="coerce")
         with np.errstate(divide="ignore", invalid="ignore"):
             out[f"mrate_{name}"] = np.where(d.to_numpy() > 0, n.to_numpy() / d.to_numpy(), np.nan)
-    return out
+    return _add_sub_axis(out, df_oriented) if sub_axis else out
 
 
 def orient_winner_first(
@@ -225,7 +268,7 @@ def training_matrix(df: pd.DataFrame) -> tuple[pd.DataFrame, np.ndarray, pd.Seri
     sub = df.loc[gradeable_rows(df)].reset_index(drop=True)
     oriented = orient_winner_first(sub)
     base, _, _ = build_feature_matrix(oriented)
-    X = build_method_features(base, oriented, levels=USE_LEVELS)
+    X = build_method_features(base, oriented, levels=USE_LEVELS, sub_axis=USE_SUB_AXIS)
     y = np.array([METHODS.index(m) for m in sub["method_bucket"]], dtype=int)
     return X, y, pd.to_datetime(sub["event_date"])
 
@@ -241,7 +284,9 @@ def conditional_mix(model: MethodModel, df: pd.DataFrame) -> np.ndarray:
     out = np.empty((len(df), 2, 3))
     for s, frame in enumerate((df, swap_sides(df))):
         base, _, _ = build_feature_matrix(frame)
-        X = build_method_features(base, frame, levels=model.use_levels)
+        X = build_method_features(
+            base, frame, levels=model.use_levels, sub_axis=model.use_sub_axis
+        )
         out[:, s, :] = model.predict_cond(X[model.feature_columns])
     return out
 
@@ -293,6 +338,7 @@ class MethodModel:
 
     feature_columns: list[str] = field(default_factory=list)
     use_levels: bool = True
+    use_sub_axis: bool = True
     weights: dict[str, float] = field(default_factory=dict)
     best_iters: dict[str, int] = field(default_factory=dict)
     lgb_model: lgb.Booster | None = None
@@ -453,6 +499,7 @@ class MethodModel:
                 {
                     "feature_columns": self.feature_columns,
                     "use_levels": self.use_levels,
+                    "use_sub_axis": self.use_sub_axis,
                     "weights": self.weights,
                     "best_iters": self.best_iters,
                     "col_means": (
@@ -471,6 +518,7 @@ class MethodModel:
         m = cls(
             feature_columns=meta["feature_columns"],
             use_levels=meta.get("use_levels", True),
+            use_sub_axis=meta.get("use_sub_axis", True),
             weights=meta.get("weights", {}),
             best_iters=meta.get("best_iters", {}),
             val_metrics=meta.get("val_metrics", {}),
