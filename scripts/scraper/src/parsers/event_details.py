@@ -8,7 +8,7 @@ from selectolax.parser import HTMLParser, Node
 
 from ..utils.dates import parse_event_date, parse_round_time
 from ..utils.methods import map_method
-from ..utils.weight_classes import is_title_bout, map_weight_class
+from ..utils.weight_classes import is_belt_image, is_title_bout, map_weight_class
 
 _FIGHT_ID_RE = re.compile(r"/fight-details/([a-z0-9]+)")
 _FIGHTER_ID_RE = re.compile(r"/fighter-details/([a-z0-9]+)")
@@ -131,7 +131,12 @@ def parse_event_details(html: str) -> EventDetails:
 
         # Weight class + title belt (index 6).
         wc_text = cells[6].text(strip=True)
-        has_belt = cells[6].css_first("img") is not None
+        # The belt icon shares this cell with the post-fight bonus icons, so
+        # "an image is present" is not "this is a title fight" — match the
+        # belt by filename. See utils.weight_classes.is_belt_image.
+        has_belt = any(
+            is_belt_image(img.attributes.get("src")) for img in cells[6].css("img")
+        )
         weight_class = map_weight_class(wc_text)
         title = is_title_bout(wc_text, has_belt)
 
