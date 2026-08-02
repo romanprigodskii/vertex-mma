@@ -41,6 +41,7 @@ if str(PACKAGE_ROOT) not in sys.path:
 
 import pandas as pd  # noqa: E402
 
+import src.monte_carlo as _mc  # noqa: E402
 from src.export import (  # noqa: E402
     METHOD_BUCKETS,
     method_bucket,
@@ -171,12 +172,41 @@ def test_method_bucket_never_flips() -> None:
     print("ok   method_bucket survives swap_sides and symmetrize untouched")
 
 
+def test_leaked_covariate_cannot_reach_the_served_timing() -> None:
+    """`finish_hazard.py` still takes `is_title_fight` as a covariate, and §7
+    of docs/method_leg.md shows that column is a post-fight bonus flag. The
+    blast radius on the ROUND leg is nil, and this pins why rather than
+    asserting it: every covariate in the hazard model is time-CONSTANT, so it
+    contributes a constant factor to exp(eta) and `_normalize_shape` divides
+    that factor straight back out.
+
+    What this does NOT establish is that the flag's presence during FITTING
+    left the shared time-basis coefficients where they would otherwise be.
+    That is a refit question, and it is open."""
+    hazard = _mc.load_hazard_model()
+    if hazard is None:
+        print("skip finish_hazard artifact absent — run run_train.py first")
+        return
+    a, b = _fighters()
+    for rounds in (3, 5):
+        off = _mc._fitted_timing_shapes(hazard, a, b, rounds, rounds * 300, False, False)
+        on = _mc._fitted_timing_shapes(hazard, a, b, rounds, rounds * 300, False, True)
+        for curve_off, curve_on in zip(off, on, strict=True):
+            assert float(abs(curve_off - curve_on).max()) < 1e-12, rounds
+        r_off = simulate_bout(a, b, rounds, seed=5, is_title_fight=False)
+        r_on = simulate_bout(a, b, rounds, seed=5, is_title_fight=True)
+        assert r_off.prob_finish_per_round == r_on.prob_finish_per_round, rounds
+        assert r_off.prob_ko_a == r_on.prob_ko_a, rounds
+    print("ok   the leaked title flag cannot move the served round distribution")
+
+
 def main() -> None:
     test_fallback_is_bit_identical()
     test_mix_preserves_each_win_level()
     test_rounds_track_the_new_totals()
     test_method_bucket_matches_sportsbook()
     test_method_bucket_never_flips()
+    test_leaked_covariate_cannot_reach_the_served_timing()
     print("\nall method-leg tests passed")
 
 
