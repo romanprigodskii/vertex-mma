@@ -46,6 +46,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 if str(PACKAGE_ROOT) not in sys.path:
@@ -66,6 +67,11 @@ from src.export import (  # noqa: E402
     symmetrize_for_training,
 )
 from src.features import build_feature_matrix  # noqa: E402
+from src.method_model import (  # noqa: E402
+    MethodModel,
+    _multiclass_logloss,
+    build_method_features,
+)
 from src.monte_carlo import FighterMC, simulate_bout  # noqa: E402
 
 REPORT_PATH = ARTIFACTS_DIR / "lab_method_leg.json"
@@ -208,6 +214,38 @@ def gradeable_mask(df: pd.DataFrame) -> np.ndarray:
         df["winner_side"].isin(("a", "b")).to_numpy()
         & df["method_bucket"].isin(METHODS).to_numpy()
     )
+
+
+def orient_winner_first(df: pd.DataFrame) -> pd.DataFrame:
+    """Flip every bout the B side won, so slot A is always the winner.
+
+    `swap_sides` handles the `*_a`/`*_b` schema and `market_prob_a`; the four
+    columns this lab added afterwards (`winner_side`, the six book cells) are
+    not `_a`/`_b` pairs, so they are mirrored by hand here — the same trap
+    `symmetrize_for_training` documents for `dominance_a`. Getting it wrong
+    would not announce itself: the label would lock onto the winner slot and
+    the backtest would look brilliant with nothing behind it.
+
+    Row order and index are preserved, so row i of the result is still bout i
+    of the input."""
+    b_wins = (df["winner_side"].to_numpy() == "b")
+    if not b_wins.any():
+        return df.copy()
+    kept = df.loc[~b_wins].copy()
+    flipped = swap_sides(df.loc[b_wins])
+    flipped["winner_side"] = "a"
+    for m in METHODS:
+        a_col, b_col = f"book_a_{m}", f"book_b_{m}"
+        a_vals = df.loc[b_wins, a_col].to_numpy()
+        flipped[a_col] = df.loc[b_wins, b_col].to_numpy()
+        flipped[b_col] = a_vals
+    if "target_a_wins" in flipped.columns:
+        flipped["target_a_wins"] = 1 - df.loc[b_wins, "target_a_wins"].to_numpy()
+    return pd.concat([kept, flipped]).sort_index()
+
+
+def method_index(bucket: np.ndarray) -> np.ndarray:
+    return np.array([METHODS.index(b) for b in bucket], dtype=int)
 
 
 def book_probs(df: pd.DataFrame) -> tuple[np.ndarray, np.ndarray]:
@@ -509,6 +547,190 @@ def stage_decompose(df: pd.DataFrame, *, cache: bool) -> dict:
     return report
 
 
+# ── GATE 0 — can a direct fit beat the simulator's mix? ────────────────
+
+GATE0_MARGIN = 0.02  # nats the fit must take off the MC mix on val, per seed
+SEEDS = (42, 7, 13)
+
+
+def _fit_variant(
+    X: pd.DataFrame,
+    y: np.ndarray,
+    tr: np.ndarray,
+    va: np.ndarray,
+    *,
+    seed: int,
+    sample_weight: np.ndarray | None = None,
+) -> tuple[MethodModel, np.ndarray]:
+    m = MethodModel().fit(
+        X.loc[tr].reset_index(drop=True),
+        y[tr],
+        X.loc[va].reset_index(drop=True),
+        y[va],
+        seed=seed,
+        sample_weight=None if sample_weight is None else sample_weight[tr],
+    )
+    return m, m.predict_cond(X.loc[va].reset_index(drop=True))
+
+
+def stage_gate0(df: pd.DataFrame, *, cache: bool) -> dict:
+    masks = split_masks(df)
+    grade = gradeable_mask(df)
+
+    print("\nloading production Monte Carlo artifacts:")
+    load_split_trained_mc()
+
+    tr_mask = masks["train"] & grade
+    va_mask = masks["val"] & grade
+    sel = tr_mask | va_mask
+    sub = df.loc[sel].reset_index(drop=True)
+    oriented = orient_winner_first(sub)
+    y = method_index(sub["method_bucket"].to_numpy())
+
+    tr = tr_mask[sel]
+    va = va_mask[sel]
+    print(f"\n=== GATE 0 — train n={int(tr.sum())} (< {TRAIN_END}) · "
+          f"val n={int(va.sum())} ([{TRAIN_END}, {VAL_END})) ===")
+
+    base_X, _, _ = build_feature_matrix(oriented)
+    variants = {
+        "diffs_only": build_method_features(base_X, oriented, levels=False),
+        "with_levels": build_method_features(base_X, oriented, levels=True),
+    }
+
+    # Reference points on the identical val rows.
+    cells = mc_cells(df, va_mask, cache=cache)
+    va_ids = sub.loc[va, "bout_id"]
+    mc = cells.loc[va_ids][CELLS].to_numpy(dtype=float)
+    winner_side_va = sub.loc[va, "winner_side"].to_numpy()
+    bucket_va = sub.loc[va, "method_bucket"].to_numpy()
+    mix_mc = conditional_mix(mc)
+    ll_mc = cond_ll_from_mix(mix_mc, winner_side_va, bucket_va)
+
+    tr_bucket = sub.loc[tr, "method_bucket"].to_numpy()
+    emp = np.array([(tr_bucket == m).mean() for m in METHODS])
+    ll_const = float(
+        -np.log(np.clip(np.tile(emp, (int(va.sum()), 1))[np.arange(int(va.sum())), y[va]], EPS, 1))
+        .mean()
+    )
+
+    print(f"  reference — MC production mix   {ll_mc:.4f}")
+    print(f"  reference — constant base rates {ll_const:.4f}  ({dict(zip(METHODS, emp.round(4), strict=True))})")
+    print(f"  gate: beat the MC mix by >= {GATE0_MARGIN:.2f} nats on every seed\n")
+
+    results: dict[str, Any] = {}
+    for name, X in variants.items():
+        per_seed = []
+        for seed in SEEDS:
+            model, p_va = _fit_variant(X, y, tr, va, seed=seed)
+            ll = _multiclass_logloss(y[va], p_va)
+            per_seed.append(
+                {"seed": seed, "val_logloss": ll, "solo": model.val_metrics["solo_logloss"],
+                 "weights": model.weights, "best_iters": model.best_iters}
+            )
+            print(
+                f"  {name:12s} seed {seed:2d}  val {ll:.4f}  "
+                f"(lgb {model.val_metrics['solo_logloss'].get('lgb', float('nan')):.4f} · "
+                f"cb {model.val_metrics['solo_logloss'].get('cb', float('nan')):.4f} · "
+                f"lr {model.val_metrics['solo_logloss'].get('logreg', float('nan')):.4f})  "
+                f"w={ {k: round(v, 2) for k, v in model.weights.items()} }"
+            )
+        lls = [r["val_logloss"] for r in per_seed]
+        results[name] = {
+            "per_seed": per_seed,
+            "median_val_logloss": float(np.median(lls)),
+            "worst_val_logloss": float(np.max(lls)),
+            "n_features": int(X.shape[1]),
+            "beats_mc_every_seed": bool(all(ll_mc - ll >= GATE0_MARGIN for ll in lls)),
+            "beats_constant_every_seed": bool(all(ll < ll_const for ll in lls)),
+        }
+        print(
+            f"  {name:12s} median {results[name]['median_val_logloss']:.4f} · "
+            f"worst {results[name]['worst_val_logloss']:.4f} · "
+            f"{X.shape[1]} features · gate "
+            f"{'PASS' if results[name]['beats_mc_every_seed'] else 'FAIL'}\n"
+        )
+
+    # Where the gain comes from. A 0.18-nat jump over the simulator is large
+    # enough that "it must be a leak" is the right first reaction, so the two
+    # ablations that would localise one are run here rather than left to a
+    # reader: a context-only fit (no fighter stats at all — just the four
+    # bout facts the simulator structurally cannot see, plus the weight-class
+    # and gender one-hots) and a fit on RANDOM rather than winner-first
+    # orientation (which removes the conditioning and leaves only bout-level
+    # method information).
+    best_name = min(results, key=lambda k: results[k]["median_val_logloss"])
+    X_best = variants[best_name]
+    ctx_cols = [
+        c for c in X_best.columns
+        if c.startswith("wc_")
+        or c in ("is_womens", "scheduled_rounds", "is_title_fight", "is_main_event")
+    ]
+    _, p_ctx = _fit_variant(X_best[ctx_cols], y, tr, va, seed=42)
+    ll_ctx = _multiclass_logloss(y[va], p_ctx)
+
+    rng_or = np.random.default_rng(0)
+    flip = rng_or.random(len(sub)) < 0.5
+    mixed = sub.copy()
+    mixed.loc[flip] = swap_sides(sub.loc[flip])
+    bx_mixed, _, _ = build_feature_matrix(mixed)
+    X_mixed = build_method_features(bx_mixed, mixed, levels=(best_name == "with_levels"))
+    _, p_mixed = _fit_variant(X_mixed, y, tr, va, seed=42)
+    ll_mixed = _multiclass_logloss(y[va], p_mixed)
+
+    print("\n  where the gain comes from (val log-loss, seed 42):")
+    print(f"    constant base rates                      {ll_const:.4f}")
+    print(f"    MC production mix                        {ll_mc:.4f}")
+    print(f"    context only ({len(ctx_cols)} cols, no fighter stats)  {ll_ctx:.4f}")
+    print(f"    random orientation (no conditioning)     {ll_mixed:.4f}")
+    print(f"    full, winner-first                       {results[best_name]['per_seed'][0]['val_logloss']:.4f}")
+
+    provenance = {
+        "constant": ll_const,
+        "mc_production": ll_mc,
+        "context_only": ll_ctx,
+        "context_columns": ctx_cols,
+        "random_orientation": ll_mixed,
+        "full_winner_first": results[best_name]["per_seed"][0]["val_logloss"],
+    }
+
+    # Falsification: shuffle the method labels inside train only. A model that
+    # is reading real signal collapses to roughly the constant predictor; one
+    # that is reading a leak or a slot artefact does not.
+    rng = np.random.default_rng(42)
+    y_shuf = y.copy()
+    y_shuf[tr] = rng.permutation(y_shuf[tr])
+    _, p_shuf = _fit_variant(variants[best_name], y_shuf, tr, va, seed=42)
+    ll_shuf = _multiclass_logloss(y[va], p_shuf)
+    print(f"  falsification — train labels shuffled: val {ll_shuf:.4f} "
+          f"(constant {ll_const:.4f}; a real fit must NOT beat the constant here)")
+
+    passed = results[best_name]["beats_mc_every_seed"] and results[best_name][
+        "beats_constant_every_seed"
+    ]
+    print(f"\n  GATE 0: {'PASS' if passed else 'FAIL'} — best variant '{best_name}' "
+          f"{results[best_name]['median_val_logloss']:.4f} vs MC {ll_mc:.4f}")
+
+    return {
+        "n_train": int(tr.sum()),
+        "n_val": int(va.sum()),
+        "reference": {
+            "mc_production_mix": ll_mc,
+            "constant_train_empirical": ll_const,
+            "train_base_rates": dict(zip(METHODS, [float(x) for x in emp], strict=True)),
+        },
+        "variants": results,
+        "provenance": provenance,
+        "falsification_shuffled_labels": {
+            "variant": best_name, "val_logloss": ll_shuf, "constant": ll_const,
+            "clean": bool(ll_shuf >= ll_const - 0.005),
+        },
+        "best_variant": best_name,
+        "gate_margin": GATE0_MARGIN,
+        "passed": bool(passed),
+    }
+
+
 # ── entrypoint ─────────────────────────────────────────────────────────
 
 
@@ -532,6 +754,8 @@ def main() -> None:
     report: dict = {}
     if args.stage in ("decompose", "all"):
         report["decompose"] = stage_decompose(df, cache=cache)
+    if args.stage in ("gate0", "all"):
+        report["gate0"] = stage_gate0(df, cache=cache)
 
     existing = json.loads(REPORT_PATH.read_text()) if REPORT_PATH.exists() else {}
     existing.update(report)

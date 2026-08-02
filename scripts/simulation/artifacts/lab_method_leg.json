@@ -165,5 +165,178 @@
       },
       "n_train_gradeable": 5340
     }
+  },
+  "gate0": {
+    "n_train": 5340,
+    "n_val": 428,
+    "reference": {
+      "mc_production_mix": 0.9448530420345546,
+      "constant_train_empirical": 0.9904097333222688,
+      "train_base_rates": {
+        "ko": 0.3308988764044944,
+        "sub": 0.1898876404494382,
+        "dec": 0.47921348314606743
+      }
+    },
+    "variants": {
+      "diffs_only": {
+        "per_seed": [
+          {
+            "seed": 42,
+            "val_logloss": 0.7604386783221898,
+            "solo": {
+              "lgb": 0.7641401333244658,
+              "cb": 0.7685528476023352,
+              "logreg": 0.7741213136733309
+            },
+            "weights": {
+              "lgb": 0.6000000000000001,
+              "cb": 0.0,
+              "logreg": 0.3999999999999999
+            },
+            "best_iters": {
+              "lgb": 259,
+              "cb": 661
+            }
+          },
+          {
+            "seed": 7,
+            "val_logloss": 0.7627464522354113,
+            "solo": {
+              "lgb": 0.7674634456785069,
+              "cb": 0.7733362301702894,
+              "logreg": 0.7741213136733309
+            },
+            "weights": {
+              "lgb": 0.6000000000000001,
+              "cb": 0.0,
+              "logreg": 0.3999999999999999
+            },
+            "best_iters": {
+              "lgb": 244,
+              "cb": 826
+            }
+          },
+          {
+            "seed": 13,
+            "val_logloss": 0.7641208678501947,
+            "solo": {
+              "lgb": 0.7694560106843484,
+              "cb": 0.7782644440321597,
+              "logreg": 0.7741213136733309
+            },
+            "weights": {
+              "lgb": 0.6000000000000001,
+              "cb": 0.0,
+              "logreg": 0.3999999999999999
+            },
+            "best_iters": {
+              "lgb": 248,
+              "cb": 719
+            }
+          }
+        ],
+        "median_val_logloss": 0.7627464522354113,
+        "worst_val_logloss": 0.7641208678501947,
+        "n_features": 120,
+        "beats_mc_every_seed": true,
+        "beats_constant_every_seed": true
+      },
+      "with_levels": {
+        "per_seed": [
+          {
+            "seed": 42,
+            "val_logloss": 0.7633055195675836,
+            "solo": {
+              "lgb": 0.7706718487416654,
+              "cb": 0.7652577544259009,
+              "logreg": 0.7860985932723292
+            },
+            "weights": {
+              "lgb": 0.1,
+              "cb": 0.7000000000000001,
+              "logreg": 0.19999999999999996
+            },
+            "best_iters": {
+              "lgb": 156,
+              "cb": 405
+            }
+          },
+          {
+            "seed": 7,
+            "val_logloss": 0.7614821872959974,
+            "solo": {
+              "lgb": 0.7645205679431548,
+              "cb": 0.7648249334807741,
+              "logreg": 0.7860985932723292
+            },
+            "weights": {
+              "lgb": 0.5,
+              "cb": 0.30000000000000004,
+              "logreg": 0.19999999999999996
+            },
+            "best_iters": {
+              "lgb": 223,
+              "cb": 561
+            }
+          },
+          {
+            "seed": 13,
+            "val_logloss": 0.7636236656382238,
+            "solo": {
+              "lgb": 0.7697110693987469,
+              "cb": 0.76628056081901,
+              "logreg": 0.7860985932723292
+            },
+            "weights": {
+              "lgb": 0.2,
+              "cb": 0.6000000000000001,
+              "logreg": 0.19999999999999996
+            },
+            "best_iters": {
+              "lgb": 188,
+              "cb": 435
+            }
+          }
+        ],
+        "median_val_logloss": 0.7633055195675836,
+        "worst_val_logloss": 0.7636236656382238,
+        "n_features": 185,
+        "beats_mc_every_seed": true,
+        "beats_constant_every_seed": true
+      }
+    },
+    "provenance": {
+      "constant": 0.9904097333222688,
+      "mc_production": 0.9448530420345546,
+      "context_only": 0.8245152429134855,
+      "context_columns": [
+        "is_title_fight",
+        "is_main_event",
+        "scheduled_rounds",
+        "is_womens",
+        "wc_strawweight",
+        "wc_flyweight",
+        "wc_bantamweight",
+        "wc_featherweight",
+        "wc_lightweight",
+        "wc_welterweight",
+        "wc_middleweight",
+        "wc_light_heavyweight",
+        "wc_heavyweight",
+        "wc_other"
+      ],
+      "random_orientation": 0.8029528141012329,
+      "full_winner_first": 0.7604386783221898
+    },
+    "falsification_shuffled_labels": {
+      "variant": "diffs_only",
+      "val_logloss": 0.9912635212791175,
+      "constant": 0.9904097333222688,
+      "clean": true
+    },
+    "best_variant": "diffs_only",
+    "gate_margin": 0.02,
+    "passed": true
   }
 }
