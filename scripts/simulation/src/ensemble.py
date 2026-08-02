@@ -182,6 +182,86 @@ class ProbabilityCalibrator:
         return cls(payload["family"], payload["params"])
 
 
+class ResidualCorrector:
+    """An additive, antisymmetric shift in logit space, applied after blending.
+
+    Different animal from `ProbabilityCalibrator` above: that one is a monotone
+    map of the probability alone, this one is CONDITIONAL on a feature. It
+    exists because the blend has a measured directional bias no monotone map
+    can reach — the winner-batch lab (docs/winner_batch.md) found the ensemble
+    gives a 35-year-old facing a 28-year-old a 0.371 chance where the truth is
+    0.164, and that giving LightGBM more age gain (`FEATURE_CONTRI_OVERRIDES`)
+    does not fix it: the signal is there, it is diluted by 117 partly collinear
+    columns and by a blend that averages three learners' disagreements about it.
+
+    Shape, and why each part of it is pinned:
+        z' = slope·z + Σ wᵢ·(xᵢ / scaleᵢ)
+      * no intercept, and every xᵢ is an (A − B) difference, so the whole
+        correction NEGATES under a side swap. Production averages both
+        orderings; an asymmetric correction would survive that averaging as a
+        slot bias, an antisymmetric one composes with it cleanly.
+      * slope pinned to 1.0 in the shipped fit. The coefficients are fitted on
+        walk-forward models trained on less data than the served one, so a
+        fitted slope would import that sharpness difference into production,
+        where it does not belong. Only the direction transfers.
+      * a NaN input contributes ZERO shift rather than dropping the row — a
+        fighter with no date of birth must come out of this unchanged, not
+        corrected by a guess.
+
+    Refit it whenever the recipe changes; the parameters live in
+    `config.RESIDUAL_CORRECTION` and the fit is reproducible from
+    `scripts/lab_winner_batch.py --stage correct`.
+    """
+
+    def __init__(self, terms: list[dict[str, Any]], slope: float = 1.0) -> None:
+        if not terms:
+            raise ValueError("ResidualCorrector needs at least one term")
+        for t in terms:
+            missing = {"column", "weight", "scale"} - set(t)
+            if missing:
+                raise ValueError(f"term {t!r} is missing {sorted(missing)}")
+            if float(t["scale"]) == 0.0:
+                raise ValueError(f"term {t['column']!r} has scale 0")
+        self.terms = [
+            {"column": str(t["column"]), "weight": float(t["weight"]), "scale": float(t["scale"])}
+            for t in terms
+        ]
+        self.slope = float(slope)
+
+    def shift(self, X: pd.DataFrame) -> np.ndarray:
+        out = np.zeros(len(X), dtype=float)
+        for t in self.terms:
+            if t["column"] not in X.columns:
+                # Loud, not silent: a served feature matrix that lost the
+                # column would otherwise quietly serve an uncorrected
+                # probability under a version number that promises otherwise.
+                raise KeyError(
+                    f"ResidualCorrector needs feature {t['column']!r}, which is not in "
+                    f"the feature matrix — refit or clear config.RESIDUAL_CORRECTION"
+                )
+            v = pd.to_numeric(X[t["column"]], errors="coerce").to_numpy(dtype=float)
+            out += t["weight"] * np.nan_to_num(v / t["scale"], nan=0.0, posinf=0.0, neginf=0.0)
+        return out
+
+    def transform(self, p: np.ndarray, X: pd.DataFrame) -> np.ndarray:
+        p = np.clip(np.asarray(p, dtype=float), _CAL_EPS, 1 - _CAL_EPS)
+        z = np.log(p / (1 - p))
+        return 1.0 / (1.0 + np.exp(-np.clip(self.slope * z + self.shift(X), -50, 50)))
+
+    def describe(self) -> str:
+        body = " ".join(
+            f"{t['weight']:+.4f}·{t['column']}/{t['scale']:g}" for t in self.terms
+        )
+        return f"slope={self.slope:.3f} {body}"
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"terms": self.terms, "slope": self.slope}
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> ResidualCorrector:
+        return cls(payload["terms"], payload.get("slope", 1.0))
+
+
 class EnsembleModel:
     """Container with persistence — handles training all sub-models and
     blending them into a single probability (blended, not post-hoc
@@ -227,6 +307,12 @@ class EnsembleModel:
         # So: filling this in is a measured dead end, not an oversight. If you
         # are here to add a calibrator, read the lab first.
         self.calibrator: ProbabilityCalibrator | None = None
+        # v0.13.0 — the slot above's conditional cousin, and unlike it this one
+        # ships filled. See ResidualCorrector and docs/winner_batch.md: one
+        # coefficient on the age difference, fitted on 3,087 walk-forward OOF
+        # bouts, worth -0.0026 nats there / -0.0054 on the held-out window.
+        # Attached by train.py from config.RESIDUAL_CORRECTION.
+        self.corrector: ResidualCorrector | None = None
         self.training_meta: dict[str, Any] = {}
 
     # ── individual training helpers ────────────────────────────────────
@@ -449,7 +535,7 @@ class EnsembleModel:
         X_all: pd.DataFrame,
         y_all: pd.Series,
         sample_weight: np.ndarray | None = None,
-    ) -> "EnsembleModel":
+    ) -> EnsembleModel:
         """Return a PRODUCTION ensemble whose base learners are refit on the
         FULL dataset (train+val+test), so the SERVED weights include the most
         recent fights instead of only data before TRAIN_END. The temporal-split
@@ -482,6 +568,7 @@ class EnsembleModel:
         # Transfer the blend config unchanged (meta-params selected on val).
         prod.blender = self.blender
         prod.calibrator = self.calibrator
+        prod.corrector = self.corrector
         prod._blend_mode = getattr(self, "_blend_mode", "logreg")
         prod._blend_weights = getattr(self, "_blend_weights", [])
         prod._val_blend_logloss = getattr(self, "_val_blend_logloss", {})
@@ -529,7 +616,13 @@ class EnsembleModel:
             # Default / "logreg" mode.
             blended = self.blender.predict_proba(base)[:, 1]
         if self.calibrator is not None:
-            return self.calibrator.transform(blended)
+            blended = self.calibrator.transform(blended)
+        # The corrector runs LAST and needs X, not just the probability: it is
+        # conditional on a feature, so it cannot live in the calibrator slot.
+        # Both sit inside predict_proba_a, i.e. inside the order averaging that
+        # predict.py wraps around this call.
+        if self.corrector is not None:
+            blended = self.corrector.transform(blended, X)
         return blended
 
     def predict_proba_breakdown(self, X: pd.DataFrame) -> dict[str, np.ndarray]:
@@ -576,6 +669,14 @@ class EnsembleModel:
             cal_json.write_text(json.dumps(self.calibrator.to_dict(), indent=2))
         elif cal_json.exists():
             cal_json.unlink()
+        # Same discipline for the corrector: JSON, and removed when absent so a
+        # directory on disk can never serve a correction the loaded model does
+        # not have.
+        corr_json = dir_path / "corrector.json"
+        if self.corrector is not None:
+            corr_json.write_text(json.dumps(self.corrector.to_dict(), indent=2))
+        elif corr_json.exists():
+            corr_json.unlink()
         (dir_path / "feature_columns.json").write_text(
             json.dumps(self.feature_columns)
         )
@@ -590,7 +691,7 @@ class EnsembleModel:
         )
 
     @classmethod
-    def load(cls, dir_path: Path) -> "EnsembleModel":
+    def load(cls, dir_path: Path) -> EnsembleModel:
         feature_columns = json.loads((dir_path / "feature_columns.json").read_text())
         m = cls(feature_columns=feature_columns, lgb_params={}, lgb_num_rounds=0, lgb_early_stopping=0)
         m.lgb_global = lgb.Booster(model_file=str(dir_path / "lgb_global.lgb"))
@@ -604,6 +705,12 @@ class EnsembleModel:
         m.calibrator = (
             ProbabilityCalibrator.from_dict(json.loads(cal_path.read_text()))
             if cal_path.exists()
+            else None
+        )
+        corr_path = dir_path / "corrector.json"
+        m.corrector = (
+            ResidualCorrector.from_dict(json.loads(corr_path.read_text()))
+            if corr_path.exists()
             else None
         )
         blend_mode_path = dir_path / "blend_mode.json"
