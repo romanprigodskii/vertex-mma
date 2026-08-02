@@ -1156,13 +1156,130 @@ def stage_gate2(df: pd.DataFrame, *, cache: bool) -> dict:
     return verdict
 
 
+# ── Stage 3 — every leg the book actually offers ───────────────────────
+
+
+def _binary_scores(p: np.ndarray, y: np.ndarray) -> dict[str, float]:
+    p = np.clip(p, 1e-9, 1 - 1e-9)
+    return {
+        "n": int(len(y)),
+        "log_loss": float(-(y * np.log(p) + (1 - y) * np.log(1 - p)).mean()),
+        "brier": float(((p - y) ** 2).mean()),
+        "mean_pred": float(p.mean()),
+        "base_rate": float(y.mean()),
+    }
+
+
+def stage_legs(df: pd.DataFrame, *, cache: bool) -> dict:
+    """The method market is one of FOUR legs `sportsbook.ts` prices, and three
+    of them read the same reconciled distribution. `computeSportsbookOutcomes`
+    derives P(distance) from the method cells directly and rescales the
+    per-round finish curve to the reconciled finish total, so a better mix
+    moves the distance and total_rounds legs whether or not anyone measures
+    it. This stage measures it.
+
+    Only the method leg has a scraped closing line, so the others are scored
+    against the constant base rate instead of a market — an internal
+    improvement, stated as one."""
+    masks = split_masks(df)
+    grade = gradeable_mask(df)
+    prev = json.loads(REPORT_PATH.read_text()) if REPORT_PATH.exists() else {}
+    levels = prev.get("gate0", {}).get("best_variant", "diffs_only") == "with_levels"
+
+    print("\nloading production Monte Carlo artifacts:")
+    load_split_trained_mc()
+
+    tr_mask, va_mask, te_mask = masks["train"] & grade, masks["val"] & grade, masks["test"] & grade
+    fit_sel = tr_mask | va_mask
+    fit_sub = df.loc[fit_sel].reset_index(drop=True)
+    fit_or = orient_winner_first(fit_sub)
+    y_fit = method_index(fit_sub["method_bucket"].to_numpy())
+    base_fit, _, _ = build_feature_matrix(fit_or)
+    X_fit = build_method_features(base_fit, fit_or, levels=levels)
+    model, _ = _fit_variant(X_fit, y_fit, tr_mask[fit_sel], va_mask[fit_sel], seed=42)
+
+    te = df.loc[te_mask].reset_index(drop=True)
+    bucket = te["method_bucket"].to_numpy()
+    winner_side = te["winner_side"].to_numpy()
+    market, coherent = book_probs(te)
+    cells_mc = mc_cells(df, te_mask, cache=cache).loc[te["bout_id"]]
+    mix_mc = conditional_mix(cells_mc[CELLS].to_numpy(dtype=float))
+    mix_new = model_mix(model, te, levels=levels)
+    fr = cells_mc[[f"fr_{r}" for r in range(1, 6)]].to_numpy(dtype=float)
+    raw_finish = fr.sum(axis=1)
+
+    prob_a = ensemble_prob_a(te)
+    market_prob_a = np.where(coherent, market[:, :3].sum(axis=1), np.nan)
+    guarded_a = apply_edge_guard(prob_a, market_prob_a)
+
+    # Outcomes, graded exactly as settleSelection does.
+    y_dist = (bucket == "dec").astype(float)
+    rf = te["round_finished"].to_numpy(dtype=float)
+    y_under = np.where(bucket == "dec", 0.0, (rf <= 2).astype(float))
+    gradeable_totals = (bucket == "dec") | np.isfinite(rf)
+    y_win_a = (winner_side == "a").astype(float)
+
+    print(f"\n=== Stage 3 — all four legs on the held-out test window, n={len(te)} ===")
+    legs: dict[str, Any] = {}
+    for label, mix in (("production", mix_mc), ("new", mix_new)):
+        cells = reconcile(mix, guarded_a)
+        dec_total = cells[:, 2] + cells[:, 5]
+        finish_total = 1.0 - dec_total
+        # sportsbook.ts: rescale the raw finish curve to the reconciled total
+        # so totals, distance and method cannot be arbitraged against each
+        # other. Bouts where the simulator produced no finish mass are not
+        # priced at all (`if (rawFinish > 0)`), so they drop out here too.
+        scale = np.where(raw_finish > 0, finish_total / np.maximum(raw_finish, EPS), 0.0)
+        p_under = np.clip((fr[:, 0] + fr[:, 1]) * scale, 0.0, 1.0)
+        priced = (raw_finish > 0) & gradeable_totals
+        legs[label] = {
+            "winner": _binary_scores(guarded_a, y_win_a),
+            "distance_yes": _binary_scores(dec_total, y_dist),
+            "under_2_5": _binary_scores(p_under[priced], y_under[priced]),
+        }
+
+    # Constant baselines from TRAIN, the honest "no model" reference.
+    tr_bucket = df.loc[tr_mask, "method_bucket"].to_numpy()
+    tr_rf = df.loc[tr_mask, "round_finished"].to_numpy(dtype=float)
+    c_dist = float((tr_bucket == "dec").mean())
+    tr_under = np.where(tr_bucket == "dec", 0.0, (tr_rf <= 2).astype(float))
+    c_under = float(tr_under[np.isfinite(tr_rf) | (tr_bucket == "dec")].mean())
+    legs["constant_train_rate"] = {
+        "winner": _binary_scores(np.full(len(te), 0.5), y_win_a),
+        "distance_yes": _binary_scores(np.full(len(te), c_dist), y_dist),
+        "under_2_5": _binary_scores(
+            np.full(int(gradeable_totals.sum()), c_under), y_under[gradeable_totals]
+        ),
+    }
+
+    for leg in ("winner", "distance_yes", "under_2_5"):
+        print(f"\n  {leg}:")
+        print(f"    {'variant':20s} {'n':>5} {'log-loss':>9} {'brier':>8} "
+              f"{'mean p':>8} {'actual':>8}")
+        for label in ("constant_train_rate", "production", "new"):
+            d = legs[label][leg]
+            print(f"    {label:20s} {d['n']:5d} {d['log_loss']:9.4f} {d['brier']:8.4f} "
+                  f"{d['mean_pred']:8.3f} {d['base_rate']:8.3f}")
+
+    delta = {
+        leg: legs["production"][leg]["log_loss"] - legs["new"][leg]["log_loss"]
+        for leg in ("winner", "distance_yes", "under_2_5")
+    }
+    print("\n  log-loss taken off each leg by the method model "
+          "(positive = better; winner leg is untouched by construction):")
+    for leg, v in delta.items():
+        print(f"    {leg:16s} {v:+.4f}")
+
+    return {"n_test": int(len(te)), "legs": legs, "delta_production_minus_new": delta}
+
+
 # ── entrypoint ─────────────────────────────────────────────────────────
 
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--stage", default="decompose",
-                    choices=["decompose", "gate0", "gate1", "gate2", "all"])
+                    choices=["decompose", "gate0", "gate1", "gate2", "legs", "all"])
     ap.add_argument("--no-cache", action="store_true",
                     help="rebuild the dataset and Monte Carlo caches from the DB")
     args = ap.parse_args()
@@ -1185,6 +1302,8 @@ def main() -> None:
         report["gate1"] = stage_gate1(df, cache=cache)
     if args.stage in ("gate2", "all"):
         report["gate2"] = stage_gate2(df, cache=cache)
+    if args.stage in ("legs", "all"):
+        report["legs"] = stage_legs(df, cache=cache)
 
     existing = json.loads(REPORT_PATH.read_text()) if REPORT_PATH.exists() else {}
     existing.update(report)
