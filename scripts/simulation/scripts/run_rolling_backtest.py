@@ -79,6 +79,9 @@ DEFAULT_STEP_MONTHS = 3
 # blender fit, blend-mode select) — 12 months, exactly like TRAIN_END→VAL_END.
 VAL_MONTHS = 12
 REPORT_PATH = ARTIFACTS_DIR / "rolling_backtest.json"
+# Flipped by --uncorrected so the lab can measure the corrector's effect on
+# identical origins instead of against a stale committed report.
+CORRECTOR_ENABLED = True
 CACHE_PATH = DATA_DIR / "rolling_dataset.parquet"
 
 
@@ -144,7 +147,7 @@ def _fit_ensemble(
     # written down in docs/winner_batch.md rather than acted on.)
     model.corrector = (
         ResidualCorrector.from_dict(RESIDUAL_CORRECTION)
-        if (RESIDUAL_CORRECTION and corrected)
+        if (RESIDUAL_CORRECTION and corrected and CORRECTOR_ENABLED)
         else None
     )
     return model
@@ -420,7 +423,21 @@ def main() -> None:
         action="store_true",
         help="reuse data/rolling_dataset.parquet instead of rebuilding from Postgres",
     )
+    ap.add_argument(
+        "--uncorrected",
+        action="store_true",
+        help=(
+            "run the main segment WITHOUT the v0.13.0 residual corrector and write "
+            "rolling_backtest_uncorrected.json — the paired before/after on identical "
+            "origins and identical data, which comparing against an older committed "
+            "report cannot give you (the data grows between runs)"
+        ),
+    )
     args = ap.parse_args()
+    if args.uncorrected:
+        global CORRECTOR_ENABLED, REPORT_PATH
+        CORRECTOR_ENABLED = False
+        REPORT_PATH = ARTIFACTS_DIR / "rolling_backtest_uncorrected.json"
     run(args.start, args.end, args.step_months, args.cache)
 
 

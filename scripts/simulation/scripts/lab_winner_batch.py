@@ -649,6 +649,13 @@ def run_correction(seeds: list[int], use_cache: bool) -> dict:
 
     prep = prepare_splits(use_cache=use_cache)
     ens = prep["ensemble"]
+    # Strip the shipped corrector before measuring. Once v0.13.0 landed the
+    # eval artifacts carry it, and a rerun would otherwise fit a correction on
+    # top of a corrected model and report a delta near zero — which reads as
+    # "the lab was wrong" rather than "the lab already shipped".
+    if getattr(ens, "corrector", None) is not None:
+        print(f"  (stripping the shipped corrector to measure: {ens.corrector.describe()})")
+        ens.corrector = None
     sp = prep["splits"]["test"]
     p_te = ens.predict_proba_a(sp["X"])
     p_te_sw = ens.predict_proba_a(sp["X_swapped"])
@@ -838,6 +845,13 @@ def run_calibration(seeds: list[int], use_cache: bool, recent_from: str = "2022-
 
     prep = prepare_splits(use_cache=use_cache)
     ens = prep["ensemble"]
+    # Strip the shipped corrector before measuring. Once v0.13.0 landed the
+    # eval artifacts carry it, and a rerun would otherwise fit a correction on
+    # top of a corrected model and report a delta near zero — which reads as
+    # "the lab was wrong" rather than "the lab already shipped".
+    if getattr(ens, "corrector", None) is not None:
+        print(f"  (stripping the shipped corrector to measure: {ens.corrector.describe()})")
+        ens.corrector = None
     sp = prep["splits"]["test"]
     p_te = ens.predict_proba_a(sp["X"])
     p_te_sw = ens.predict_proba_a(sp["X_swapped"])
