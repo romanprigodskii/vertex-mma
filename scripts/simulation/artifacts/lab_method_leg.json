@@ -880,5 +880,117 @@
       "distance_yes": 0.07465705376132226,
       "under_2_5": 0.046391523930271794
     }
+  },
+  "leak": {
+    "finish_rate_by_flag": [
+      {
+        "rounds": 3,
+        "flagged": false,
+        "n": 6054,
+        "finish_rate": 0.4132804757185332
+      },
+      {
+        "rounds": 3,
+        "flagged": true,
+        "n": 1854,
+        "finish_rate": 0.8408845738942826
+      },
+      {
+        "rounds": 5,
+        "flagged": false,
+        "n": 218,
+        "finish_rate": 0.4036697247706422
+      },
+      {
+        "rounds": 5,
+        "flagged": true,
+        "n": 682,
+        "finish_rate": 0.656891495601173
+      }
+    ],
+    "flag_rate_by_year": [
+      {
+        "year": 2021,
+        "completed": 509,
+        "flagged": 156,
+        "upcoming": 0,
+        "flagged_upcoming": 0
+      },
+      {
+        "year": 2022,
+        "completed": 511,
+        "flagged": 175,
+        "upcoming": 0,
+        "flagged_upcoming": 0
+      },
+      {
+        "year": 2023,
+        "completed": 520,
+        "flagged": 170,
+        "upcoming": 0,
+        "flagged_upcoming": 0
+      },
+      {
+        "year": 2024,
+        "completed": 517,
+        "flagged": 156,
+        "upcoming": 0,
+        "flagged_upcoming": 0
+      },
+      {
+        "year": 2025,
+        "completed": 522,
+        "flagged": 149,
+        "upcoming": 0,
+        "flagged_upcoming": 0
+      },
+      {
+        "year": 2026,
+        "completed": 314,
+        "flagged": 81,
+        "upcoming": 65,
+        "flagged_upcoming": 2
+      }
+    ],
+    "arms": {
+      "with_leak": {
+        "val_logloss_median": 0.7642058691227991,
+        "val_per_seed": [
+          0.7622464860609245,
+          0.7642058691227991,
+          0.7646916386252183
+        ],
+        "test_cond_median": 0.8612709720868388,
+        "test_cond_per_seed": [
+          0.8585614144442385,
+          0.8612709720868388,
+          0.8615789758519354
+        ],
+        "n_features": 120
+      },
+      "shipped_without_leak": {
+        "val_logloss_median": 0.8965710861768912,
+        "val_per_seed": [
+          0.896812980992372,
+          0.894239313162398,
+          0.8965710861768912
+        ],
+        "test_cond_median": 0.9293301361995477,
+        "test_cond_per_seed": [
+          0.9293301361995477,
+          0.931423817687725,
+          0.9283794681619651
+        ],
+        "n_features": 119
+      }
+    },
+    "mc_production_test_cond": 0.9707944191055042,
+    "constant_test_cond": 1.0233762724741446,
+    "leak_value": {
+      "val": 0.1323652170540921,
+      "test": 0.06805916411270896
+    },
+    "result_survives_removal": true,
+    "root_cause": "parsers/event_details.is_title_bout treats any <img> in the weight-class cell as a belt; UFCStats renders post-fight bonus icons in that cell"
   }
 }

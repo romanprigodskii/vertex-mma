@@ -99,6 +99,33 @@ METHOD_LEVEL_COLUMNS = [
     "preufc_finish_losses",
 ]
 
+# Columns dropped from the method matrix because they are not known before
+# the fight, whatever their name says.
+#
+# `is_title_fight` is scraped by `parsers/event_details.is_title_bout`, which
+# reads "any <img> in the weight-class cell" as a belt. UFCStats puts the
+# post-fight BONUS icons in that same cell — Performance of the Night, Fight
+# of the Night — so the flag is set on ~24 % of all bouts against a real
+# title rate near 5 %, including 1,855 three-round "title fights" (a title
+# fight is five rounds, always).
+#
+# It is a leak, not just noise, and specifically a leak of THIS target:
+# bonuses go to finishes, so among three-round bouts the flag marks an 84.1 %
+# finish rate against 41.3 % unflagged. It was the method model's single
+# largest feature by gain before this exclusion, worth 0.134 nats on val and
+# 0.068 on test — none of it available at serve time, where unfought bouts
+# carry no bonus icon and the flag sits at its honest ~3 %.
+#
+# The winner ensemble is unaffected (rank 114 of 118, 0.0 % gain): "this bout
+# ended in a finish" says almost nothing about WHO won, which is why the leak
+# went unnoticed until a model was pointed at the method.
+#
+# The flag stays in the dataset — `derive_title_fights.ts` already treats the
+# scraped column as untrustworthy and the UI reads a curated list instead, so
+# repairing the column is its own job. This just stops the model eating it.
+# See docs/method_leg.md §7.
+LEAKING_COLUMNS = ("is_title_fight",)
+
 # Ratios the simulator's lift formulas are built out of, handed to the model
 # directly so it can learn the functional form instead of inheriting a
 # hand-set one. Numerator/denominator pairs are per side; a zero denominator
@@ -121,8 +148,12 @@ def build_method_features(
     model's matrix on a WINNER-FIRST frame. When `levels` is True, append the
     per-side absolute levels and hand-formula ratios the diff view destroys.
 
+    `LEAKING_COLUMNS` are dropped here rather than at the call sites, so the
+    training matrix and the serve-time matrix cannot disagree about them.
+
     Column order is deterministic (base order, then levels, then rates) so the
     saved `feature_columns` list is a stable contract."""
+    base_X = base_X.drop(columns=list(LEAKING_COLUMNS), errors="ignore")
     if not levels:
         return base_X.copy()
 

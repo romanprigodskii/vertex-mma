@@ -1283,13 +1283,167 @@ def stage_legs(df: pd.DataFrame, *, cache: bool) -> dict:
     return {"n_test": int(len(te)), "legs": legs, "delta_production_minus_new": delta}
 
 
+# ── Stage 4 — the audit that caught a leak in this lab's own result ────
+
+LEAK_AUDIT_SQL = """
+SELECT b.scheduled_rounds,
+       b.is_title_fight,
+       COUNT(*)                                                              AS n,
+       COUNT(*) FILTER (WHERE b.method::text IN ('ko','tko','submission'))   AS finishes
+FROM bout b
+WHERE b.status = 'completed' AND b.method IS NOT NULL
+GROUP BY 1, 2
+ORDER BY 1, 2
+"""
+
+LEAK_RATE_SQL = """
+SELECT EXTRACT(YEAR FROM e.date)::int                                        AS yr,
+       COUNT(*) FILTER (WHERE b.status = 'completed')                        AS completed,
+       COUNT(*) FILTER (WHERE b.status = 'completed' AND b.is_title_fight)   AS flagged,
+       COUNT(*) FILTER (WHERE b.status <> 'completed')                       AS upcoming,
+       COUNT(*) FILTER (WHERE b.status <> 'completed' AND b.is_title_fight)  AS flagged_upcoming
+FROM bout b JOIN event e ON e.id = b.event_id
+WHERE e.date >= '2021-01-01'
+GROUP BY 1 ORDER BY 1
+"""
+
+
+def stage_leak(df: pd.DataFrame, *, cache: bool) -> dict:
+    """`is_title_fight` was this lab's single largest feature by gain. It is
+    also not known before the fight.
+
+    `parsers/event_details.is_title_bout` reads "any <img> in the weight-class
+    cell" as a belt, and UFCStats puts the post-fight bonus icons in that
+    cell. So the flag marks bonuses, bonuses go to finishes, and the method
+    model was reading its own target. This stage measures the contamination
+    in the source data and re-runs the gate with the column removed —
+    `method_model.LEAKING_COLUMNS` now drops it, so the "without" arm is what
+    ships and the "with" arm is what the first pass of this lab reported."""
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute(LEAK_AUDIT_SQL)
+        audit = cur.fetchall()
+        cur.execute(LEAK_RATE_SQL)
+        rates = cur.fetchall()
+
+    print("\n=== Stage 4 — is_title_fight is a post-fight bonus flag ===")
+    print("\n  finish rate by (scheduled_rounds, flag) — completed bouts:")
+    print(f"    {'rounds':>7} {'flag':>6} {'n':>6} {'finish%':>9}")
+    audit_rows = []
+    for rounds, flag, n, fin in audit:
+        audit_rows.append({"rounds": int(rounds), "flagged": bool(flag),
+                           "n": int(n), "finish_rate": float(fin) / int(n)})
+        print(f"    {int(rounds):7d} {str(bool(flag)):>6} {int(n):6d} {fin / n * 100:8.1f}%")
+    print("\n  A title fight is five rounds, always. Three-round bouts carrying")
+    print("  the flag are impossible as titles and finish at roughly twice the")
+    print("  base rate — the signature of Performance/Fight of the Night.")
+
+    print("\n  flag rate by year, completed vs not-yet-fought:")
+    print(f"    {'year':>5} {'done':>6} {'flagged':>8} {'pct':>7} {'upcoming':>9} {'flagged':>8}")
+    rate_rows = []
+    for yr, done, flagged, up, flagged_up in rates:
+        rate_rows.append({"year": int(yr), "completed": int(done), "flagged": int(flagged),
+                          "upcoming": int(up), "flagged_upcoming": int(flagged_up)})
+        pct = flagged / done * 100 if done else 0.0
+        print(f"    {int(yr):5d} {int(done):6d} {int(flagged):8d} {pct:6.1f}% "
+              f"{int(up):9d} {int(flagged_up):8d}")
+    print("\n  Unfought bouts carry no bonus icon, so they sit at the honest rate.")
+    print("  That is a train/serve skew on top of the leak.")
+
+    # Re-gate with and without. The "without" arm is what ships.
+    masks = split_masks(df)
+    grade = gradeable_mask(df)
+    tr_m, va_m, te_m = masks["train"] & grade, masks["val"] & grade, masks["test"] & grade
+    fit_sel = tr_m | va_m
+    sub = df.loc[fit_sel].reset_index(drop=True)
+    oriented = orient_winner_first(sub)
+    y = method_index(sub["method_bucket"].to_numpy())
+    tr, va = tr_m[fit_sel], va_m[fit_sel]
+    te = df.loc[te_m].reset_index(drop=True)
+    ws_te, bk_te = te["winner_side"].to_numpy(), te["method_bucket"].to_numpy()
+
+    base_fit, _, _ = build_feature_matrix(oriented)
+    X_clean = build_method_features(base_fit, oriented, levels=False)
+    X_leaky = X_clean.copy()
+    X_leaky["is_title_fight"] = base_fit["is_title_fight"].to_numpy()
+
+    def _test_cond(model, cols) -> float:
+        mix = np.empty((len(te), 2, 3))
+        for s, frame in enumerate((te, swap_sides(te))):
+            b, _, _ = build_feature_matrix(frame)
+            xx = build_method_features(b, frame, levels=False)
+            if "is_title_fight" in cols:
+                xx = xx.copy()
+                xx["is_title_fight"] = b["is_title_fight"].to_numpy()
+            mix[:, s, :] = model.predict_cond(xx[cols])
+        return cond_ll_from_mix(mix, ws_te, bk_te)
+
+    arms: dict[str, Any] = {}
+    for tag, X in (("with_leak", X_leaky), ("shipped_without_leak", X_clean)):
+        cols = list(X.columns)
+        va_lls, te_lls = [], []
+        for seed in SEEDS:
+            m, p_va = _fit_variant(X, y, tr, va, seed=seed)
+            va_lls.append(_multiclass_logloss(y[va], p_va))
+            te_lls.append(_test_cond(m, cols))
+        arms[tag] = {
+            "val_logloss_median": float(np.median(va_lls)),
+            "val_per_seed": [float(v) for v in va_lls],
+            "test_cond_median": float(np.median(te_lls)),
+            "test_cond_per_seed": [float(v) for v in te_lls],
+            "n_features": len(cols),
+        }
+
+    cells = mc_cells(df, te_m, cache=cache).loc[te["bout_id"]]
+    ll_mc = cond_ll_from_mix(conditional_mix(cells[CELLS].to_numpy(dtype=float)), ws_te, bk_te)
+    tr_b = sub.loc[tr, "method_bucket"].to_numpy()
+    emp = np.array([(tr_b == m).mean() for m in METHODS])
+    yi = method_index(bk_te)
+    ll_const = float(-np.log(np.clip(np.tile(emp, (len(te), 1))[np.arange(len(te)), yi],
+                                     EPS, 1.0)).mean())
+
+    print("\n  conditional log-loss, with the leak and without:")
+    print(f"    {'arm':26s} {'val':>8} {'test':>8}")
+    for tag, d in arms.items():
+        print(f"    {tag:26s} {d['val_logloss_median']:8.4f} {d['test_cond_median']:8.4f}")
+    print(f"    {'MC production':26s} {'—':>8} {ll_mc:8.4f}")
+    print(f"    {'constant base rates':26s} {'—':>8} {ll_const:8.4f}")
+
+    cost = {
+        "val": arms["shipped_without_leak"]["val_logloss_median"]
+        - arms["with_leak"]["val_logloss_median"],
+        "test": arms["shipped_without_leak"]["test_cond_median"]
+        - arms["with_leak"]["test_cond_median"],
+    }
+    survives = arms["shipped_without_leak"]["test_cond_median"] < ll_mc
+    print(f"\n  the leak was worth {cost['val']:.4f} nats on val and "
+          f"{cost['test']:.4f} on test — none of it available at serve time.")
+    print(f"  the honest model still beats the simulator: "
+          f"{'YES' if survives else 'NO'} "
+          f"({arms['shipped_without_leak']['test_cond_median']:.4f} vs {ll_mc:.4f})")
+
+    return {
+        "finish_rate_by_flag": audit_rows,
+        "flag_rate_by_year": rate_rows,
+        "arms": arms,
+        "mc_production_test_cond": ll_mc,
+        "constant_test_cond": ll_const,
+        "leak_value": cost,
+        "result_survives_removal": bool(survives),
+        "root_cause": (
+            "parsers/event_details.is_title_bout treats any <img> in the "
+            "weight-class cell as a belt; UFCStats renders post-fight bonus "
+            "icons in that cell"
+        ),
+    }
+
+
 # ── entrypoint ─────────────────────────────────────────────────────────
 
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--stage", default="decompose",
-                    choices=["decompose", "gate0", "gate1", "gate2", "legs", "all"])
+                    choices=["decompose", "gate0", "gate1", "gate2", "legs", "leak", "all"])
     ap.add_argument("--no-cache", action="store_true",
                     help="rebuild the dataset and Monte Carlo caches from the DB")
     args = ap.parse_args()
@@ -1314,6 +1468,8 @@ def main() -> None:
         report["gate2"] = stage_gate2(df, cache=cache)
     if args.stage in ("legs", "all"):
         report["legs"] = stage_legs(df, cache=cache)
+    if args.stage in ("leak", "all"):
+        report["leak"] = stage_leak(df, cache=cache)
 
     existing = json.loads(REPORT_PATH.read_text()) if REPORT_PATH.exists() else {}
     existing.update(report)
