@@ -62,6 +62,7 @@ PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 if str(PACKAGE_ROOT) not in sys.path:
     sys.path.insert(0, str(PACKAGE_ROOT))
 
+import lightgbm as lgb  # noqa: E402
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
@@ -78,6 +79,7 @@ from src.export import (  # noqa: E402
 )
 from src.features import build_feature_matrix  # noqa: E402
 from src.method_model import (  # noqa: E402
+    LGB_MULTI_PARAMS,
     MethodModel,
     _multiclass_logloss,
     build_method_features,
@@ -1447,13 +1449,204 @@ def stage_leak(df: pd.DataFrame, *, cache: bool) -> dict:
     }
 
 
+# ── Stage 5 — the round leg ────────────────────────────────────────────
+
+MAX_ROUNDS = 5
+
+
+def _round_mask(sched: np.ndarray) -> np.ndarray:
+    """(n, 5) boolean — which round indices a bout of that length can end in."""
+    return np.arange(1, MAX_ROUNDS + 1)[None, :] <= sched[:, None]
+
+
+def _masked_norm(p: np.ndarray, sched: np.ndarray) -> np.ndarray:
+    """Zero out rounds the bout cannot reach and renormalise."""
+    out = np.where(_round_mask(sched), p, 0.0)
+    s = out.sum(axis=1, keepdims=True)
+    return np.divide(out, np.where(s > 0, s, 1.0))
+
+
+def _round_ll(p: np.ndarray, y: np.ndarray) -> float:
+    return float(-np.log(np.clip(p[np.arange(len(y)), y], EPS, 1.0)).mean())
+
+
+def stage_rounds(df: pd.DataFrame, *, cache: bool, report: dict | None = None) -> dict:
+    """Can a per-bout model beat the simulator on WHEN a finish lands?
+
+    The prior is that it should, and for a structural reason: every covariate
+    in `finish_hazard.py` is time-constant, so `_normalize_shape` divides it
+    back out and the served timing is TWO FIXED CURVES per scheduled length,
+    identical for every bout on the card. The only per-bout variation in the
+    round distribution comes from how those two curves get mixed by the KO/sub
+    totals. A discriminative P(round | a finish happened, X) has per-bout
+    resolution the hazard cannot express.
+
+    Scored on finished bouts only — the round market's `u2_5` needs the round
+    a finish landed in, and decisions are graded by `wentDistance` instead."""
+    levels = _best_variant(report)
+    masks = split_masks(df)
+
+    rf = df["round_finished"].to_numpy(dtype=float)
+    sched_all = df["scheduled_rounds"].to_numpy(dtype=float)
+    finished = (
+        df["method_bucket"].isin(("ko", "sub")).to_numpy()
+        & np.isfinite(rf)
+        & (rf >= 1)
+        & (rf <= sched_all)
+    )
+    print(f"\n=== Stage 5 — round of finish, n={int(finished.sum()):,} finished bouts ===")
+
+    tr_m = masks["train"] & finished
+    va_m = masks["val"] & finished
+    te_m = masks["test"] & finished
+
+    fit_sel = tr_m | va_m
+    fit_sub = df.loc[fit_sel].reset_index(drop=True)
+    te = df.loc[te_m].reset_index(drop=True)
+    tr, va = tr_m[fit_sel], va_m[fit_sel]
+    y_fit = fit_sub["round_finished"].to_numpy(dtype=int) - 1
+    y_te = te["round_finished"].to_numpy(dtype=int) - 1
+    sched_fit = fit_sub["scheduled_rounds"].to_numpy(dtype=int)
+    sched_te = te["scheduled_rounds"].to_numpy(dtype=int)
+
+    def _matrix(frame: pd.DataFrame) -> pd.DataFrame:
+        base, _, _ = build_feature_matrix(frame)
+        return build_method_features(base, frame, levels=levels)
+
+    # Slot order is arbitrary for a bout-level target, so average both.
+    X_fit = _matrix(fit_sub)
+    X_fit_sw = _matrix(swap_sides(fit_sub))
+    X_te = _matrix(te)
+    X_te_sw = _matrix(swap_sides(te))
+
+    print(f"  train {int(tr.sum()):,} · val {int(va.sum()):,} · test {len(te):,} "
+          f"· {X_fit.shape[1]} features")
+
+    # ── references ────────────────────────────────────────────────────
+    cells_va = mc_cells(df, va_m, cache=cache).loc[fit_sub.loc[va, "bout_id"]]
+    cells_te = mc_cells(df, te_m, cache=cache).loc[te["bout_id"]]
+    fr_cols = [f"fr_{r}" for r in range(1, MAX_ROUNDS + 1)]
+    prod_va = _masked_norm(cells_va[fr_cols].to_numpy(dtype=float),
+                           fit_sub.loc[va, "scheduled_rounds"].to_numpy(dtype=int))
+    prod_te = _masked_norm(cells_te[fr_cols].to_numpy(dtype=float), sched_te)
+
+    # Constant: the empirical round distribution on TRAIN, per scheduled length.
+    const_by_len: dict[int, np.ndarray] = {}
+    for length in (3, 5):
+        sel = tr & (sched_fit == length)
+        counts = np.array([(y_fit[sel] == r).sum() for r in range(MAX_ROUNDS)], dtype=float)
+        const_by_len[length] = counts / max(counts.sum(), 1.0)
+    const_va = _masked_norm(
+        np.array([const_by_len.get(int(s), const_by_len[3])
+                  for s in fit_sub.loc[va, "scheduled_rounds"]]),
+        fit_sub.loc[va, "scheduled_rounds"].to_numpy(dtype=int),
+    )
+    const_te = _masked_norm(
+        np.array([const_by_len.get(int(s), const_by_len[3]) for s in sched_te]), sched_te
+    )
+
+    # ── discriminative model ──────────────────────────────────────────
+    def _fit(seed: int):
+        params = {
+            **LGB_MULTI_PARAMS, "num_class": MAX_ROUNDS, "seed": seed,
+            "min_data_in_leaf": 60, "num_leaves": 15, "max_depth": 4,
+        }
+        dtr = lgb.Dataset(X_fit.loc[tr].reset_index(drop=True), label=y_fit[tr])
+        dva = lgb.Dataset(X_fit.loc[va].reset_index(drop=True), label=y_fit[va],
+                          reference=dtr)
+        return lgb.train(
+            params, dtr, num_boost_round=2000, valid_sets=[dva],
+            callbacks=[lgb.early_stopping(120, verbose=False)],
+        )
+
+    def _predict(booster, Xa: pd.DataFrame, Xb: pd.DataFrame, sched: np.ndarray) -> np.ndarray:
+        it = booster.best_iteration or None
+        p = 0.5 * (booster.predict(Xa, num_iteration=it) + booster.predict(Xb, num_iteration=it))
+        return _masked_norm(np.asarray(p, dtype=float), sched)
+
+    per_seed, va_preds, te_preds = [], [], []
+    for seed in SEEDS:
+        booster = _fit(seed)
+        p_va = _predict(booster, X_fit.loc[va].reset_index(drop=True),
+                        X_fit_sw.loc[va].reset_index(drop=True),
+                        fit_sub.loc[va, "scheduled_rounds"].to_numpy(dtype=int))
+        p_te = _predict(booster, X_te, X_te_sw, sched_te)
+        va_preds.append(p_va)
+        te_preds.append(p_te)
+        per_seed.append({
+            "seed": seed,
+            "val_logloss": _round_ll(p_va, y_fit[va]),
+            "test_logloss": _round_ll(p_te, y_te),
+            "best_iteration": int(booster.best_iteration or 0),
+        })
+        print(f"  seed {seed:2d}  val {per_seed[-1]['val_logloss']:.4f}  "
+              f"test {per_seed[-1]['test_logloss']:.4f}")
+
+    model_va = np.mean(va_preds, axis=0)
+    model_te = np.mean(te_preds, axis=0)
+
+    refs = {
+        "constant_train_by_length": {
+            "val": _round_ll(const_va, y_fit[va]), "test": _round_ll(const_te, y_te)},
+        "production_hazard": {
+            "val": _round_ll(prod_va, y_fit[va]), "test": _round_ll(prod_te, y_te)},
+        "discriminative": {
+            "val": _round_ll(model_va, y_fit[va]), "test": _round_ll(model_te, y_te)},
+    }
+    print("\n  round-of-finish log-loss (conditional on a finish):")
+    print(f"    {'variant':28s} {'val':>8} {'test':>8}")
+    for k, v in refs.items():
+        print(f"    {k:28s} {v['val']:8.4f} {v['test']:8.4f}")
+
+    boot = _paired_bootstrap(
+        -np.log(np.clip(prod_te[np.arange(len(y_te)), y_te], EPS, 1.0)),
+        -np.log(np.clip(model_te[np.arange(len(y_te)), y_te], EPS, 1.0)),
+    )
+    print(f"\n  paired bootstrap: production − model {boot['delta']:+.4f} "
+          f"[{boot['lo95']:+.4f}, {boot['hi95']:+.4f}]  P(improves) {boot['frac_positive']:.3f}")
+
+    # Where the mass sits, 3-round bouts.
+    three = sched_te == 3
+    print("\n  3-round finishes, predicted vs actual share by round "
+          f"(n={int(three.sum())}):")
+    print(f"    {'round':>6} {'actual':>8} {'hazard':>8} {'model':>8}")
+    dist = {}
+    for r in range(3):
+        dist[r + 1] = {
+            "actual": float((y_te[three] == r).mean()),
+            "hazard": float(prod_te[three, r].mean()),
+            "model": float(model_te[three, r].mean()),
+        }
+        d = dist[r + 1]
+        print(f"    {r + 1:6d} {d['actual']:8.3f} {d['hazard']:8.3f} {d['model']:8.3f}")
+
+    passed = (
+        refs["discriminative"]["val"] < refs["production_hazard"]["val"] - GATE0_MARGIN
+        and all(s["val_logloss"] < refs["production_hazard"]["val"] for s in per_seed)
+        and boot["lo95"] > 0
+    )
+    print(f"\n  GATE 5: {'PASS' if passed else 'FAIL'}")
+
+    return {
+        "n_train": int(tr.sum()), "n_val": int(va.sum()), "n_test": int(len(te)),
+        "n_features": int(X_fit.shape[1]),
+        "per_seed": per_seed,
+        "references": refs,
+        "bootstrap_production_minus_model": boot,
+        "three_round_distribution": dist,
+        "train_constant_by_length": {
+            str(k): [float(x) for x in v] for k, v in const_by_len.items()},
+        "passed": bool(passed),
+    }
+
+
 # ── entrypoint ─────────────────────────────────────────────────────────
 
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--stage", default="decompose",
-                    choices=["decompose", "gate0", "gate1", "gate2", "legs", "leak", "all"])
+                    choices=["decompose", "gate0", "gate1", "gate2", "legs", "leak", "rounds", "all"])
     ap.add_argument("--no-cache", action="store_true",
                     help="rebuild the dataset and Monte Carlo caches from the DB")
     args = ap.parse_args()
@@ -1480,6 +1673,8 @@ def main() -> None:
         report["legs"] = stage_legs(df, cache=cache, report=report)
     if args.stage in ("leak", "all"):
         report["leak"] = stage_leak(df, cache=cache)
+    if args.stage in ("rounds", "all"):
+        report["rounds"] = stage_rounds(df, cache=cache, report=report)
 
     existing = json.loads(REPORT_PATH.read_text()) if REPORT_PATH.exists() else {}
     existing.update(report)

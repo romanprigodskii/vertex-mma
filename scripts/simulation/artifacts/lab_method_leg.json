@@ -984,5 +984,85 @@
     },
     "result_survives_removal": true,
     "root_cause": "parsers/event_details.is_title_bout treats any <img> in the weight-class cell as a belt; UFCStats renders post-fight bonus icons in that cell"
+  },
+  "rounds": {
+    "n_train": 2781,
+    "n_val": 187,
+    "n_test": 333,
+    "n_features": 184,
+    "per_seed": [
+      {
+        "seed": 42,
+        "val_logloss": 1.0959401878895416,
+        "test_logloss": 1.03429372726142,
+        "best_iteration": 75
+      },
+      {
+        "seed": 7,
+        "val_logloss": 1.1021930032171492,
+        "test_logloss": 1.0272011201490678,
+        "best_iteration": 58
+      },
+      {
+        "seed": 13,
+        "val_logloss": 1.0889523019569591,
+        "test_logloss": 1.0306877128863485,
+        "best_iteration": 76
+      }
+    ],
+    "references": {
+      "constant_train_by_length": {
+        "val": 1.107300780454013,
+        "test": 1.0437377656419586
+      },
+      "production_hazard": {
+        "val": 1.102537158579247,
+        "test": 1.0402375615841772
+      },
+      "discriminative": {
+        "val": 1.0938315614132372,
+        "test": 1.0289257787683557
+      }
+    },
+    "bootstrap_production_minus_model": {
+      "delta": 0.011311782815821457,
+      "lo95": -0.005950398601633742,
+      "hi95": 0.028042299620482915,
+      "frac_positive": 0.90875
+    },
+    "three_round_distribution": {
+      "1": {
+        "actual": 0.5429553264604811,
+        "hazard": 0.4902297058701019,
+        "model": 0.5022653072550884
+      },
+      "2": {
+        "actual": 0.30584192439862545,
+        "hazard": 0.3209477530494784,
+        "model": 0.3352136590899746
+      },
+      "3": {
+        "actual": 0.15120274914089346,
+        "hazard": 0.1888225410804196,
+        "model": 0.162521033654937
+      }
+    },
+    "train_constant_by_length": {
+      "3": [
+        0.5166382252559727,
+        0.33319112627986347,
+        0.15017064846416384,
+        0.0,
+        0.0
+      ],
+      "5": [
+        0.41418764302059496,
+        0.2585812356979405,
+        0.16933638443935928,
+        0.09153318077803203,
+        0.06636155606407322
+      ]
+    },
+    "passed": false
   }
 }
