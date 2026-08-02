@@ -43,6 +43,10 @@ Outputs to `artifacts/`:
 - `ensemble/` — served 3-learner ensemble (LGB + XGB + LogReg + blender),
   refit on ALL data
 - `ensemble_eval/` — the split-trained twin, kept for out-of-sample evals
+- `method_model/` — served conditional method model (v0.12.0), refit on all
+  gradeable rows; prices the method / distance / total_rounds legs
+- `method_model_eval/` — its split-trained twin, so
+  `eval_method_market.py` stays out-of-sample on every moving part
 - `metadata.json` — feature columns, params, per-split metrics, model_version
 
 v0.8.0 adds full-slate coverage: bouts with a UFC debutant (~18 % of
@@ -78,6 +82,43 @@ signal that results-only recent-form misses), and CatBoost replacing
 XGBoost in the blend (strongest individual learner on every eval).
 Tested and rejected honestly: KO-damage recency (val tie = luck at
 the 0.5 threshold).
+
+v0.12.0 moves the METHOD leg. Until now the fixed-odds book took its
+winner probability from the 118-feature ensemble and its method / round /
+distance probabilities from `monte_carlo.simulate_bout` — a generative
+simulator whose entire per-fight input is the ten hand-shrunk fields of
+`FighterMC`. No weight class, no gender, no ratings. A 6-cell method
+distribution factorises exactly as `LL = LL(winner) + LL(method | winner)`,
+and on the held-out window 82 % of the 0.107 nats the closing method line
+beat us by lived in the second term.
+
+`src/method_model.py` fits that term directly — P(ko/sub/dec | this side
+wins) over the winner model's own feature matrix, called once per
+orientation so each side's conditional is an independent estimate.
+Held-out test, n=566 bouts with a coherent 6-cell book:
+
+| | 6-cell | = winner | + conditional |
+|---|---|---|---|
+| production (v0.11.0) | 1.5955 | 0.6099 | 0.9856 |
+| **v0.12.0, edge-guarded** | **1.4807** | 0.6099 | **0.8716** |
+| devigged market | 1.4966 | 0.5989 | 0.8977 |
+
+Paired bootstrap by bout: 0.114 nats off the production number, improving
+in 100 % of resamples. Against the book the honest statement is **parity**
+— −0.0150 nats with a [−0.0618, +0.0319] interval — not victory. Flat-stake
+ROI against the closing method lines goes from −26 % to +6 %, with a
+[−6 %, +18 %] bout-bootstrap interval: it stopped paying the overround, it
+did not acquire a demonstrated edge.
+
+Three of the four legs move, because `sportsbook.ts` prices method,
+`distance` and `total_rounds` off one reconciled distribution: distance
+0.6734 → 0.5987, under-2.5 0.6590 → 0.6126, winner 0.6066 → 0.6066 (the
+control — this is a mix change, not a re-scoring). `METHOD_ANCHOR_LAMBDA`
+was swept again and selected 0.00: it existed to hide a mix with no
+resolution. Marginal calibration regresses (15.5 % submissions predicted vs
+18.4 % actual) and every correction for it was refused — the deviation
+flips sign between val and test, which is drift, not bias.
+Details and the full refusal list: `docs/method_leg.md`.
 
 Where the model stands against the closing line. Every number below
 names the basis it was measured on, because the two bases disagree by
@@ -167,6 +208,7 @@ scripts/simulation/
 │   ├── dns_override.py     # mirrors photo_scraper trick for libpq DNS
 │   ├── export.py           # raw → leakage-free per-bout feature rows
 │   ├── features.py         # row → A-B diff matrix (column order locked)
+│   ├── method_model.py     # P(ko/sub/dec | this side wins) — the method leg
 │   ├── train.py            # LightGBM + isotonic + metrics + save
 │   └── predict.py          # load artifacts → upsert bout_simulation
 ├── scripts/
