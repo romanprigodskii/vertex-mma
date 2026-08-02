@@ -127,6 +127,34 @@ worth 0.132 nats of pure leakage. The winner ensemble is unaffected (rank
 114 of 118). Parser fixed, column excluded from the model, existing rows
 not yet repaired. Full gate trail and refusal list: `docs/method_leg.md`.
 
+v0.13.0 moves the WINNER leg, which nine labs in a row had failed to
+move. Not with a feature: with one coefficient applied after the blend.
+`ResidualCorrector` (`src/ensemble.py`) adds −0.2939 logits per ten
+years of age advantage to the blended logit, fitted on 3,087
+walk-forward out-of-fold bouts and pinned in `config.RESIDUAL_CORRECTION`.
+
+The bias it corrects is large and had gone unnoticed because the market
+shares most of it: on bouts where a 35-plus fighter meets someone 28 or
+younger, the older side wins 16.4 % of the time, the closing line says
+34.3 %, and the ensemble said 37.1 %. Raising the age throttle in
+`FEATURE_CONTRI_OVERRIDES` does NOT fix it (+0.0000 on the OOF pool) —
+`diff_age` competes with 117 partly collinear columns and three learners
+whose disagreement the blend averages toward zero, so the correction has
+to live where nothing else is competing with it.
+
+Held-out test, order-averaged: log-loss **0.6131 → 0.6078**, AUC 0.7332
+→ 0.7360, gap to the closing line **0.0248 → 0.0196**, and the
+market-0.72+ bucket that `tail_resolution.md` could not move at all goes
++0.0770 → +0.0616. Rolling retrain on identical origins: 0.6218 →
+0.6159. The method book moves with it (6-cell 1.5273 → 1.5231, ROI at
+EV>0 −18.8 % → −15.9 %) because the winner term is shared. Accuracy
+drops 0.45 pp — three near-coin-flip picks out of 664 change side, which
+is what optimising log-loss instead of accuracy costs.
+
+Applied to the main ensemble only; the debut specialist is untouched and
+explicitly ungated. Full trail, including the eleven levers that closed
+at zero and the rankings that failed twice: `docs/winner_batch.md`.
+
 Where the model stands against the closing line. Every number below
 names the basis it was measured on, because the two bases disagree by
 more than the effect anyone is arguing about — an earlier version of
@@ -134,29 +162,43 @@ this README quoted 66.9 % against a rolling window that does not
 produce it, and a ~2.4 pp gap that no basis produces.
 
 * **Static test split** (event date ≥ 2025-01-01, averaged over both
-  fighter orderings, n=568 bouts that have a closing line):
-  model **0.6690 accuracy / 0.6198 log-loss**, market **0.6796 /
-  0.5968**. The 1.1 pp accuracy difference is NOT established —
-  McNemar exact p = 0.72, i.e. the two disagree on individual fights
-  about as often in each direction as chance predicts.
+  fighter orderings, n=582 bouts that have a closing line):
+  model **0.6632 accuracy / 0.6118 log-loss**, market **0.6838 /
+  0.5922**. Over all 664 test bouts (not just those with a line) the
+  model is 0.6732 / 0.6078. The accuracy difference is NOT
+  established — the two disagree on individual fights about as often
+  in each direction as chance predicts.
 * **Rolling retrain**, 2025-07..2026-07, main segment (n=417):
-  model **0.6475 accuracy / 0.6218 log-loss**; market 0.6929 on the
-  394 of those with a line. Rolling is the honest number for "how
-  would this have performed week to week"; the static split is the
-  one every earlier metric in this README was measured on.
+  model **0.6451 accuracy / 0.6159 log-loss**; on the 394 with a line
+  the model is 0.6103 against the book's 0.5928. Rolling is the
+  honest number for "how would this have performed week to week"; the
+  static split is the one every earlier metric in this README was
+  measured on.
 
-The log-loss gap decomposes cleanly, and this is the useful part:
-calibration is at **parity** (reliability 0.00296 model vs 0.00303
-market — lower is better), while **resolution** is 0.03812 vs
-0.04580. The entire deficit is sharpness on lopsided matchups: the
-book knows which mismatches are real and we don't. Three attempts to
-close it by tuning — post-blender recalibration, re-selecting the
-blend on the tail bucket, removing the age throttle — all failed
-their gate (`docs/tail_resolution.md`). The remaining lever is
-information, not fitting: booking circumstance (short notice,
-replacement opponent, missed weight), which the scraper began
-accruing in `bout_change_event` / `first_seen_at` and which cannot be
-backfilled.
+The log-loss gap decomposes, and after v0.13.0 it decomposes the other
+way round from how it used to: **calibration is now BETTER than the
+book's** (reliability 0.00186 model vs 0.00301 market — lower is
+better) while **resolution** is 0.03826 vs 0.04801. The deficit is
+sharpness on lopsided matchups: the book knows which mismatches are
+real and we don't.
+
+What closed a fifth of it was not sharpness. `docs/winner_batch.md`
+asked each losing segment whether the book was merely SHARPER there or
+we were wrong in a DIRECTION, and found one direction big enough to
+correct: a 35-year-old facing someone 28 or younger wins 16 % of the
+time and the ensemble said 37 %. One coefficient after the blend
+(`RESIDUAL_CORRECTION`) took the gap from 0.0248 to 0.0196. Eleven
+other levers in the same lab closed at zero, including raising the age
+throttle itself — the signal was diluted across 118 collinear columns,
+not missing, which is why the fix belongs after the blend.
+
+The remaining deficit is resolution, and resolution needs information:
+booking circumstance (short notice, replacement opponent, missed
+weight), which the scraper began accruing in `bout_change_event` /
+`first_seen_at` and which cannot be backfilled. The official UFC
+rankings — the last untapped source in the database, 47k point-in-time
+snapshots — were tried twice and failed both gates
+(`docs/winner_batch.md` §7).
 
 Main model core (v0.7.0 recipe): opponent-adjusted ratings
 (`src/opponent_ratings.py`) — online attack/defense skill ratings
@@ -216,11 +258,12 @@ scripts/simulation/
 │   ├── export.py           # raw → leakage-free per-bout feature rows
 │   ├── features.py         # row → A-B diff matrix (column order locked)
 │   ├── method_model.py     # P(ko/sub/dec | this side wins) — the method leg
+│   ├── rank_export.py      # point-in-time UFC rankings (built, gated, unused)
 │   ├── train.py            # LightGBM + isotonic + metrics + save
 │   └── predict.py          # load artifacts → upsert bout_simulation
 ├── scripts/
 │   ├── run_train.py        # CLI: full pipeline (export → features → train)
 │   └── run_predict.py      # CLI: predict upcoming + write DB
-├── artifacts/              # committed: model.lgb, calibrator.pkl, metadata.json
+├── artifacts/              # committed: ensemble/, method_model/, corrector.json, metadata.json
 └── data/                   # cache: dataset.parquet (not committed)
 ```
