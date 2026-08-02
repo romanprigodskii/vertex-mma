@@ -120,6 +120,51 @@ def _recency_weights(dates: pd.Series, halflife_years: float | None) -> np.ndarr
     return np.asarray(0.5 ** (age_years / halflife_years), dtype=float)
 
 
+def _apply_blend_override(
+    model: EnsembleModel,
+    force_blend_mode: str | None,
+    force_blend_weights: list[float] | None,
+) -> None:
+    """Replace the blend rule chosen inside `fit()` on the val split.
+
+    Worth having a knob for, because the shipped rule is stranger than it
+    looks: `weighted_mean` weights are softmax(−val_logloss / std of the three
+    val log-losses). Dividing by the std of THREE numbers makes the softmax
+    temperature depend on how close the learners happened to land on 429 rows,
+    so a 0.01 spread turns into weights of 0.07 / 0.17 / 0.76. The current
+    served model puts 76 % of its blend on the LogReg leg for exactly that
+    reason. Whether that is a good rule or an artefact of the scale is a
+    question only a bigger sample can answer.
+    """
+    if force_blend_weights is not None:
+        w = np.asarray(force_blend_weights, dtype=float)
+        model._blend_weights = (w / w.sum()).tolist()
+        model._blend_mode = "weighted_mean"
+    elif force_blend_mode is not None:
+        model._blend_mode = force_blend_mode
+
+
+def _bind_cb_params(
+    model: EnsembleModel, cb_overrides: dict[str, Any] | None, seed: int
+) -> None:
+    """Rebind CatBoost's parameter factory on this instance.
+
+    `_cb_params` is a staticmethod baked into EnsembleModel, so a lab that
+    wants a different depth — or just a different seed — has to replace it
+    here. Worth doing carefully rather than skipping: CatBoost is the strongest
+    single learner on every eval, and leaving its seed frozen while LightGBM's
+    moves would make any seed-stability claim vacuous.
+    """
+    overrides = dict(cb_overrides or {})
+    if seed != 42:
+        overrides["random_seed"] = seed
+    if not overrides:
+        return
+    model._cb_params = staticmethod(  # type: ignore[method-assign]
+        lambda: {**EnsembleModel._cb_params(), **overrides}
+    ).__func__
+
+
 def fit_arm(
     df: pd.DataFrame,
     *,
@@ -131,6 +176,10 @@ def fit_arm(
     augment: str = "none",
     halflife_years: float | None = None,
     lgb_overrides: dict[str, Any] | None = None,
+    cb_overrides: dict[str, Any] | None = None,
+    feature_contri: dict[str, float] | None = None,
+    force_blend_mode: str | None = None,
+    force_blend_weights: list[float] | None = None,
     seed: int = 42,
     keep_probs: bool = False,
     **_ignored: Any,
@@ -148,12 +197,13 @@ def fit_arm(
     Xsw_s, _, _ = temporal_split(X_sw, y, meta)
 
     tuned = _load_tuned_params()
+    contri = FEATURE_CONTRI_OVERRIDES if feature_contri is None else feature_contri
     lgb_params = {
         **LGB_PARAMS,
         **tuned,
         **(lgb_overrides or {}),
         "seed": seed,
-        "feature_contri": [FEATURE_CONTRI_OVERRIDES.get(c, 1.0) for c in cols],
+        "feature_contri": [contri.get(c, 1.0) for c in cols],
     }
     model = EnsembleModel(
         feature_columns=cols,
@@ -161,10 +211,7 @@ def fit_arm(
         lgb_num_rounds=LGB_NUM_ROUNDS,
         lgb_early_stopping=LGB_EARLY_STOPPING_ROUNDS,
     )
-    if seed != 42:
-        model._cb_params = staticmethod(  # type: ignore[method-assign]
-            lambda: {**EnsembleModel._cb_params(), "random_seed": seed}
-        ).__func__
+    _bind_cb_params(model, cb_overrides, seed)
 
     X_tr, y_tr = Xs["train"].reset_index(drop=True), ys["train"].reset_index(drop=True)
     X_va, y_va = Xs["val"].reset_index(drop=True), ys["val"].reset_index(drop=True)
@@ -181,6 +228,7 @@ def fit_arm(
         y_va = pd.concat([y_va, (1 - y_va.iloc[:n_va])], ignore_index=True)
 
     model.fit(X_train=X_tr, y_train=y_tr, X_val=X_va, y_val=y_va, sample_weight=w_tr)
+    _apply_blend_override(model, force_blend_mode, force_blend_weights)
 
     def score(name: str) -> tuple[dict, list, np.ndarray]:
         p = model.predict_proba_a(Xs[name].reset_index(drop=True))
@@ -232,6 +280,10 @@ def walk_forward(
     augment: str = "none",
     halflife_years: float | None = None,
     lgb_overrides: dict[str, Any] | None = None,
+    cb_overrides: dict[str, Any] | None = None,
+    feature_contri: dict[str, float] | None = None,
+    force_blend_mode: str | None = None,
+    force_blend_weights: list[float] | None = None,
     seed: int = 42,
     start: str = OOF_START,
     end: str = OOF_END,
@@ -249,12 +301,13 @@ def walk_forward(
     market = meta["market_prob_a"].to_numpy(dtype=float)
 
     tuned = _load_tuned_params()
+    contri = FEATURE_CONTRI_OVERRIDES if feature_contri is None else feature_contri
     lgb_params = {
         **LGB_PARAMS,
         **tuned,
         **(lgb_overrides or {}),
         "seed": seed,
-        "feature_contri": [FEATURE_CONTRI_OVERRIDES.get(c, 1.0) for c in cols],
+        "feature_contri": [contri.get(c, 1.0) for c in cols],
     }
 
     rows = []
@@ -276,10 +329,7 @@ def walk_forward(
             lgb_num_rounds=LGB_NUM_ROUNDS,
             lgb_early_stopping=LGB_EARLY_STOPPING_ROUNDS,
         )
-        if seed != 42:
-            model._cb_params = staticmethod(  # type: ignore[method-assign]
-                lambda: {**EnsembleModel._cb_params(), "random_seed": seed}
-            ).__func__
+        _bind_cb_params(model, cb_overrides, seed)
 
         X_tr = X.loc[tr].reset_index(drop=True)
         y_tr = y.loc[tr].reset_index(drop=True)
@@ -298,6 +348,7 @@ def walk_forward(
             y_va = pd.concat([y_va, 1 - y_va.iloc[:n_va]], ignore_index=True)
 
         model.fit(X_train=X_tr, y_train=y_tr, X_val=X_va, y_val=y_va, sample_weight=w_tr)
+        _apply_blend_override(model, force_blend_mode, force_blend_weights)
         p = model.predict_proba_a(X.loc[sc].reset_index(drop=True))
         p_sw = model.predict_proba_a(X_sw.loc[sc].reset_index(drop=True))
         rows.append(
