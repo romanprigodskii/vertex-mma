@@ -26,6 +26,8 @@ from .db import get_connection
 from .ensemble import EnsembleModel
 from .export import build_dataset, fetch_raw, stable_hash, swap_sides
 from .features import build_feature_matrix
+from .method_model import METHOD_MODEL_DIR, MethodModel
+from .method_model import conditional_mix as method_conditional_mix
 from .monte_carlo import FighterMC, simulate_bout
 
 console = Console()
@@ -206,6 +208,23 @@ def predict_upcoming(*, force_version: str | None = None) -> int:
     # (stable_hash, NOT the salted builtin hash) so re-running the same bout
     # gets the same distribution across processes — the contract this comment
     # promised but the old `hash()` quietly broke.
+    # v0.12.0 — conditional method mix from the discriminative model. It
+    # replaces the simulator's hazard-derived mix and its base-rate anchor on
+    # the segment it was fitted for; debut bouts keep the simulator, because
+    # the model has never seen a row with one side's career columns entirely
+    # NaN and the debut segment is served by a separate specialist anyway.
+    # Missing artifact → mix stays None → pre-v0.12.0 behaviour, unchanged.
+    method_mixes: np.ndarray | None = None
+    if METHOD_MODEL_DIR.exists():
+        method_model = MethodModel.load(METHOD_MODEL_DIR)
+        method_mixes = method_conditional_mix(method_model, upcoming_fill)
+        console.log(
+            f"method model loaded ({len(method_model.feature_columns)} features) — "
+            f"pricing {int((~debut_mask).sum())} non-debut bouts"
+        )
+    else:
+        console.log("no method model artifact — method mix falls back to the simulator")
+
     mc_rows: list[tuple] = []
     for i, m in enumerate(meta.itertuples(index=False)):
         row = upcoming.iloc[i]
@@ -224,6 +243,11 @@ def predict_upcoming(*, force_version: str | None = None) -> int:
             # this needs no extra fetch.
             is_main_event=bool(row["is_main_event"]),
             is_title_fight=bool(row["is_title_fight"]),
+            method_mix=(
+                (tuple(method_mixes[i, 0]), tuple(method_mixes[i, 1]))
+                if method_mixes is not None and not debut_mask[i]
+                else None
+            ),
         )
         mc_rows.append(
             (
