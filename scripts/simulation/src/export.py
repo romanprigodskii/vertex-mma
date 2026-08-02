@@ -33,6 +33,26 @@ from .opponent_ratings import compute_rating_snapshots
 
 console = Console()
 
+# The three buckets the method market settles on. Mirror of
+# `methodBucket` in src/lib/sportsbook.ts — keep the two in sync, because a
+# disagreement would train the method model on one grading and pay out on
+# another.
+METHOD_BUCKETS = ("ko", "sub", "dec")
+
+
+def method_bucket(method: str | None) -> str | None:
+    """UFCStats method enum → ko / sub / dec, or None for anything the method
+    market voids (dq, draw, no-contest, missing)."""
+    if method is None:
+        return None
+    if method in ("ko", "tko"):
+        return "ko"
+    if method == "submission":
+        return "sub"
+    if method.startswith("decision"):
+        return "dec"
+    return None
+
 
 def stable_hash(s: str) -> int:
     """Deterministic 32-bit hash of a string, stable across processes.
@@ -939,6 +959,14 @@ def build_dataset(
                 # [0,1] with 0.5 = draw (src/dominance.py). Alongside, never
                 # instead: target_a_wins remains the evaluation label.
                 "dominance_a": dominance_by_bout.get(bout_id),
+                # HOW the bout ended, in the three buckets the method market
+                # settles on (src/lib/sportsbook.ts methodBucket). Unlike
+                # `dominance_a` this is orientation-INVARIANT — a KO is a KO
+                # whichever slot the winner sits in — so `swap_sides` and
+                # `symmetrize_for_training` must leave it alone, and the
+                # absence of an `_a` suffix is what guarantees they do.
+                # None for dq / draw / no-contest / not-yet-fought.
+                "method_bucket": method_bucket(bout.method) if is_completed else None,
             }
             # elo + attack/defense + opponent-quality columns per side.
             for key in RATING_ALL_KEYS:
