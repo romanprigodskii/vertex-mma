@@ -31,7 +31,7 @@ Reproduce:
 
 ```bash
 cd scripts/simulation && source venv/bin/activate
-python scripts/lab_method_leg.py --stage all      # decompose → gate0/1/2 → legs → leak → rounds
+python scripts/lab_method_leg.py --stage all      # decompose → gate0/1/2 → legs → leak → rounds → submission
 python scripts/eval_method_market.py              # from shipped artifacts
 python scripts/eval_method_market.py --legacy     # pre-round-lab config
 python tests/test_method_leg.py
@@ -196,7 +196,8 @@ Which closes the accounting on the leg:
 new(guarded) − market = +0.0330 = +0.0223 conditional mix + 0.0107 winner level
 ```
 
-The next swing at this leg should aim at submissions specifically.
+The next swing at this leg should aim at submissions specifically — §9 took
+that swing, with both a re-shape and new data, and neither landed.
 
 **The anchor answers its own question.** λ was re-swept on val for the new
 mix over a 0.00–0.60 grid and selected **0.00** on every seed.
@@ -410,7 +411,54 @@ which is bounded by the same ceiling as everything else.
 
 ---
 
-## 9. What shipped, and what it replaced
+## 9. Stage 6 — the submission cell resists everything: **FAIL**
+
+§4 leaves one target: submissions carry the whole residual gap. This stage
+asks the question the six winner-leg labs answered the hard way — shape or
+information?
+
+The gate metric is the OVERALL conditional log-loss on val, not the sub cell.
+Val carries 71 submissions, and a gate on 71 rows selects noise; the cell is a
+diagnostic.
+
+| arm | val overall | val sub cell | P(sub) when sub landed | gate |
+|---|---|---|---|---|
+| shipped matrix | 0.8870 | 1.4544 | 0.276 | baseline |
+| hierarchical re-shape | 0.8969 | 1.4918 | 0.275 | **FAIL** |
+| + submission axis | 0.8837 | 1.4520 | 0.279 | **FAIL** |
+
+**GATE A — shape.** A hierarchical P(finish) × P(sub | finish) factorisation,
+the natural decomposition if "will it end early" and "on the mat or on the
+feet" are separate questions. It is **worse** than the flat softmax by 0.010.
+The 3-class model was not losing anything to its own shape.
+
+**GATE B — information.** An opponent-adjusted SUBMISSION rating (the existing
+`grap_*` pair is takedowns) plus submission attempts CONCEDED — nine columns
+built from `bout_round_stats.sub_attempts`, a field present since the first
+scrape that had never reached a model from the defensive side.
+`prior_losses_sub` counts only completed submissions, far too sparse to
+separate "hard to submit" from "never met a grappler".
+
+Median val improves 0.0033 — below the 0.005 margin — and the per-seed deltas
+are **−0.0033 / +0.0038 / −0.0081**, not even consistent in sign. Probed on
+the winner leg as well, since the column was new there too: val 0.6203 →
+0.6195, test 0.6181 → **0.6199**. Nothing, and negative on the split that
+counts.
+
+So the seventh independent confirmation of the ceiling, and the second — after
+`regional_regime.md` — where the lever genuinely added *information* rather
+than re-arranging what was already there. Submission attempts conceded is real,
+unexploited data about exactly this failure mode, and it moves the cell by
+0.002 nats. **What the book knows about submissions is not in the round-stat
+record.**
+
+`USE_SUB_AXIS` ships False. The export plumbing stays, on the same reasoning
+that kept `regional_export.py` after its lab failed: building the data is the
+expensive part, and the next lab should not have to redo it.
+
+---
+
+## 10. What shipped, and what it replaced
 
 | | before | after |
 |---|---|---|
@@ -446,7 +494,8 @@ only HOW MUCH finish mass there is to place changed.
 | **Serving the model on debut bouts** | not done | Never fitted on a row where one side's career columns are entirely NaN, and that segment already routes to its own specialist |
 | **Claiming we beat the method book** | refused | +0.0330 nats [+0.0039, +0.0629] is measurably behind it |
 | **Claiming an ROI edge** | refused | −16.7 % is an improvement on −26.5 % and still a loss |
-| **A submission specialist** | not attempted | The whole residual gap (§4). Named as the next lab rather than half-tried here |
+| **A submission specialist (hierarchical re-shape)** | GATE 6 fail | 0.8969 vs 0.8870 — WORSE than the flat softmax. The 3-class model loses nothing to its shape. §9 |
+| **The submission axis as a feature** | GATE 6 fail | Genuinely new information, and per-seed deltas of −0.0033/+0.0038/−0.0081. Plumbing kept, `USE_SUB_AXIS=False`. §9 |
 | **A discriminative round-of-finish model** | GATE 5 fail | 0.0113 nats on 333 test finishes, bootstrap [−0.0060, +0.0280]. The hazard already beats a per-length CONSTANT by only 0.0035 — there is almost no per-bout signal in round timing to find. §8 |
 | **Re-fitting `finish_hazard.py` without the leaked flag** | not done | Its covariate value is provably divided out of the served shape (1.7e-18, pinned by test). Whether its presence during FITTING moved the shared time-basis is untested, and §8 shows the whole covariate block is worth 0.0035 nats, so the upside is bounded by roughly that |
 
