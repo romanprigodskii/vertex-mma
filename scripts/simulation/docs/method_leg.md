@@ -13,7 +13,9 @@ line. The book is still ahead. Flat-stake ROI against the closing method
 lines improves from −26.5 % to −16.7 % and stays negative. Two of the other
 three legs move with it: `distance` by 0.014 nats, `total_rounds` by 0.017.
 The winner leg moves by exactly 0.0000, which is the check that this is a
-mix change and not a re-scoring of the book.
+mix change and not a re-scoring of the book. The round SHAPE turns out to
+have no lever at all (§8) — the simulator's fixed per-length curves beat a
+constant by 0.0035 nats, and a per-bout model cannot clear the gate.
 
 **And the lab caught itself.** The first pass reported roughly triple those
 numbers and a model that overtook the market. Its largest feature by gain was
@@ -29,7 +31,7 @@ Reproduce:
 
 ```bash
 cd scripts/simulation && source venv/bin/activate
-python scripts/lab_method_leg.py --stage all      # decompose → gate0/1/2 → legs → leak
+python scripts/lab_method_leg.py --stage all      # decompose → gate0/1/2 → legs → leak → rounds
 python scripts/eval_method_market.py              # from shipped artifacts
 python scripts/eval_method_market.py --legacy     # pre-round-lab config
 python tests/test_method_leg.py
@@ -336,7 +338,52 @@ builds precisely because the scraped flag "can't be trusted".
 
 ---
 
-## 8. What shipped, and what it replaced
+## 8. Stage 5 — the round leg has no lever: **FAIL**
+
+The round market looked like the obvious next target, and for a structural
+reason. Every covariate in `finish_hazard.py` is time-constant, so
+`_normalize_shape` divides it back out: the served timing is **two fixed
+curves per scheduled length, identical for every bout on the card**. Flipping
+`is_title_fight` on an otherwise identical bout moves the curves by 1.7e-18
+(pinned in `tests/test_method_leg.py`). A per-bout model should have
+resolution the hazard structurally cannot express.
+
+It does not. Discriminative P(round | a finish happened, X) over the same
+184-column matrix, three seeds, both orientations averaged, scored on 333
+held-out finishes:
+
+| | val | test |
+|---|---|---|
+| constant — train rate by scheduled length | 1.1073 | 1.0437 |
+| production hazard curves | 1.1025 | 1.0402 |
+| discriminative model | 1.0938 | 1.0289 |
+
+**Read the first two lines before the third.** The fitted hazard beats a
+constant — one number per scheduled length, no per-bout input whatsoever — by
+0.0035 nats. That is the entire per-bout signal the round distribution
+contains. The round lab's headline (1.0218 fitted vs 1.4585 incumbent) was a
+fix for a curve that pointed the wrong way, not evidence that round timing is
+predictable.
+
+The model's 0.0113-nat edge fails on both counts: below the 0.02 val margin,
+and a paired bootstrap of [−0.0060, +0.0280] straddling zero. At 333 test
+finishes an effect that size is not resolvable.
+
+| 3-round finishes (n=291) | R1 | R2 | R3 |
+|---|---|---|---|
+| actual | 54.3 % | 30.6 % | 15.1 % |
+| hazard | 49.0 % | 32.1 % | 18.9 % |
+| model | 50.2 % | 33.5 % | 16.3 % |
+
+The model moves toward the truth by about two points in round 1 and stops.
+
+So `total_rounds` has no lever left on the round SHAPE. Its remaining loss is
+the finish-vs-decision TOTAL — which the method model already moves (§6) and
+which is bounded by the same ceiling as everything else.
+
+---
+
+## 9. What shipped, and what it replaced
 
 | | before | after |
 |---|---|---|
@@ -372,7 +419,8 @@ only HOW MUCH finish mass there is to place changed.
 | **Serving the model on debut bouts** | not done | Never fitted on a row where one side's career columns are entirely NaN, and that segment already routes to its own specialist |
 | **Claiming we beat the method book** | refused | +0.0330 nats [+0.0039, +0.0629] is measurably behind it |
 | **Claiming an ROI edge** | refused | −16.7 % is an improvement on −26.5 % and still a loss |
-| **A discriminative round-of-finish model** | not attempted | The obvious next lab. It has no scraped market to be judged against — `bout_external_odds` carries winner and the six method cells only |
+| **A discriminative round-of-finish model** | GATE 5 fail | 0.0113 nats on 333 test finishes, bootstrap [−0.0060, +0.0280]. The hazard already beats a per-length CONSTANT by only 0.0035 — there is almost no per-bout signal in round timing to find. §8 |
+| **Re-fitting `finish_hazard.py` without the leaked flag** | not done | Its covariate value is provably divided out of the served shape (1.7e-18, pinned by test). Whether its presence during FITTING moved the shared time-basis is untested, and §8 shows the whole covariate block is worth 0.0035 nats, so the upside is bounded by roughly that |
 
 ## What is NOT changed
 
