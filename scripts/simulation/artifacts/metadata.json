@@ -1,7 +1,7 @@
 {
   "model_version": "v0.12.0",
   "model_kind": "ensemble",
-  "trained_at": "2026-08-02T06:54:57.595821Z",
+  "trained_at": "2026-08-02T07:20:17.287901Z",
   "feature_columns": [
     "diff_height",
     "diff_reach",
@@ -517,23 +517,23 @@
     "n_train": 5340,
     "n_val": 428,
     "n_served_rows": 6432,
-    "n_features": 120,
+    "n_features": 184,
     "use_levels": true,
-    "val_logloss": 0.7604386783221898,
+    "val_logloss": 0.8870182816724252,
     "val_logloss_constant_base_rates": 0.9904097333222688,
     "val_solo_logloss": {
-      "lgb": 0.7641401333244658,
-      "cb": 0.7685528476023352,
-      "logreg": 0.7741213136733309
+      "lgb": 0.8959220031079637,
+      "cb": 0.8878609415917992,
+      "logreg": 0.9175041336999787
     },
     "blend_weights": {
-      "lgb": 0.6000000000000001,
-      "cb": 0.0,
-      "logreg": 0.3999999999999999
+      "lgb": 0.0,
+      "cb": 0.8,
+      "logreg": 0.19999999999999996
     },
     "best_iters": {
-      "lgb": 259,
-      "cb": 661
+      "lgb": 87,
+      "cb": 275
     },
     "train_base_rates": {
       "ko": 0.3308988764044944,

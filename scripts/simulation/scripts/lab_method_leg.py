@@ -844,11 +844,21 @@ def _roi(
     return out
 
 
-def stage_gate1(df: pd.DataFrame, *, cache: bool) -> dict:
+def _best_variant(report: dict | None) -> bool:
+    """`with_levels` or not, as GATE 0 selected it. Reads the in-memory report
+    first: `--stage all` writes the JSON only once at the end, so consulting
+    the file here would hand a later stage the PREVIOUS run's choice. That
+    silently ran GATE 1 on the losing variant once already."""
+    src = report if report and "gate0" in report else (
+        json.loads(REPORT_PATH.read_text()) if REPORT_PATH.exists() else {}
+    )
+    return src.get("gate0", {}).get("best_variant", "diffs_only") == "with_levels"
+
+
+def stage_gate1(df: pd.DataFrame, *, cache: bool, report: dict | None = None) -> dict:
     masks = split_masks(df)
     grade = gradeable_mask(df)
-    prev = json.loads(REPORT_PATH.read_text()) if REPORT_PATH.exists() else {}
-    levels = prev.get("gate0", {}).get("best_variant", "diffs_only") == "with_levels"
+    levels = _best_variant(report)
 
     print("\nloading production Monte Carlo artifacts:")
     load_split_trained_mc()
@@ -1034,7 +1044,7 @@ def _prior_correct(mix: np.ndarray, w: np.ndarray) -> np.ndarray:
     return out / out.sum(axis=2, keepdims=True)
 
 
-def stage_gate2(df: pd.DataFrame, *, cache: bool) -> dict:
+def stage_gate2(df: pd.DataFrame, *, cache: bool, report: dict | None = None) -> dict:
     """Removing the anchor hands back the marginal accuracy it was buying:
     the new mix predicts 15.6 % submissions against 18.4 % actual on test.
     This stage asks whether that is a model defect (fixable) or year-to-year
@@ -1044,12 +1054,13 @@ def stage_gate2(df: pd.DataFrame, *, cache: bool) -> dict:
     grade = gradeable_mask(df)
     tr_m, va_m, te_m = masks["train"] & grade, masks["val"] & grade, masks["test"] & grade
 
+    levels = _best_variant(report)
     fit_sel = tr_m | va_m
     fit_sub = df.loc[fit_sel].reset_index(drop=True)
     fit_or = orient_winner_first(fit_sub)
     y = method_index(fit_sub["method_bucket"].to_numpy())
     base_fit, _, _ = build_feature_matrix(fit_or)
-    X = build_method_features(base_fit, fit_or, levels=False)
+    X = build_method_features(base_fit, fit_or, levels=levels)
     tr, va = tr_m[fit_sel], va_m[fit_sel]
 
     va_sub = fit_sub.loc[va].reset_index(drop=True)
@@ -1064,8 +1075,8 @@ def stage_gate2(df: pd.DataFrame, *, cache: bool) -> dict:
         return mix[np.arange(len(mix)), np.where(ws == "a", 0, 1), :]
 
     model, _ = _fit_variant(X, y, tr, va, seed=42)
-    mix_va = model_mix(model, va_sub, levels=False)
-    mix_te = model_mix(model, te, levels=False)
+    mix_va = model_mix(model, va_sub, levels=levels)
+    mix_te = model_mix(model, te, levels=levels)
     ll_va, ll_te = _ll(mix_va, ws_va, bk_va), _ll(mix_te, ws_te, bk_te)
 
     p_tr = model.predict_cond(X.loc[tr].reset_index(drop=True))
@@ -1128,8 +1139,8 @@ def stage_gate2(df: pd.DataFrame, *, cache: bool) -> dict:
         w = np.exp(-np.log(2.0) * np.maximum(0.0, age_yr) / hl)
         m_hl, _ = _fit_variant(X, y, tr, va, seed=42, sample_weight=w)
         attempts[f"recency_halflife_{hl:g}y"] = {
-            "val": _ll(model_mix(m_hl, va_sub, levels=False), ws_va, bk_va),
-            "test": _ll(model_mix(m_hl, te, levels=False), ws_te, bk_te),
+            "val": _ll(model_mix(m_hl, va_sub, levels=levels), ws_va, bk_va),
+            "test": _ll(model_mix(m_hl, te, levels=levels), ws_te, bk_te),
         }
 
     print(f"\n  corrections (conditional log-loss; baseline val {ll_va:.4f} test {ll_te:.4f}):")
@@ -1180,7 +1191,7 @@ def _binary_scores(p: np.ndarray, y: np.ndarray) -> dict[str, float]:
     }
 
 
-def stage_legs(df: pd.DataFrame, *, cache: bool) -> dict:
+def stage_legs(df: pd.DataFrame, *, cache: bool, report: dict | None = None) -> dict:
     """The method market is one of FOUR legs `sportsbook.ts` prices, and three
     of them read the same reconciled distribution. `computeSportsbookOutcomes`
     derives P(distance) from the method cells directly and rescales the
@@ -1193,8 +1204,7 @@ def stage_legs(df: pd.DataFrame, *, cache: bool) -> dict:
     improvement, stated as one."""
     masks = split_masks(df)
     grade = gradeable_mask(df)
-    prev = json.loads(REPORT_PATH.read_text()) if REPORT_PATH.exists() else {}
-    levels = prev.get("gate0", {}).get("best_variant", "diffs_only") == "with_levels"
+    levels = _best_variant(report)
 
     print("\nloading production Monte Carlo artifacts:")
     load_split_trained_mc()
@@ -1463,11 +1473,11 @@ def main() -> None:
     if args.stage in ("gate0", "all"):
         report["gate0"] = stage_gate0(df, cache=cache)
     if args.stage in ("gate1", "all"):
-        report["gate1"] = stage_gate1(df, cache=cache)
+        report["gate1"] = stage_gate1(df, cache=cache, report=report)
     if args.stage in ("gate2", "all"):
-        report["gate2"] = stage_gate2(df, cache=cache)
+        report["gate2"] = stage_gate2(df, cache=cache, report=report)
     if args.stage in ("legs", "all"):
-        report["legs"] = stage_legs(df, cache=cache)
+        report["legs"] = stage_legs(df, cache=cache, report=report)
     if args.stage in ("leak", "all"):
         report["leak"] = stage_leak(df, cache=cache)
 

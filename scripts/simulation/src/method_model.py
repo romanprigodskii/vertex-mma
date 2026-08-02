@@ -56,11 +56,17 @@ EPS = 1e-12
 METHOD_MODEL_DIR = ARTIFACTS_DIR / "method_model"
 METHOD_MODEL_EVAL_DIR = ARTIFACTS_DIR / "method_model_eval"
 
-# Whether the per-side absolute levels below are added to the matrix. The
-# GATE 0 sweep found them a tie on val (0.7633 vs 0.7627 over three seeds)
-# against 65 extra columns, so the diffs-only matrix wins on parsimony.
+# Whether the per-side absolute levels below are added to the matrix.
+#
+# They were a tie on the first GATE 0 sweep and lost on parsimony. That sweep
+# was run before `is_title_fight` was found to be a leaked bonus flag: with a
+# post-fight finish indicator in the matrix, per-side style levels had nothing
+# left to explain. Re-run clean they win clearly and seed-stably — 0.8870 vs
+# 0.8966 median val over seeds 42/7/13 — which is what a mix model reading
+# style rather than the answer should look like.
+#
 # Flipping this is a model change: refit both artifacts, do not hand-edit.
-USE_LEVELS = False
+USE_LEVELS = True
 
 # Per-fighter columns whose ABSOLUTE level (not just the winner-loser gap)
 # drives how a fight ends. The winner-model feature matrix keeps most of
