@@ -171,6 +171,33 @@ The second line is the honest limit. The interval excludes zero **in the
 book's favour** — we are measurably still behind it, having closed about two
 thirds of the gap (0.0986 → 0.0330).
 
+### Where the residual gap lives
+
+The same breakdown Stage 0 ran on the simulator, re-run on the shipped mix —
+this is what decides whether another lab on this leg has anywhere to go.
+
+| method | n | new ll | market ll | gap | new mean p | market mean p |
+|---|---|---|---|---|---|---|
+| ko | 189 | 0.9409 | 0.8607 | +0.0802 | 0.416 | 0.461 |
+| sub | 105 | 1.5587 | 1.3446 | **+0.2141** | 0.248 | 0.293 |
+| dec | 272 | 0.6588 | **0.7508** | **−0.0920** | 0.534 | 0.502 |
+| **total** | **566** | | | **+0.0223** | | |
+
+We now **beat the book on decisions** by 0.092 nats, wider than the
+simulator's own 0.075 — the model did not sell the one cell a fundamentals
+approach was always going to hold in order to buy the finish cells. The KO
+gap is two thirds closed (+0.240 → +0.080). And **submissions are the entire
+remaining problem**: weighted, sub contributes +0.040 of the +0.022 net and
+KO +0.027, both partly paid for by decisions at −0.044.
+
+Which closes the accounting on the leg:
+
+```
+new(guarded) − market = +0.0330 = +0.0223 conditional mix + 0.0107 winner level
+```
+
+The next swing at this leg should aim at submissions specifically.
+
 **The anchor answers its own question.** λ was re-swept on val for the new
 mix over a 0.00–0.60 grid and selected **0.00** on every seed.
 `METHOD_ANCHOR_LAMBDA` existed to hide a mix with no resolution; a mix with
@@ -419,6 +446,7 @@ only HOW MUCH finish mass there is to place changed.
 | **Serving the model on debut bouts** | not done | Never fitted on a row where one side's career columns are entirely NaN, and that segment already routes to its own specialist |
 | **Claiming we beat the method book** | refused | +0.0330 nats [+0.0039, +0.0629] is measurably behind it |
 | **Claiming an ROI edge** | refused | −16.7 % is an improvement on −26.5 % and still a loss |
+| **A submission specialist** | not attempted | The whole residual gap (§4). Named as the next lab rather than half-tried here |
 | **A discriminative round-of-finish model** | GATE 5 fail | 0.0113 nats on 333 test finishes, bootstrap [−0.0060, +0.0280]. The hazard already beats a per-length CONSTANT by only 0.0035 — there is almost no per-bout signal in round timing to find. §8 |
 | **Re-fitting `finish_hazard.py` without the leaked flag** | not done | Its covariate value is provably divided out of the served shape (1.7e-18, pinned by test). Whether its presence during FITTING moved the shared time-basis is untested, and §8 shows the whole covariate block is worth 0.0035 nats, so the upside is bounded by roughly that |
 
