@@ -466,6 +466,12 @@ class FighterHistory:
         "reversals",
         "knockdowns",
         "knockdowns_absorbed",
+        # Submission attempts CONCEDED (v0.12.1). The grappling analogue of a
+        # chin: `prior_losses_sub` only counts completed submissions, which is
+        # far too sparse to separate "hard to submit" from "never met a
+        # grappler". Every attempt survived is a datum, and until now they
+        # were all discarded. Added for the method leg's submission cell.
+        "sub_attempts_absorbed",
         "control_seconds",
         "control_seconds_absorbed",
         "total_seconds",
@@ -505,6 +511,7 @@ class FighterHistory:
         self.reversals = 0
         self.knockdowns = 0
         self.knockdowns_absorbed = 0
+        self.sub_attempts_absorbed = 0
         self.control_seconds = 0
         self.control_seconds_absorbed = 0
         self.total_seconds = 0
@@ -580,6 +587,9 @@ class FighterHistory:
             self.control_seconds_absorbed / per_min if per_min else None
         )
         reversals_per_fight = self.reversals / self.bouts if self.bouts else None
+        sub_att_absorbed_per15 = (
+            self.sub_attempts_absorbed / per_15m if per_15m else None
+        )
         # Career pacing.
         avg_bout_seconds = self.total_seconds / self.bouts if self.bouts else None
         title_bouts_ratio = self.title_bouts / self.bouts if self.bouts else None
@@ -628,6 +638,7 @@ class FighterHistory:
             "ground_share": ground_share,
             "kd_absorbed_per_fight": kd_absorbed_per_fight,
             "control_absorbed_per_min": control_absorbed_per_min,
+            "sub_att_absorbed_per15": sub_att_absorbed_per15,
             "reversals_per_fight": reversals_per_fight,
             "avg_bout_seconds": avg_bout_seconds,
             "title_bouts_ratio": title_bouts_ratio,
@@ -713,6 +724,7 @@ class FighterHistory:
         if opp_stats:
             self.sig_str_absorbed += opp_stats.get("sig_str_landed", 0) or 0
             self.knockdowns_absorbed += opp_stats.get("knockdowns", 0) or 0
+            self.sub_attempts_absorbed += opp_stats.get("sub_attempts", 0) or 0
             self.control_seconds_absorbed += opp_stats.get("control_seconds", 0) or 0
             self.td_def_attempted += opp_stats.get("td_attempted", 0) or 0
             self.td_def_stopped += (

@@ -58,12 +58,21 @@ TRAJ_MIN_MINUTES = 0.5  # clip bout length so 10-second KOs don't give 60 slpm
 
 # Attack/defense engine constants. LR validated on the v0.7.0 lab grid
 # (0.2 beat 0.1/0.3 and an experience-decayed schedule on val).
-RATING_METRICS = ("str", "grap", "kd", "ctrl")
+# `grap` is TAKEDOWNS. `sub` (v0.12.1) is a separate axis and was missing:
+# a wrestler takes you down and holds you, a jiu-jitsu player hunts the neck,
+# and the method leg cares which. Its DEFENCE side is the point — `sub_def`
+# is the grappling analogue of a chin, and unlike `prior_losses_sub` (which
+# only counts completed submissions, a very sparse signal) it accumulates
+# from every attempt conceded. Added because the residual gap to the closing
+# method line is entirely the submission cell; see docs/method_leg.md §4.
+RATING_METRICS = ("str", "grap", "kd", "ctrl", "sub")
 RATING_LR = 0.2
 DURATION_FLOOR_S = 60.0  # damp rate blow-ups from sub-minute finishes
 # League-mean running averages are seeded with a broad prior so the first
 # few hundred bouts don't swing the baseline the errors are measured against.
-LEAGUE_PRIOR = {"str": 3.5, "grap": 1.5, "kd": 0.5, "ctrl": 0.2}
+# Priors are the observed per-15-minute means (sub 0.53, grap 1.51 — the
+# latter reproduces the hand-set 1.5 this table already carried).
+LEAGUE_PRIOR = {"str": 3.5, "grap": 1.5, "kd": 0.5, "ctrl": 0.2, "sub": 0.5}
 LEAGUE_PRIOR_WEIGHT = 200.0
 # Observed rates are clipped at the p99 computed over bouts before this
 # FROZEN anchor (the v0.7.0 train period) — a stable constant-by-construction,
@@ -165,6 +174,7 @@ def _rates(stat: dict[str, Any], duration_s: float) -> dict[str, float]:
         "grap": (stat.get("td_landed") or 0) / d * 900.0,
         "kd": (stat.get("knockdowns") or 0) / d * 900.0,
         "ctrl": (stat.get("control_seconds") or 0) / d,
+        "sub": (stat.get("sub_attempts") or 0) / d * 900.0,
     }
 
 
