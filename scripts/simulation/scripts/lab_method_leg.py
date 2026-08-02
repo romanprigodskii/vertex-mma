@@ -31,12 +31,22 @@ Gates (each must pass before the next stage is built):
   GATE 1  on the held-out TEST window the new mix, reconciled to the same
           ensemble winner level production uses, must beat the production
           6-cell log-loss — seed-stably, and with a label-shuffle control.
-  GATE 2  marginal calibration and per-cell reliability must not degrade.
+  GATE 2  marginal calibration and per-cell reliability must not degrade —
+          and if they do, no correction ships unless VAL selects it by a
+          margin bigger than val noise.
+
+Stage 3 then measures every leg `sportsbook.ts` actually offers, because
+three of the four are priced off the same reconciled distribution and a mix
+change moves them whether or not anyone looks.
+
+Results: docs/method_leg.md. Report: artifacts/lab_method_leg.json.
 
 Usage (from scripts/simulation, venv active):
   python scripts/lab_method_leg.py --stage decompose
   python scripts/lab_method_leg.py --stage gate0
   python scripts/lab_method_leg.py --stage gate1
+  python scripts/lab_method_leg.py --stage gate2
+  python scripts/lab_method_leg.py --stage legs
   python scripts/lab_method_leg.py --stage all
 """
 
