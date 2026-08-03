@@ -30,7 +30,12 @@ from .config import (
     VAL_END,
 )
 from .ensemble import EnsembleModel, ResidualCorrector
-from .features import build_feature_matrix, debut_feature_names, feature_names
+from .features import (
+    build_feature_matrix,
+    debut_feature_names,
+    feature_names,
+    serving_columns,
+)
 from .method_model import (
     METHOD_MODEL_DEBUT_DIR,
     METHOD_MODEL_DEBUT_EVAL_DIR,
@@ -438,11 +443,17 @@ def run_training(df: pd.DataFrame) -> dict[str, dict[str, float]]:
     else:
         exp_df = df
 
-    X, y, meta = build_feature_matrix(exp_df)
+    # `corrector=True` so the CORRECTOR_COLUMNS ride along. The learners
+    # never see them — `cols` below is feature_names() and EnsembleModel
+    # narrows to its own feature_columns — but every scoring call after the
+    # corrector is attached needs them present.
+    X, y, meta = build_feature_matrix(exp_df, corrector=True)
     cols = feature_names()
-    X = X[cols]
+    X_fit = X[cols]
+    X = X[serving_columns(cols)]
 
     Xs, ys, metas = temporal_split(X, y, meta)
+    Xfit_s, _, _ = temporal_split(X_fit, y, meta)
     if len(Xs["train"]) == 0 or len(Xs["val"]) == 0:
         raise RuntimeError(
             "Empty train or val split. Check TRAIN_END / VAL_END vs your data range."
@@ -463,9 +474,9 @@ def run_training(df: pd.DataFrame) -> dict[str, dict[str, float]]:
 
     console.log("training ensemble (LGB + XGB + LogReg)…")
     train_meta = ensemble.fit(
-        X_train=Xs["train"],
+        X_train=Xfit_s["train"],
         y_train=ys["train"],
-        X_val=Xs["val"],
+        X_val=Xfit_s["val"],
         y_val=ys["val"],
     )
     console.log(
@@ -524,7 +535,7 @@ def run_training(df: pd.DataFrame) -> dict[str, dict[str, float]]:
     ensemble.save(ENSEMBLE_EVAL_DIR)
 
     console.log(f"refitting production model on ALL {len(X):,} rows (served weights)…")
-    prod = ensemble.refit_on_all(X, y)
+    prod = ensemble.refit_on_all(X_fit, y)
     served_through = str(pd.to_datetime(meta["event_date"]).max().date())
 
     # Persist artifacts — the PRODUCTION (refit-on-all) model is what we serve.
@@ -542,8 +553,9 @@ def run_training(df: pd.DataFrame) -> dict[str, dict[str, float]]:
     debut_cols: list[str] | None = None
     if "is_debut_a" in df.columns and bool(debut_mask_df.any()):
         debut_cols = debut_feature_names()
-        X_d, y_d, meta_d = build_feature_matrix(df)
-        X_d = X_d[debut_cols]
+        X_d, y_d, meta_d = build_feature_matrix(df, corrector=True)
+        X_d_fit = X_d[debut_cols]
+        X_d = X_d[serving_columns(debut_cols)]
         weights_all = np.where(debut_mask_df.to_numpy(), 1.0, DEBUT_EXP_ROW_WEIGHT)
 
         dt_d = pd.to_datetime(meta_d["event_date"])
@@ -573,9 +585,9 @@ def run_training(df: pd.DataFrame) -> dict[str, dict[str, float]]:
             f"{int(m_debut.sum()):,} debut rows · val {int(va_mask.sum())}"
         )
         specialist.fit(
-            X_train=X_d.loc[m_tr.to_numpy()].reset_index(drop=True),
+            X_train=X_d_fit.loc[m_tr.to_numpy()].reset_index(drop=True),
             y_train=y_d.loc[m_tr.to_numpy()].reset_index(drop=True),
-            X_val=X_d.loc[va_mask].reset_index(drop=True),
+            X_val=X_d_fit.loc[va_mask].reset_index(drop=True),
             y_val=y_d.loc[va_mask].reset_index(drop=True),
             sample_weight=weights_all[m_tr.to_numpy()],
         )
@@ -593,7 +605,9 @@ def run_training(df: pd.DataFrame) -> dict[str, dict[str, float]]:
 
         ENSEMBLE_DEBUT_EVAL_DIR.mkdir(exist_ok=True)
         specialist.save(ENSEMBLE_DEBUT_EVAL_DIR)
-        prod_specialist = specialist.refit_on_all(X_d, y_d, sample_weight=weights_all)
+        prod_specialist = specialist.refit_on_all(
+            X_d_fit, y_d, sample_weight=weights_all
+        )
         ENSEMBLE_DEBUT_DIR.mkdir(exist_ok=True)
         prod_specialist.save(ENSEMBLE_DEBUT_DIR)
 

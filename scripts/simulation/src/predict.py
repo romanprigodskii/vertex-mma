@@ -25,7 +25,7 @@ from .config import ARTIFACTS_DIR, confidence_label
 from .db import get_connection
 from .ensemble import EnsembleModel
 from .export import build_dataset, fetch_raw, stable_hash, swap_sides
-from .features import build_feature_matrix
+from .features import build_feature_matrix, serving_columns
 from .method_model import METHOD_MODEL_DEBUT_DIR, METHOD_MODEL_DIR, MethodModel
 from .method_model import conditional_mix as method_conditional_mix
 from .monte_carlo import FighterMC, simulate_bout
@@ -70,9 +70,10 @@ class LoadedModel:
     ) -> np.ndarray:
         if debut:
             assert self.debut_ensemble is not None
-            return self.debut_ensemble.predict_proba_a(X[self.debut_feature_columns])
-        X = X[self.feature_columns]
-        return self.ensemble.predict_proba_a(X)
+            return self.debut_ensemble.predict_proba_a(
+                X[serving_columns(self.debut_feature_columns)]
+            )
+        return self.ensemble.predict_proba_a(X[serving_columns(self.feature_columns)])
 
     def shap_contributions(
         self, X: pd.DataFrame, *, debut: bool = False
@@ -122,7 +123,7 @@ def predict_upcoming(*, force_version: str | None = None) -> int:
     # (which selects on target) doesn't break — we won't use y.
     upcoming_fill = upcoming.copy()
     upcoming_fill["target_a_wins"] = 0
-    X, _, meta = build_feature_matrix(upcoming_fill)
+    X, _, meta = build_feature_matrix(upcoming_fill, corrector=True)
 
     # Order-invariant winner prob: the model isn't perfectly antisymmetric
     # (abs_*_a/_b, stance one-hots), so the raw scrape order would leak into
@@ -130,7 +131,7 @@ def predict_upcoming(*, force_version: str | None = None) -> int:
     #   P(A wins) = ½·[ predict(A,B) + (1 − predict(B,A)) ].
     # Bouts with a debutant route to the specialist, everything else to the
     # main ensemble; both get the same order-averaging.
-    X_swapped, _, _ = build_feature_matrix(swap_sides(upcoming_fill))
+    X_swapped, _, _ = build_feature_matrix(swap_sides(upcoming_fill), corrector=True)
     probs_a = np.empty(len(upcoming), dtype=float)
     for mask, is_debut in ((~debut_mask, False), (debut_mask, True)):
         if not mask.any():

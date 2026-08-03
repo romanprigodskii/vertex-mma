@@ -26,7 +26,7 @@ import numpy as np  # noqa: E402
 from src.config import ARTIFACTS_DIR, CONFIDENCE_BANDS  # noqa: E402
 from src.ensemble import EnsembleModel  # noqa: E402
 from src.export import build_dataset, fetch_raw, symmetrize_for_training  # noqa: E402
-from src.features import build_feature_matrix  # noqa: E402
+from src.features import build_feature_matrix, serving_columns  # noqa: E402
 from src.train import evaluate_probs, temporal_split  # noqa: E402
 
 # Evaluate the EVAL (split-trained) model so the test split is genuinely
@@ -42,7 +42,7 @@ def main() -> None:
     # so we must symmetrize (deterministic A/B flip) before splitting, exactly
     # like training did — otherwise the target is trivially 1 and AUC collapses.
     df = symmetrize_for_training(build_dataset(fetch_raw()))
-    X, y, meta = build_feature_matrix(df)
+    X, y, meta = build_feature_matrix(df, corrector=True)
 
     if ENSEMBLE_DIR.name != "ensemble_eval":
         print("WARNING: eval_market.py: ensemble_eval/ missing — evaluating the "
@@ -53,7 +53,7 @@ def main() -> None:
     # feature_names(): between a feature addition landing and the next
     # retrain, the code list is wider than the trained artifacts and the
     # un-sliced frame would crash (or misalign) the base learners.
-    X = X[ensemble.feature_columns]
+    X = X[serving_columns(ensemble.feature_columns)]
     Xs, ys, metas = temporal_split(X, y, meta)
     probs = ensemble.predict_proba_a(Xs["test"])
     y_test = ys["test"].to_numpy()
