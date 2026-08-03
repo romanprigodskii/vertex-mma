@@ -745,6 +745,277 @@ def print_subtemp(res: dict) -> None:
     print(f"    => {'GATE PASS' if ok else 'GATE FAIL'}")
 
 
+# ── stage: debutcorr — the shipped age correction, on the specialist ───
+
+
+def apply_corrector_to_pool(pool: pd.DataFrame, shift: np.ndarray) -> np.ndarray:
+    """Re-serve a stored pool under an additive antisymmetric logit shift.
+
+    Exact, not an approximation: `ResidualCorrector` runs after the blend
+    and does not touch fitting, so applying it to the stored per-orientation
+    probabilities reproduces what `predict_proba_a` would have returned —
+    including the sign flip on the swapped orientation, which is what makes
+    the shift survive the order averaging instead of cancelling in it.
+    """
+    za = logit(pool["p_raw"].to_numpy(dtype=float)) + shift
+    zb = logit(pool["p_sw"].to_numpy(dtype=float)) - shift
+    return 0.5 * (
+        1.0 / (1.0 + np.exp(-za)) + (1.0 - 1.0 / (1.0 + np.exp(-zb)))
+    )
+
+
+def stage_debutcorr(df: pd.DataFrame, seeds: list[int]) -> dict[str, Any]:
+    """GATE — does RESIDUAL_CORRECTION belong on the debut specialist?
+
+    The open question at the end of `winner_batch.md`. The correction was
+    fitted and gated on the both-experienced population only, and
+    `train.py` never assigns `.corrector` to the specialist. One
+    uncontrolled observation (an accidental run) moved the debut segment
+    0.6534 -> 0.6380 on 94 bouts and was left explicitly ungated.
+
+    The MDE is declared here, before the number is read, because at n=798
+    it decides what this stage is even able to say. And a mechanistic
+    argument is recorded AGAINST the lever up front: v0.13.0's whole
+    justification was that `diff_age` is DILUTED among 117 partly
+    collinear columns. A debut row has 27 of the 67 diffs at NaN, so
+    there is less to dilute it, so the correction should be worth LESS
+    here, not more. The uncontrolled observation says the opposite, which
+    is exactly why it needed gating rather than shipping.
+    """
+    from src.config import RESIDUAL_CORRECTION
+
+    if not POOL_DEBUT.exists():
+        raise SystemExit("run --stage pools first")
+    pool = pd.read_parquet(POOL_DEBUT)
+    pool = pool[(pool.label == "baseline") & (pool.seed == seeds[0])].reset_index(drop=True)
+
+    joined = pool.join(
+        df.set_index("bout_id")[["age_a", "age_b", "event_date"]], on="bout_id"
+    )
+    y = joined["y"].to_numpy(dtype=float)
+    base = joined["p"].to_numpy(dtype=float)
+    base_ll = binary_logloss(y, base)
+
+    eps = 1e-6
+    pb = np.clip(base, eps, 1 - eps)
+    per_bout = -(y * np.log(pb) + (1 - y) * np.log(1 - pb))
+    se_pair_upper = float(per_bout.std(ddof=1) / np.sqrt(len(per_bout)))
+
+    terms = (RESIDUAL_CORRECTION or {}).get("terms", [])
+    shift = np.zeros(len(joined), dtype=float)
+    d_age = (
+        joined["age_a"].to_numpy(dtype=float) - joined["age_b"].to_numpy(dtype=float)
+    )
+    age_live = float(np.isfinite(d_age).mean())
+    for t in terms:
+        if t["column"] != "diff_age":
+            raise SystemExit(
+                f"this stage only knows diff_age, got {t['column']!r} — extend it"
+            )
+        shift += float(t["weight"]) * np.nan_to_num(d_age / float(t["scale"]))
+
+    p_corr = apply_corrector_to_pool(joined, shift)
+    delta = binary_logloss(y, p_corr) - base_ll
+
+    d = -(y * np.log(np.clip(p_corr, eps, 1 - eps))
+          + (1 - y) * np.log(np.clip(1 - p_corr, eps, 1 - eps))) - per_bout
+    se_paired = float(d.std(ddof=1) / np.sqrt(len(d)))
+
+    return {
+        "n": int(len(joined)),
+        "diff_age_live_share": age_live,
+        "effective_n": int(np.isfinite(d_age).sum()),
+        "corrector": RESIDUAL_CORRECTION,
+        "declared_mde_before_run": {
+            "unpaired_se": se_pair_upper,
+            "one_sided_80pct": 2.49 * se_pair_upper,
+            "note": (
+                "Declared from the baseline pool alone, before the corrected "
+                "number was computed. The paired SE below is smaller and is "
+                "the one the verdict uses; the unpaired figure is what a lab "
+                "that forgot to pair would have been stuck with."
+            ),
+        },
+        "baseline_logloss": base_ll,
+        "corrected_logloss": binary_logloss(y, p_corr),
+        "delta": float(delta),
+        "paired_se": se_paired,
+        "z": float(delta / se_paired) if se_paired else float("nan"),
+        "uncontrolled_observation_for_scale": {"before": 0.6534, "after": 0.6380, "n": 94},
+    }
+
+
+def print_debutcorr(res: dict) -> None:
+    print(f"\n{'=' * 78}\nAGE CORRECTION ON THE DEBUT SPECIALIST\n{'=' * 78}")
+    m = res["declared_mde_before_run"]
+    print(
+        f"  n={res['n']} · diff_age live on {res['diff_age_live_share']:.1%} "
+        f"(effective n={res['effective_n']})"
+    )
+    print(
+        f"  DECLARED BEFORE THE RUN: unpaired SE {m['unpaired_se']:.5f} -> "
+        f"one-sided 80% MDE {m['one_sided_80pct']:.5f}"
+    )
+    print(
+        f"\n  baseline  {res['baseline_logloss']:.5f}\n"
+        f"  corrected {res['corrected_logloss']:.5f}\n"
+        f"  delta     {res['delta']:+.5f}  (paired SE {res['paired_se']:.5f}, "
+        f"z = {res['z']:+.2f})"
+    )
+    verdict = "PASS" if res["delta"] < 0 and abs(res["z"]) >= 1.96 else "FAIL"
+    print(f"  => GATE {verdict}")
+
+
+# ── stage: debutlv — absolute levels in the specialist's matrix ────────
+
+
+def stage_debutlv(df: pd.DataFrame, seeds: list[int]) -> dict[str, Any]:
+    """GATE — 22 absolute pairs the debut matrix cannot currently see.
+
+    Measured, not assumed: 27 of the 67 diffs are 100% NaN on a debut row,
+    and 22 of them have no `abs_*` companion. The consequence is not that
+    the debutant's level is unknown — it is that the OPPONENT's is. Every
+    debut bout looks identical on those 22 axes.
+
+    Same diagnosis METHOD_LEVEL_COLUMNS fixed for the method leg, where it
+    was worth 0.8966 -> 0.8870 seed-stably.
+    """
+    if not POOL_DEBUT.exists():
+        raise SystemExit("run --stage pools first")
+    base_pool = pd.read_parquet(POOL_DEBUT)
+
+    from src.features import DEBUT_LEVEL_COLUMNS
+
+    out: dict[str, Any] = {
+        "n_level_columns": len(DEBUT_LEVEL_COLUMNS),
+        "level_columns": list(DEBUT_LEVEL_COLUMNS),
+        "seeds": seeds,
+        "arms": {},
+    }
+    for seed in seeds:
+        b = base_pool[(base_pool.label == "baseline") & (base_pool.seed == seed)]
+        if b.empty:
+            print(f"  (no baseline pool for seed {seed} — building)")
+            b = walk_forward_debut(df, label="baseline", seed=seed)
+        cand = walk_forward_debut(df, label="levels", seed=seed, levels=True, verbose=True)
+
+        b = b.sort_values("bout_id").reset_index(drop=True)
+        c = cand.sort_values("bout_id").reset_index(drop=True)
+        boot = paired_bootstrap(c, b)
+        out["arms"][str(seed)] = {
+            "baseline_logloss": oof_logloss(b),
+            "levels_logloss": oof_logloss(c),
+            "delta": oof_logloss(c) - oof_logloss(b),
+            "bootstrap": boot,
+            "n": int(len(b)),
+        }
+        print(
+            f"  seed {seed}: {oof_logloss(b):.5f} -> {oof_logloss(c):.5f}  "
+            f"delta {oof_logloss(c) - oof_logloss(b):+.5f}  "
+            f"improving {boot['frac_improving']:.0%}"
+        )
+    deltas = [a["delta"] for a in out["arms"].values()]
+    out["sign_stable"] = bool(all(d < 0 for d in deltas) or all(d > 0 for d in deltas))
+    out["median_delta"] = float(np.median(deltas))
+    return out
+
+
+def print_debutlv(res: dict) -> None:
+    print(f"\n{'=' * 78}\nABSOLUTE LEVELS IN THE DEBUT MATRIX ({res['n_level_columns']} pairs)\n{'=' * 78}")
+    print(f"  {'seed':>5} {'baseline':>9} {'levels':>9} {'delta':>9} {'95% CI':>22} {'improving':>10}")
+    for seed, a in res["arms"].items():
+        b = a["bootstrap"]
+        ci = f"[{b['lo']:+.5f}, {b['hi']:+.5f}]"
+        print(
+            f"  {seed:>5} {a['baseline_logloss']:>9.5f} {a['levels_logloss']:>9.5f} "
+            f"{a['delta']:>+9.5f} {ci:>22} {b['frac_improving']:>10.0%}"
+        )
+    print(
+        f"\n  median delta {res['median_delta']:+.5f} · "
+        f"sign stable across seeds: {res['sign_stable']}"
+    )
+    ok = res["sign_stable"] and res["median_delta"] < 0
+    print(f"  => GATE {'PASS' if ok else 'FAIL'}")
+
+
+# ── stage: debutmethod — a method model for the debut segment ──────────
+
+
+def stage_debutmethod(df: pd.DataFrame, seeds: list[int]) -> dict[str, Any]:
+    """GATE — the method leg on the 19% of the slate it does not serve.
+
+    Baseline is a per-scheduled-length CONSTANT on the debut base rates,
+    not the current MC anchor. Most of the available gain is a marginal
+    that is simply wrong for the segment (ko/sub/dec 0.3597/0.2292/0.4111
+    on debut rows against 0.3257/0.1877/0.4866 on experienced ones), and a
+    discriminative model that only beats the anchor has demonstrated
+    nothing except that the anchor was wrong.
+    """
+    from lab_method_common import (
+        paired_bootstrap_method,
+        walk_forward_method_debut,
+    )
+
+    out: dict[str, Any] = {"arms": {}, "seeds": seeds}
+    const = walk_forward_method_debut(df, label="constant", arm="constant", seed=seeds[0])
+    out["constant"] = {
+        "n": int(len(const)),
+        "n_submissions": int((const["y"] == 1).sum()),
+        "logloss": pool_logloss(const),
+        "cells": cell_table(const),
+    }
+    print(
+        f"  constant baseline: n={len(const)} ll={pool_logloss(const):.5f} "
+        f"(submissions {int((const['y'] == 1).sum())})"
+    )
+
+    for seed in seeds:
+        model = walk_forward_method_debut(
+            df, label="model", arm="model", seed=seed, verbose=True
+        )
+        c = model.sort_values("bout_id").reset_index(drop=True)
+        b = const.sort_values("bout_id").reset_index(drop=True)
+        boot = paired_bootstrap_method(c, b)
+        out["arms"][str(seed)] = {
+            "logloss": pool_logloss(model),
+            "delta_vs_constant": pool_logloss(model) - out["constant"]["logloss"],
+            "bootstrap": boot,
+            "cells": cell_table(model),
+        }
+        print(
+            f"  seed {seed}: model {pool_logloss(model):.5f} vs constant "
+            f"{out['constant']['logloss']:.5f}  "
+            f"delta {pool_logloss(model) - out['constant']['logloss']:+.5f}  "
+            f"improving {boot['frac_improving']:.0%}"
+        )
+    deltas = [a["delta_vs_constant"] for a in out["arms"].values()]
+    out["median_delta"] = float(np.median(deltas))
+    out["sign_stable"] = bool(all(d < 0 for d in deltas) or all(d > 0 for d in deltas))
+    return out
+
+
+def print_debutmethod(res: dict) -> None:
+    print(f"\n{'=' * 78}\nMETHOD MODEL FOR THE DEBUT SEGMENT\n{'=' * 78}")
+    c = res["constant"]
+    print(
+        f"  constant baseline (per-length debut base rates): n={c['n']} · "
+        f"submissions {c['n_submissions']} · ll {c['logloss']:.5f}"
+    )
+    print(f"\n  {'seed':>5} {'model ll':>9} {'delta':>9} {'95% CI':>24} {'improving':>10}")
+    for seed, a in res["arms"].items():
+        b = a["bootstrap"]
+        ci = f"[{b['lo']:+.5f}, {b['hi']:+.5f}]"
+        print(
+            f"  {seed:>5} {a['logloss']:>9.5f} {a['delta_vs_constant']:>+9.5f} "
+            f"{ci:>24} {b['frac_improving']:>10.0%}"
+        )
+    print(
+        f"\n  median delta {res['median_delta']:+.5f} · sign stable: {res['sign_stable']}"
+    )
+    ok = res["sign_stable"] and res["median_delta"] < 0
+    print(f"  => GATE {'PASS' if ok else 'FAIL'} (against the CONSTANT, not the MC anchor)")
+
+
 # ── stage: power (probe D) ─────────────────────────────────────────────
 
 
@@ -897,7 +1168,16 @@ def main() -> None:
     ap.add_argument(
         "--stage",
         default="pools",
-        choices=("pools", "nat", "subtemp", "debutlv", "debutcorr", "power", "calib"),
+        choices=(
+            "pools",
+            "nat",
+            "subtemp",
+            "debutlv",
+            "debutcorr",
+            "debutmethod",
+            "power",
+            "calib",
+        ),
     )
     ap.add_argument("--seeds", default="42")
     ap.add_argument("--cache", action="store_true", help="reuse data/dataset.parquet")
@@ -927,6 +1207,18 @@ def main() -> None:
         df = load_dataset(args.cache)
         payload["subtemp"] = stage_subtemp(df, seeds)
         print_subtemp(payload["subtemp"])
+    elif args.stage == "debutcorr":
+        df = load_dataset(args.cache)
+        payload["debutcorr"] = stage_debutcorr(df, seeds)
+        print_debutcorr(payload["debutcorr"])
+    elif args.stage == "debutlv":
+        df = load_dataset(args.cache)
+        payload["debutlv"] = stage_debutlv(df, seeds)
+        print_debutlv(payload["debutlv"])
+    elif args.stage == "debutmethod":
+        df = load_dataset(args.cache)
+        payload["debutmethod"] = stage_debutmethod(df, seeds)
+        print_debutmethod(payload["debutmethod"])
     elif args.stage == "power":
         payload["power"] = stage_power(seeds)
         print(json.dumps(payload["power"], indent=1, default=str))

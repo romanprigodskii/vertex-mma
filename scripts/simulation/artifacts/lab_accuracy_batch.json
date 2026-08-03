@@ -619,5 +619,35 @@
     }
    }
   }
+ },
+ "debutcorr": {
+  "n": 798,
+  "diff_age_live_share": 1.0,
+  "effective_n": 798,
+  "corrector": {
+   "terms": [
+    {
+     "column": "diff_age",
+     "weight": -0.2939,
+     "scale": 10.0
+    }
+   ],
+   "slope": 1.0
+  },
+  "declared_mde_before_run": {
+   "unpaired_se": 0.008479650408288322,
+   "one_sided_80pct": 0.02111432951663792,
+   "note": "Declared from the baseline pool alone, before the corrected number was computed. The paired SE below is smaller and is the one the verdict uses; the unpaired figure is what a lab that forgot to pair would have been stuck with."
+  },
+  "baseline_logloss": 0.6637897308845001,
+  "corrected_logloss": 0.6659700454192038,
+  "delta": 0.0021803145347036867,
+  "paired_se": 0.00261214042879321,
+  "z": 0.8346850386259579,
+  "uncontrolled_observation_for_scale": {
+   "before": 0.6534,
+   "after": 0.638,
+   "n": 94
+  }
  }
 }
