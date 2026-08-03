@@ -177,10 +177,22 @@ produce it, and a ~2.4 pp gap that no basis produces.
 
 The log-loss gap decomposes, and after v0.13.0 it decomposes the other
 way round from how it used to: **calibration is now BETTER than the
-book's** (reliability 0.00186 model vs 0.00301 market — lower is
-better) while **resolution** is 0.03826 vs 0.04801. The deficit is
+book's** while **resolution** is 0.03826 vs 0.04801. The deficit is
 sharpness on lopsided matchups: the book knows which mismatches are
 real and we don't.
+
+The calibration half of that sentence used to be quoted as reliability
+0.00186 model vs 0.00301 market, off a 10-equal-width-bin Murphy
+decomposition. The claim survives; that statistic should not be the one
+carrying it. Swept over bin counts on five baseline seeds, the sign of
+(model − market) reliability is stable only at 5 bins — at 10, 20 and 40
+it flips depending on the seed, because ~30 bouts per bin makes the
+statistic measure the market's *dispersion* rather than its calibration,
+and the market is the more dispersed series by construction. The
+bin-free CORP miscalibration is sign-stable on all five seeds and says
+the same thing the README always said: **model 0.0101–0.0132 against the
+market's 0.0154** (lower is better). Full sweep: `docs/accuracy_batch.md`
+§7.
 
 What closed a fifth of it was not sharpness. `docs/winner_batch.md`
 asked each losing segment whether the book was merely SHARPER there or
@@ -199,6 +211,18 @@ weight), which the scraper began accruing in `bout_change_event` /
 rankings — the last untapped source in the database, 47k point-in-time
 snapshots — were tried twice and failed both gates
 (`docs/winner_batch.md` §7).
+
+Nothing ships from the follow-up batch (`docs/accuracy_batch.md`): five
+levers, five gate failures. What it does leave behind is instruments and
+a floor. Two more walk-forward pools now exist — the conditional method
+leg is selectable on **543 submissions** instead of the 71 val rows its
+own writeup called noise, and the debut specialist on **798 bouts**
+instead of 84 — and the main pool's detection limit is measured for the
+first time: a one-sided 80 % MDE of **0.0036** on a single seed, 0.0029
+with an infinite seed budget. `RESIDUAL_CORRECTION` is worth −0.0026,
+i.e. below it. v0.13.0 shipped because three independent legs agreed on
+its sign, not because any one reading resolved it — which is the standard
+to keep, and the reason more seeds cannot rescue an underpowered arm.
 
 Main model core (v0.7.0 recipe): opponent-adjusted ratings
 (`src/opponent_ratings.py`) — online attack/defense skill ratings
