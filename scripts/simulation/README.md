@@ -234,10 +234,22 @@ the gain would be a corrected marginal. Measured, the constant is
 per-bout signal on debut bouts even on defaults, so the win is a model
 win.
 
-Everything else in that batch failed its gate (`docs/accuracy_batch.md`):
-a nationality term in the corrector, a sub-vs-dec temperature, the age
-correction transferred to the debut specialist, and absolute levels in the
-debut matrix. What those left behind is instruments and a floor. Two more
+Everything else in that batch failed (`docs/accuracy_batch.md`): a
+sub-vs-dec temperature, the age correction transferred to the debut
+specialist, absolute levels in the debut matrix, and a nationality term in
+the corrector. The last one is the interesting refusal. It passed all three
+legs of the gate that shipped v0.13.0 — cross-fit −0.0015, forward −0.0020,
+held-out −0.0013 — and then the ROLLING basis, which this README calls the
+honest week-to-week number, came back **+0.0022** against age alone on
+identical origins. Every one of those readings is under the floor below, so
+the reading is not "three bases beat one": it is that nothing is resolved,
+and a sign that flips between bases is the same condition (g) that kills
+levers whose sign flips between seeds. The substrate shipped anyway —
+`fighter.sherdog_flag_code` is filled for 4,136 fighters and
+`features.CORRECTOR_COLUMNS` carries the column — because building the data
+is the expensive part.
+
+What those left behind is instruments and a floor. Two more
 walk-forward pools now exist — the conditional method leg is selectable on
 **543 submissions** instead of the 71 val rows its own writeup called
 noise, and the debut specialist on **798 bouts** instead of 84 — and the

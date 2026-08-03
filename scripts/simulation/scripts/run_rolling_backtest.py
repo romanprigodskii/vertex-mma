@@ -87,6 +87,12 @@ REPORT_PATH = ARTIFACTS_DIR / "rolling_backtest.json"
 # Flipped by --uncorrected so the lab can measure the corrector's effect on
 # identical origins instead of against a stale committed report.
 CORRECTOR_ENABLED = True
+# Restricted by --corrector-terms so a MULTI-term corrector can be measured
+# one term at a time. Comparing v0.15.0's two-term block against v0.13.0's
+# committed one-term report answers nothing: the data grew, and the age
+# coefficient itself moved (-0.2939 -> -0.2731) because the two terms are
+# fitted jointly and are not orthogonal.
+CORRECTOR_TERMS: tuple[str, ...] | None = None
 CACHE_PATH = DATA_DIR / "rolling_dataset.parquet"
 
 
@@ -150,9 +156,13 @@ def _fit_ensemble(
     # number nothing serves. (An accidental run that did apply it moved the
     # debut segment 0.6534 -> 0.6380 on 94 bouts — suggestive, ungated, and
     # written down in docs/winner_batch.md rather than acted on.)
+    spec = RESIDUAL_CORRECTION
+    if spec and CORRECTOR_TERMS is not None:
+        kept = [t for t in spec["terms"] if t["column"] in CORRECTOR_TERMS]
+        spec = {**spec, "terms": kept} if kept else None
     model.corrector = (
-        ResidualCorrector.from_dict(RESIDUAL_CORRECTION)
-        if (RESIDUAL_CORRECTION and corrected and CORRECTOR_ENABLED)
+        ResidualCorrector.from_dict(spec)
+        if (spec and corrected and CORRECTOR_ENABLED)
         else None
     )
     return model
@@ -442,11 +452,27 @@ def main() -> None:
             "report cannot give you (the data grows between runs)"
         ),
     )
+    ap.add_argument(
+        "--corrector-terms",
+        default=None,
+        metavar="COL,COL",
+        help=(
+            "keep only these RESIDUAL_CORRECTION terms (e.g. diff_age), so a "
+            "multi-term block can be measured one term at a time on identical "
+            "origins. Writes rolling_backtest_<slug>.json"
+        ),
+    )
     args = ap.parse_args()
+    global CORRECTOR_ENABLED, REPORT_PATH, CORRECTOR_TERMS
     if args.uncorrected:
-        global CORRECTOR_ENABLED, REPORT_PATH
         CORRECTOR_ENABLED = False
         REPORT_PATH = ARTIFACTS_DIR / "rolling_backtest_uncorrected.json"
+    elif args.corrector_terms:
+        CORRECTOR_TERMS = tuple(
+            t.strip() for t in args.corrector_terms.split(",") if t.strip()
+        )
+        slug = "_".join(c.replace("diff_", "") for c in CORRECTOR_TERMS)
+        REPORT_PATH = ARTIFACTS_DIR / f"rolling_backtest_{slug}.json"
     run(args.start, args.end, args.step_months, args.cache)
 
 

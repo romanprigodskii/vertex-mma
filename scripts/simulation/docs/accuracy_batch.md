@@ -90,7 +90,7 @@ Two details that are contracts, not conveniences:
 
 ---
 
-## 2. Nationality in the corrector — **GATE FAIL (third leg)**
+## 2. Nationality in the corrector — **three legs pass, the rolling basis refuses**
 
 The bias is real, large, and stable. On the seed-42 pool:
 
@@ -131,7 +131,7 @@ in §0. Then the held-out window:
 on the window it was not — the signature that killed the 8-column block in
 `winner_batch.md` §6, reappearing at two parameters.
 
-### Why this is not closed
+### Why that reading was not the end of it
 
 `country_code` covers **71.1 %** of the OOF pool and **41.7 %** of the test
 window. The column is Wikidata-sourced through an English-Wikipedia article
@@ -142,13 +142,69 @@ applied where it mostly is not.
 
 That was stated before the run, not after it, which is what makes the
 re-run legitimate rather than a second bite: migration `0094` adds
-`fighter.sherdog_flag_code` / `sherdog_nationality`, and step 18
-(`scripts/scraper/scripts/18_backfill_country_sherdog.py`) fills it from
-Sherdog for the 4,171 fighters (**91.1 %**) that carry a verified
-`sherdog_id`. One definition across the whole population, instead of one
-that is present exactly where the model was fitted.
+`fighter.sherdog_flag_code` / `sherdog_nationality`, and step 18 fills it
+for the 4,171 fighters (**91.1 %**) with a verified `sherdog_id` — 4,136
+of them came back with a flag. One definition across the whole population,
+instead of one present exactly where the model was fitted.
 
-Both readings are in this document. The `country_code` arm failed.
+### The re-gate — three legs pass
+
+Coverage on the held-out window goes **41.7 % → 99.1 %**, and the third leg
+flips:
+
+| block | cross-fit | forward | held-out test |
+|---|---|---|---|
+| age only | −0.00243 | −0.00291 | −0.00529 |
+| US only | −0.00180 | −0.00269 | −0.00236 |
+| age + US | −0.00388 | −0.00492 | −0.00658 |
+| **incremental** | **−0.00145** | **−0.00201** | **−0.00129** |
+
+Wired end to end, that reproduces on the served artifact: a retrain over
+identical data goes 0.613663 → 0.612374 on test (exactly the −0.00129),
+the gap to the closing line 0.0196 → 0.0189, reliability 0.00186 →
+0.00136.
+
+### And it still does not ship — the fourth basis
+
+`winner_batch.md` §8 reported a **rolling** number when v0.13.0 shipped:
+production semantics, per-origin refit, the basis the README calls "the
+honest number for how would this have performed week to week". It
+disagrees, on identical origins and identical data:
+
+| arm | all (n=417) | odds subset (n=394) |
+|---|---|---|
+| uncorrected | 0.62384 | 0.61989 |
+| **age only** | **0.61676** | **0.61150** |
+| age + nationality | 0.61894 | 0.61241 |
+| market | — | 0.59279 |
+
+**+0.0022 against age alone**, where the other three bases said −0.0013 to
+−0.0020.
+
+The temptation is to say three bases beat one. The honest reading is the
+opposite: **every one of those numbers is under the floor from §0**
+(one-sided 80 % MDE 0.0036 single-seed). Nothing here is resolved, and a
+term whose sign flips between bases is not shippable — that is exactly the
+condition (g) that killed the debut levels in §5, applied across bases
+instead of across seeds.
+
+There is also a mechanism that would explain the rolling sign rather than
+dismiss it. The coefficients are fitted on walk-forward models trained on
+*less* data than the rolling ones — which is the stated reason `slope` is
+pinned to 1.0 in the first place. A correction sized for a weaker model
+can overshoot a stronger one, and the rolling arm is the only basis where
+the scoring model is trained on production-scale data.
+
+**Refused.** What ships is the substrate, not the coefficient:
+`fighter.sherdog_flag_code` is filled, `export.FIGHTERS_SQL` reads it,
+`features.CORRECTOR_COLUMNS` carries `diff_is_american` into the serving
+matrix, and the fitted block sits commented in `config.py`. Same reasoning
+that kept `regional_export.py` and `USE_SUB_AXIS` after their labs failed:
+building the data is the expensive part, and the next lab should not have
+to redo it.
+
+Both readings stay on the record — the `country_code` arm failed its third
+leg, the Sherdog arm passed all three and failed the rolling check.
 
 ### The two sources are not the same fact
 
@@ -364,41 +420,45 @@ mix change on a segment, not a re-scoring.
 
 ---
 
-## 6b. CatBoost is the one leg that does not reproduce
+## 6b. CatBoost is where two days of scraping shows up
 
-Found while shipping §6, and it is a reproducibility fact about the repo
-rather than a result about the model. Re-running `run_train.py` on the same
-dataset (identical split sizes 5,350 / 429 / 664, identical method-model
-`n_train` 5,340) does not reproduce the committed artifact:
+The retrain for v0.14.0 does not reproduce the committed artifacts, and the
+first explanation was wrong, so both go on the record.
 
-| leg | previous test log-loss | re-run | Δ |
+| leg | committed (trained 2026-08-02 17:02) | retrain | Δ |
 |---|---|---|---|
 | LightGBM | 0.6234925 | 0.6234880 | −0.0000045 |
 | LogReg | 0.6212311 | 0.6211650 | −0.0000662 |
 | **CatBoost** | 0.6212159 | **0.6256980** | **+0.0044821** |
 | blend | 0.6125547 | 0.6136627 | +0.0011079 |
 
-LightGBM reproduces to six decimals and LogReg to five. CatBoost does not,
-and it drags the blend with it — the val-picked softmax weights move
-0.067/0.172/0.761 → 0.079/0.124/0.797 because CatBoost's val log-loss moved.
+The first reading was CatBoost non-determinism — `_cb_params` pins
+`random_seed` but not `thread_count`, ordered boosting reduces across
+threads, and the retrain had happened while three scraper shards were
+saturating the machine. **That was refuted by re-running it on an idle
+machine: the second run reproduces the first to seven decimals.** CatBoost
+is deterministic here; the hypothesis was plausible and wrong.
 
-`EnsembleModel._cb_params` pins `random_seed=42` but **not**
-`thread_count`, and CatBoost's ordered boosting reduces across threads, so
-the fit depends on how many cores are actually available. The re-run here
-happened while three scraper shards were saturating the machine.
+What actually moved is the data. Between the committed artifact's
+`trained_at` and this branch, the daily crons brought in 89 updated bouts,
+3 new ones and 48 new `fighter_sherdog_bout` career rows — enough to shift
+`preufc_*` and the round-stat features slightly. The split sizes are
+unchanged (5,350 / 429 / 664), so this is drift inside the same rows, not
+a bigger training set.
 
-Two consequences worth stating plainly:
+The interesting part is the *distribution* of that drift across learners.
+Two days of incremental scraping moves LightGBM by 4.5e-6 and LogReg by
+6.6e-5, and CatBoost by **4.5e-3** — three orders of magnitude more.
+Ordered boosting builds its permutations from the data, so a handful of
+changed rows re-orders them; LightGBM's histogram splits mostly do not
+notice. That is a real fragility in the leg the v0.10 lab picked as the
+strongest single learner, and it is worth a lab of its own.
 
-* the +0.0011 blend movement in this branch's artifacts is CatBoost
-  run-to-run noise, not a cost of v0.14.0. It sits inside the seed band
-  measured in §0 (sd across seeds 0.00088, spread 0.0021), and v0.14.0
-  cannot touch the winner leg by construction — the method mix is a
-  reshape and the winner term of the 6-cell factorisation is shared,
-  unmodified.
-* every weekly auto-retrain has been drawing a fresh sample from this
-  distribution. Pinning `thread_count` would remove it, but that changes
-  every committed artifact and therefore needs its own gate rather than a
-  drive-by fix in this branch.
+For this branch it means one thing: the +0.0011 blend movement in these
+artifacts is **not a cost of v0.14.0**. It sits inside the seed band
+measured in §0 (sd 0.00088, spread 0.0021), and v0.14.0 cannot touch the
+winner leg by construction — the method mix is a reshape, and the winner
+term of the 6-cell factorisation is shared and unmodified.
 
 ---
 
@@ -445,7 +505,8 @@ move when the seed does.
 | # | Idea | Why rejected |
 |---|---|---|
 | 0 | Gating the debut method model against a per-length CONSTANT | The prior was that the MC anchor was a straw man and the win would be a corrected marginal. Measured, the constant is WORSE than the anchor by +0.0433 — the simulator carries real per-bout signal there. The gate moved to the anchor and the constant stayed as the diagnostic. §6 |
-| 1 | Nationality term in `RESIDUAL_CORRECTION` (`country_code`) | Two legs pass (−0.0023 / −0.0025), held-out +0.0017. Coverage 71 % on the fit pool against 42 % on test. §2 |
+| 1 | Nationality term, fitted on `country_code` | Two legs pass (−0.0023 / −0.0025), held-out +0.0017. Coverage 71 % on the fit pool against 42 % on test. §2 |
+| 1b | Nationality term, fitted on `sherdog_flag_code` | All three legs pass (−0.0015 / −0.0020 / −0.0013) and the ROLLING basis says +0.0022. Every reading is under the §0 floor; a sign that flips between bases is condition (g) applied across bases. §2 |
 | 2 | Sub-vs-dec temperature | τ = 0.9335 full / 1.0021 forward; cross-fit +0.00023, forward +0.00007; spends +0.0104 of the decision cell. §3 |
 | 3 | The under-dispersion diagnosis behind it | Does not reproduce at 543 submissions — the ends are calibrated, the defect is a q4 bump a one-parameter tilt cannot reach. §3 |
 | 4 | `RESIDUAL_CORRECTION` on the debut specialist | +0.00218, z = +0.83 on 798 rows. The 94-bout observation does not reproduce. §4 |
