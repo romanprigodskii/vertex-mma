@@ -175,9 +175,32 @@ CONTEXT_COLUMNS = [
 ]
 
 
-def build_feature_matrix(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series, pd.DataFrame]:
+# Columns the post-blend ResidualCorrector may read, which the three
+# learners must NOT see. They are opt-in (`corrector=True`) rather than
+# always present for one concrete reason: `method_model.build_method_features`
+# copies the WHOLE base matrix, so widening `build_feature_matrix`
+# unconditionally would silently widen the method model's 184-column
+# contract too.
+#
+# The separation is the entire mechanism of v0.13.0. `winner_batch.md` §6
+# showed the age signal is not missing from the feature matrix, it is
+# DILUTED — 117 partly collinear columns and three learners whose
+# disagreement the blend averages toward zero. A correction works because
+# nothing competes with it. Handing the same column to the learners would
+# recreate exactly the dilution the correction exists to escape.
+CORRECTOR_COLUMNS = ["diff_is_american"]
+
+
+def build_feature_matrix(
+    df: pd.DataFrame, *, corrector: bool = False
+) -> tuple[pd.DataFrame, pd.Series, pd.DataFrame]:
     """Return (X, y, meta) where meta keeps bout_id + event_date for
-    temporal splitting / joining predictions back to the DB."""
+    temporal splitting / joining predictions back to the DB.
+
+    `corrector=True` appends CORRECTOR_COLUMNS. Callers that serve a model
+    carrying a `ResidualCorrector` need it; nothing else does, and the
+    learners never select those columns because they are absent from
+    `feature_names()`."""
     out: dict[str, pd.Series] = {}
 
     # A - B diffs.
@@ -266,6 +289,19 @@ def build_feature_matrix(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series, pd.
     # zeros, indistinguishable from a missing class. Flag them so the model can
     # treat those (often short-notice / heavy) bouts differently.
     out["wc_other"] = (~weight_cat.isin(_STD_WC)).astype("int8")
+
+    if corrector:
+        # float, not int8: NaN has to survive. An unknown nationality must
+        # reach ResidualCorrector as NaN so it contributes a zero shift —
+        # False would assert "not American", which is a different claim.
+        for side in ("a", "b"):
+            col = f"is_american_{side}"
+            out[f"_am_{side}"] = (
+                pd.to_numeric(df[col], errors="coerce").astype("float64")
+                if col in df.columns
+                else pd.Series(float("nan"), index=df.index, dtype="float64")
+            )
+        out["diff_is_american"] = out.pop("_am_a") - out.pop("_am_b")
 
     X = pd.DataFrame(out)
     y = df["target_a_wins"].astype("int8")
@@ -392,6 +428,16 @@ def build_debut_matrix(
     if levels:
         X = add_debut_levels(X, df)
     return X, y, meta
+
+
+def serving_columns(feature_columns: list[str]) -> list[str]:
+    """`feature_columns` plus whatever the corrector needs, in a stable
+    order. Use this wherever a SAVED ensemble is scored — a saved model may
+    carry a `ResidualCorrector`, and `ResidualCorrector.shift` raises rather
+    than silently serving an uncorrected probability under a version number
+    that promises otherwise."""
+    cols = list(feature_columns)
+    return cols + [c for c in CORRECTOR_COLUMNS if c not in cols]
 
 
 def debut_feature_names(*, levels: bool = False) -> list[str]:

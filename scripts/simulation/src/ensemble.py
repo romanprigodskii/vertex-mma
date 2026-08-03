@@ -585,6 +585,13 @@ class EnsembleModel:
         assert self.logreg is not None
         assert self.scaler is not None
         assert self.logreg_means is not None
+        # Narrow HERE rather than trusting the caller. `predict_proba_a` may
+        # be handed a wider frame than the learners were fitted on, because
+        # `ResidualCorrector` reads columns the learners must never see
+        # (features.CORRECTOR_COLUMNS). For a caller that already passes
+        # exactly `feature_columns` this is a no-op.
+        if list(X.columns) != list(self.feature_columns):
+            X = X[self.feature_columns]
         X_filled = X.fillna(pd.Series(self.logreg_means, index=X.columns)).fillna(0.0)
         p_lgb = self.lgb_global.predict(X, num_iteration=self.lgb_global.best_iteration)
         # CatBoost's predict_proba respects best_iteration automatically when

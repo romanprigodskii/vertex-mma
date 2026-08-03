@@ -131,7 +131,21 @@ SELECT
   f.leg_reach_cm,
   f.stance::text AS stance,
   f.gender,
-  (f.sherdog_id IS NOT NULL) AS sherdog_matched
+  (f.sherdog_id IS NOT NULL) AS sherdog_matched,
+  -- v0.15.0 — nationality as Sherdog publishes it. Read from
+  -- sherdog_flag_code and NOT from country_code: the latter is Wikidata
+  -- P27 and only covers 35% of the roster, concentrated on the notable
+  -- end, so a term fitted on it is fitted where it is visible and served
+  -- where it mostly is not. That coverage asymmetry is exactly what made
+  -- the first version of this lever fail its held-out leg
+  -- (docs/accuracy_batch.md §2). sherdog_flag_code reaches 4,136 of
+  -- 4,577 fighters and 99% of the test window.
+  --
+  -- Only the US indicator is used, so the Home-Nations vocabulary problem
+  -- that stopped these codes being written into country_code ('en' for
+  -- England, not ISO) does not reach the model: 'US' means the same thing
+  -- in both sources.
+  (f.sherdog_flag_code = 'US') AS is_american
 FROM fighter f
 """
 
@@ -873,6 +887,20 @@ def build_dataset(
         age_b = age_years(info_b["dob"] if info_b is not None else None, ev_date)
         stance_a = info_a["stance"] if info_a is not None else None
         stance_b = info_b["stance"] if info_b is not None else None
+        # NaN, not False, when the fighter has no Sherdog flag — the
+        # corrector maps NaN to a zero shift, so an unknown nationality
+        # leaves the bout served exactly as it is today rather than
+        # asserting "not American".
+        is_american_a = (
+            bool(info_a["is_american"])
+            if info_a is not None and not pd.isna(info_a["is_american"])
+            else None
+        )
+        is_american_b = (
+            bool(info_b["is_american"])
+            if info_b is not None and not pd.isna(info_b["is_american"])
+            else None
+        )
         # Bout gender (men's vs women's divisions differ in pace/finish rates).
         # Both fighters share it; take A's, fall back to B's.
         gender: str | None = None
@@ -962,6 +990,12 @@ def build_dataset(
                 "age_b": age_b,
                 "stance_a": stance_a,
                 "stance_b": stance_b,
+                # v0.15.0 — corrector input, NOT a learner feature. It is an
+                # _a/_b pair so `swap_sides` negates the diff built from it,
+                # which is what keeps the correction antisymmetric and
+                # therefore able to survive the order averaging.
+                "is_american_a": is_american_a,
+                "is_american_b": is_american_b,
                 "gender": gender,
                 "is_debut_a": snap_a["prior_bouts"] == 0,
                 "is_debut_b": snap_b["prior_bouts"] == 0,
