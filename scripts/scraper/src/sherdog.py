@@ -52,6 +52,14 @@ _UFC_EVENT_RE = re.compile(r"^UFC\b|\bUltimate Fighter\b", re.IGNORECASE)
 
 _RESULTS = {"win", "loss", "draw", "nc", "no contest"}
 
+# Nationality lives in .fighter-nationality as BOTH a display name
+# ("Peru") and a flag whose filename is already ISO 3166-1 alpha-2
+# ("/img/flags/big/pe.png"). We read the flag — `fighter.country_code`
+# stores alpha-2, so the flag needs no name→ISO map and cannot disagree
+# with one. The display name comes back alongside it purely so the
+# backfill can log what it read.
+_FLAG_SRC_RE = re.compile(r"/img/flags/[a-z_]+/([a-z]{2})\.(?:png|gif|jpg)", re.I)
+
 
 @dataclass
 class SherdogCandidate:
@@ -81,6 +89,8 @@ class SherdogProfile:
     name: str | None
     nickname: str | None
     birth_date: date | None
+    country_code: str | None = None  # ISO 3166-1 alpha-2, from the flag
+    nationality: str | None = None  # display name, for logging only
     fights: list[SherdogFight] = field(default_factory=list)
 
 
@@ -279,6 +289,23 @@ def parse_fighter_page(html: str) -> SherdogProfile:
     if bd_node is not None:
         birth_date = parse_birth_date(bd_node.text(strip=True))
 
+    # Scoped to the nationality block on purpose. There is only one
+    # /img/flags/ hit on a fighter page today, but an unscoped regex would
+    # silently start reading an event banner or a related-fighter rail the
+    # day Sherdog adds one.
+    country_code = None
+    nationality = None
+    nat_block = tree.css_first(".fighter-nationality")
+    if nat_block is not None:
+        nat_node = nat_block.css_first('[itemprop="nationality"]')
+        if nat_node is not None:
+            nationality = nat_node.text(strip=True) or None
+        flag_node = nat_block.css_first("img")
+        if flag_node is not None:
+            m = _FLAG_SRC_RE.search(flag_node.attributes.get("src") or "")
+            if m is not None:
+                country_code = m.group(1).upper()
+
     fights: list[SherdogFight] = []
     chunk = _pro_history_chunk(html)
     if chunk:
@@ -338,7 +365,12 @@ def parse_fighter_page(html: str) -> SherdogProfile:
                 )
             )
     return SherdogProfile(
-        name=name, nickname=nickname, birth_date=birth_date, fights=fights
+        name=name,
+        nickname=nickname,
+        birth_date=birth_date,
+        country_code=country_code,
+        nationality=nationality,
+        fights=fights,
     )
 
 
