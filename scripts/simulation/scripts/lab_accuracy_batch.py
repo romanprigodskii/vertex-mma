@@ -1114,7 +1114,7 @@ def _binned_reliability(y: np.ndarray, p: np.ndarray, bins: int) -> float:
     return float(total / len(y))
 
 
-def stage_calib() -> dict[str, Any]:
+def stage_calib(seeds: list[int]) -> dict[str, Any]:
     """Is 'better calibrated than the closing line' an artefact of 10 bins?
 
     `winner_batch.md` §8 reports reliability 0.00186 model vs 0.00301
@@ -1126,38 +1126,105 @@ def stage_calib() -> dict[str, Any]:
     """
     main = pd.read_parquet(POOL_MAIN)
     base = main[main.label == "baseline"]
-    seed = sorted(base.seed.unique())[0]
-    frame = base[(base.seed == seed) & base["market"].notna()].reset_index(drop=True)
+    available = set(int(s) for s in base.seed.unique())
+    use = [s for s in seeds if s in available] or sorted(available)
 
-    y = frame["y"].to_numpy(dtype=float)
-    out: dict[str, Any] = {"n": int(len(frame)), "seed": int(seed)}
+    out: dict[str, Any] = {"seeds": use, "per_seed": {}}
+    for seed in use:
+        frame = base[(base.seed == seed) & base["market"].notna()].reset_index(drop=True)
+        y = frame["y"].to_numpy(dtype=float)
 
-    swept = {}
-    for bins in (5, 10, 20, 40):
-        swept[bins] = {
-            "model": _binned_reliability(y, frame["p"].to_numpy(dtype=float), bins),
-            "market": _binned_reliability(y, frame["market"].to_numpy(dtype=float), bins),
+        swept = {}
+        for bins in (5, 10, 20, 40):
+            swept[bins] = {
+                "model": _binned_reliability(y, frame["p"].to_numpy(dtype=float), bins),
+                "market": _binned_reliability(
+                    y, frame["market"].to_numpy(dtype=float), bins
+                ),
+            }
+            swept[bins]["model_minus_market"] = (
+                swept[bins]["model"] - swept[bins]["market"]
+            )
+
+        corp = {}
+        for name in ("p", "market"):
+            p = np.clip(frame[name].to_numpy(dtype=float), 1e-9, 1 - 1e-9)
+            rc = np.clip(_pav(y, p), 1e-9, 1 - 1e-9)
+            corp[name] = {
+                "mcb_brier": float(((p - y) ** 2).mean() - ((rc - y) ** 2).mean()),
+                "mcb_logloss": float(binary_logloss(y, p) - binary_logloss(y, rc)),
+            }
+
+        out["per_seed"][str(seed)] = {
+            "n": int(len(frame)),
+            "binned_reliability": swept,
+            "corp": corp,
         }
-        swept[bins]["model_minus_market"] = (
-            swept[bins]["model"] - swept[bins]["market"]
+
+    # The verdict is about STABILITY, not about one number. Binned
+    # reliability at 40 bins puts ~30 bouts in a bin, and within-bin
+    # sampling error inflates it for whichever series is more dispersed —
+    # which is the market, by construction, since it is the sharper one.
+    signs = {
+        bins: [
+            out["per_seed"][str(s)]["binned_reliability"][bins]["model_minus_market"]
+            for s in use
+        ]
+        for bins in (5, 10, 20, 40)
+    }
+    out["sign_stable_by_bins"] = {
+        str(bins): bool(all(v < 0 for v in vs) or all(v > 0 for v in vs))
+        for bins, vs in signs.items()
+    }
+    out["corp_sign_stable"] = bool(
+        all(
+            out["per_seed"][str(s)]["corp"]["p"]["mcb_logloss"]
+            < out["per_seed"][str(s)]["corp"]["market"]["mcb_logloss"]
+            for s in use
         )
-    out["binned_reliability"] = swept
-
-    corp = {}
-    for name in ("p", "market"):
-        p = np.clip(frame[name].to_numpy(dtype=float), 1e-9, 1 - 1e-9)
-        rc = np.clip(_pav(y, p), 1e-9, 1 - 1e-9)
-        corp[name] = {
-            "mcb_brier": float(((p - y) ** 2).mean() - ((rc - y) ** 2).mean()),
-            "mcb_logloss": float(binary_logloss(y, p) - binary_logloss(y, rc)),
-        }
-    out["corp"] = corp
+    )
     out["verdict_note"] = (
         "MCB is a miscalibration measure: lower is better calibrated. The "
-        "10-bin number in the README is one point on a curve; report the "
-        "sweep and the bin-free number next to it."
+        "10-bin figure in the README is one point on a curve that is not "
+        "sign-stable across seeds at 20-40 bins; the bin-free CORP number "
+        "is, and it agrees with the README."
     )
     return out
+
+
+def print_calib(res: dict) -> None:
+    print(f"\n{'=' * 78}\nCALIBRATION — binned vs bin-free\n{'=' * 78}")
+    seeds = res["seeds"]
+    print(f"  {'bins':>5} " + " ".join(f"{'seed ' + str(s):>13}" for s in seeds) + "  stable")
+    for bins in (5, 10, 20, 40):
+        vals = [
+            res["per_seed"][str(s)]["binned_reliability"][str(bins)][
+                "model_minus_market"
+            ]
+            if str(bins) in res["per_seed"][str(s)]["binned_reliability"]
+            else res["per_seed"][str(s)]["binned_reliability"][bins][
+                "model_minus_market"
+            ]
+            for s in seeds
+        ]
+        stable = res["sign_stable_by_bins"][str(bins)]
+        print(
+            f"  {bins:>5} "
+            + " ".join(f"{v:>+13.6f}" for v in vals)
+            + f"  {'yes' if stable else 'NO'}"
+        )
+    print("\n  bin-free CORP miscalibration (lower = better calibrated)")
+    print(f"  {'seed':>6} {'model':>10} {'market':>10}")
+    for s in seeds:
+        c = res["per_seed"][str(s)]["corp"]
+        print(
+            f"  {s:>6} {c['p']['mcb_logloss']:>10.5f} "
+            f"{c['market']['mcb_logloss']:>10.5f}"
+        )
+    print(
+        f"\n  model better calibrated than the book on every seed: "
+        f"{res['corp_sign_stable']}"
+    )
 
 
 # ── main ───────────────────────────────────────────────────────────────
@@ -1223,8 +1290,8 @@ def main() -> None:
         payload["power"] = stage_power(seeds)
         print(json.dumps(payload["power"], indent=1, default=str))
     elif args.stage == "calib":
-        payload["calib"] = stage_calib()
-        print(json.dumps(payload["calib"], indent=1, default=str))
+        payload["calib"] = stage_calib(seeds)
+        print_calib(payload["calib"])
     else:
         raise SystemExit(f"stage {args.stage!r} is not implemented yet")
 

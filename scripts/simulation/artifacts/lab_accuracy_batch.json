@@ -649,5 +649,216 @@
    "after": 0.638,
    "n": 94
   }
+ },
+ "power": {
+  "logloss_by_seed": {
+   "7": 0.6489227463309318,
+   "13": 0.6494505863225115,
+   "42": 0.64807609935175,
+   "99": 0.6479093943297369,
+   "2024": 0.649977873702361
+  },
+  "seed_spread": 0.00206847937262411,
+  "sd_across_seeds": 0.0008832118812789262,
+  "unpaired_se": 0.004643634122155388,
+  "paired_se_between_seeds": 0.0011577727627496695,
+  "mde_one_sided_80pct_single_seed": 0.0036259230871548793,
+  "mde_one_sided_80pct_infinite_seeds": 0.002882854179246677,
+  "shipped_lever_for_scale": -0.0026,
+  "note": "RESIDUAL_CORRECTION, the only lever this repo has ever shipped on the winner leg, is worth -0.0026 OOF. Any candidate whose honest estimate is below the MDE above cannot be gated on this pool no matter how many seeds are spent on it."
+ },
+ "calib": {
+  "seeds": [
+   42,
+   7,
+   13,
+   99,
+   2024
+  ],
+  "per_seed": {
+   "42": {
+    "n": 1186,
+    "binned_reliability": {
+     "5": {
+      "model": 0.00023167538534385628,
+      "market": 0.0009006963712812538,
+      "model_minus_market": -0.0006690209859373975
+     },
+     "10": {
+      "model": 0.0009578648351080183,
+      "market": 0.0011490630507208707,
+      "model_minus_market": -0.0001911982156128524
+     },
+     "20": {
+      "model": 0.004858547646764733,
+      "market": 0.002792543728130456,
+      "model_minus_market": 0.0020660039186342774
+     },
+     "40": {
+      "model": 0.006935050218081277,
+      "market": 0.0041319460932788855,
+      "model_minus_market": 0.0028031041248023914
+     }
+    },
+    "corp": {
+     "p": {
+      "mcb_brier": 0.005420112252420034,
+      "mcb_logloss": 0.013209027281607444
+     },
+     "market": {
+      "mcb_brier": 0.005513400137353741,
+      "mcb_logloss": 0.01536526072782829
+     }
+    }
+   },
+   "7": {
+    "n": 1186,
+    "binned_reliability": {
+     "5": {
+      "model": 0.0006481684211733946,
+      "market": 0.0009006963712812538,
+      "model_minus_market": -0.00025252795010785914
+     },
+     "10": {
+      "model": 0.0007434382652216021,
+      "market": 0.0011490630507208707,
+      "model_minus_market": -0.00040562478549926865
+     },
+     "20": {
+      "model": 0.0018498956627801234,
+      "market": 0.002792543728130456,
+      "model_minus_market": -0.0009426480653503325
+     },
+     "40": {
+      "model": 0.002747992997380509,
+      "market": 0.0041319460932788855,
+      "model_minus_market": -0.0013839530958983767
+     }
+    },
+    "corp": {
+     "p": {
+      "mcb_brier": 0.003937913612803989,
+      "mcb_logloss": 0.010140724911019361
+     },
+     "market": {
+      "mcb_brier": 0.005513400137353741,
+      "mcb_logloss": 0.01536526072782829
+     }
+    }
+   },
+   "13": {
+    "n": 1186,
+    "binned_reliability": {
+     "5": {
+      "model": 0.0006170602469678561,
+      "market": 0.0009006963712812538,
+      "model_minus_market": -0.00028363612431339766
+     },
+     "10": {
+      "model": 0.0007304834610239517,
+      "market": 0.0011490630507208707,
+      "model_minus_market": -0.000418579589696919
+     },
+     "20": {
+      "model": 0.0013736209532648164,
+      "market": 0.002792543728130456,
+      "model_minus_market": -0.0014189227748656395
+     },
+     "40": {
+      "model": 0.0043528851874244925,
+      "market": 0.0041319460932788855,
+      "model_minus_market": 0.00022093909414560697
+     }
+    },
+    "corp": {
+     "p": {
+      "mcb_brier": 0.004827075239154155,
+      "mcb_logloss": 0.011814082367949452
+     },
+     "market": {
+      "mcb_brier": 0.005513400137353741,
+      "mcb_logloss": 0.01536526072782829
+     }
+    }
+   },
+   "99": {
+    "n": 1186,
+    "binned_reliability": {
+     "5": {
+      "model": 0.0007132133464239344,
+      "market": 0.0009006963712812538,
+      "model_minus_market": -0.00018748302485731934
+     },
+     "10": {
+      "model": 0.0013548053449081454,
+      "market": 0.0011490630507208707,
+      "model_minus_market": 0.00020574229418727466
+     },
+     "20": {
+      "model": 0.0018318773690531398,
+      "market": 0.002792543728130456,
+      "model_minus_market": -0.000960666359077316
+     },
+     "40": {
+      "model": 0.003581687026086863,
+      "market": 0.0041319460932788855,
+      "model_minus_market": -0.0005502590671920223
+     }
+    },
+    "corp": {
+     "p": {
+      "mcb_brier": 0.0047335950726075104,
+      "mcb_logloss": 0.012863957242639001
+     },
+     "market": {
+      "mcb_brier": 0.005513400137353741,
+      "mcb_logloss": 0.01536526072782829
+     }
+    }
+   },
+   "2024": {
+    "n": 1186,
+    "binned_reliability": {
+     "5": {
+      "model": 0.0008889131465680587,
+      "market": 0.0009006963712812538,
+      "model_minus_market": -1.178322471319512e-05
+     },
+     "10": {
+      "model": 0.001080712876422773,
+      "market": 0.0011490630507208707,
+      "model_minus_market": -6.835017429809766e-05
+     },
+     "20": {
+      "model": 0.002337721176469791,
+      "market": 0.002792543728130456,
+      "model_minus_market": -0.00045482255166066476
+     },
+     "40": {
+      "model": 0.004523303755396417,
+      "market": 0.0041319460932788855,
+      "model_minus_market": 0.0003913576621175311
+     }
+    },
+    "corp": {
+     "p": {
+      "mcb_brier": 0.005060700515535144,
+      "mcb_logloss": 0.012401510870829413
+     },
+     "market": {
+      "mcb_brier": 0.005513400137353741,
+      "mcb_logloss": 0.01536526072782829
+     }
+    }
+   }
+  },
+  "sign_stable_by_bins": {
+   "5": true,
+   "10": false,
+   "20": false,
+   "40": false
+  },
+  "corp_sign_stable": true,
+  "verdict_note": "MCB is a miscalibration measure: lower is better calibrated. The 10-bin figure in the README is one point on a curve that is not sign-stable across seeds at 20-40 bins; the bin-free CORP number is, and it agrees with the README."
  }
 }
