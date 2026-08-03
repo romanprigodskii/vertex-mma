@@ -290,7 +290,7 @@ lab should not have to re-derive which 22 columns they are.
 
 ---
 
-## 6. A method model for the debut segment
+## 6. A method model for the debut segment — **GATE PASS, ships as v0.14.0**
 
 **GATE PASS — the only one in this batch. Ships as v0.14.0.**
 
@@ -483,11 +483,19 @@ python scripts/lab_accuracy_batch.py --stage debutcorr   --cache
 python scripts/lab_accuracy_batch.py --stage debutlv     --cache --seeds 42,7,13
 python scripts/lab_accuracy_batch.py --stage debutmethod --cache --seeds 42,7,13
 
-# the nationality re-run, once step 18 has filled the column
-cd ../scraper && ./venv/bin/python scripts/18_backfill_country_sherdog.py
+# the nationality re-run, once step 18 has filled the column. Three shards
+# because the limiter never binds — Sherdog's own page latency does.
+cd ../scraper
+for i in 0 1 2; do ./venv/bin/python scripts/18_backfill_country_sherdog.py --shard $i/3 & done; wait
 cd ../simulation
 python scripts/lab_accuracy_batch.py --stage nat --cache --nat-source sherdog_flag_code
 ```
 
 Results land in `artifacts/lab_accuracy_batch.json`; the pools are cached in
-`data/lab_accuracy_{debut,method}_oof.parquet` (gitignored).
+`data/lab_accuracy_{debut,method,debut_method}_oof.parquet` and
+`data/lab_accuracy_debut_mc.parquet` (all gitignored — the MC anchor arm is
+2,199 `simulate_bout` calls and is the slow one to rebuild).
+
+`run_train.py` was run end to end. Note §6b before comparing its artifacts
+against the previous ones: LightGBM and LogReg reproduce, CatBoost does
+not, and the blend inherits that.
