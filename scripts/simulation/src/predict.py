@@ -26,7 +26,7 @@ from .db import get_connection
 from .ensemble import EnsembleModel
 from .export import build_dataset, fetch_raw, stable_hash, swap_sides
 from .features import build_feature_matrix
-from .method_model import METHOD_MODEL_DIR, MethodModel
+from .method_model import METHOD_MODEL_DEBUT_DIR, METHOD_MODEL_DIR, MethodModel
 from .method_model import conditional_mix as method_conditional_mix
 from .monte_carlo import FighterMC, simulate_bout
 
@@ -225,6 +225,32 @@ def predict_upcoming(*, force_version: str | None = None) -> int:
     else:
         console.log("no method model artifact — method mix falls back to the simulator")
 
+    # v0.14.0 — the debut segment gets its own conditional instead of the
+    # simulator's hazards. It is a SEPARATE artifact, not the model above
+    # applied wider: that one has never been fitted on a row where one
+    # side's career columns are entirely NaN. Missing artifact → this stays
+    # None → the debut segment keeps pre-v0.14.0 behaviour exactly.
+    debut_method_mixes: np.ndarray | None = None
+    if METHOD_MODEL_DEBUT_DIR.exists() and bool(debut_mask.any()):
+        debut_method_model = MethodModel.load(METHOD_MODEL_DEBUT_DIR)
+        debut_method_mixes = method_conditional_mix(debut_method_model, upcoming_fill)
+        console.log(
+            f"debut method model loaded "
+            f"({len(debut_method_model.feature_columns)} features) — "
+            f"pricing {int(debut_mask.sum())} debut bouts"
+        )
+    elif bool(debut_mask.any()):
+        console.log(
+            f"no debut method model artifact — {int(debut_mask.sum())} debut "
+            f"bouts fall back to the simulator"
+        )
+
+    def mix_for(i: int) -> tuple[tuple[float, ...], tuple[float, ...]] | None:
+        source = debut_method_mixes if debut_mask[i] else method_mixes
+        if source is None:
+            return None
+        return (tuple(source[i, 0]), tuple(source[i, 1]))
+
     mc_rows: list[tuple] = []
     for i, m in enumerate(meta.itertuples(index=False)):
         row = upcoming.iloc[i]
@@ -243,11 +269,7 @@ def predict_upcoming(*, force_version: str | None = None) -> int:
             # this needs no extra fetch.
             is_main_event=bool(row["is_main_event"]),
             is_title_fight=bool(row["is_title_fight"]),
-            method_mix=(
-                (tuple(method_mixes[i, 0]), tuple(method_mixes[i, 1]))
-                if method_mixes is not None and not debut_mask[i]
-                else None
-            ),
+            method_mix=mix_for(i),
         )
         mc_rows.append(
             (
