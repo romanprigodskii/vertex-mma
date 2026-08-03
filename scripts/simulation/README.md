@@ -212,17 +212,41 @@ rankings — the last untapped source in the database, 47k point-in-time
 snapshots — were tried twice and failed both gates
 (`docs/winner_batch.md` §7).
 
-Nothing ships from the follow-up batch (`docs/accuracy_batch.md`): five
-levers, five gate failures. What it does leave behind is instruments and
-a floor. Two more walk-forward pools now exist — the conditional method
-leg is selectable on **543 submissions** instead of the 71 val rows its
-own writeup called noise, and the debut specialist on **798 bouts**
-instead of 84 — and the main pool's detection limit is measured for the
-first time: a one-sided 80 % MDE of **0.0036** on a single seed, 0.0029
-with an infinite seed budget. `RESIDUAL_CORRECTION` is worth −0.0026,
-i.e. below it. v0.13.0 shipped because three independent legs agreed on
-its sign, not because any one reading resolved it — which is the standard
-to keep, and the reason more seeds cannot rescue an underpowered arm.
+v0.14.0 does not touch the winner leg either. It closes a COVERAGE hole:
+`train_method_model` was handed the both-experienced frame, so the
+conditional method model had never seen a debut row, and `predict.py`
+passed `method_mix=None` for those bouts — about 19 % of the priced slate
+took its method / distance / total_rounds numbers from the simulator's
+hazards, whose ten `FighterMC` inputs are all router defaults when one
+side has no UFC record. `train_debut_method_model` fits that segment on
+the v0.8.0 transfer recipe (both-experienced rows down-weighted to 0.2,
+selection on debut val rows only) and beats what production serves there
+by **0.048 nats** on 793 walk-forward bouts — −0.048 / −0.053 / −0.046
+across three seeds, every interval excluding zero, 100 % of resamples
+improving. The winner leg moves by exactly 0.0000; this is a mix change
+on a segment, not a re-scoring.
+
+The baseline that gate ran against is worth recording, because the prior
+was wrong. It was meant to be a per-length CONSTANT on the debut base
+rates, on the reasoning that the MC anchor was a straw man and most of
+the gain would be a corrected marginal. Measured, the constant is
+**worse** than the anchor (1.0524 vs 1.0091) — the simulator carries real
+per-bout signal on debut bouts even on defaults, so the win is a model
+win.
+
+Everything else in that batch failed its gate (`docs/accuracy_batch.md`):
+a nationality term in the corrector, a sub-vs-dec temperature, the age
+correction transferred to the debut specialist, and absolute levels in the
+debut matrix. What those left behind is instruments and a floor. Two more
+walk-forward pools now exist — the conditional method leg is selectable on
+**543 submissions** instead of the 71 val rows its own writeup called
+noise, and the debut specialist on **798 bouts** instead of 84 — and the
+main pool's detection limit is measured for the first time: a one-sided
+80 % MDE of **0.0036** on a single seed, 0.0029 with an infinite seed
+budget. `RESIDUAL_CORRECTION` is worth −0.0026, i.e. below it. v0.13.0
+shipped because three independent legs agreed on its sign, not because any
+one reading resolved it — which is the standard to keep, and the reason
+more seeds cannot rescue an underpowered arm.
 
 Main model core (v0.7.0 recipe): opponent-adjusted ratings
 (`src/opponent_ratings.py`) — online attack/defense skill ratings

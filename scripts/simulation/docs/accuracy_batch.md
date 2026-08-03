@@ -1,14 +1,23 @@
-# Accuracy batch — five levers, three new instruments, and a README fix
+# Accuracy batch — six levers, one ships, and a README number that was wrong
 
 Branch `lab/accuracy-batch`. Everything here was gated on walk-forward
 out-of-fold pools rather than on a val window, and the reason is the first
 result in the report: **the instrument this repository selects on cannot
 resolve the effects it is routinely asked about.**
 
-**Headline: nothing ships on the winner leg, and that is the honest answer.**
-Five levers, five gate failures — but three of the five failed in ways that
-close a question rather than leave it open, and the batch's real product is
-the machinery that made those failures legible: a walk-forward pool for the
+**Headline: nothing moves the winner leg, and the one thing that ships is
+coverage, not sharpness.** Five of six levers failed their gate. The sixth
+— v0.14.0 — gives the conditional method model to the ~19 % of the slate
+that had no method model at all, and beats what production serves there by
+**0.048 nats**, sign-stable over three seeds with every interval excluding
+zero. That is an order of magnitude above the detection floor in §0,
+because it is not an improvement to a model: it is a model where there was
+none.
+
+The five failures are not filler. Three of them close a question rather
+than leaving it open, one of them dissolves the diagnosis that motivated
+it, and one corrects a number in the README. And the batch's other product
+is the machinery that made all of that legible: a walk-forward pool for the
 method leg (543 submissions instead of 71), one for the debut specialist
 (798 rows instead of 84), and a measured detection floor to put at the top
 of every future lab report.
@@ -283,7 +292,113 @@ lab should not have to re-derive which 22 columns they are.
 
 ## 6. A method model for the debut segment
 
-<!-- RESULTS: debutmethod -->
+**GATE PASS — the only one in this batch. Ships as v0.14.0.**
+
+`train_method_model` is handed `exp_df` (`train.py:604`), so it has never
+seen a debut row, and `predict.py` passed `method_mix=None` for those
+bouts. About 19 % of the priced slate took its method / distance /
+total_rounds numbers from the simulator's own hazards, whose entire
+per-fight input is ten hand-shrunk `FighterMC` fields — every one of them
+a router default when one side has no UFC record.
+
+### The baseline was not the straw man it looked like
+
+The gate was designed around a prior that turned out to be wrong, and the
+refutation is the most useful thing in this section. The plan was to gate
+against a per-scheduled-length CONSTANT on the debut base rates
+(ko/sub/dec 0.3597 / 0.2292 / 0.4111 against the experienced
+0.3257 / 0.1877 / 0.4866), on the reasoning that most of the available
+gain was a marginal that is simply wrong for the segment, and that beating
+the MC anchor would therefore prove nothing.
+
+On 793 walk-forward bouts:
+
+| arm | 3-class log-loss |
+|---|---|
+| per-length constant on debut base rates | 1.05242 |
+| **MC anchor — what production serves today** | **1.00910** |
+
+The constant is **worse than the anchor by +0.04332** ([+0.02102,
++0.06468], improving in 0 % of resamples). The simulator is carrying real
+per-bout signal on this segment even on router defaults, so the anchor was
+never a straw man and the marginal was never the story. The gate is
+therefore against the anchor — against what production actually serves —
+and the constant stays in the report as the diagnostic that says the win
+is a model win and not a corrected base rate.
+
+### The gate
+
+| seed | model | vs MC anchor | 95 % CI | improving | vs constant |
+|---|---|---|---|---|---|
+| 42 | 0.96085 | **−0.04825** | [−0.07582, −0.01967] | 100 % | −0.09157 |
+| 7 | 0.95625 | **−0.05285** | [−0.08054, −0.02484] | 100 % | −0.09616 |
+| 13 | 0.96302 | **−0.04608** | [−0.07363, −0.01859] | 100 % | −0.08940 |
+
+Median **−0.04825**, sign stable, every interval excludes zero, every
+resample improves. This is an order of magnitude above the §0 floor —
+which is what a segment with *no model at all* should look like, and is
+the reason this is the one lever in the batch that did not need the floor
+argued about.
+
+### What ships
+
+`train_debut_method_model` (`src/train.py`), artifacts in
+`artifacts/method_model_debut{,_eval}/`, routing through `mix_for(i)` in
+`src/predict.py`. Same transfer recipe as the v0.8.0 winner-leg
+specialist and for the same reason — ~2.2k gradeable debut rows is not
+enough alone, so both-experienced rows enter at `DEBUT_EXP_ROW_WEIGHT`
+while early stopping and the simplex blend are selected on debut val rows
+only.
+
+A separate artifact rather than the existing model served wider: that one
+has never been fitted on a row where one side's career columns are
+entirely NaN, and `method_leg.md` refused exactly that widening at the
+time. Missing artifact → mix stays `None` → the debut segment keeps
+pre-v0.14.0 behaviour bit for bit, the same fallback contract v0.12.0
+shipped with.
+
+Three of the four legs `sportsbook.ts` prices move with it — method,
+`distance` and `total_rounds` all come off the one reconciled
+distribution. The winner leg is untouched at exactly 0.0000: this is a
+mix change on a segment, not a re-scoring.
+
+---
+
+## 6b. CatBoost is the one leg that does not reproduce
+
+Found while shipping §6, and it is a reproducibility fact about the repo
+rather than a result about the model. Re-running `run_train.py` on the same
+dataset (identical split sizes 5,350 / 429 / 664, identical method-model
+`n_train` 5,340) does not reproduce the committed artifact:
+
+| leg | previous test log-loss | re-run | Δ |
+|---|---|---|---|
+| LightGBM | 0.6234925 | 0.6234880 | −0.0000045 |
+| LogReg | 0.6212311 | 0.6211650 | −0.0000662 |
+| **CatBoost** | 0.6212159 | **0.6256980** | **+0.0044821** |
+| blend | 0.6125547 | 0.6136627 | +0.0011079 |
+
+LightGBM reproduces to six decimals and LogReg to five. CatBoost does not,
+and it drags the blend with it — the val-picked softmax weights move
+0.067/0.172/0.761 → 0.079/0.124/0.797 because CatBoost's val log-loss moved.
+
+`EnsembleModel._cb_params` pins `random_seed=42` but **not**
+`thread_count`, and CatBoost's ordered boosting reduces across threads, so
+the fit depends on how many cores are actually available. The re-run here
+happened while three scraper shards were saturating the machine.
+
+Two consequences worth stating plainly:
+
+* the +0.0011 blend movement in this branch's artifacts is CatBoost
+  run-to-run noise, not a cost of v0.14.0. It sits inside the seed band
+  measured in §0 (sd across seeds 0.00088, spread 0.0021), and v0.14.0
+  cannot touch the winner leg by construction — the method mix is a
+  reshape and the winner term of the 6-cell factorisation is shared,
+  unmodified.
+* every weekly auto-retrain has been drawing a fresh sample from this
+  distribution. Pinning `thread_count` would remove it, but that changes
+  every committed artifact and therefore needs its own gate rather than a
+  drive-by fix in this branch.
 
 ---
 
@@ -329,6 +444,7 @@ move when the seed does.
 
 | # | Idea | Why rejected |
 |---|---|---|
+| 0 | Gating the debut method model against a per-length CONSTANT | The prior was that the MC anchor was a straw man and the win would be a corrected marginal. Measured, the constant is WORSE than the anchor by +0.0433 — the simulator carries real per-bout signal there. The gate moved to the anchor and the constant stayed as the diagnostic. §6 |
 | 1 | Nationality term in `RESIDUAL_CORRECTION` (`country_code`) | Two legs pass (−0.0023 / −0.0025), held-out +0.0017. Coverage 71 % on the fit pool against 42 % on test. §2 |
 | 2 | Sub-vs-dec temperature | τ = 0.9335 full / 1.0021 forward; cross-fit +0.00023, forward +0.00007; spends +0.0104 of the decision cell. §3 |
 | 3 | The under-dispersion diagnosis behind it | Does not reproduce at 543 submissions — the ends are calibrated, the defect is a q4 bump a one-parameter tilt cannot reach. §3 |
@@ -339,13 +455,18 @@ move when the seed does.
 
 ## What is NOT changed
 
-* The served feature matrix — same 118 columns. `DEBUT_LEVEL_COLUMNS` and
-  `build_debut_matrix(levels=True)` exist but are off; `debut_feature_names()`
-  returns the v0.8.0 list unless asked otherwise.
-* The three learners, the blend rule, `FEATURE_CONTRI_OVERRIDES`,
-  `RESIDUAL_CORRECTION`.
-* `monte_carlo.py`, `finish_hazard.py`, `decision_model.py`,
-  `method_model.py` — `USE_SUB_AXIS` stays False.
+* The winner leg. Same 118 columns, same three learners, same blend rule,
+  same `FEATURE_CONTRI_OVERRIDES`, same `RESIDUAL_CORRECTION`. v0.14.0
+  moves it by exactly 0.0000 — the method mix is a reshape, and the winner
+  term inside the 6-cell factorisation is untouched.
+* The non-debut conditional method model, its artifacts and its
+  population. `USE_SUB_AXIS` stays False.
+* `monte_carlo.py`, `finish_hazard.py`, `decision_model.py`. The debut
+  segment's TIMING still comes from the fitted hazards; only how much
+  finish mass there is to place changed.
+* `DEBUT_LEVEL_COLUMNS` and `build_debut_matrix(levels=True)` exist but are
+  off — `debut_feature_names()` with no argument returns the v0.8.0 list,
+  and `tests/test_accuracy_batch.py` pins that.
 * `fighter.country_code`. The new nationality columns are additive.
 
 ## Reproducing
