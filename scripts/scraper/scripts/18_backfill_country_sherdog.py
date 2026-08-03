@@ -56,9 +56,15 @@ from src.http import Client
 from src.sherdog import FIGHTER_URL_TEMPLATE, parse_fighter_page
 from src.utils.logger import log, record_parse_error
 
-CHECKPOINT_PATH = (
-    Path(__file__).resolve().parents[1] / ".checkpoint_country_sherdog.json"
-)
+CHECKPOINT_DIR = Path(__file__).resolve().parents[1]
+
+
+def checkpoint_path(shard: tuple[int, int] | None) -> Path:
+    """Per-shard, so parallel shards cannot clobber each other's resume
+    state. A single-shard run keeps the original filename."""
+    if shard is None:
+        return CHECKPOINT_DIR / ".checkpoint_country_sherdog.json"
+    return CHECKPOINT_DIR / f".checkpoint_country_sherdog.{shard[0]}of{shard[1]}.json"
 
 # has_upcoming_bout DESC first: the point of this backfill is the next
 # slate, and a run interrupted halfway should still have covered it.
@@ -105,14 +111,14 @@ UPDATE fighter
 """
 
 
-def _load_checkpoint() -> set[str]:
-    if CHECKPOINT_PATH.exists():
-        return set(json.loads(CHECKPOINT_PATH.read_text()))
+def _load_checkpoint(path: Path) -> set[str]:
+    if path.exists():
+        return set(json.loads(path.read_text()))
     return set()
 
 
-def _save_checkpoint(done: set[str]) -> None:
-    CHECKPOINT_PATH.write_text(json.dumps(sorted(done)))
+def _save_checkpoint(path: Path, done: set[str]) -> None:
+    path.write_text(json.dumps(sorted(done)))
 
 
 def _fetch(client: Client, sherdog_id: str) -> tuple[str | None, str | None]:
@@ -172,18 +178,34 @@ def run_validate(limit: int) -> int:
     return 0
 
 
-def run_backfill(*, limit: int | None, dry_run: bool, refresh: bool) -> int:
+def run_backfill(
+    *,
+    limit: int | None,
+    dry_run: bool,
+    refresh: bool,
+    shard: tuple[int, int] | None = None,
+) -> int:
     with get_connection() as conn, conn.cursor() as cur:
         cur.execute(TARGETS_REFRESH_SQL if refresh else TARGETS_SQL)
         targets = cur.fetchall()
+    if shard is not None:
+        # Sharding exists because throughput here is bound by Sherdog's own
+        # page latency (~8s), not by SHERDOG_RATE_LIMIT_SECONDS: a single
+        # process lands ~0.12 req/s against a configured ceiling of 1.0.
+        # Three shards is ~0.4 req/s aggregate — still under the limit this
+        # scraper set for itself, which is the number to respect.
+        index, total = shard
+        targets = [t for t in targets if int(t[0].replace("-", "")[-8:], 16) % total == index]
     if limit is not None:
         targets = targets[:limit]
 
-    done = set() if dry_run else _load_checkpoint()
+    ckpt = checkpoint_path(shard)
+    done = set() if dry_run else _load_checkpoint(ckpt)
     pending = [t for t in targets if t[0] not in done]
     log.info(
         f"sherdog nationality: {len(targets):,} candidates · "
         f"{len(pending):,} pending (checkpointed {len(done):,})"
+        + (f" · SHARD {shard[0]}/{shard[1]}" if shard else "")
         + (" · DRY RUN" if dry_run else "")
         + (" · REFRESH" if refresh else "")
     )
@@ -235,13 +257,13 @@ def run_backfill(*, limit: int | None, dry_run: bool, refresh: bool) -> int:
             if not dry_run:
                 done.add(fighter_id)
                 if totals["processed"] % CHECKPOINT_EVERY_FIGHTERS == 0:
-                    _save_checkpoint(done)
+                    _save_checkpoint(ckpt, done)
             progress.advance(task)
 
     if not dry_run:
         # Intra-run resume state only — a finished run must not block the
         # next one, which re-derives its own (smaller) candidate list.
-        CHECKPOINT_PATH.unlink(missing_ok=True)
+        ckpt.unlink(missing_ok=True)
 
     log.info(
         f"done: processed {totals['processed']:,} · "
@@ -275,12 +297,28 @@ def main() -> int:
         action="store_true",
         help="re-scrape fighters that already have a flag code",
     )
+    parser.add_argument(
+        "--shard",
+        default=None,
+        metavar="I/N",
+        help=(
+            "run shard I of N (0-indexed) so several processes can share the "
+            "backlog; each keeps its own checkpoint"
+        ),
+    )
     args = parser.parse_args()
 
     if args.validate is not None:
         return run_validate(args.validate)
+
+    shard = None
+    if args.shard:
+        index, total = (int(x) for x in args.shard.split("/"))
+        if not 0 <= index < total:
+            raise SystemExit(f"--shard {args.shard} is out of range")
+        shard = (index, total)
     return run_backfill(
-        limit=args.limit, dry_run=args.dry_run, refresh=args.refresh
+        limit=args.limit, dry_run=args.dry_run, refresh=args.refresh, shard=shard
     )
 
 
