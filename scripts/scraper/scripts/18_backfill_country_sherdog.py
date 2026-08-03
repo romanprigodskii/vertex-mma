@@ -66,12 +66,23 @@ def checkpoint_path(shard: tuple[int, int] | None) -> Path:
         return CHECKPOINT_DIR / ".checkpoint_country_sherdog.json"
     return CHECKPOINT_DIR / f".checkpoint_country_sherdog.{shard[0]}of{shard[1]}.json"
 
-# has_upcoming_bout DESC first: the point of this backfill is the next
-# slate, and a run interrupted halfway should still have covered it.
+# Slate first: the point of this backfill is the next card, and a run
+# interrupted halfway should still have covered it.
+#
+# Derived from `bout` rather than from `fighter.has_upcoming_bout`. The
+# flag is maintained by the roster-watch pass and is stale — on the live
+# slate it marks 144 fighters while 66 of the 67 scheduled bouts need both
+# sides, and names like Liz Carmouche and Jack Jenkins sit in a
+# non-completed bout with the flag unset. Ordering on the flag put them
+# behind ~3,000 retired fighters in alphabetical order.
 _ORDER = """
-ORDER BY f.has_upcoming_bout DESC NULLS LAST,
-         f.next_event_date ASC NULLS LAST,
-         f.name_en
+ORDER BY (
+  SELECT min(e.date) FROM bout b
+    JOIN event e ON e.id = b.event_id
+   WHERE b.status <> 'completed'
+     AND (b.fighter_a_id = f.id OR b.fighter_b_id = f.id)
+) ASC NULLS LAST,
+  f.name_en
 """
 
 TARGETS_SQL = (
