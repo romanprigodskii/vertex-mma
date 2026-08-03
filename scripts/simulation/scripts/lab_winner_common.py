@@ -47,6 +47,7 @@ from src.config import (  # noqa: E402
 from src.ensemble import EnsembleModel  # noqa: E402
 from src.export import swap_sides  # noqa: E402
 from src.features import (  # noqa: E402
+    build_debut_matrix,
     build_feature_matrix,
     debut_feature_names,
     feature_names,
@@ -417,6 +418,7 @@ def walk_forward_debut(
     label: str = "baseline",
     seed: int = 42,
     columns: list[str] | None = None,
+    levels: bool = False,
     corrector: Any | None = None,
     start: str = OOF_START,
     end: str = OOF_END,
@@ -443,11 +445,19 @@ def walk_forward_debut(
     only on the main ensemble, at :365). That is the open question at the end
     of docs/winner_batch.md, and this is the pool it needs.
     """
-    cols = list(columns) if columns is not None else debut_feature_names()
-    X, y, meta = build_feature_matrix(df)
+    cols = (
+        list(columns)
+        if columns is not None
+        else debut_feature_names(levels=levels)
+    )
+    X, y, meta = build_debut_matrix(df, levels=levels)
     X = X[cols]
     df_sw = swap_sides(df)
-    X_sw, _, _ = build_feature_matrix(df_sw)
+    # Rebuilt from the swapped FRAME, never by permuting columns of X — the
+    # `dlvl_*_a/_b` pairs are exactly what a naive permutation gets wrong,
+    # and getting them wrong breaks the antisymmetry the order averaging
+    # below depends on.
+    X_sw, _, _ = build_debut_matrix(df_sw, levels=levels)
     X_sw = X_sw[cols]
 
     debut = (df["is_debut_a"].astype(bool) | df["is_debut_b"].astype(bool)).to_numpy()

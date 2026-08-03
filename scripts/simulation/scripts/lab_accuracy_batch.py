@@ -244,6 +244,283 @@ def stage_pools(df: pd.DataFrame, seeds: list[int], fresh: bool) -> dict[str, An
     return out
 
 
+# ── stage: nat — a nationality term in the corrector ───────────────────
+
+
+NAT_SOURCES = ("country_code", "sherdog_flag_code")
+
+
+def fetch_nationality(column: str) -> dict[str, str]:
+    """{fighter_id: code} from one of the two nationality columns.
+
+    Only the US indicator is ever used downstream, and 'US' means the same
+    thing in both vocabularies — so the Home-Nations ambiguity that stopped
+    the Sherdog codes from being written into `country_code` (0094) does not
+    reach this lever at all.
+    """
+    from src.db import get_connection
+
+    if column not in NAT_SOURCES:
+        raise ValueError(f"unknown nationality column {column!r}")
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute(
+            f"SELECT id::text, {column} FROM fighter WHERE {column} IS NOT NULL"  # noqa: S608
+        )
+        return {r[0]: str(r[1]).upper() for r in cur.fetchall()}
+
+
+def _us_indicator(
+    ids_a: np.ndarray, ids_b: np.ndarray, nat: dict[str, str]
+) -> tuple[np.ndarray, np.ndarray]:
+    """(d_us, covered). An uncovered side contributes 0, which is the same
+    thing `ResidualCorrector` does with a NaN — the row is served exactly as
+    it is today rather than corrected by a guess."""
+    a = np.array([nat.get(str(i)) for i in ids_a], dtype=object)
+    b = np.array([nat.get(str(i)) for i in ids_b], dtype=object)
+    covered = np.array([x is not None and y is not None for x, y in zip(a, b, strict=True)])
+    d = (a == "US").astype(float) - (b == "US").astype(float)
+    d[~covered] = 0.0
+    return d, covered
+
+
+def stage_nat(df: pd.DataFrame, seeds: list[int], source: str) -> dict[str, Any]:
+    """GATE — does a fighter-nationality term belong in RESIDUAL_CORRECTION?
+
+    The bias is not subtle. On the seed-42 OOF pool the blend gives the
+    American side ~8pp more than it gets, in every era. What the gate has to
+    decide is whether ONE coefficient on that, applied where nothing else
+    competes with it, survives all three legs — the shipped age term's own
+    standard, and the standard the 8-column block failed in §6.
+    """
+    if not POOL_MAIN.exists():
+        raise SystemExit("run --stage pools first")
+    pool = pd.read_parquet(POOL_MAIN)
+    pool = pool[(pool.label == "baseline") & (pool.seed == seeds[0])].reset_index(drop=True)
+
+    ids = df.set_index("bout_id")[["fighter_a_id", "fighter_b_id", "age_a", "age_b"]]
+    joined = pool.join(ids, on="bout_id")
+    assert joined["fighter_a_id"].notna().all(), "OOF pool has bouts absent from the frame"
+
+    nat = fetch_nationality(source)
+    d_us, covered = _us_indicator(
+        joined["fighter_a_id"].to_numpy(), joined["fighter_b_id"].to_numpy(), nat
+    )
+    d_age = np.nan_to_num(
+        (joined["age_a"].to_numpy(dtype=float) - joined["age_b"].to_numpy(dtype=float)) / 10.0
+    )
+    y = joined["y"].to_numpy(dtype=float)
+    z = logit(joined["p"].to_numpy(dtype=float))
+    dates = joined.join(
+        df.set_index("bout_id")[["event_date"]], on="bout_id"
+    )["event_date"]
+
+    out: dict[str, Any] = {
+        "source": source,
+        "n": int(len(joined)),
+        "n_covered": int(covered.sum()),
+        "coverage": float(covered.mean()),
+        "n_asymmetric": int((d_us != 0).sum()),
+        "seed": seeds[0],
+    }
+
+    # The raw bias, before any fitting. This is the thing that has to be
+    # real; the coefficient is only its summary.
+    bias = []
+    for value in (1.0, -1.0):
+        m = d_us == value
+        if m.any():
+            bias.append(
+                {
+                    "d_us": value,
+                    "n": int(m.sum()),
+                    "model_p": float(joined.loc[m, "p"].mean()),
+                    "actual": float(y[m].mean()),
+                    "bias": float(joined.loc[m, "p"].mean() - y[m].mean()),
+                }
+            )
+    out["raw_bias"] = bias
+
+    era_rows = []
+    dt = pd.to_datetime(dates).to_numpy()
+    for lo, hi in (("2017", "2020"), ("2020", "2023"), ("2023", "2027")):
+        era = (dt >= np.datetime64(lo)) & (dt < np.datetime64(hi))
+        for value in (1.0, -1.0):
+            m = era & (d_us == value)
+            if m.sum() >= 30:
+                era_rows.append(
+                    {
+                        "era": f"{lo}-{hi}",
+                        "d_us": value,
+                        "n": int(m.sum()),
+                        "bias": float(joined.loc[m, "p"].mean() - y[m].mean()),
+                    }
+                )
+    out["era_bias"] = era_rows
+
+    blocks = {
+        "age_only": np.column_stack([d_age]),
+        "us_only": np.column_stack([d_us]),
+        "age_plus_us": np.column_stack([d_age, d_us]),
+    }
+    out["gate"] = {
+        name: three_leg_gate(z, y, Xc, dates) for name, Xc in blocks.items()
+    }
+    out["incremental_forward"] = (
+        out["gate"]["age_plus_us"]["forward_delta"]
+        - out["gate"]["age_only"]["forward_delta"]
+    )
+    out["incremental_cross_fit"] = (
+        out["gate"]["age_plus_us"]["cross_fit_delta"]
+        - out["gate"]["age_only"]["cross_fit_delta"]
+    )
+
+    # ── the third leg: the untouched 2025+ window, read once ────────────
+    out["test"] = nat_test_leg(
+        {name: np.asarray(g["full_coefs"]) for name, g in out["gate"].items()},
+        nat,
+        use_cache=True,
+    )
+    return out
+
+
+def nat_test_leg(
+    coefs: dict[str, np.ndarray], nat: dict[str, str], *, use_cache: bool
+) -> dict[str, Any]:
+    """Apply each fitted block to the held-out window and read the delta.
+
+    This is the leg that killed the 8-column correction block in
+    `winner_batch.md` §6 — it was the best block on the pool it was
+    cross-fitted on and the worst here. Nothing is fitted in this function;
+    the coefficients arrive already fixed from the OOF pool.
+
+    The shipped corrector is stripped from the eval artifact first. Since
+    v0.13.0 it is baked in, and measuring on top of it would fit a
+    correction to an already-corrected model and report ~0 — which reads
+    as "the lab was wrong" rather than "the lab already shipped".
+    """
+    from eval_tail_buckets import bucket_table, murphy, prepare_splits
+
+    prep = prepare_splits(use_cache=use_cache)
+    ens = prep["ensemble"]
+    stripped = None
+    if getattr(ens, "corrector", None) is not None:
+        stripped = ens.corrector.describe()
+        ens.corrector = None
+
+    sp = prep["splits"]["test"]
+    p = ens.predict_proba_a(sp["X"])
+    p_sw = ens.predict_proba_a(sp["X_swapped"])
+    y = sp["y"].astype(float)
+    meta = sp["meta"]
+
+    d_us, covered = _us_indicator(
+        meta["fighter_a_id"].to_numpy(), meta["fighter_b_id"].to_numpy(), nat
+    )
+    d_age = np.nan_to_num(
+        (
+            pd.to_numeric(sp["X"]["abs_age_a"], errors="coerce").to_numpy(dtype=float)
+            - pd.to_numeric(sp["X"]["abs_age_b"], errors="coerce").to_numpy(dtype=float)
+        )
+        / 10.0
+    )
+    block_cols = {
+        "age_only": [d_age],
+        "us_only": [d_us],
+        "age_plus_us": [d_age, d_us],
+    }
+
+    def served(shift: np.ndarray) -> np.ndarray:
+        # The correction is antisymmetric, so it enters the swapped
+        # orientation with the opposite sign — exactly what
+        # ResidualCorrector does inside predict_proba_a, and the reason the
+        # shift survives the order averaging instead of cancelling.
+        za = logit(p) + shift
+        zb = logit(p_sw) - shift
+        return 0.5 * (
+            1.0 / (1.0 + np.exp(-za)) + (1.0 - 1.0 / (1.0 + np.exp(-zb)))
+        )
+
+    base = served(np.zeros(len(y)))
+    base_ll = binary_logloss(y, base)
+    out: dict[str, Any] = {
+        "n": int(len(y)),
+        "n_covered": int(covered.sum()),
+        "coverage": float(covered.mean()),
+        "stripped_corrector": stripped,
+        "baseline_logloss": base_ll,
+        "baseline_murphy": murphy(base, y.astype(int)),
+        "blocks": {},
+    }
+    market = sp["market"]
+    for name, cols in block_cols.items():
+        k = coefs[name]
+        shift = sum(float(kk) * c for kk, c in zip(k, cols, strict=True))
+        pr = served(shift)
+        out["blocks"][name] = {
+            "coefs": [float(v) for v in k],
+            "logloss": binary_logloss(y, pr),
+            "delta": binary_logloss(y, pr) - base_ll,
+            "accuracy": float(((pr >= 0.5).astype(int) == y.astype(int)).mean()),
+            "murphy": murphy(pr, y.astype(int)),
+            "buckets": bucket_table(pr, market, y.astype(int)),
+        }
+    out["incremental_delta"] = (
+        out["blocks"]["age_plus_us"]["delta"] - out["blocks"]["age_only"]["delta"]
+    )
+    return out
+
+
+def print_nat(res: dict) -> None:
+    print(f"\n{'=' * 78}\nNATIONALITY TERM — source: {res['source']}\n{'=' * 78}")
+    print(
+        f"  pool n={res['n']}  covered {res['n_covered']} ({res['coverage']:.1%})  "
+        f"asymmetric {res['n_asymmetric']}"
+    )
+    print(f"\n  {'segment':16s} {'n':>5} {'model p':>9} {'actual':>8} {'bias':>8}")
+    for b in res["raw_bias"]:
+        seg = "A is US" if b["d_us"] > 0 else "B is US"
+        print(
+            f"  {seg:16s} {b['n']:>5} {b['model_p']:>9.4f} {b['actual']:>8.4f} "
+            f"{b['bias']:>+8.4f}"
+        )
+    print(f"\n  {'era':12s} {'d_us':>5} {'n':>5} {'bias':>8}")
+    for e in res["era_bias"]:
+        print(f"  {e['era']:12s} {e['d_us']:>+5.0f} {e['n']:>5} {e['bias']:>+8.4f}")
+    print(f"\n  {'block':14s} {'cross-fit':>10} {'forward':>9} {'coefs (full fit)':>28}")
+    for name, g in res["gate"].items():
+        coefs = " ".join(f"{c:+.4f}" for c in g["full_coefs"])
+        print(
+            f"  {name:14s} {g['cross_fit_delta']:>+10.5f} {g['forward_delta']:>+9.5f} "
+            f"{coefs:>28}"
+        )
+    print(
+        f"\n  incremental over age:  cross-fit {res['incremental_cross_fit']:+.5f}  "
+        f"forward {res['incremental_forward']:+.5f}"
+    )
+    t = res.get("test")
+    if t:
+        print(
+            f"\n  HELD-OUT 2025+ (n={t['n']}, covered {t['coverage']:.1%}, "
+            f"baseline ll {t['baseline_logloss']:.4f})"
+        )
+        print(f"  {'block':14s} {'log-loss':>9} {'delta':>9} {'acc':>7} {'resolution':>11}")
+        for name, b in t["blocks"].items():
+            print(
+                f"  {name:14s} {b['logloss']:>9.4f} {b['delta']:>+9.5f} "
+                f"{b['accuracy']:>7.4f} {b['murphy']['resolution']:>11.5f}"
+            )
+        print(f"  incremental over age on test: {t['incremental_delta']:+.5f}")
+        print("\n  VERDICT — three legs must agree in sign for the US term:")
+        legs = {
+            "cross-fit": res["incremental_cross_fit"],
+            "forward": res["incremental_forward"],
+            "test": t["incremental_delta"],
+        }
+        for leg, v in legs.items():
+            print(f"    {leg:10s} {v:+.5f}  {'PASS' if v < 0 else 'FAIL'}")
+        print(f"    => {'GATE PASS' if all(v < 0 for v in legs.values()) else 'GATE FAIL'}")
+
+
 # ── stage: power (probe D) ─────────────────────────────────────────────
 
 
@@ -401,6 +678,12 @@ def main() -> None:
     ap.add_argument("--seeds", default="42")
     ap.add_argument("--cache", action="store_true", help="reuse data/dataset.parquet")
     ap.add_argument("--fresh", action="store_true", help="rebuild the OOF pools")
+    ap.add_argument(
+        "--nat-source",
+        default="country_code",
+        choices=NAT_SOURCES,
+        help="which nationality column the nat stage reads",
+    )
     args = ap.parse_args()
 
     seeds = [int(s) for s in args.seeds.split(",") if s.strip()]
@@ -411,6 +694,11 @@ def main() -> None:
     if args.stage == "pools":
         df = load_dataset(args.cache)
         payload["pools"] = stage_pools(df, seeds, args.fresh)
+    elif args.stage == "nat":
+        df = load_dataset(args.cache)
+        res = stage_nat(df, seeds, args.nat_source)
+        payload.setdefault("nat", {})[args.nat_source] = res
+        print_nat(res)
     elif args.stage == "power":
         payload["power"] = stage_power(seeds)
         print(json.dumps(payload["power"], indent=1, default=str))

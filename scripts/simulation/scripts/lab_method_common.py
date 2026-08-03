@@ -71,11 +71,27 @@ def method_frame(
     base, _, _ = build_feature_matrix(oriented)
     X = build_method_features(base, oriented, levels=levels, sub_axis=sub_axis)
     y = np.array([METHODS.index(m) for m in sub["method_bucket"]], dtype=int)
+    # is_debut is a property of the BOUT ("either side is debuting"), so it
+    # is read off `sub` before the winner-first flip rather than off the
+    # oriented frame, where the _a/_b pair has moved.
+    if "is_debut_a" in sub.columns:
+        is_debut = (
+            sub["is_debut_a"].fillna(False).astype(bool)
+            | sub["is_debut_b"].fillna(False).astype(bool)
+        ).to_numpy()
+    else:
+        is_debut = np.zeros(len(sub), dtype=bool)
+
     meta = pd.DataFrame(
         {
             "bout_id": sub["bout_id"].to_numpy(),
             "event_date": pd.to_datetime(sub["event_date"]),
             "weight_class": sub.get("weight_class", pd.Series([None] * len(sub))),
+            "scheduled_rounds": pd.to_numeric(
+                sub.get("scheduled_rounds", pd.Series([3] * len(sub))),
+                errors="coerce",
+            ).fillna(3).astype(int),
+            "is_debut": is_debut,
         }
     )
     return X, y, meta
@@ -147,6 +163,109 @@ def walk_forward_method(
                 f"    origin {origin.date()}  train {int(tr.sum()):5d}  "
                 f"val {int(va.sum()):4d}  scored {int(sc.sum()):4d}  "
                 f"weights {model.weights}"
+            )
+    return pd.concat(rows, ignore_index=True)
+
+
+def walk_forward_method_debut(
+    df: pd.DataFrame,
+    *,
+    label: str = "debut_specialist",
+    seed: int = 42,
+    levels: bool = USE_LEVELS,
+    sub_axis: bool = USE_SUB_AXIS,
+    exp_row_weight: float = 0.2,
+    arm: str = "model",
+    start: str = OOF_START,
+    end: str = OOF_END,
+    min_val_debut: int = 20,
+    verbose: bool = False,
+) -> pd.DataFrame:
+    """The method leg on the segment it currently does not serve at all.
+
+    `train.py:485` fits the conditional method model on `exp_df` — both
+    experienced sides only — and `predict.py:246-250` passes
+    `method_mix=None` for a debut bout. So ~19% of the priced slate takes
+    its method / distance / total_rounds numbers from the Monte Carlo
+    anchor, whose entire per-fight input is ten hand-shrunk `FighterMC`
+    fields that are router defaults for a debutant.
+
+    And the marginal it falls back to is wrong for the segment. On
+    data/dataset.parquet the gradeable debut rows (n=2,199) run
+    ko/sub/dec 0.3597 / 0.2292 / 0.4111 against the experienced
+    0.3257 / 0.1877 / 0.4866 — +3.4pp KO and +4.2pp submissions.
+
+    `arm` selects what gets scored, and the choice of BASELINE is the
+    whole gate:
+      * "constant" — per-scheduled-length class base rates measured on the
+        origin's own debut TRAIN rows. This is the honest baseline. Most
+        of the available gain is a base rate, and a discriminative model
+        that only beats the MC anchor has demonstrated nothing except
+        that the anchor was wrong.
+      * "model" — the v0.8.0 transfer recipe carried over: fit on all
+        gradeable rows with both-experienced down-weighted, select on
+        debut rows, serve on debut rows.
+    """
+    X, y, meta = method_frame(df, levels=levels, sub_axis=sub_axis)
+    dates = meta["event_date"]
+    debut = meta["is_debut"].to_numpy()
+    lengths = meta["scheduled_rounds"].to_numpy()
+    weights_all = np.where(debut, 1.0, exp_row_weight)
+
+    rows = []
+    for origin, tr, va, sc in iter_origins(dates, start=start, end=end):
+        va_d, sc_d = va & debut, sc & debut
+        if va_d.sum() < min_val_debut or sc_d.sum() == 0:
+            if verbose:
+                print(
+                    f"    origin {origin.date()}  SKIP (val debut {int(va_d.sum())}, "
+                    f"scored debut {int(sc_d.sum())})"
+                )
+            continue
+
+        if arm == "constant":
+            # Base rates per scheduled length, from this origin's debut
+            # training rows. Falls back to the pooled debut rate when a
+            # length has too few rows to estimate three shares.
+            tr_d = tr & debut
+            pooled = np.array([(y[tr_d] == j).mean() for j in range(3)])
+            p = np.tile(pooled, (int(sc_d.sum()), 1))
+            for length in np.unique(lengths[sc_d]):
+                m_tr = tr_d & (lengths == length)
+                if m_tr.sum() < 60:
+                    continue
+                rate = np.array([(y[m_tr] == j).mean() for j in range(3)])
+                p[lengths[sc_d] == length] = rate
+        else:
+            model = MethodModel(use_levels=levels, use_sub_axis=sub_axis).fit(
+                X.loc[tr].reset_index(drop=True),
+                y[tr],
+                X.loc[va_d].reset_index(drop=True),
+                y[va_d],
+                seed=seed,
+                sample_weight=weights_all[tr],
+            )
+            p = model.predict_cond(X.loc[sc_d].reset_index(drop=True))
+
+        rows.append(
+            pd.DataFrame(
+                {
+                    "origin": str(origin.date()),
+                    "label": label,
+                    "seed": seed,
+                    "bout_id": meta.loc[sc_d, "bout_id"].to_numpy(),
+                    "event_date": meta.loc[sc_d, "event_date"].to_numpy(),
+                    "p_ko": p[:, 0],
+                    "p_sub": p[:, 1],
+                    "p_dec": p[:, 2],
+                    "y": y[sc_d],
+                }
+            )
+        )
+        if verbose:
+            print(
+                f"    origin {origin.date()}  train {int(tr.sum()):5d}  "
+                f"val debut {int(va_d.sum()):3d}  scored debut {int(sc_d.sum()):3d}"
             )
     return pd.concat(rows, ignore_index=True)
 
