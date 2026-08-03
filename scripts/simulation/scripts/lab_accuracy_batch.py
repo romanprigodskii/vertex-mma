@@ -969,6 +969,20 @@ def stage_debutmethod(df: pd.DataFrame, seeds: list[int]) -> dict[str, Any]:
         f"(submissions {int((const['y'] == 1).sum())})"
     )
 
+    mc_scored = score_mc_against(mc_anchor_frame(df), const)
+    mc_frame = mc_scored.pop("frame")
+    out["mc_anchor"] = mc_scored
+    out["mc_anchor"]["delta_constant_minus_mc"] = (
+        out["constant"]["logloss"] - mc_scored["logloss"]
+    )
+    c_al = const.sort_values("bout_id").reset_index(drop=True)
+    m_al = mc_frame.sort_values("bout_id").reset_index(drop=True)
+    out["mc_anchor"]["bootstrap_constant_vs_mc"] = paired_bootstrap_method(c_al, m_al)
+    print(
+        f"  MC anchor (what production serves today): ll={mc_scored['logloss']:.5f}  "
+        f"constant - MC = {out['mc_anchor']['delta_constant_minus_mc']:+.5f}"
+    )
+
     for seed in seeds:
         model = walk_forward_method_debut(
             df, label="model", arm="model", seed=seed, verbose=True
@@ -994,9 +1008,122 @@ def stage_debutmethod(df: pd.DataFrame, seeds: list[int]) -> dict[str, Any]:
     return out
 
 
+MC_ANCHOR_CACHE = DATA_DIR / "lab_accuracy_debut_mc.parquet"
+
+
+def mc_anchor_frame(df: pd.DataFrame) -> pd.DataFrame:
+    """What production actually serves on these bouts today.
+
+    Without this arm the gate answers the wrong question. "The model beats
+    a constant" decides whether to build a MODEL; "the constant beats the
+    MC anchor" decides whether to ship ANYTHING, and that is the one worth
+    knowing first, because `predict.py:246-250` currently hands the whole
+    debut segment to a simulator whose ten `FighterMC` inputs are router
+    defaults for a debutant.
+
+    The conditional is read off the joint the way `sportsbook.ts` does:
+    P(ko | this side wins) = prob_ko_side / winner_prob_side, taken for
+    the side that actually won so it lines up with the winner-first pool.
+    """
+    from lab_method_common import method_frame
+
+    from src.export import stable_hash
+    from src.monte_carlo import FighterMC, simulate_bout
+
+    _, y, meta = method_frame(df)
+    keep = meta["is_debut"].to_numpy()
+    ids = set(meta.loc[keep, "bout_id"].to_numpy())
+
+    if MC_ANCHOR_CACHE.exists():
+        cached = pd.read_parquet(MC_ANCHOR_CACHE)
+        if set(cached["bout_id"]) == ids:
+            print(f"  MC anchor: reusing {MC_ANCHOR_CACHE.name} ({len(cached)} bouts)")
+            return cached
+
+    sub = df.loc[df["bout_id"].isin(ids)].reset_index(drop=True)
+    print(f"  MC anchor: simulating {len(sub)} debut bouts (~0.4s each)…")
+    rows = []
+    for i in range(len(sub)):
+        row = sub.iloc[i]
+        snap_a = {
+            k[:-2]: row[k]
+            for k in row.index
+            if k.endswith("_a") and k != "fighter_a_id"
+        }
+        snap_b = {
+            k[:-2]: row[k]
+            for k in row.index
+            if k.endswith("_b") and k != "fighter_b_id"
+        }
+        mc = simulate_bout(
+            FighterMC.from_snapshot(snap_a),
+            FighterMC.from_snapshot(snap_b),
+            int(row["scheduled_rounds"]),
+            seed=stable_hash(row["bout_id"]),
+            is_main_event=bool(row["is_main_event"]),
+            is_title_fight=bool(row["is_title_fight"]),
+        )
+        a_won = int(row["target_a_wins"]) == 1
+        win = mc.winner_prob_a if a_won else mc.winner_prob_b
+        ko = mc.prob_ko_a if a_won else mc.prob_ko_b
+        sb = mc.prob_sub_a if a_won else mc.prob_sub_b
+        dc = mc.prob_decision_a if a_won else mc.prob_decision_b
+        win = max(win, 1e-9)
+        rows.append(
+            {
+                "bout_id": row["bout_id"],
+                "p_ko": ko / win,
+                "p_sub": sb / win,
+                "p_dec": dc / win,
+            }
+        )
+    frame = pd.DataFrame(rows)
+    frame.to_parquet(MC_ANCHOR_CACHE)
+    return frame
+
+
+def score_mc_against(frame: pd.DataFrame, truth: pd.DataFrame) -> dict[str, Any]:
+    """Score the MC conditional on exactly the bouts the pool scored.
+
+    `truth` is the constant arm's own output — same bout_ids, same class
+    encoding — so the two numbers are comparable per bout and the paired
+    bootstrap below is a real pairing rather than two marginal means.
+    """
+    m = frame.merge(truth[["bout_id", "y"]], on="bout_id", how="inner")
+    p = np.clip(m[["p_ko", "p_sub", "p_dec"]].to_numpy(dtype=float), 1e-9, None)
+    p = p / p.sum(axis=1, keepdims=True)
+    scored = pd.DataFrame(
+        {
+            "bout_id": m["bout_id"],
+            "p_ko": p[:, 0],
+            "p_sub": p[:, 1],
+            "p_dec": p[:, 2],
+            "y": m["y"].to_numpy(dtype=int),
+        }
+    )
+    return {
+        "n": int(len(scored)),
+        "logloss": pool_logloss(scored),
+        "cells": cell_table(scored),
+        "frame": scored,
+    }
+
+
 def print_debutmethod(res: dict) -> None:
     print(f"\n{'=' * 78}\nMETHOD MODEL FOR THE DEBUT SEGMENT\n{'=' * 78}")
     c = res["constant"]
+    mc = res.get("mc_anchor")
+    if mc:
+        b = mc["bootstrap_constant_vs_mc"]
+        print(
+            f"  MC anchor — what production serves today: n={mc['n']} · "
+            f"ll {mc['logloss']:.5f}"
+        )
+        print(
+            f"  constant - MC anchor: {mc['delta_constant_minus_mc']:+.5f}  "
+            f"95% CI [{b['lo']:+.5f}, {b['hi']:+.5f}]  "
+            f"improving {b['frac_improving']:.0%}"
+        )
     print(
         f"  constant baseline (per-length debut base rates): n={c['n']} · "
         f"submissions {c['n_submissions']} · ll {c['logloss']:.5f}"
