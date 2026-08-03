@@ -521,6 +521,230 @@ def print_nat(res: dict) -> None:
         print(f"    => {'GATE PASS' if all(v < 0 for v in legs.values()) else 'GATE FAIL'}")
 
 
+# ── stage: subtemp — temperature on the sub-vs-dec contrast ────────────
+
+
+def apply_sub_temperature(p: np.ndarray, tau: float) -> np.ndarray:
+    """Scale the submission coordinate's log-odds against DECISION.
+
+    Decision is the reference class, so `tau` moves sub-vs-dec and leaves
+    ko-vs-dec alone; ko still moves in absolute terms because everything
+    renormalises, which is correct — the three shares are a simplex, not
+    three independent numbers.
+
+    A SCALE and not a shift, because the measured defect is a scale. The
+    submission share is under-dispersed at BOTH ends of its own quintile
+    table, and a shift can only move one end at the cost of the other.
+    `tau > 1` sharpens.
+    """
+    q = np.clip(np.asarray(p, dtype=float), 1e-12, 1.0)
+    z_ko = np.log(q[:, 0] / q[:, 2])
+    z_sub = np.log(q[:, 1] / q[:, 2]) * float(tau)
+    z = np.column_stack([z_ko, z_sub, np.zeros(len(q))])
+    z -= z.max(axis=1, keepdims=True)
+    e = np.exp(z)
+    return e / e.sum(axis=1, keepdims=True)
+
+
+def _fit_tau(p: np.ndarray, y: np.ndarray) -> float:
+    from scipy.optimize import minimize_scalar
+
+    res = minimize_scalar(
+        lambda t: multiclass_logloss(y, apply_sub_temperature(p, t)),
+        bounds=(0.2, 3.0),
+        method="bounded",
+    )
+    return float(res.x)
+
+
+def _quintile_reliability(p_col: np.ndarray, hit: np.ndarray) -> list[dict[str, Any]]:
+    edges = np.quantile(p_col, [0.0, 0.2, 0.4, 0.6, 0.8, 1.0])
+    out = []
+    for i in range(5):
+        lo, hi = edges[i], edges[i + 1]
+        m = (p_col >= lo) & (p_col <= hi if i == 4 else p_col < hi)
+        if m.sum() == 0:
+            continue
+        out.append(
+            {
+                "quintile": i + 1,
+                "n": int(m.sum()),
+                "predicted": float(p_col[m].mean()),
+                "actual": float(hit[m].mean()),
+            }
+        )
+    return out
+
+
+def stage_subtemp(df: pd.DataFrame, seeds: list[int]) -> dict[str, Any]:
+    """GATE — one temperature parameter on the submission axis.
+
+    `method_leg.md` §4 named the submission cell as carrying the whole
+    residual gap to the book, and §9 then failed to move it twice: a
+    hierarchical re-shape was WORSE than the flat softmax, and nine columns
+    of genuinely new submission information moved the val cell by 0.002 with
+    per-seed deltas that did not agree in sign. Both of those were gates on
+    71 val submissions.
+
+    This is the third thing it could have been, and the only one those two
+    do not rule out: not the shape, not the information, the DISPERSION.
+    Gated on 543 submissions instead of 71.
+
+    Gate metric is the OVERALL 3-class log-loss. Hard side condition: the
+    decision cell must not degrade — `dec` is the one cell where the model
+    is ahead of the book (-0.0920), and a sub-vs-dec temperature is the
+    most direct way to spend it.
+    """
+    if not POOL_METHOD.exists():
+        raise SystemExit("run --stage pools first")
+    pool = pd.read_parquet(POOL_METHOD)
+    pool = pool[(pool.label == "baseline") & (pool.seed == seeds[0])].reset_index(drop=True)
+
+    p = pool[["p_ko", "p_sub", "p_dec"]].to_numpy(dtype=float)
+    y = pool["y"].to_numpy(dtype=int)
+    dates = pd.to_datetime(pool["event_date"])
+
+    out: dict[str, Any] = {
+        "n": int(len(pool)),
+        "n_submissions": int((y == 1).sum()),
+        "baseline_logloss": multiclass_logloss(y, p),
+        "baseline_cells": cell_table(pool),
+        "sub_reliability_before": _quintile_reliability(p[:, 1], (y == 1).astype(float)),
+    }
+
+    # in-sample, cross-fit, forward
+    tau_all = _fit_tau(p, y)
+    rng = np.random.default_rng(0)
+    fold = rng.integers(0, 5, len(y))
+    p_cf = p.copy()
+    taus_cf = []
+    for f in range(5):
+        tr, te = fold != f, fold == f
+        t = _fit_tau(p[tr], y[tr])
+        taus_cf.append(t)
+        p_cf[te] = apply_sub_temperature(p[te], t)
+    dt = dates.to_numpy()
+    tr = dt < np.datetime64(FORWARD_SPLIT)
+    te = ~tr
+    tau_fwd = _fit_tau(p[tr], y[tr])
+
+    out["tau_full"] = tau_all
+    out["tau_cross_fit"] = taus_cf
+    out["tau_forward"] = tau_fwd
+    out["cross_fit_delta"] = multiclass_logloss(y, p_cf) - out["baseline_logloss"]
+    out["forward_delta"] = multiclass_logloss(
+        y[te], apply_sub_temperature(p[te], tau_fwd)
+    ) - multiclass_logloss(y[te], p[te])
+    out["forward_n_train"] = int(tr.sum())
+    out["forward_n_score"] = int(te.sum())
+
+    after = pool.copy()
+    after[["p_ko", "p_sub", "p_dec"]] = apply_sub_temperature(p, tau_all)
+    out["cells_after_full_fit"] = cell_table(after)
+    out["sub_reliability_after"] = _quintile_reliability(
+        after["p_sub"].to_numpy(), (y == 1).astype(float)
+    )
+
+    # ── the third leg: 2025+, with the split-trained twin ───────────────
+    out["test"] = subtemp_test_leg(df, tau_all, tau_fwd)
+    return out
+
+
+def subtemp_test_leg(df: pd.DataFrame, tau_all: float, tau_fwd: float) -> dict[str, Any]:
+    """The conditional leg on the untouched window, using method_model_eval
+    (the split-trained twin) so the measurement stays out-of-sample."""
+    from src.config import VAL_END
+    from src.method_model import METHOD_MODEL_EVAL_DIR, MethodModel
+
+    model = MethodModel.load(METHOD_MODEL_EVAL_DIR)
+    keep = ~(df["is_debut_a"].astype(bool) | df["is_debut_b"].astype(bool))
+    frame = df.loc[keep].reset_index(drop=True)
+    X, y, meta = method_frame(
+        frame, levels=model.use_levels, sub_axis=model.use_sub_axis
+    )
+    te = (meta["event_date"] >= pd.Timestamp(VAL_END)).to_numpy()
+    p = model.predict_cond(X.loc[te][model.feature_columns].reset_index(drop=True))
+    yy = y[te]
+
+    base = pd.DataFrame(
+        {"p_ko": p[:, 0], "p_sub": p[:, 1], "p_dec": p[:, 2], "y": yy}
+    )
+    out: dict[str, Any] = {
+        "n": int(len(yy)),
+        "n_submissions": int((yy == 1).sum()),
+        "baseline_logloss": multiclass_logloss(yy, p),
+        "baseline_cells": cell_table(base),
+        "arms": {},
+    }
+    for name, tau in (("tau_full_fit", tau_all), ("tau_forward_fit", tau_fwd)):
+        q = apply_sub_temperature(p, tau)
+        after = pd.DataFrame(
+            {"p_ko": q[:, 0], "p_sub": q[:, 1], "p_dec": q[:, 2], "y": yy}
+        )
+        cells = cell_table(after)
+        base_cells = {c["class"]: c["logloss_when_true"] for c in out["baseline_cells"]}
+        out["arms"][name] = {
+            "tau": tau,
+            "logloss": multiclass_logloss(yy, q),
+            "delta": multiclass_logloss(yy, q) - out["baseline_logloss"],
+            "cells": cells,
+            "cell_deltas": {
+                c["class"]: c["logloss_when_true"] - base_cells[c["class"]]
+                for c in cells
+            },
+        }
+    return out
+
+
+def print_subtemp(res: dict) -> None:
+    print(f"\n{'=' * 78}\nSUB-AXIS TEMPERATURE\n{'=' * 78}")
+    print(
+        f"  pool n={res['n']} · submissions {res['n_submissions']} · "
+        f"baseline 3-class ll {res['baseline_logloss']:.4f}"
+    )
+    print(f"\n  submission reliability by quintile (n={res['n']})")
+    print(f"  {'q':>2} {'n':>5} {'predicted':>10} {'actual':>8}   {'-> after':>10} ")
+    for b, a in zip(
+        res["sub_reliability_before"], res["sub_reliability_after"], strict=True
+    ):
+        print(
+            f"  {b['quintile']:>2} {b['n']:>5} {b['predicted']:>10.4f} "
+            f"{b['actual']:>8.4f}   {a['predicted']:>10.4f}"
+        )
+    print(
+        f"\n  tau: full {res['tau_full']:.4f} · forward {res['tau_forward']:.4f} · "
+        f"cross-fit {[round(t, 3) for t in res['tau_cross_fit']]}"
+    )
+    print(
+        f"  cross-fit {res['cross_fit_delta']:+.5f} · "
+        f"forward {res['forward_delta']:+.5f} (n={res['forward_n_score']})"
+    )
+    t = res["test"]
+    print(
+        f"\n  HELD-OUT 2025+ (n={t['n']}, submissions {t['n_submissions']}, "
+        f"baseline {t['baseline_logloss']:.4f})"
+    )
+    print(f"  {'arm':16s} {'tau':>7} {'ll':>8} {'delta':>9}   cell deltas (ko/sub/dec)")
+    for name, a in t["arms"].items():
+        cd = a["cell_deltas"]
+        print(
+            f"  {name:16s} {a['tau']:>7.4f} {a['logloss']:>8.4f} {a['delta']:>+9.5f}   "
+            f"{cd['ko']:+.4f} / {cd['sub']:+.4f} / {cd['dec']:+.4f}"
+        )
+    print("\n  VERDICT — three legs plus the decision-cell side condition:")
+    legs = {
+        "cross-fit": res["cross_fit_delta"],
+        "forward": res["forward_delta"],
+        "test": t["arms"]["tau_full_fit"]["delta"],
+    }
+    for leg, v in legs.items():
+        print(f"    {leg:14s} {v:+.5f}  {'PASS' if v < 0 else 'FAIL'}")
+    dec = t["arms"]["tau_full_fit"]["cell_deltas"]["dec"]
+    print(f"    {'dec not worse':14s} {dec:+.5f}  {'PASS' if dec <= 0 else 'FAIL'}")
+    ok = all(v < 0 for v in legs.values()) and dec <= 0
+    print(f"    => {'GATE PASS' if ok else 'GATE FAIL'}")
+
+
 # ── stage: power (probe D) ─────────────────────────────────────────────
 
 
@@ -699,6 +923,10 @@ def main() -> None:
         res = stage_nat(df, seeds, args.nat_source)
         payload.setdefault("nat", {})[args.nat_source] = res
         print_nat(res)
+    elif args.stage == "subtemp":
+        df = load_dataset(args.cache)
+        payload["subtemp"] = stage_subtemp(df, seeds)
+        print_subtemp(payload["subtemp"])
     elif args.stage == "power":
         payload["power"] = stage_power(seeds)
         print(json.dumps(payload["power"], indent=1, default=str))
