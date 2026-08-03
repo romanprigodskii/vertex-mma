@@ -73,6 +73,7 @@ DATASET_CACHE = DATA_DIR / "dataset.parquet"
 POOL_MAIN = DATA_DIR / "lab_winner_batch_oof.parquet"
 POOL_DEBUT = DATA_DIR / "lab_accuracy_debut_oof.parquet"
 POOL_METHOD = DATA_DIR / "lab_accuracy_method_oof.parquet"
+POOL_DEBUT_METHOD = DATA_DIR / "lab_accuracy_debut_method_oof.parquet"
 
 FORWARD_SPLIT = "2022-01-01"
 
@@ -983,27 +984,38 @@ def stage_debutmethod(df: pd.DataFrame, seeds: list[int]) -> dict[str, Any]:
         f"constant - MC = {out['mc_anchor']['delta_constant_minus_mc']:+.5f}"
     )
 
+    frames = []
     for seed in seeds:
         model = walk_forward_method_debut(
             df, label="model", arm="model", seed=seed, verbose=True
         )
+        frames.append(model)
         c = model.sort_values("bout_id").reset_index(drop=True)
         b = const.sort_values("bout_id").reset_index(drop=True)
-        boot = paired_bootstrap_method(c, b)
+        # vs the MC anchor is the gate. vs the constant is the diagnostic
+        # that says whether the win is a base rate or a model — and here it
+        # answers the other way round from the prior: the constant is WORSE
+        # than the anchor, so the simulator is carrying real per-bout signal
+        # on this segment and the model has to beat that, not a base rate.
+        boot_mc = paired_bootstrap_method(c, m_al)
+        boot_const = paired_bootstrap_method(c, b)
         out["arms"][str(seed)] = {
             "logloss": pool_logloss(model),
+            "delta_vs_mc_anchor": pool_logloss(model) - mc_scored["logloss"],
             "delta_vs_constant": pool_logloss(model) - out["constant"]["logloss"],
-            "bootstrap": boot,
+            "bootstrap_vs_mc": boot_mc,
+            "bootstrap_vs_constant": boot_const,
             "cells": cell_table(model),
         }
         print(
-            f"  seed {seed}: model {pool_logloss(model):.5f} vs constant "
-            f"{out['constant']['logloss']:.5f}  "
-            f"delta {pool_logloss(model) - out['constant']['logloss']:+.5f}  "
-            f"improving {boot['frac_improving']:.0%}"
+            f"  seed {seed}: model {pool_logloss(model):.5f} · "
+            f"vs MC anchor {pool_logloss(model) - mc_scored['logloss']:+.5f} "
+            f"(improving {boot_mc['frac_improving']:.0%}) · "
+            f"vs constant {pool_logloss(model) - out['constant']['logloss']:+.5f}"
         )
-    deltas = [a["delta_vs_constant"] for a in out["arms"].values()]
-    out["median_delta"] = float(np.median(deltas))
+    pd.concat(frames, ignore_index=True).to_parquet(POOL_DEBUT_METHOD)
+    deltas = [a["delta_vs_mc_anchor"] for a in out["arms"].values()]
+    out["median_delta_vs_mc"] = float(np.median(deltas))
     out["sign_stable"] = bool(all(d < 0 for d in deltas) or all(d > 0 for d in deltas))
     return out
 
@@ -1128,19 +1140,24 @@ def print_debutmethod(res: dict) -> None:
         f"  constant baseline (per-length debut base rates): n={c['n']} · "
         f"submissions {c['n_submissions']} · ll {c['logloss']:.5f}"
     )
-    print(f"\n  {'seed':>5} {'model ll':>9} {'delta':>9} {'95% CI':>24} {'improving':>10}")
+    print(
+        f"\n  {'seed':>5} {'model ll':>9} {'vs MC':>9} {'95% CI':>24} "
+        f"{'improving':>10} {'vs const':>9}"
+    )
     for seed, a in res["arms"].items():
-        b = a["bootstrap"]
+        b = a["bootstrap_vs_mc"]
         ci = f"[{b['lo']:+.5f}, {b['hi']:+.5f}]"
         print(
-            f"  {seed:>5} {a['logloss']:>9.5f} {a['delta_vs_constant']:>+9.5f} "
-            f"{ci:>24} {b['frac_improving']:>10.0%}"
+            f"  {seed:>5} {a['logloss']:>9.5f} {a['delta_vs_mc_anchor']:>+9.5f} "
+            f"{ci:>24} {b['frac_improving']:>10.0%} "
+            f"{a['delta_vs_constant']:>+9.5f}"
         )
     print(
-        f"\n  median delta {res['median_delta']:+.5f} · sign stable: {res['sign_stable']}"
+        f"\n  median delta vs MC anchor {res['median_delta_vs_mc']:+.5f} · "
+        f"sign stable: {res['sign_stable']}"
     )
-    ok = res["sign_stable"] and res["median_delta"] < 0
-    print(f"  => GATE {'PASS' if ok else 'FAIL'} (against the CONSTANT, not the MC anchor)")
+    ok = res["sign_stable"] and res["median_delta_vs_mc"] < 0
+    print(f"  => GATE {'PASS' if ok else 'FAIL'} (against what production serves today)")
 
 
 # ── stage: power (probe D) ─────────────────────────────────────────────
