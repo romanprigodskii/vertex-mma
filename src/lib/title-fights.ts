@@ -69,7 +69,7 @@ const CURATED_TITLE_BOUT_IDS: readonly string[] = [
   "69d78d34-c429-40bc-a197-baf8fac7a613", // 2023-11-11 · UFC 295: Prochazka vs. Pereira · Tom Aspinall vs Sergei Pavlovich
   "e90ff4cb-495c-4b12-afd6-3a6a2cfc083e", // 2023-11-11 · UFC 295: Prochazka vs. Pereira · Alex Pereira vs Jiri Prochazka
   "8c09c4fd-6408-4cb7-a549-c83de419cb08", // 2023-10-21 · UFC 294: Makhachev vs. Volkanovski 2 · Islam Makhachev vs Alexander Volkanovski
-  "2eaba757-6d32-49c1-a8f4-2263c65fbea0", // 2023-09-16 · UFC Fight Night: Grasso vs. Shevchenko 2 · Alexa Grasso vs Valentina Shevchenko
+  "2eaba757-6d32-49c1-a8f4-2263c65fbea0", // 2023-09-16 · Noche UFC: Grasso vs. Shevchenko 2 · Alexa Grasso vs Valentina Shevchenko
   "d5426913-85e9-4577-a444-445196ad347f", // 2023-09-09 · UFC 293: Adesanya vs. Strickland · Israel Adesanya vs Sean Strickland
   "bf57f5bd-3823-415b-ac5a-d0556421ad80", // 2023-08-19 · UFC 292: Sterling vs. O'Malley · Aljamain Sterling vs Sean O'Malley
   "0b909120-0c18-4ba9-93f0-3c1257524331", // 2023-08-19 · UFC 292: Sterling vs. O'Malley · Zhang Weili vs Amanda Lemos
