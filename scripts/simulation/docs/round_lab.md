@@ -209,7 +209,9 @@ predates this lab and neither has anything to do with rounds.
 
 ## Stage 1 — fitted finish hazards
 
-`src/finish_hazard.py`, fitted by `scripts/lab_fit_hazard.py`, report at
+`src/finish_hazard.py`, fitted by `src/round_fit.py` (which `run_train.py` calls
+on every retrain — since 2026-08-13; before that the fit ran only when someone
+ran the lab by hand) and graded by `scripts/lab_fit_hazard.py`, report at
 `artifacts/lab_finish_hazard.json`.
 
 Cause-specific KO and submission hazards, Poisson regression with exposure on a
@@ -284,8 +286,8 @@ wrong.
 
 ## Stage 2 — fitted decision-winner model
 
-`src/decision_model.py`, fitted by `scripts/lab_fit_decision.py`, report at
-`artifacts/lab_decision_winner.json`.
+`src/decision_model.py`, fitted by `src/round_fit.py` (see Stage 1) and graded
+by `scripts/lab_fit_decision.py`, report at `artifacts/lab_decision_winner.json`.
 
 4,014 decisions with a winner; train 3,350 / val 277 / test 387. Logistic
 regression with **no intercept** on A−B differences of all ten `FighterMC`

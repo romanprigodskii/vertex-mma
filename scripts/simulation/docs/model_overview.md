@@ -317,8 +317,8 @@ clamp [0.4, 2.5];  length_bonus = 1 + 0.12·max(0, R−3)/2;  cap ΣH ≤ 2.3025
 Neutral matchup: P(any finish) = 0.4780 at 3 rounds, 0.5171 at 5.
 
 **Timing** is a fitted cause-specific Poisson model on a 15-second person-period
-expansion, `alpha 1e-4`, 8,548 bouts, `trained_through 2026-07-18`; intercepts
-ko −8.15201, sub −8.93579. Every covariate is time-constant, so `_normalize_shape`
+expansion, `alpha 1e-4`, 8,586 bouts, `trained_through 2026-08-08`; intercepts
+ko −8.05232, sub −8.85684. Every covariate is time-constant, so `_normalize_shape`
 divides it back out: **the served timing is two fixed curves per scheduled
 length, identical for every bout on the card** (pinned at 1.7e-18 by
 `test_method_leg.py`). It replaced a shape that produced R1/R2/R3 = 17/35/49%
@@ -326,7 +326,7 @@ against an observed 54/31/15%; held-out round-of-finish log-loss **1.0218 vs
 1.4585**.
 
 **Decisions** come from a no-intercept logistic model on all ten `FighterMC`
-diffs (temperature 0.8, C 10.0, 4,014 decisions). It replaced a hand-weighted
+diffs (temperature 0.8, C 10.0, 4,025 decisions). It replaced a hand-weighted
 logit scoring test log-loss **4.2238** against a coin flip's 0.6931 — and pricing
 **83.4%** of decisions outside [0.05, 0.95] against the fit's 0.0%.
 
@@ -448,10 +448,26 @@ destroys the feature's usefulness along with everything else. What caught it was
 serving-time sanity check: 62% predicted decisions on the upcoming slate against
 54% on test.
 
-Parser fixed and pinned; the column is excluded from the method matrix. The 1,855
-rows are **not** repaired, `is_title_fight` remains one of the 118 winner features
-(rank 114/118, gain 0.0%, removal +0.0004), and it is still a live covariate of
-the served `finish_hazard.json`.
+Parser fixed and pinned; the column is excluded from the method matrix.
+`is_title_fight` remains one of the 118 winner features (rank 114/118, gain 0.0%,
+removal +0.0004) and a live covariate of the served `finish_hazard.json`.
+
+**The rows were repaired after all**, by the second of the two routes
+`method_leg.md`'s rejected-list allowed ("a rewrite from the curated title
+list"): `scripts/derive_title_fights.ts` rebuilds the flag from
+`CHAMPIONSHIP_HISTORY` and runs first in the daily `recompute.sh` chain.
+Measured 2026-08-13: 76 of 7,920 completed three-round bouts still carry the
+flag — **0.96%**, against the 1,855 (23.4%) this section was written about —
+and 408 of 902 five-rounders (45.2%).
+
+That repair is what the 2026-08-13 hazard refit collected. Re-fitting the SAME
+8,548 bouts against the corrected DB — the only thing that changed — moves
+`is_title_fight` from **+0.3097 to −0.0124** (ko) and **+0.2814 to +0.0155**
+(sub), and `scheduled_rounds`, which had been absorbing the confound, from
+−0.0798 to −0.0053. The served neutral round split moves 39.0/34.9/26.1 →
+40.3/34.6/25.1 at three rounds. `test_method_leg.py` proved the flag could not
+reach the served curve *at serve time*; it left the fitting question open, and
+this is its answer.
 
 ### 8.2 The nationality refusal (v0.15.0, shipped then reverted)
 
@@ -532,16 +548,21 @@ three nationality legs, "+0.0022", the pool sizes (543 submissions / 71 val;
 
 ## 11. Open debts
 
-1. **Branch vs production diverge.** `origin/main` carries `MODEL_VERSION
-   v0.13.0` with artifacts retrained 2026-08-09 (`n_test 673`, data through
-   2026-08-08), because the weekly cron retrains and commits **without bumping the
-   version**. Merging the accuracy batch collides on binary artifacts, and main's
-   are six days fresher in data.
-2. **`finish_hazard.json` / `decision_winner.json` are frozen.** They are fitted by
-   `lab_fit_hazard.py` / `lab_fit_decision.py`, which neither `run_train.py` nor
-   the cron invokes: `trained_through 2026-07-18` against the ensemble's
-   2026-08-01. The MC timing and the decision model silently drift with every
-   auto-retrain.
+1. ~~**Branch vs production diverge.**~~ **Closed 2026-08-12** — the accuracy
+   batch merged (#2) and main was retrained on top of it, so `MODEL_VERSION`
+   v0.14.0 and the artifacts now agree. The underlying hazard remains: the
+   weekly cron retrains and commits **without bumping the version**, so any
+   future sim branch collides with main on binary artifacts and the resolution
+   is to take one whole coherent artifact set, never file by file.
+2. ~~**`finish_hazard.json` / `decision_winner.json` are frozen.**~~ **Closed
+   2026-08-13.** The fits moved to `src/round_fit.py` and `run_train.py` calls
+   `refit_round_models`, so the weekly cron now refreshes them with everything
+   else; both are `trained_through 2026-08-08`, matching the ensemble. The lab
+   scripts kept their grading and re-run the same fit. What is still open is
+   smaller and named here so it is not rediscovered: the *grading* reports
+   (`lab_finish_hazard.json`, `lab_decision_winner.json`) are written only by
+   the lab scripts, so the held-out numbers in §5 go stale between lab runs
+   even though the served weights no longer do.
 3. **CatBoost is fragile to data drift.** Two days of incremental scraping (89
    updated bouts, 3 new, 48 new Sherdog rows) moved LightGBM by 4.5e-6, LogReg by
    6.6e-5 and CatBoost by **4.5e-3**. The thread-nondeterminism hypothesis was
