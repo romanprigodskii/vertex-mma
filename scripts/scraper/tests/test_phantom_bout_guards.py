@@ -184,9 +184,18 @@ def check_alias_beats_the_name_guard(conn) -> None:
         print("  skip check_alias_beats_the_name_guard (Renato Moicano absent)")
         return
     moicano = row[0]
-    # Without the alias the guard rejects it (different given name is not the
-    # issue here — the surname differs outright).
-    assert resolve_fighter_ids(conn, ["Renato Carneiro"], {}) != [moicano]
+    # Drop the real alias first (rolled back with everything else): asserting
+    # against whatever production currently holds would make this a report on
+    # the alias table, not on the resolver.
+    with conn.cursor() as cur:
+        cur.execute(
+            "DELETE FROM fighter_alias WHERE lower(alias) = lower(%s)",
+            ("Renato Carneiro",),
+        )
+    assert resolve_fighter_ids(conn, ["Renato Carneiro"], {}) != [moicano], (
+        "without an alias, 'Renato Carneiro' must not resolve to Moicano — "
+        "the surnames differ outright"
+    )
     with conn.cursor() as cur:
         cur.execute(
             "INSERT INTO fighter_alias (fighter_id, alias) VALUES (%s::uuid, %s)",
