@@ -198,11 +198,18 @@ def check_adoption_preserves_first_seen_at(conn) -> None:
         # Two fighters with no bout on this card, so auto_create_bout really
         # inserts (its idempotency guard is the pair-at-event lookup) and the
         # adoption UPDATE has exactly one candidate.
+        #
+        # Active roster only: auto_create_bout refuses to book a fighter who is
+        # off the roster and years past their last bout (that pattern is what a
+        # bad name match looks like — see test_phantom_bout_guards). An
+        # arbitrary pair used to draw someone retired since 2013 and this check
+        # failed for a reason that has nothing to do with first_seen_at.
         cur.execute(
             """
             SELECT f.id::text, f.ufc_stats_id
             FROM fighter f
             WHERE f.ufc_stats_id IS NOT NULL
+              AND f.roster_status = 'active'
               AND f.id NOT IN (
                 SELECT fighter_a_id FROM bout WHERE event_id = %s::uuid
                 UNION

@@ -11,6 +11,7 @@ at runtime (the checkout's `git pull` is currently best-effort — see below).
 |---|---|---|
 | hourly | `news-refresh.sh` | RSS → extract → classify (Haiku) → rephrase → translate; auto-creates provisional events/bouts |
 | every 6h | `scrape-refresh.sh` | re-list events + recent bouts (results) + bestfightodds + `fighter_with_stats` matview |
+| every 6h at :20 | `verify-cards.sh` | diff every upcoming card against the live UFCStats card; read-only, logs `CARD DRIFT` on disagreement |
 | daily 04:00 | `sherdog-refresh.sh` | Sherdog pre-UFC fight histories (step 17, incremental: new fighters + upcoming-bout retries/re-syncs) → `fighter_sherdog_bout`, feeds the model's pre-UFC features before predict at 05:15 |
 | **daily 04:30** | `scrape-stats.sh` | **`enrich-bouts` (per-round stats) + `scorecards` + full recompute** |
 | daily 05:15 | `predict-refresh.sh` | score upcoming bouts → `bout_simulation`/`_features`/`_rounds` (winner + Monte-Carlo props) so the sportsbook + "how" panel don't go stale. Committed model (no retrain). Needs `.env.local` at the repo root for `DATABASE_URL`. |
@@ -21,6 +22,24 @@ at runtime (the checkout's `git pull` is currently best-effort — see below).
 The daily `scrape-stats.sh` is the job whose absence let per-round stats,
 scorecards and score-history silently go ~1 month stale (the old cron only
 ran the light `refresh`/`quick` phases — never `enrich-bouts`/`scorecards`).
+
+`verify-cards.sh` is the same lesson from the other direction. Every job here
+reports whether it *ran*; none reported whether the result was *right*, so
+three fights that were never booked sat on live cards for a week while the
+scrape logs stayed green. It re-reads the source and diffs, which is the only
+way that class of defect surfaces without a user noticing first:
+
+```bash
+grep "CARD DRIFT" /var/log/vertex-cron.log      # any disagreement, ever
+grep -A3 "verify-cards start" /var/log/vertex-cron.log | tail -20
+```
+
+`CARD DRIFT` means a bout is on one side and not the other — the EXTRA /
+MISSING lines directly above it name the fights. EXTRA is usually a
+provisional (news-created) row UFCStats never adopted; MISSING is a scrape
+that under-read a card. Neither is self-healing: investigate, then either
+`scripts/scraper/scripts/purge_phantom_bookings.py --apply` (for a phantom) or
+a targeted re-scrape (for a miss).
 
 ## Recompute chain (`recompute.sh`)
 

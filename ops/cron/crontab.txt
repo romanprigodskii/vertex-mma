@@ -9,6 +9,11 @@
 # Every 6h — light: re-list events + recent bouts (results) + odds + matview
 0 */6 * * *  /opt/vertex-cron/scrape-refresh.sh
 
+# Every 6h at :20 — diff our upcoming cards against the live UFCStats cards,
+# 20 min after the refresh above so it checks what that scrape just wrote.
+# Read-only. Logs `CARD DRIFT` when a bout is on one side and not the other.
+20 */6 * * * /opt/vertex-cron/verify-cards.sh
+
 # Daily 03:30 — live ufc.com/rankings -> ranking_snapshot, before the daily
 # recompute so fresh ranks land in scores the same day
 30 3 * * *   /opt/vertex-cron/rankings-refresh.sh
