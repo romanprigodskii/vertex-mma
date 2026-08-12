@@ -55,6 +55,11 @@ EPS = 1e-12
 # of a held-out number stays out-of-sample and not just the ensemble weights.
 METHOD_MODEL_DIR = ARTIFACTS_DIR / "method_model"
 METHOD_MODEL_EVAL_DIR = ARTIFACTS_DIR / "method_model_eval"
+# v0.14.0 — the debut segment's own conditional. Same two-artifact
+# discipline; see train.train_debut_method_model for why it is a separate
+# model rather than the main one served on a wider population.
+METHOD_MODEL_DEBUT_DIR = ARTIFACTS_DIR / "method_model_debut"
+METHOD_MODEL_DEBUT_EVAL_DIR = ARTIFACTS_DIR / "method_model_debut_eval"
 
 # Whether the per-side absolute levels below are added to the matrix.
 #

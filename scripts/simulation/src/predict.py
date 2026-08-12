@@ -25,8 +25,8 @@ from .config import ARTIFACTS_DIR, confidence_label
 from .db import get_connection
 from .ensemble import EnsembleModel
 from .export import build_dataset, fetch_raw, stable_hash, swap_sides
-from .features import build_feature_matrix
-from .method_model import METHOD_MODEL_DIR, MethodModel
+from .features import build_feature_matrix, serving_columns
+from .method_model import METHOD_MODEL_DEBUT_DIR, METHOD_MODEL_DIR, MethodModel
 from .method_model import conditional_mix as method_conditional_mix
 from .monte_carlo import FighterMC, simulate_bout
 
@@ -70,9 +70,10 @@ class LoadedModel:
     ) -> np.ndarray:
         if debut:
             assert self.debut_ensemble is not None
-            return self.debut_ensemble.predict_proba_a(X[self.debut_feature_columns])
-        X = X[self.feature_columns]
-        return self.ensemble.predict_proba_a(X)
+            return self.debut_ensemble.predict_proba_a(
+                X[serving_columns(self.debut_feature_columns)]
+            )
+        return self.ensemble.predict_proba_a(X[serving_columns(self.feature_columns)])
 
     def shap_contributions(
         self, X: pd.DataFrame, *, debut: bool = False
@@ -122,7 +123,7 @@ def predict_upcoming(*, force_version: str | None = None) -> int:
     # (which selects on target) doesn't break — we won't use y.
     upcoming_fill = upcoming.copy()
     upcoming_fill["target_a_wins"] = 0
-    X, _, meta = build_feature_matrix(upcoming_fill)
+    X, _, meta = build_feature_matrix(upcoming_fill, corrector=True)
 
     # Order-invariant winner prob: the model isn't perfectly antisymmetric
     # (abs_*_a/_b, stance one-hots), so the raw scrape order would leak into
@@ -130,7 +131,7 @@ def predict_upcoming(*, force_version: str | None = None) -> int:
     #   P(A wins) = ½·[ predict(A,B) + (1 − predict(B,A)) ].
     # Bouts with a debutant route to the specialist, everything else to the
     # main ensemble; both get the same order-averaging.
-    X_swapped, _, _ = build_feature_matrix(swap_sides(upcoming_fill))
+    X_swapped, _, _ = build_feature_matrix(swap_sides(upcoming_fill), corrector=True)
     probs_a = np.empty(len(upcoming), dtype=float)
     for mask, is_debut in ((~debut_mask, False), (debut_mask, True)):
         if not mask.any():
@@ -225,6 +226,32 @@ def predict_upcoming(*, force_version: str | None = None) -> int:
     else:
         console.log("no method model artifact — method mix falls back to the simulator")
 
+    # v0.14.0 — the debut segment gets its own conditional instead of the
+    # simulator's hazards. It is a SEPARATE artifact, not the model above
+    # applied wider: that one has never been fitted on a row where one
+    # side's career columns are entirely NaN. Missing artifact → this stays
+    # None → the debut segment keeps pre-v0.14.0 behaviour exactly.
+    debut_method_mixes: np.ndarray | None = None
+    if METHOD_MODEL_DEBUT_DIR.exists() and bool(debut_mask.any()):
+        debut_method_model = MethodModel.load(METHOD_MODEL_DEBUT_DIR)
+        debut_method_mixes = method_conditional_mix(debut_method_model, upcoming_fill)
+        console.log(
+            f"debut method model loaded "
+            f"({len(debut_method_model.feature_columns)} features) — "
+            f"pricing {int(debut_mask.sum())} debut bouts"
+        )
+    elif bool(debut_mask.any()):
+        console.log(
+            f"no debut method model artifact — {int(debut_mask.sum())} debut "
+            f"bouts fall back to the simulator"
+        )
+
+    def mix_for(i: int) -> tuple[tuple[float, ...], tuple[float, ...]] | None:
+        source = debut_method_mixes if debut_mask[i] else method_mixes
+        if source is None:
+            return None
+        return (tuple(source[i, 0]), tuple(source[i, 1]))
+
     mc_rows: list[tuple] = []
     for i, m in enumerate(meta.itertuples(index=False)):
         row = upcoming.iloc[i]
@@ -243,11 +270,7 @@ def predict_upcoming(*, force_version: str | None = None) -> int:
             # this needs no extra fetch.
             is_main_event=bool(row["is_main_event"]),
             is_title_fight=bool(row["is_title_fight"]),
-            method_mix=(
-                (tuple(method_mixes[i, 0]), tuple(method_mixes[i, 1]))
-                if method_mixes is not None and not debut_mask[i]
-                else None
-            ),
+            method_mix=mix_for(i),
         )
         mc_rows.append(
             (

@@ -51,7 +51,7 @@ from sklearn.metrics import accuracy_score, log_loss, roc_auc_score  # noqa: E40
 from src.config import ARTIFACTS_DIR, DATA_DIR  # noqa: E402
 from src.ensemble import EnsembleModel  # noqa: E402
 from src.export import build_dataset, fetch_raw, swap_sides, symmetrize_for_training  # noqa: E402
-from src.features import build_feature_matrix  # noqa: E402
+from src.features import build_feature_matrix, serving_columns  # noqa: E402
 from src.train import temporal_split  # noqa: E402
 
 EPS = 1e-6
@@ -122,10 +122,11 @@ def prepare_splits(use_cache: bool = False, ensemble_dir: Path | None = None) ->
     df = load_symmetrized(use_cache)
     ens = EnsembleModel.load(ensemble_dir or resolve_ensemble_dir())
 
-    X, y, meta = build_feature_matrix(df)
-    X = X[ens.feature_columns]
-    X_sw, _, _ = build_feature_matrix(swap_sides(df))
-    X_sw = X_sw[ens.feature_columns]
+    cols = serving_columns(ens.feature_columns)
+    X, y, meta = build_feature_matrix(df, corrector=True)
+    X = X[cols]
+    X_sw, _, _ = build_feature_matrix(swap_sides(df), corrector=True)
+    X_sw = X_sw[cols]
 
     Xs, ys, metas = temporal_split(X, y, meta)
     Xsw_s, _, _ = temporal_split(X_sw, y, meta)

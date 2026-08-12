@@ -157,7 +157,12 @@ SELECT
   f.stance::text AS stance,
   f.gender,
   f.photo_thumbnail_url,
-  (f.sherdog_id IS NOT NULL) AS sherdog_matched
+  (f.sherdog_id IS NOT NULL) AS sherdog_matched,
+  -- v0.15.0 — same corrector input export.FIGHTERS_SQL reads. Without
+  -- it a custom sim would price at a DIFFERENT correction from the one
+  -- production serves for the same two fighters, silently, because the
+  -- corrector maps a missing column to a zero shift.
+  (f.sherdog_flag_code = 'US') AS is_american
 FROM fighter f
 WHERE f.id = %s::uuid
 """
@@ -399,6 +404,11 @@ def score_pair(
         "age_b": b.age_years,
         "stance_a": a.info.get("stance"),
         "stance_b": b.info.get("stance"),
+        # v0.15.0 — corrector input. None (not False) when unknown, so the
+        # shift is zero rather than an assertion that the fighter is not
+        # American.
+        "is_american_a": a.info.get("is_american"),
+        "is_american_b": b.info.get("is_american"),
         "gender": gender,
         "market_prob_a": None,
         "target_a_wins": 0,  # dummy — build_feature_matrix selects on it
@@ -412,8 +422,8 @@ def score_pair(
         row[f"{k}_b"] = v
 
     df = pd.DataFrame([row])
-    X, _, _ = build_feature_matrix(df)
-    X_swapped, _, _ = build_feature_matrix(swap_sides(df))
+    X, _, _ = build_feature_matrix(df, corrector=True)
+    X_swapped, _, _ = build_feature_matrix(swap_sides(df), corrector=True)
     # Order-invariant winner prob, same as predict.py.
     p_orig = float(model.predict_proba_a(X)[0])
     p_swap = float(model.predict_proba_a(X_swapped)[0])

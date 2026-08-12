@@ -30,13 +30,25 @@ from .config import (
     VAL_END,
 )
 from .ensemble import EnsembleModel, ResidualCorrector
-from .features import build_feature_matrix, debut_feature_names, feature_names
+from .features import (
+    build_feature_matrix,
+    debut_feature_names,
+    feature_names,
+    serving_columns,
+)
 from .method_model import (
+    METHOD_MODEL_DEBUT_DIR,
+    METHOD_MODEL_DEBUT_EVAL_DIR,
     METHOD_MODEL_DIR,
     METHOD_MODEL_EVAL_DIR,
     METHODS,
+    USE_LEVELS,
+    USE_SUB_AXIS,
     MethodModel,
     _multiclass_logloss,
+    build_method_features,
+    gradeable_rows,
+    orient_winner_first,
     training_matrix,
 )
 
@@ -308,6 +320,118 @@ def train_method_model(exp_df: pd.DataFrame) -> dict[str, Any]:
     }
 
 
+def train_debut_method_model(df: pd.DataFrame) -> dict[str, Any]:
+    """Fit the conditional method model for the DEBUT segment.
+
+    Until v0.14.0 there was no model here at all. `train_method_model`
+    above is handed `exp_df`, so it has never seen a debut row, and
+    `predict.py` passed `method_mix=None` for those bouts — roughly 19 % of
+    the priced slate took its method / distance / total_rounds numbers from
+    the simulator's own hazards, whose entire per-fight input is the ten
+    hand-shrunk `FighterMC` fields, every one of which is a router default
+    when one side has no UFC record.
+
+    Same transfer recipe as the winner-leg specialist (v0.8.0), for the same
+    reason: there are only ~2.2k gradeable debut rows, and training on them
+    alone throws away everything the other 6.4k teach about how a skill gap
+    turns into a finish. Both-experienced rows enter at
+    `DEBUT_EXP_ROW_WEIGHT`; selection (early stopping and the simplex blend)
+    uses DEBUT val rows only, so the model is chosen for the segment it
+    serves.
+
+    Gate trail: `docs/accuracy_batch.md` §6. The number that mattered was
+    not the one this was expected to be: a per-length CONSTANT on the debut
+    base rates is WORSE than the simulator (1.0524 vs 1.0091 on 793
+    walk-forward bouts), so the anchor was not a straw man and the win here
+    is a model win, not a corrected marginal.
+    """
+    sub = df.loc[gradeable_rows(df)].reset_index(drop=True)
+    debut = (
+        sub["is_debut_a"].fillna(False).astype(bool)
+        | sub["is_debut_b"].fillna(False).astype(bool)
+    ).to_numpy()
+    oriented = orient_winner_first(sub)
+    base, _, _ = build_feature_matrix(oriented)
+    X = build_method_features(base, oriented, levels=USE_LEVELS, sub_axis=USE_SUB_AXIS)
+    y = np.array([METHODS.index(m) for m in sub["method_bucket"]], dtype=int)
+    dates = pd.to_datetime(sub["event_date"])
+    weights = np.where(debut, 1.0, DEBUT_EXP_ROW_WEIGHT)
+
+    tr = (dates < pd.Timestamp(TRAIN_END)).to_numpy()
+    va = (
+        (dates >= pd.Timestamp(TRAIN_END)) & (dates < pd.Timestamp(VAL_END))
+    ).to_numpy() & debut
+    if not tr.any() or va.sum() < 20:
+        raise RuntimeError(
+            f"debut method model: train {int(tr.sum())} / debut val {int(va.sum())} "
+            "— refusing to select on that"
+        )
+
+    console.log(
+        f"training debut method model (transfer, exp-row weight "
+        f"{DEBUT_EXP_ROW_WEIGHT}) — {int(debut.sum()):,} debut rows · "
+        f"train {int(tr.sum()):,} · debut val {int(va.sum())}"
+    )
+    split = MethodModel().fit(
+        X.loc[tr].reset_index(drop=True),
+        y[tr],
+        X.loc[va].reset_index(drop=True),
+        y[va],
+        sample_weight=weights[tr],
+    )
+    p_va = split.predict_cond(X.loc[va].reset_index(drop=True))
+    va_ll = _multiclass_logloss(y[va], p_va)
+    base_rates = np.array([(y[tr & debut] == j).mean() for j in range(3)])
+    const_ll = float(
+        -np.log(
+            np.clip(
+                np.tile(base_rates, (int(va.sum()), 1))[np.arange(int(va.sum())), y[va]],
+                1e-12,
+                1.0,
+            )
+        ).mean()
+    )
+    console.log(
+        f"debut method model val log-loss {va_ll:.4f} vs {const_ll:.4f} for the "
+        f"debut base rates · weights "
+        + " ".join(f"{k}={v:.2f}" for k, v in split.weights.items())
+    )
+    split.save(METHOD_MODEL_DEBUT_EVAL_DIR)
+
+    served = MethodModel(
+        feature_columns=split.feature_columns,
+        use_levels=split.use_levels,
+        weights=split.weights,
+        best_iters=split.best_iters,
+        val_metrics=split.val_metrics,
+    ).refit_fixed(X, y, sample_weight=weights)
+    served.save(METHOD_MODEL_DEBUT_DIR)
+    console.log(
+        f"debut method model refit on ALL {len(X):,} gradeable rows (served)"
+    )
+
+    return {
+        "n_debut_rows": int(debut.sum()),
+        "n_train": int(tr.sum()),
+        "n_val_debut": int(va.sum()),
+        "n_served_rows": int(len(X)),
+        "n_features": int(X.shape[1]),
+        "exp_row_weight": DEBUT_EXP_ROW_WEIGHT,
+        "val_logloss": va_ll,
+        "val_logloss_debut_base_rates": const_ll,
+        "blend_weights": split.weights,
+        "best_iters": split.best_iters,
+        "debut_base_rates": dict(
+            zip(METHODS, [float(x) for x in base_rates], strict=True)
+        ),
+        "note": (
+            "conditional P(method | this side wins) for bouts with a UFC "
+            "debutant; before v0.14.0 that segment had no method model and "
+            "fell back to the simulator's hazards on router defaults"
+        ),
+    }
+
+
 def run_training(df: pd.DataFrame) -> dict[str, dict[str, float]]:
     # The dataset may include debut rows (v0.8.0). The MAIN model trains on
     # both-experienced bouts only — exactly the v0.7.0 recipe — so adding
@@ -319,11 +443,17 @@ def run_training(df: pd.DataFrame) -> dict[str, dict[str, float]]:
     else:
         exp_df = df
 
-    X, y, meta = build_feature_matrix(exp_df)
+    # `corrector=True` so the CORRECTOR_COLUMNS ride along. The learners
+    # never see them — `cols` below is feature_names() and EnsembleModel
+    # narrows to its own feature_columns — but every scoring call after the
+    # corrector is attached needs them present.
+    X, y, meta = build_feature_matrix(exp_df, corrector=True)
     cols = feature_names()
-    X = X[cols]
+    X_fit = X[cols]
+    X = X[serving_columns(cols)]
 
     Xs, ys, metas = temporal_split(X, y, meta)
+    Xfit_s, _, _ = temporal_split(X_fit, y, meta)
     if len(Xs["train"]) == 0 or len(Xs["val"]) == 0:
         raise RuntimeError(
             "Empty train or val split. Check TRAIN_END / VAL_END vs your data range."
@@ -344,9 +474,9 @@ def run_training(df: pd.DataFrame) -> dict[str, dict[str, float]]:
 
     console.log("training ensemble (LGB + XGB + LogReg)…")
     train_meta = ensemble.fit(
-        X_train=Xs["train"],
+        X_train=Xfit_s["train"],
         y_train=ys["train"],
-        X_val=Xs["val"],
+        X_val=Xfit_s["val"],
         y_val=ys["val"],
     )
     console.log(
@@ -405,7 +535,7 @@ def run_training(df: pd.DataFrame) -> dict[str, dict[str, float]]:
     ensemble.save(ENSEMBLE_EVAL_DIR)
 
     console.log(f"refitting production model on ALL {len(X):,} rows (served weights)…")
-    prod = ensemble.refit_on_all(X, y)
+    prod = ensemble.refit_on_all(X_fit, y)
     served_through = str(pd.to_datetime(meta["event_date"]).max().date())
 
     # Persist artifacts — the PRODUCTION (refit-on-all) model is what we serve.
@@ -423,8 +553,9 @@ def run_training(df: pd.DataFrame) -> dict[str, dict[str, float]]:
     debut_cols: list[str] | None = None
     if "is_debut_a" in df.columns and bool(debut_mask_df.any()):
         debut_cols = debut_feature_names()
-        X_d, y_d, meta_d = build_feature_matrix(df)
-        X_d = X_d[debut_cols]
+        X_d, y_d, meta_d = build_feature_matrix(df, corrector=True)
+        X_d_fit = X_d[debut_cols]
+        X_d = X_d[serving_columns(debut_cols)]
         weights_all = np.where(debut_mask_df.to_numpy(), 1.0, DEBUT_EXP_ROW_WEIGHT)
 
         dt_d = pd.to_datetime(meta_d["event_date"])
@@ -454,9 +585,9 @@ def run_training(df: pd.DataFrame) -> dict[str, dict[str, float]]:
             f"{int(m_debut.sum()):,} debut rows · val {int(va_mask.sum())}"
         )
         specialist.fit(
-            X_train=X_d.loc[m_tr.to_numpy()].reset_index(drop=True),
+            X_train=X_d_fit.loc[m_tr.to_numpy()].reset_index(drop=True),
             y_train=y_d.loc[m_tr.to_numpy()].reset_index(drop=True),
-            X_val=X_d.loc[va_mask].reset_index(drop=True),
+            X_val=X_d_fit.loc[va_mask].reset_index(drop=True),
             y_val=y_d.loc[va_mask].reset_index(drop=True),
             sample_weight=weights_all[m_tr.to_numpy()],
         )
@@ -474,7 +605,9 @@ def run_training(df: pd.DataFrame) -> dict[str, dict[str, float]]:
 
         ENSEMBLE_DEBUT_EVAL_DIR.mkdir(exist_ok=True)
         specialist.save(ENSEMBLE_DEBUT_EVAL_DIR)
-        prod_specialist = specialist.refit_on_all(X_d, y_d, sample_weight=weights_all)
+        prod_specialist = specialist.refit_on_all(
+            X_d_fit, y_d, sample_weight=weights_all
+        )
         ENSEMBLE_DEBUT_DIR.mkdir(exist_ok=True)
         prod_specialist.save(ENSEMBLE_DEBUT_DIR)
 
@@ -483,6 +616,14 @@ def run_training(df: pd.DataFrame) -> dict[str, dict[str, float]]:
     # population as the main ensemble, on rows whose outcome the method
     # market actually settles.
     method_meta = train_method_model(exp_df)
+
+    # v0.14.0 — the same leg for the segment that had none. Trained on the
+    # FULL frame (debut rows included) with both-experienced down-weighted,
+    # so it does not disturb the model above, which keeps its own
+    # both-experienced-only fit.
+    debut_method_meta: dict[str, Any] | None = None
+    if "is_debut_a" in df.columns and bool(debut_mask_df.any()):
+        debut_method_meta = train_debut_method_model(df)
 
     metadata = {
         "model_version": MODEL_VERSION,
@@ -526,6 +667,8 @@ def run_training(df: pd.DataFrame) -> dict[str, dict[str, float]]:
         # v0.12.0 — conditional method model. Prices the method/round legs;
         # the winner leg is untouched, so every metric above is unaffected.
         "method_model": method_meta,
+        # v0.14.0 — the debut segment's conditional method model.
+        "method_model_debut": debut_method_meta,
     }
     (ARTIFACTS_DIR / "metadata.json").write_text(
         json.dumps(metadata, indent=2, default=str)

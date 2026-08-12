@@ -177,10 +177,22 @@ produce it, and a ~2.4 pp gap that no basis produces.
 
 The log-loss gap decomposes, and after v0.13.0 it decomposes the other
 way round from how it used to: **calibration is now BETTER than the
-book's** (reliability 0.00186 model vs 0.00301 market — lower is
-better) while **resolution** is 0.03826 vs 0.04801. The deficit is
+book's** while **resolution** is 0.03826 vs 0.04801. The deficit is
 sharpness on lopsided matchups: the book knows which mismatches are
 real and we don't.
+
+The calibration half of that sentence used to be quoted as reliability
+0.00186 model vs 0.00301 market, off a 10-equal-width-bin Murphy
+decomposition. The claim survives; that statistic should not be the one
+carrying it. Swept over bin counts on five baseline seeds, the sign of
+(model − market) reliability is stable only at 5 bins — at 10, 20 and 40
+it flips depending on the seed, because ~30 bouts per bin makes the
+statistic measure the market's *dispersion* rather than its calibration,
+and the market is the more dispersed series by construction. The
+bin-free CORP miscalibration is sign-stable on all five seeds and says
+the same thing the README always said: **model 0.0101–0.0132 against the
+market's 0.0154** (lower is better). Full sweep: `docs/accuracy_batch.md`
+§7.
 
 What closed a fifth of it was not sharpness. `docs/winner_batch.md`
 asked each losing segment whether the book was merely SHARPER there or
@@ -199,6 +211,54 @@ weight), which the scraper began accruing in `bout_change_event` /
 rankings — the last untapped source in the database, 47k point-in-time
 snapshots — were tried twice and failed both gates
 (`docs/winner_batch.md` §7).
+
+v0.14.0 does not touch the winner leg either. It closes a COVERAGE hole:
+`train_method_model` was handed the both-experienced frame, so the
+conditional method model had never seen a debut row, and `predict.py`
+passed `method_mix=None` for those bouts — about 19 % of the priced slate
+took its method / distance / total_rounds numbers from the simulator's
+hazards, whose ten `FighterMC` inputs are all router defaults when one
+side has no UFC record. `train_debut_method_model` fits that segment on
+the v0.8.0 transfer recipe (both-experienced rows down-weighted to 0.2,
+selection on debut val rows only) and beats what production serves there
+by **0.048 nats** on 793 walk-forward bouts — −0.048 / −0.053 / −0.046
+across three seeds, every interval excluding zero, 100 % of resamples
+improving. The winner leg moves by exactly 0.0000; this is a mix change
+on a segment, not a re-scoring.
+
+The baseline that gate ran against is worth recording, because the prior
+was wrong. It was meant to be a per-length CONSTANT on the debut base
+rates, on the reasoning that the MC anchor was a straw man and most of
+the gain would be a corrected marginal. Measured, the constant is
+**worse** than the anchor (1.0524 vs 1.0091) — the simulator carries real
+per-bout signal on debut bouts even on defaults, so the win is a model
+win.
+
+Everything else in that batch failed (`docs/accuracy_batch.md`): a
+sub-vs-dec temperature, the age correction transferred to the debut
+specialist, absolute levels in the debut matrix, and a nationality term in
+the corrector. The last one is the interesting refusal. It passed all three
+legs of the gate that shipped v0.13.0 — cross-fit −0.0015, forward −0.0020,
+held-out −0.0013 — and then the ROLLING basis, which this README calls the
+honest week-to-week number, came back **+0.0022** against age alone on
+identical origins. Every one of those readings is under the floor below, so
+the reading is not "three bases beat one": it is that nothing is resolved,
+and a sign that flips between bases is the same condition (g) that kills
+levers whose sign flips between seeds. The substrate shipped anyway —
+`fighter.sherdog_flag_code` is filled for 4,136 fighters and
+`features.CORRECTOR_COLUMNS` carries the column — because building the data
+is the expensive part.
+
+What those left behind is instruments and a floor. Two more
+walk-forward pools now exist — the conditional method leg is selectable on
+**543 submissions** instead of the 71 val rows its own writeup called
+noise, and the debut specialist on **798 bouts** instead of 84 — and the
+main pool's detection limit is measured for the first time: a one-sided
+80 % MDE of **0.0036** on a single seed, 0.0029 with an infinite seed
+budget. `RESIDUAL_CORRECTION` is worth −0.0026, i.e. below it. v0.13.0
+shipped because three independent legs agreed on its sign, not because any
+one reading resolved it — which is the standard to keep, and the reason
+more seeds cannot rescue an underpowered arm.
 
 Main model core (v0.7.0 recipe): opponent-adjusted ratings
 (`src/opponent_ratings.py`) — online attack/defense skill ratings

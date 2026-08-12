@@ -175,9 +175,32 @@ CONTEXT_COLUMNS = [
 ]
 
 
-def build_feature_matrix(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series, pd.DataFrame]:
+# Columns the post-blend ResidualCorrector may read, which the three
+# learners must NOT see. They are opt-in (`corrector=True`) rather than
+# always present for one concrete reason: `method_model.build_method_features`
+# copies the WHOLE base matrix, so widening `build_feature_matrix`
+# unconditionally would silently widen the method model's 184-column
+# contract too.
+#
+# The separation is the entire mechanism of v0.13.0. `winner_batch.md` §6
+# showed the age signal is not missing from the feature matrix, it is
+# DILUTED — 117 partly collinear columns and three learners whose
+# disagreement the blend averages toward zero. A correction works because
+# nothing competes with it. Handing the same column to the learners would
+# recreate exactly the dilution the correction exists to escape.
+CORRECTOR_COLUMNS = ["diff_is_american"]
+
+
+def build_feature_matrix(
+    df: pd.DataFrame, *, corrector: bool = False
+) -> tuple[pd.DataFrame, pd.Series, pd.DataFrame]:
     """Return (X, y, meta) where meta keeps bout_id + event_date for
-    temporal splitting / joining predictions back to the DB."""
+    temporal splitting / joining predictions back to the DB.
+
+    `corrector=True` appends CORRECTOR_COLUMNS. Callers that serve a model
+    carrying a `ResidualCorrector` need it; nothing else does, and the
+    learners never select those columns because they are absent from
+    `feature_names()`."""
     out: dict[str, pd.Series] = {}
 
     # A - B diffs.
@@ -267,6 +290,19 @@ def build_feature_matrix(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series, pd.
     # treat those (often short-notice / heavy) bouts differently.
     out["wc_other"] = (~weight_cat.isin(_STD_WC)).astype("int8")
 
+    if corrector:
+        # float, not int8: NaN has to survive. An unknown nationality must
+        # reach ResidualCorrector as NaN so it contributes a zero shift —
+        # False would assert "not American", which is a different claim.
+        for side in ("a", "b"):
+            col = f"is_american_{side}"
+            out[f"_am_{side}"] = (
+                pd.to_numeric(df[col], errors="coerce").astype("float64")
+                if col in df.columns
+                else pd.Series(float("nan"), index=df.index, dtype="float64")
+            )
+        out["diff_is_american"] = out.pop("_am_a") - out.pop("_am_b")
+
     X = pd.DataFrame(out)
     y = df["target_a_wins"].astype("int8")
     # market_prob_a travels on `meta` (NOT `X`) so it stays positionally
@@ -319,10 +355,105 @@ def feature_names() -> list[str]:
     return cols
 
 
-def debut_feature_names() -> list[str]:
+# Columns whose DIFF is unreadable on a debut row, and which have no
+# absolute companion in ABSOLUTE_KEEP. Measured, not assumed: on the 2,211
+# debut rows in data/dataset.parquet, exactly 27 of the 67 diffs are 100%
+# NaN, and 22 of them are these. The other five (kd_per_fight, layoff_days,
+# vertex_score, vertex_score_all_time, kd_absorbed_per_fight) already carry
+# abs_*_a/_b.
+#
+# The point is NOT the debutant's own level — that is genuinely unknown.
+# It is the OPPONENT's. When the debutant side is NaN the diff is NaN, so
+# the model cannot see whether the experienced fighter is a 5.2-slpm
+# volume striker or a 1.8-slpm grinder; every debut bout looks the same on
+# these 22 axes. This is the same hole METHOD_LEVEL_COLUMNS closed for the
+# method leg ("a diff of zero reads the same for two knockout artists as
+# for two point-fighters") — there it was worth 0.8966 -> 0.8870.
+#
+# Deliberately NOT here: str_off/def, grap_off/def, ctrl_off/def, elo,
+# glicko_cons. A debutant's snapshot gives those real initial values (0 for
+# the opponent-adjusted ratings = league mean, elo 1500, glicko 800), so
+# the diff already carries the opponent's level and a level column would be
+# the redundancy the round lab refused.
+DEBUT_LEVEL_COLUMNS = [
+    "prior_win_rate",
+    "prior_finish_rate",
+    "slpm",
+    "sapm",
+    "str_acc",
+    "td_per15",
+    "td_acc",
+    "td_def",
+    "sub_per15",
+    "control_per_min",
+    "control_absorbed_per_min",
+    "reversals_per_fight",
+    "finish_against_per_bout",
+    "avg_bout_seconds",
+    "avg_opp_elo_career",
+    "avg_opp_elo_last5",
+    "avg_opp_elo_beaten",
+    "max_opp_elo_beaten",
+    "sos_weighted_winrate",
+    "traj_slpm",
+    "traj_sapm",
+    "traj_td",
+]
+
+
+def add_debut_levels(X: pd.DataFrame, df: pd.DataFrame) -> pd.DataFrame:
+    """Append `dlvl_<col>_a/_b` for DEBUT_LEVEL_COLUMNS.
+
+    A separate function rather than a branch inside `build_feature_matrix`
+    on purpose: `method_model.build_method_features` copies the WHOLE base
+    matrix, so widening `build_feature_matrix` would silently widen the
+    method model's 184-column contract too. The specialist asks for these
+    explicitly; nothing else sees them.
+    """
+    out = X.copy()
+    for col in DEBUT_LEVEL_COLUMNS:
+        for side in ("a", "b"):
+            out[f"dlvl_{col}_{side}"] = pd.to_numeric(
+                df[f"{col}_{side}"], errors="coerce"
+            )
+    return out
+
+
+def build_debut_matrix(
+    df: pd.DataFrame, *, levels: bool = False
+) -> tuple[pd.DataFrame, pd.Series, pd.DataFrame]:
+    """(X, y, meta) for the debut specialist. `levels=False` reproduces the
+    v0.8.0 matrix exactly."""
+    X, y, meta = build_feature_matrix(df)
+    if levels:
+        X = add_debut_levels(X, df)
+    return X, y, meta
+
+
+def serving_columns(feature_columns: list[str]) -> list[str]:
+    """`feature_columns` plus whatever the corrector needs, in a stable
+    order. Use this wherever a SAVED ensemble is scored — a saved model may
+    carry a `ResidualCorrector`, and `ResidualCorrector.shift` raises rather
+    than silently serving an uncorrected probability under a version number
+    that promises otherwise."""
+    cols = list(feature_columns)
+    return cols + [c for c in CORRECTOR_COLUMNS if c not in cols]
+
+
+def debut_feature_names(*, levels: bool = False) -> list[str]:
     """Feature list for the DEBUT SPECIALIST (v0.8.0): the main model's
     columns plus the per-side debut flags. The debutant side's career
     columns arrive as NaN (LGB/XGB consume them natively; the LogReg leg
     mean-imputes from train), so the flags let the model tell "unknown
-    because debut" apart from ordinary missingness."""
-    return feature_names() + ["is_debut_a", "is_debut_b"]
+    because debut" apart from ordinary missingness.
+
+    `levels=True` adds the 22 absolute pairs above. The flags stay either
+    way, and they have to: the LogReg leg mean-imputes without a
+    missingness indicator (`ensemble.py:404-424`), so every new level on
+    the debutant's side becomes the train mean, and only `is_debut_*` tells
+    the model that is what happened."""
+    cols = feature_names() + ["is_debut_a", "is_debut_b"]
+    if levels:
+        for col in DEBUT_LEVEL_COLUMNS:
+            cols += [f"dlvl_{col}_a", f"dlvl_{col}_b"]
+    return cols

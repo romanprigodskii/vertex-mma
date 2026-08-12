@@ -46,8 +46,17 @@ from src.config import (  # noqa: E402
 )
 from src.ensemble import EnsembleModel  # noqa: E402
 from src.export import swap_sides  # noqa: E402
-from src.features import build_feature_matrix, feature_names  # noqa: E402
-from src.train import _load_tuned_params, temporal_split  # noqa: E402
+from src.features import (  # noqa: E402
+    build_debut_matrix,
+    build_feature_matrix,
+    debut_feature_names,
+    feature_names,
+)
+from src.train import (  # noqa: E402
+    DEBUT_EXP_ROW_WEIGHT,
+    _load_tuned_params,
+    temporal_split,
+)
 
 
 @dataclass
@@ -270,6 +279,46 @@ OOF_STEP_MONTHS = 3
 OOF_VAL_MONTHS = 12
 
 
+def iter_origins(
+    dates: pd.Series,
+    *,
+    start: str = OOF_START,
+    end: str = OOF_END,
+    step_months: int = OOF_STEP_MONTHS,
+    val_months: int = OOF_VAL_MONTHS,
+    min_train: int = 500,
+    min_val: int = 50,
+):
+    """Yield `(origin, train_mask, val_mask, score_mask)` per quarterly origin.
+
+    The schedule, extracted so that objects other than the winner ensemble can
+    be measured on the SAME instrument rather than on a re-implementation of
+    it. That matters more than it sounds: the method leg selects on 428 val
+    rows and the debut specialist on 84, both of them smaller than the 429-row
+    val split this directory already documented as unable to resolve the
+    effects it was being asked about — and a second, subtly different
+    walk-forward would make those two numbers incomparable with the winner
+    leg's.
+
+    Masks are plain boolean arrays over the caller's frame, so a caller that
+    fits on everything and scores on a subset (the debut specialist) just
+    intersects `score_mask` with its own segment mask.
+    """
+    origin = pd.to_datetime(start)
+    stop = pd.to_datetime(end)
+    while origin < stop:
+        nxt = origin + pd.DateOffset(months=step_months)
+        val_start = origin - pd.DateOffset(months=val_months)
+        tr = (dates < val_start).to_numpy()
+        va = ((dates >= val_start) & (dates < origin)).to_numpy()
+        sc = ((dates >= origin) & (dates < min(nxt, stop))).to_numpy()
+        if tr.sum() < min_train or va.sum() < min_val or sc.sum() == 0:
+            origin = nxt
+            continue
+        yield origin, tr, va, sc
+        origin = nxt
+
+
 def walk_forward(
     df: pd.DataFrame,
     *,
@@ -311,18 +360,7 @@ def walk_forward(
     }
 
     rows = []
-    origin = pd.to_datetime(start)
-    stop = pd.to_datetime(end)
-    while origin < stop:
-        nxt = origin + pd.DateOffset(months=OOF_STEP_MONTHS)
-        val_start = origin - pd.DateOffset(months=OOF_VAL_MONTHS)
-        tr = (dates < val_start).to_numpy()
-        va = ((dates >= val_start) & (dates < origin)).to_numpy()
-        sc = ((dates >= origin) & (dates < min(nxt, stop))).to_numpy()
-        if tr.sum() < 500 or va.sum() < 50 or sc.sum() == 0:
-            origin = nxt
-            continue
-
+    for origin, tr, va, sc in iter_origins(dates, start=start, end=end):
         model = EnsembleModel(
             feature_columns=cols,
             lgb_params=lgb_params,
@@ -371,7 +409,123 @@ def walk_forward(
                 f"    origin {origin.date()}  train {int(tr.sum()):5d}  val {int(va.sum()):4d}  "
                 f"scored {int(sc.sum()):4d}"
             )
-        origin = nxt
+    return pd.concat(rows, ignore_index=True)
+
+
+def walk_forward_debut(
+    df: pd.DataFrame,
+    *,
+    label: str = "baseline",
+    seed: int = 42,
+    columns: list[str] | None = None,
+    levels: bool = False,
+    corrector: Any | None = None,
+    start: str = OOF_START,
+    end: str = OOF_END,
+    min_val_debut: int = 20,
+    verbose: bool = False,
+) -> pd.DataFrame:
+    """Walk-forward OOF pool for the DEBUT specialist.
+
+    The specialist is the worst-measured object in this tree. `train.py:436`
+    picks its early-stopping round, its blender and its blend mode on the
+    debut rows inside the 2024 val window — 84 of them. `tail_resolution.md`
+    retired a 429-row instrument for being unable to resolve the effects it
+    was asked about; this one is five times smaller, and every v0.8.0-era
+    claim about the specialist rests on it.
+
+    Production recipe, reproduced exactly (`train.py:415-479`): fit on ALL
+    rows with both-experienced bouts down-weighted to `DEBUT_EXP_ROW_WEIGHT`,
+    select on DEBUT rows only, serve on debut rows only. The only thing that
+    changes here is the split — quarterly origins instead of one static 2024
+    window.
+
+    `corrector` attaches a `ResidualCorrector` after the blend, which
+    production does NOT do for the specialist (`train.py` assigns `.corrector`
+    only on the main ensemble, at :365). That is the open question at the end
+    of docs/winner_batch.md, and this is the pool it needs.
+    """
+    cols = (
+        list(columns)
+        if columns is not None
+        else debut_feature_names(levels=levels)
+    )
+    X, y, meta = build_debut_matrix(df, levels=levels)
+    X = X[cols]
+    df_sw = swap_sides(df)
+    # Rebuilt from the swapped FRAME, never by permuting columns of X — the
+    # `dlvl_*_a/_b` pairs are exactly what a naive permutation gets wrong,
+    # and getting them wrong breaks the antisymmetry the order averaging
+    # below depends on.
+    X_sw, _, _ = build_debut_matrix(df_sw, levels=levels)
+    X_sw = X_sw[cols]
+
+    debut = (df["is_debut_a"].astype(bool) | df["is_debut_b"].astype(bool)).to_numpy()
+    weights_all = np.where(debut, 1.0, DEBUT_EXP_ROW_WEIGHT)
+    dates = pd.to_datetime(meta["event_date"])
+    market = meta["market_prob_a"].to_numpy(dtype=float)
+
+    tuned = _load_tuned_params()
+    lgb_params = {
+        **LGB_PARAMS,
+        **tuned,
+        "seed": seed,
+        "feature_contri": [FEATURE_CONTRI_OVERRIDES.get(c, 1.0) for c in cols],
+    }
+
+    rows = []
+    for origin, tr, va, sc in iter_origins(dates, start=start, end=end):
+        va_d = va & debut
+        sc_d = sc & debut
+        # Guarded on the DEBUT counts, not the full ones. An origin whose val
+        # window holds four debutants would pick an early-stopping round from
+        # noise, and the pool would inherit it silently.
+        if va_d.sum() < min_val_debut or sc_d.sum() == 0:
+            if verbose:
+                print(
+                    f"    origin {origin.date()}  SKIP (val debut {int(va_d.sum())}, "
+                    f"scored debut {int(sc_d.sum())})"
+                )
+            continue
+
+        model = EnsembleModel(
+            feature_columns=cols,
+            lgb_params=lgb_params,
+            lgb_num_rounds=LGB_NUM_ROUNDS,
+            lgb_early_stopping=LGB_EARLY_STOPPING_ROUNDS,
+        )
+        _bind_cb_params(model, None, seed)
+        model.fit(
+            X_train=X.loc[tr].reset_index(drop=True),
+            y_train=y.loc[tr].reset_index(drop=True),
+            X_val=X.loc[va_d].reset_index(drop=True),
+            y_val=y.loc[va_d].reset_index(drop=True),
+            sample_weight=weights_all[tr],
+        )
+        model.corrector = corrector
+
+        p = model.predict_proba_a(X.loc[sc_d].reset_index(drop=True))
+        p_sw = model.predict_proba_a(X_sw.loc[sc_d].reset_index(drop=True))
+        rows.append(
+            pd.DataFrame(
+                {
+                    "origin": str(origin.date()),
+                    "label": label,
+                    "seed": seed,
+                    "bout_id": meta.loc[sc_d, "bout_id"].to_numpy(),
+                    "p": 0.5 * (p + (1.0 - p_sw)),
+                    "p_raw": p,
+                    "p_sw": p_sw,
+                    "y": y.loc[sc_d].to_numpy().astype(int),
+                    "market": market[sc_d],
+                }
+            )
+        )
+        if verbose:
+            print(
+                f"    origin {origin.date()}  train {int(tr.sum()):5d}  "
+                f"val debut {int(va_d.sum()):3d}  scored debut {int(sc_d.sum()):3d}"
+            )
     return pd.concat(rows, ignore_index=True)
 
 

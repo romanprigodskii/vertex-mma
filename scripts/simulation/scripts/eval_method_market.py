@@ -60,7 +60,7 @@ from src.export import (  # noqa: E402
     swap_sides,
     symmetrize_for_training,
 )
-from src.features import build_feature_matrix  # noqa: E402
+from src.features import build_feature_matrix, serving_columns  # noqa: E402
 from src.method_model import METHOD_MODEL_EVAL_DIR, MethodModel  # noqa: E402
 from src.method_model import conditional_mix as method_conditional_mix  # noqa: E402
 from src.monte_carlo import FighterMC, simulate_bout  # noqa: E402
@@ -241,7 +241,7 @@ def main() -> None:
         )
 
     df = symmetrize_for_training(build_dataset(fetch_raw()))
-    X, _, meta = build_feature_matrix(df)
+    X, _, meta = build_feature_matrix(df, corrector=True)
 
     if ENSEMBLE_DIR.name != "ensemble_eval":
         print("WARNING: ensemble_eval/ missing — falling back to the served "
@@ -259,9 +259,9 @@ def main() -> None:
             print(f"{label}: legacy hand-set constants (no artifact)")
 
     ensemble = EnsembleModel.load(ENSEMBLE_DIR)
-    X = X[ensemble.feature_columns]
-    X_sw, _, _ = build_feature_matrix(swap_sides(df))
-    X_sw = X_sw[ensemble.feature_columns]
+    X = X[serving_columns(ensemble.feature_columns)]
+    X_sw, _, _ = build_feature_matrix(swap_sides(df), corrector=True)
+    X_sw = X_sw[serving_columns(ensemble.feature_columns)]
 
     test_mask = pd.to_datetime(meta["event_date"]) >= pd.to_datetime(VAL_END)
     df_test = df.loc[test_mask.to_numpy()].reset_index(drop=True)

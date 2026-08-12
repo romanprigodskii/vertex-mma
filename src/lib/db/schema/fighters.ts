@@ -252,6 +252,27 @@ export const fighter = pgTable(
     sherdogMatchStatus: text("sherdog_match_status"),
     sherdogSyncedAt: timestamp("sherdog_synced_at", { withTimezone: true }),
 
+    // Nationality as Sherdog publishes it, stored RAW and kept separate
+    // from country_code on purpose. Two reasons they must not be merged:
+    //
+    //   1. Different definitions. country_code is Wikidata P27 (citizenship);
+    //      Sherdog's block is `.item birthplace`, so Adesanya reads NG here
+    //      and NZ there, Uriah Hall JM vs US. Overwriting country_code would
+    //      change the flag the site renders for a third of the roster.
+    //   2. Different vocabularies. Sherdog's flag filename is alpha-2 for
+    //      most countries but uses subdivision codes for the Home Nations
+    //      ('en' for England), and 'en'/'sc' are not ISO — 'SC' is even a
+    //      real ISO code for Seychelles. Normalising at write time would bake
+    //      a guess into the data; the raw code plus the display name lets the
+    //      map be revised without re-scraping 4k pages.
+    //
+    // Consumer is the sim model (a fighter-nationality residual term), which
+    // needs ONE definition across the whole population — coverage on
+    // country_code is 35% and biased toward the notable end of the roster.
+    // Written only by scripts/scraper/scripts/18_backfill_country_sherdog.py.
+    sherdogFlagCode: text("sherdog_flag_code"),
+    sherdogNationality: text("sherdog_nationality"),
+
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),

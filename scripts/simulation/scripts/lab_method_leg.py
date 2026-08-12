@@ -77,7 +77,7 @@ from src.export import (  # noqa: E402
     swap_sides,
     symmetrize_for_training,
 )
-from src.features import build_feature_matrix  # noqa: E402
+from src.features import build_feature_matrix, serving_columns  # noqa: E402
 from src.method_model import (  # noqa: E402
     LGB_MULTI_PARAMS,
     MethodModel,
@@ -345,10 +345,10 @@ def mc_cells(df: pd.DataFrame, mask: np.ndarray, *, cache: bool = True) -> pd.Da
 def ensemble_prob_a(df: pd.DataFrame) -> np.ndarray:
     """Order-averaged ensemble P(A wins), exactly like predict.py."""
     ens = EnsembleModel.load(ENSEMBLE_DIR)
-    X, _, _ = build_feature_matrix(df)
-    X_sw, _, _ = build_feature_matrix(swap_sides(df))
-    p_raw = ens.predict_proba_a(X[ens.feature_columns])
-    p_sw = ens.predict_proba_a(X_sw[ens.feature_columns])
+    X, _, _ = build_feature_matrix(df, corrector=True)
+    X_sw, _, _ = build_feature_matrix(swap_sides(df), corrector=True)
+    p_raw = ens.predict_proba_a(X[serving_columns(ens.feature_columns)])
+    p_sw = ens.predict_proba_a(X_sw[serving_columns(ens.feature_columns)])
     return 0.5 * (p_raw + (1.0 - p_sw))
 
 
