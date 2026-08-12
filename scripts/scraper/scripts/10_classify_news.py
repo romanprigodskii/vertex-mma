@@ -13,6 +13,7 @@ from src.loaders.news import (
     record_news_signal,
     resolve_fighter_ids,
     resolve_or_create_event,
+    stale_bookee,
     update_provisional_bout,
 )
 from src.news_classifier import ItemInput, classify_batch
@@ -199,6 +200,26 @@ def run() -> dict[str, int]:
                             continue
                         if find_bout(conn, fa_id, fb_id) is not None:
                             continue
+                        # Check the pairing BEFORE resolving the card: creating
+                        # the event first and refusing the bout afterwards
+                        # leaves an empty provisional event on the schedule.
+                        stale = next(
+                            (
+                                s
+                                for s in (
+                                    stale_bookee(conn, fa_id),
+                                    stale_bookee(conn, fb_id),
+                                )
+                                if s
+                            ),
+                            None,
+                        )
+                        if stale:
+                            log.info(
+                                f"  auto-bout skipped: {name_a} vs {name_b} — "
+                                f"{stale} is off the roster with no bout in years"
+                            )
+                            continue
                         event_id = resolve_or_create_event(
                             conn,
                             res.event_hint,
@@ -221,6 +242,11 @@ def run() -> dict[str, int]:
                             # survives adoption by the UFCStats scrape.
                             first_seen_at=item.published_at_ts,
                         )
+                        # None = the pairing was refused (an off-roster
+                        # fighter years past their last bout); leave the item
+                        # unlinked rather than pointing it at someone else.
+                        if new_bout_id is None:
+                            continue
                         if bout_id is None:
                             bout_id = new_bout_id
                         if created:

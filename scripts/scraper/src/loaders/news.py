@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import json
+import re
+import unicodedata
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -230,14 +232,69 @@ def fetch_unprocessed(
         ]
 
 
+def _fold(value: str) -> str:
+    """Accent-, case- and punctuation-insensitive form used to compare names."""
+    folded = unicodedata.normalize("NFKD", value or "")
+    folded = "".join(ch for ch in folded if not unicodedata.combining(ch))
+    folded = re.sub(r"[^A-Za-z ]", " ", folded)
+    return " ".join(folded.lower().split())
+
+
+def _given_names_compatible(a: str, b: str) -> bool:
+    """Whether two given names can belong to the same fighter.
+
+    Equal ("Ian"/"Ian"), an initial ("J."/"Joshua"), or one a prefix of the
+    other ("Alex"/"Alexander", "Dooho"/"Doo Ho" once folded) all pass.
+    Two different names ("Renato"/"Roan") do not.
+    """
+    if a == b:
+        return True
+    if not a or not b:
+        return False
+    if len(a) == 1 or len(b) == 1:
+        return a[0] == b[0]
+    return a.startswith(b) or b.startswith(a)
+
+
+def names_can_be_same_fighter(candidate: str, mention: str) -> bool:
+    """Reject surname-only trigram collisions.
+
+    pg_trgm scores "Renato Carneiro" against "Roan Carneiro" at 0.50 — over
+    the 0.45 bar — purely on the shared surname, and that is how a Sherdog
+    article using Renato Moicano's legal surname booked a phantom bout for a
+    fighter who last competed in 2017. Trigrams cannot tell "same surname,
+    different man" from "same man, spelled differently", so require the
+    surname to match AND the given names to be compatible.
+
+    Deliberately asymmetric in cost: a rejected match means the bout waits for
+    the UFCStats scrape, a wrong one puts a fight that does not exist on a
+    live card.
+    """
+    cand, mention_f = _fold(candidate), _fold(mention)
+    if not cand or not mention_f:
+        return False
+    if cand == mention_f:
+        return True
+    cand_parts, mention_parts = cand.split(), mention_f.split()
+    if cand_parts[-1] != mention_parts[-1]:
+        return False
+    return _given_names_compatible(cand_parts[0], mention_parts[0])
+
+
 def resolve_fighter_ids(
     conn: psycopg.Connection,
     names: list[str],
     cache: dict[str, str | None],
 ) -> list[str]:
-    """Fuzzy-match fighter names to fighter IDs via pg_trgm. The threshold is
-    deliberately high — a wrong link is worse than a missing one. `cache`
-    memoises lookups within a run (the same fighters recur across articles)."""
+    """Match fighter names to fighter IDs via a registered alias or pg_trgm.
+
+    The trigram threshold is deliberately high and every fuzzy candidate must
+    still clear `names_can_be_same_fighter` — a wrong link is worse than a
+    missing one. An explicit `fighter_alias` row bypasses the name check: it
+    is a human-curated statement that the two strings are one person (e.g.
+    "Renato Carneiro" → Renato Moicano). `cache` memoises lookups within a
+    run (the same fighters recur across articles).
+    """
     ids: list[str] = []
     with conn.cursor() as cur:
         for raw in names:
@@ -247,18 +304,33 @@ def resolve_fighter_ids(
             if name not in cache:
                 cur.execute(
                     """
-                    SELECT id::text
-                    FROM fighter
-                    WHERE similarity(name_en, %s) > 0.45
-                       OR lower(name_en) = lower(%s)
-                    ORDER BY (lower(name_en) = lower(%s)) DESC,
-                             similarity(name_en, %s) DESC
-                    LIMIT 1
+                    SELECT f.id::text, f.name_en, a.alias
+                    FROM fighter f
+                    LEFT JOIN fighter_alias a
+                      ON a.fighter_id = f.id
+                     AND lower(a.alias) = lower(%(name)s)
+                    WHERE lower(f.name_en) = lower(%(name)s)
+                       OR a.alias IS NOT NULL
+                       OR similarity(f.name_en, %(name)s) > 0.45
+                    ORDER BY (lower(f.name_en) = lower(%(name)s)) DESC,
+                             (a.alias IS NOT NULL) DESC,
+                             similarity(f.name_en, %(name)s) DESC
+                    LIMIT 5
                     """,
-                    (name, name, name, name),
+                    {"name": name},
                 )
-                row = cur.fetchone()
-                cache[name] = row[0] if row else None
+                resolved: str | None = None
+                for fid, candidate_name, alias in cur.fetchall():
+                    if alias is not None or names_can_be_same_fighter(
+                        candidate_name, name
+                    ):
+                        resolved = fid
+                        break
+                    log.info(
+                        f"  fighter name rejected: {name!r} ~ {candidate_name!r} "
+                        "(surname collision, different given name)"
+                    )
+                cache[name] = resolved
             fid = cache[name]
             if fid and fid not in ids:
                 ids.append(fid)
@@ -286,6 +358,22 @@ def find_bout(
         return row[0] if row else None
 
 
+_UFC_NUMBER_RE = re.compile(r"\bUFC\s*(\d{1,4})\b", re.IGNORECASE)
+
+# A numbered card matches by its number or not at all. Trigrams cannot do
+# this: similarity('UFC 330', 'UFC 331') is 0.60 — the same 0.60 that
+# 'UFC 300' scores against 'UFC 309' — while the real "UFC 331: Van vs.
+# Pantoja 2" scores only 0.33 against the hint "UFC 331" and falls under the
+# threshold entirely. So the hint "UFC 331" used to resolve, confidently, to
+# UFC 330. Numbers are exact identifiers; match them as such.
+_UFC_NUMBER_SQL = r"\yUFC[[:space:]]*{}\y"
+
+
+def _ufc_number(text: str | None) -> str | None:
+    match = _UFC_NUMBER_RE.search(text or "")
+    return match.group(1) if match else None
+
+
 def resolve_event_id(
     conn: psycopg.Connection,
     event_hint: str | None,
@@ -293,42 +381,72 @@ def resolve_event_id(
     cache: dict[str, str | None] | None = None,
 ) -> str | None:
     """Match an event hint string (e.g. "UFC 330", "UFC Fight Night: Whittaker
-    vs Costa") to an event_id in the DB. Uses pg_trgm similarity on both
-    event.name and event.short_name. Slugs are deterministic so we also try
-    them directly. Returns None when nothing matches well enough.
+    vs Costa") to an event_id in the DB.
 
-    Threshold (0.45) is tuned to be aggressive — the news pipeline already
-    runs upstream confidence gates before reaching here, so a missed match
-    is worse than a slightly fuzzy hit. Won't return events that already
-    happened more than a week ago."""
+    A hint carrying a card number ("UFC 331") is resolved by that number
+    alone — exactly, against both name and short_name — and returns None when
+    we don't track that card yet, so the caller can create it provisionally
+    instead of attaching the bout to a neighbouring card. Numbered candidates
+    are likewise excluded from the fuzzy path, so an unnumbered hint
+    ("UFC Paris") can never land on "UFC 330".
+
+    Everything else falls back to pg_trgm similarity on name/short_name. That
+    threshold (0.45) is tuned to be aggressive — the news pipeline already
+    runs upstream confidence gates before reaching here, so for a *named*
+    card a missed match is worse than a slightly fuzzy hit. Won't return
+    events that already happened more than a week ago.
+    """
     if not event_hint:
         return None
     key = event_hint.strip().lower()
     if cache is not None and key in cache:
         return cache[key]
+
+    hint_number = _ufc_number(event_hint)
     with conn.cursor() as cur:
-        cur.execute(
-            """
-            SELECT id::text
-            FROM event
-            WHERE (
-                similarity(name, %s) > 0.45
-                OR similarity(coalesce(short_name, name), %s) > 0.45
-                OR lower(name) = lower(%s)
-                OR lower(coalesce(short_name, '')) = lower(%s)
-              )
-              AND (status IN ('upcoming', 'in_progress')
-                   OR date >= now() - interval '7 days')
-            ORDER BY
-              GREATEST(
-                similarity(name, %s),
-                similarity(coalesce(short_name, name), %s)
-              ) DESC,
-              date ASC
-            LIMIT 1
-            """,
-            (event_hint, event_hint, event_hint, event_hint, event_hint, event_hint),
-        )
+        if hint_number:
+            pattern = _UFC_NUMBER_SQL.format(hint_number)
+            cur.execute(
+                """
+                SELECT id::text
+                FROM event
+                WHERE (name ~* %s OR coalesce(short_name, '') ~* %s)
+                  AND (status IN ('upcoming', 'in_progress')
+                       OR date >= now() - interval '7 days')
+                ORDER BY date ASC
+                LIMIT 1
+                """,
+                (pattern, pattern),
+            )
+        else:
+            cur.execute(
+                """
+                SELECT id::text
+                FROM event
+                WHERE (
+                    similarity(name, %s) > 0.45
+                    OR similarity(coalesce(short_name, name), %s) > 0.45
+                    OR lower(name) = lower(%s)
+                    OR lower(coalesce(short_name, '')) = lower(%s)
+                  )
+                  AND (status IN ('upcoming', 'in_progress')
+                       OR date >= now() - interval '7 days')
+                  AND name !~* %s
+                  AND coalesce(short_name, '') !~* %s
+                ORDER BY
+                  GREATEST(
+                    similarity(name, %s),
+                    similarity(coalesce(short_name, name), %s)
+                  ) DESC,
+                  date ASC
+                LIMIT 1
+                """,
+                (
+                    event_hint, event_hint, event_hint, event_hint,
+                    r"\yUFC[[:space:]]*[0-9]", r"\yUFC[[:space:]]*[0-9]",
+                    event_hint, event_hint,
+                ),
+            )
         row = cur.fetchone()
         eid = row[0] if row else None
     if cache is not None:
@@ -339,6 +457,29 @@ def resolve_event_id(
 # A provisional event created from a news booking can land at most this far
 # out; anything beyond is almost certainly a hallucinated/garbled LLM date.
 _MAX_EVENT_HORIZON_DAYS = 540
+
+# Promotions we do not track. Our feeds are general MMA press, so they carry
+# plenty of bookings for other organisations — and grappling and bare-knuckle
+# cards, which are not MMA bouts at all. Provisional events are inserted with
+# promotion 'ufc' by construction, so an unguarded hint of this kind becomes a
+# fake UFC card: "BKFC event in Manchester" (Till vs. Romero, bare-knuckle
+# boxing) and "ACBJJ 22" (Zabit Magomedsharipov's grappling match) both shipped
+# to the live site this way. Resolution against an already-tracked event is
+# unaffected — this only refuses to invent a card for someone else's show.
+_FOREIGN_PROMOTION_RE = re.compile(
+    r"\b(?:"
+    r"bkfc|bare[\s-]?knuckle|pfl|bellator|rizin|ksw|invicta|glory|"
+    r"one\s+(?:championship|fight\s+night|fc)|"
+    r"cage\s+warriors|oktagon|acbjj|adcc|karate\s+combat|"
+    r"aca|acb|raf|lfa|cffc"
+    r")\b",
+    re.IGNORECASE,
+)
+
+
+def is_foreign_promotion(event_hint: str | None) -> bool:
+    """Whether an event hint names a promotion other than the UFC."""
+    return bool(_FOREIGN_PROMOTION_RE.search(event_hint or ""))
 
 
 def resolve_or_create_event(
@@ -370,6 +511,15 @@ def resolve_or_create_event(
     answer. Falls back to now() when the caller has nothing better.
     """
     if not event_hint:
+        return None
+    # Before resolution, not after: this function's answer for a promotion we
+    # don't track is "no event" whether or not a row for it already exists.
+    # Checking after would happily hand back a foreign card that an earlier,
+    # unguarded run had already created — and keep hanging bouts on it.
+    if is_foreign_promotion(event_hint):
+        log.info(
+            f"  provisional event skipped — {event_hint!r} is not a UFC card"
+        )
         return None
     existing = resolve_event_id(conn, event_hint, cache=cache)
     if existing:
@@ -413,6 +563,40 @@ def resolve_or_create_event(
     return eid
 
 
+# Past this many months without a recorded bout, a fighter carrying a
+# released/retired roster status is not someone the press is freshly booking —
+# they are what a bad name match looks like. Every phantom bout that reached
+# the live site paired a current fighter with one of these (Roan Carneiro, last
+# bout 2017; Zabit Magomedsharipov, 2019; Yoel Romero, 2020; Darren Till,
+# 2022). A genuine comeback still lands: the UFCStats scrape lists it within
+# hours and creates the bout on the official card. This gate only decides
+# whether we front-run that scrape on the strength of a headline.
+_STALE_FIGHTER_MONTHS = 36
+
+
+def stale_bookee(conn: psycopg.Connection, fighter_id: str) -> str | None:
+    """Name of the fighter when they are too long inactive to be booked, else None."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT f.name_en
+            FROM fighter f
+            WHERE f.id = %(fid)s::uuid
+              AND f.roster_status IN ('released', 'retired')
+              AND COALESCE((
+                    SELECT max(e.date)
+                    FROM bout b JOIN event e ON e.id = b.event_id
+                    WHERE (b.fighter_a_id = f.id OR b.fighter_b_id = f.id)
+                      AND b.method IS NOT NULL
+                  ), 'epoch'::timestamptz)
+                  < now() - make_interval(months => %(months)s)
+            """,
+            {"fid": fighter_id, "months": _STALE_FIGHTER_MONTHS},
+        )
+        row = cur.fetchone()
+        return row[0] if row else None
+
+
 def auto_create_bout(
     conn: psycopg.Connection,
     *,
@@ -421,10 +605,11 @@ def auto_create_bout(
     event_id: str,
     weight_class: str,
     first_seen_at: datetime | None = None,
-) -> tuple[str, bool]:
+) -> tuple[str | None, bool]:
     """Insert a scheduled bout between two fighters at an event, or return
     the existing one if a row already links the same pair to the same event.
-    Returns (bout_id, created). Idempotent on (event_id, fighter pair).
+    Returns (bout_id, created) — bout_id is None when the pairing was refused.
+    Idempotent on (event_id, fighter pair).
 
     `first_seen_at` should be the announcing article's published_at — for a
     news-born booking that IS the announcement date, and it is the earliest
@@ -457,6 +642,16 @@ def auto_create_bout(
         if row:
             return row[0], False
 
+    for fid in (fighter_a_id, fighter_b_id):
+        stale = stale_bookee(conn, fid)
+        if stale:
+            log.info(
+                f"  auto-bout refused — {stale} has no bout in "
+                f"{_STALE_FIGHTER_MONTHS} months and is off the roster"
+            )
+            return None, False
+
+    with conn.cursor() as cur:
         cur.execute(
             """
             INSERT INTO bout (event_id, fighter_a_id, fighter_b_id,
