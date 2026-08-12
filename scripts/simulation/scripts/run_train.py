@@ -22,6 +22,7 @@ from rich.console import Console  # noqa: E402
 
 from src.config import DATA_DIR  # noqa: E402
 from src.export import build_dataset, fetch_raw, symmetrize_for_training  # noqa: E402
+from src.round_fit import refit_round_models  # noqa: E402
 from src.train import run_training  # noqa: E402
 
 console = Console()
@@ -41,6 +42,26 @@ def main() -> None:
         f"target_a_wins mean={df['target_a_wins'].mean():.3f}"
     )
     run_training(df)
+
+    # The two artifacts the Monte Carlo serves — WHEN a fight ends and WHO
+    # wins a decision. They used to be fitted only by hand from the lab
+    # scripts, so every weekly retrain moved the ensemble and the method
+    # models while these stayed at their lab date; a hazard fitted on an old
+    # scrape keeps pricing `bout_simulation_rounds` and, through
+    # `sportsbook.ts`, the totals and distance markets. Refitting them here
+    # is the whole point of the pipeline being one command.
+    #
+    # A failure aborts the run before the cron commits anything, which is the
+    # intended coupling: shipping an ensemble trained through today next to a
+    # hazard trained through last quarter is the bug this replaces.
+    summary = refit_round_models(df)
+    console.log(
+        f"round models refit · hazard through {summary['hazard_trained_through']} "
+        f"({summary['n_bouts']:,} bouts, alpha {summary['hazard_alpha']:g}) · "
+        f"decisions through {summary['decision_trained_through']} "
+        f"({summary['n_decisions']:,} decisions, C {summary['decision_C']:g}, "
+        f"T {summary['decision_temperature']:.2f})"
+    )
 
 
 if __name__ == "__main__":

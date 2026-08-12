@@ -1,9 +1,13 @@
 #!/bin/bash
-# WEEKLY — retrain the bout-winner model on the latest data and, if the weights
+# WEEKLY — retrain every served model on the latest data and, if the weights
 # changed, commit + push the refreshed artifacts so the SERVED model stays
 # current. train.py refits the served model on ALL data, so each run folds in
 # the fights added since the last retrain — without this the served weights
 # drift (the audit flagged ~2.5yr staleness: they had only seen data <2024).
+# "Every served model" is load-bearing: run_train.py also refits the finish
+# hazard and the decision-winner model (src/round_fit.py). Those two used to be
+# fitted only by hand from the lab scripts, so this job kept moving the ensemble
+# around a timing model frozen at its lab date.
 #
 # Runs AFTER the Sunday full scrape + recompute so it trains on the freshest
 # point-in-time features. Pushing the artifacts is how they DEPLOY (push → other
