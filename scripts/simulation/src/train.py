@@ -51,6 +51,7 @@ from .method_model import (
     orient_winner_first,
     training_matrix,
 )
+from .provenance import collect_provenance, learner_iterations
 
 console = Console()
 
@@ -551,6 +552,7 @@ def run_training(df: pd.DataFrame) -> dict[str, dict[str, float]]:
     # blend-mode pick use the DEBUT val rows only.
     debut_metrics: dict[str, Any] | None = None
     debut_cols: list[str] | None = None
+    debut_iterations: dict[str, Any] | None = None
     if "is_debut_a" in df.columns and bool(debut_mask_df.any()):
         debut_cols = debut_feature_names()
         X_d, y_d, meta_d = build_feature_matrix(df, corrector=True)
@@ -610,6 +612,10 @@ def run_training(df: pd.DataFrame) -> dict[str, dict[str, float]]:
         )
         ENSEMBLE_DEBUT_DIR.mkdir(exist_ok=True)
         prod_specialist.save(ENSEMBLE_DEBUT_DIR)
+        debut_iterations = {
+            "split": learner_iterations(specialist),
+            "served": learner_iterations(prod_specialist),
+        }
 
     # ── Conditional method model (v0.12.0) ──────────────────────────────
     # Prices the method and round legs. Trained on the same both-experienced
@@ -629,6 +635,17 @@ def run_training(df: pd.DataFrame) -> dict[str, dict[str, float]]:
         "model_version": MODEL_VERSION,
         "model_kind": "ensemble",
         "trained_at": datetime.utcnow().isoformat() + "Z",
+        # What produced these weights. Without it a changed `.cbm` has no
+        # suspects: the dataset, the library and the code all leave the same
+        # trace, which is none. See src/provenance.py.
+        "provenance": {
+            **collect_provenance(df),
+            "iterations": {
+                "split": learner_iterations(ensemble),
+                "served": learner_iterations(prod),
+                "debut": debut_iterations,
+            },
+        },
         "feature_columns": cols,
         "train_end": TRAIN_END,
         "val_end": VAL_END,

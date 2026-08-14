@@ -37,6 +37,7 @@ what "no finish" means here.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 
 import numpy as np
@@ -61,6 +62,7 @@ from .monte_carlo import FighterMC
 
 console = Console()
 
+METADATA_PATH = ARTIFACTS_DIR / "metadata.json"
 HAZARD_PATH = ARTIFACTS_DIR / "finish_hazard.json"
 HAZARD_EVAL_PATH = ARTIFACTS_DIR / "finish_hazard_eval.json"
 DECISION_PATH = ARTIFACTS_DIR / "decision_winner.json"
@@ -464,3 +466,21 @@ def refit_round_models(
         "decision_temperature": decision.temperature,
         "decision_trained_through": decision.served.meta["trained_through"],
     }
+
+
+def record_in_metadata(summary: dict[str, object]) -> None:
+    """Fold the round-model summary into `metadata.json`.
+
+    The weight files stay pure — no timestamp, no git SHA — so a diff on
+    `finish_hazard.json` means the model moved and nothing else.
+    `metadata.json` is the run manifest instead: it already changes every run,
+    and `src/provenance.py` explains why that is the only honest place for a
+    stamp. `run_training` writes it before these two fits happen, hence a merge
+    rather than a key at construction.
+    """
+    if not METADATA_PATH.exists():
+        console.log("metadata.json absent — round-model summary not recorded")
+        return
+    meta = json.loads(METADATA_PATH.read_text())
+    meta["round_models"] = summary
+    METADATA_PATH.write_text(json.dumps(meta, indent=2, default=str))

@@ -22,7 +22,7 @@ from rich.console import Console  # noqa: E402
 
 from src.config import DATA_DIR  # noqa: E402
 from src.export import build_dataset, fetch_raw, symmetrize_for_training  # noqa: E402
-from src.round_fit import refit_round_models  # noqa: E402
+from src.round_fit import record_in_metadata, refit_round_models  # noqa: E402
 from src.train import run_training  # noqa: E402
 
 console = Console()
@@ -55,6 +55,10 @@ def main() -> None:
     # intended coupling: shipping an ensemble trained through today next to a
     # hazard trained through last quarter is the bug this replaces.
     summary = refit_round_models(df)
+    # metadata.json is written by run_training, i.e. before the two fits above
+    # exist. Merge them in so the manifest describes the whole run and not just
+    # the winner leg.
+    record_in_metadata(summary)
     console.log(
         f"round models refit · hazard through {summary['hazard_trained_through']} "
         f"({summary['n_bouts']:,} bouts, alpha {summary['hazard_alpha']:g}) · "
