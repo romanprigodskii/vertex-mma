@@ -47,7 +47,11 @@ Outputs to `artifacts/`:
   gradeable rows; prices the method / distance / total_rounds legs
 - `method_model_eval/` — its split-trained twin, so
   `eval_method_market.py` stays out-of-sample on every moving part
-- `metadata.json` — feature columns, params, per-split metrics, model_version
+- `metadata.json` — feature columns, params, per-split metrics, model_version,
+  and the run manifest: a `provenance` block (git sha, resolved library
+  versions, platform, dataset content hash, per-learner iteration counts) plus
+  a `round_models` summary. It is the only artifact carrying a timestamp, so
+  it is the only one that changes when nothing else did
 
 v0.8.0 adds full-slate coverage: bouts with a UFC debutant (~18 % of
 the slate, previously skipped entirely) are scored by a dedicated

@@ -566,10 +566,24 @@ three nationality legs, "+0.0022", the pool sizes (543 submissions / 71 val;
 3. **CatBoost is fragile to data drift.** Two days of incremental scraping (89
    updated bouts, 3 new, 48 new Sherdog rows) moved LightGBM by 4.5e-6, LogReg by
    6.6e-5 and CatBoost by **4.5e-3**. The thread-nondeterminism hypothesis was
-   tested and refuted (an idle machine reproduces to seven decimals).
-4. **`metadata.json` records no provenance** — no library versions, git SHA,
-   dataset hash, or winner-leg iteration counts, which is exactly why (3) is
-   undiagnosable from the artifact alone. `requirements.txt` is lower bounds only.
+   tested and refuted (an idle machine reproduces to seven decimals). Still
+   open, but no longer blind: from 2026-08-14 every retrain records the
+   dataset digest, the library versions and the iteration counts beside the
+   weights (4), so the NEXT time this is seen it can be attributed. The
+   historical instance cannot be — those artifacts carry no provenance and
+   nothing reconstructs it.
+4. ~~**`metadata.json` records no provenance.**~~ **Closed 2026-08-14.**
+   `src/provenance.py`; `metadata.json` carries a `provenance` block per run —
+   git sha/branch/dirty, resolved versions of the eight libraries that can move
+   a weight, python + system + machine, an order-sensitive content hash of the
+   training frame, and per-learner iteration counts (`best_iteration` AND the
+   tree count actually held, which differ on the served refit). Plus a
+   `round_models` section, because `run_train.py` produces two artifacts that
+   `run_training` writes `metadata.json` before it has.
+   **What is still open:** `requirements.txt` remains lower bounds only.
+   Recording the resolved versions makes a library-driven change *attributable*;
+   it does not make it *reproducible*. Pinning is a deploy decision — the VPS
+   reinstalls from that file weekly — and has not been taken.
 5. **No CI.** Five test files, hand-run, no pytest dependency.
 6. **`bout_simulation` is never pruned** — one row per bout per model version,
    forever. Only `bout_simulation_features` does a DELETE-then-upsert.
