@@ -233,12 +233,16 @@ def fetch_closing_decimals() -> pd.DataFrame:
     the right thing to score probabilities against and the wrong thing to
     settle a bet at.
     """
+    # `b.fighter_a_id` rides along because it is what says which man
+    # `winner_a_decimal` belongs to — see `attach_decimals`.
     sql = """
-        SELECT DISTINCT ON (bout_id)
-               bout_id, winner_a_decimal, winner_b_decimal, fetched_at
-        FROM bout_external_odds
-        WHERE winner_a_decimal IS NOT NULL AND winner_b_decimal IS NOT NULL
-        ORDER BY bout_id, fetched_at DESC
+        SELECT DISTINCT ON (o.bout_id)
+               o.bout_id, o.winner_a_decimal, o.winner_b_decimal, o.fetched_at,
+               b.fighter_a_id::text AS db_fighter_a_id
+        FROM bout_external_odds o
+        JOIN bout b ON b.id = o.bout_id
+        WHERE o.winner_a_decimal IS NOT NULL AND o.winner_b_decimal IS NOT NULL
+        ORDER BY o.bout_id, o.fetched_at DESC
     """
     with get_connection() as conn:
         return pd.read_sql(sql, conn)
@@ -249,11 +253,15 @@ def attach_decimals(frame: pd.DataFrame) -> pd.DataFrame:
 
     `bout_external_odds` is keyed to the bout's own fighter_a; the frame is
     symmetrized, so about half its rows have the two fighters swapped relative
-    to the DB. Orientation is recovered per row rather than assumed: de-vig the
-    two decimals and see which of `pa` / `1 − pa` reproduces the frame's own
-    `market_prob_a`. That is a check, not a guess — a row whose reconstruction
-    matches NEITHER (a re-scrape landed after the dataset was cached) is
-    dropped rather than settled at a price that may belong to the other man.
+    to the DB. Orientation is recovered by comparing fighter IDs, which is
+    exact and independent of the prices.
+
+    An earlier version inferred it by de-vigging the pair and checking which of
+    `pa` / `1 − pa` reproduced the frame's cached `market_prob_a`. That reads
+    as the more paranoid choice and is in fact the more fragile one: it silently
+    drops every bout whose price has been re-scraped since the dataset cache was
+    written. Running the odds backfill lost 45 bouts that way — 2.5 % of the
+    only sample this lab has.
     """
     dec = fetch_closing_decimals()
     dec["bout_id"] = dec["bout_id"].astype(str)
@@ -262,19 +270,25 @@ def attach_decimals(frame: pd.DataFrame) -> pd.DataFrame:
     # matches nothing at all rather than raising.
     frame["bout_id"] = frame["bout_id"].astype(str)
     frame = frame.merge(
-        dec[["bout_id", "winner_a_decimal", "winner_b_decimal"]],
+        dec[["bout_id", "winner_a_decimal", "winner_b_decimal", "db_fighter_a_id"]],
         on="bout_id", how="left",
     )
 
     da = pd.to_numeric(frame["winner_a_decimal"], errors="coerce")
     db = pd.to_numeric(frame["winner_b_decimal"], errors="coerce")
-    pa = (1 / da) / ((1 / da) + (1 / db))
-    mkt = pd.to_numeric(frame["market"], errors="coerce")
-    same = (pa - mkt).abs() < 1e-6
-    flip = ((1 - pa) - mkt).abs() < 1e-6
-    ok = same | flip
-    frame["dec_a"] = np.where(ok, np.where(same, da, db), np.nan)
-    frame["dec_b"] = np.where(ok, np.where(same, db, da), np.nan)
+    same = frame["fighter_a_id"].astype(str) == frame["db_fighter_a_id"].astype(str)
+    known = frame["db_fighter_a_id"].notna() & da.notna() & db.notna()
+    frame["dec_a"] = np.where(known, np.where(same, da, db), np.nan)
+    frame["dec_b"] = np.where(known, np.where(same, db, da), np.nan)
+    # Cheap invariant: the de-vigged pair must reproduce the cached
+    # proportional price on the rows whose price has NOT moved since the
+    # dataset cache. If the orientation logic ever inverts, this is what says
+    # so, and it says it as a number rather than as a silently wrong ROI.
+    pa = (1 / frame["dec_a"]) / ((1 / frame["dec_a"]) + (1 / frame["dec_b"]))
+    chk = (pa - pd.to_numeric(frame["market"], errors="coerce")).abs()
+    agree = float((chk[chk.notna()] < 1e-6).mean())
+    print(f"  decimals oriented by fighter id: {int(known.sum())} rows, "
+          f"{agree:.1%} reproduce the cached proportional price exactly")
     frame["overround"] = 1 / frame["dec_a"] + 1 / frame["dec_b"]
 
     # The de-vig matters more than it looks, so both live in the frame.
@@ -294,7 +308,7 @@ def attach_decimals(frame: pd.DataFrame) -> pd.DataFrame:
     frame["market_prop"] = frame["market"]
     frame["market"] = power_devig(frame["dec_a"].to_numpy(dtype=float),
                                   frame["dec_b"].to_numpy(dtype=float))
-    return frame.drop(columns=["winner_a_decimal", "winner_b_decimal"])
+    return frame.drop(columns=["winner_a_decimal", "winner_b_decimal", "db_fighter_a_id"])
 
 
 def power_devig(dec_a: np.ndarray, dec_b: np.ndarray) -> np.ndarray:
