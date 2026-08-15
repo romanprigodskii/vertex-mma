@@ -114,12 +114,33 @@ def run_pool(seeds: list[int], start: str, end: str, append: bool) -> None:
 
 
 def load_segments() -> list[Segment]:
+    """The registry, with EXPRESSION duplicates collapsed.
+
+    Asserting unique names is not enough — two lenses independently proposed
+    `scheduled_rounds == 5` and two more proposed `is_women == 1`. Scoring the
+    same slice twice prints the same row twice and, worse, charges the BH
+    correction for 86 tests when 84 were performed. The registry keeps both
+    entries, because it is the record of what was proposed; the scan scores
+    the first and says so.
+    """
     from lab_edge_registry import SEGMENTS
 
     segs = [Segment(**s) for s in SEGMENTS]
     names = [s.name for s in segs]
     assert len(names) == len(set(names)), "duplicate segment names in the registry"
-    return segs
+
+    seen: dict[tuple[str, bool], str] = {}
+    keep, dropped = [], []
+    for s in segs:
+        key = (" ".join(s.expr_a.split()), s.symmetric)
+        if key in seen:
+            dropped.append((s.name, seen[key]))
+            continue
+        seen[key] = s.name
+        keep.append(s)
+    for dup, orig in dropped:
+        print(f"  collapsed duplicate expression: {dup} == {orig}")
+    return keep
 
 
 def seed_windows(frame: pd.DataFrame, seeds: list[int]) -> dict[tuple[str, int], pd.DataFrame]:
@@ -172,11 +193,13 @@ def evaluate_grid(
                 for k in ("roi_00", "roi_00_n", "roi_05", "roi_05_n"):
                     row[f"blend_{k}"] = rb.get(k, np.nan)
 
-        # Seed stability — the same segment under four other model seeds.
+        # Seed stability — the same segment under the OTHER model seeds. The
+        # primary seed is excluded from its own agreement count; including it
+        # put a floor of 1/len(seeds) under the statistic and made it print
+        # 1.0 for all 89 segments.
         deltas = []
         for s in seeds:
             if s == PRIMARY_SEED:
-                deltas.append(row.get("delta", np.nan))
                 continue
             f2 = wins[(which, s)]
             a2, b2 = seg.mask(f2)
@@ -184,7 +207,10 @@ def evaluate_grid(
             deltas.append(r2.get("delta", np.nan))
         deltas = np.array(deltas, dtype=float)
         row["seed_deltas"] = [None if not np.isfinite(d) else round(float(d), 4) for d in deltas]
-        row["seed_sign_stable"] = float(np.mean(np.sign(deltas) == np.sign(row.get("delta", np.nan))))
+        row["seed_sign_stable"] = (
+            float(np.mean(np.sign(deltas) == np.sign(row.get("delta", np.nan))))
+            if len(deltas) else float("nan")
+        )
 
         # Era stability — the two halves of the window, split at its median date.
         if row.get("n", 0) >= 40:
@@ -217,9 +243,15 @@ def evaluate_grid(
 # ── reporting ──────────────────────────────────────────────────────────
 
 
-def print_headline(wins: dict) -> None:
+def print_headline(wins: dict, windows: tuple[str, ...]) -> None:
+    """Headline numbers for the window being run — and ONLY that window.
+
+    This used to loop over both unconditionally, so `--stage scan` printed the
+    2025-26 log-loss, γ and encompassing c. A protocol that reserves a window
+    and then prints it at the top of the other stage is not reserving anything.
+    """
     print(f"\n{'=' * 100}\nHEADLINE — the model, the closing line, and the two combined\n{'=' * 100}")
-    for which in ("discovery", "confirm"):
+    for which in windows:
         f = wins[(which, PRIMARY_SEED)]
         if not len(f):
             continue
@@ -261,10 +293,11 @@ def print_direction(res: pd.DataFrame) -> None:
     d["gap"] = d["model_bias"].abs() - d["market_bias"].abs()
     d = d.sort_values("market_bias")
     print(f"\n{'=' * 110}\nDIRECTION — the named side, oriented into slot A\n{'=' * 110}")
-    print(f"  {'segment':42s} {'n':>4} {'model p':>8} {'mkt p':>7} {'actual':>7} "
+    print(f"  {'segment':42s} {'n':>4} {'drop':>5} {'model p':>8} {'mkt p':>7} {'actual':>7} "
           f"{'mod−act':>8} {'mkt−act':>8}")
     for _, r in d.iterrows():
-        print(f"  {r['name']:42s} {int(r['n']):>4} {r['model_p_side']:8.3f} {r['market_p_side']:7.3f} "
+        print(f"  {r['name']:42s} {int(r['n_direction']):>4} {int(r['n_direction_dropped']):>5} "
+              f"{r['model_p_side']:8.3f} {r['market_p_side']:7.3f} "
               f"{r['actual_side']:7.3f} {r['model_bias']:+8.3f} {r['market_bias']:+8.3f}")
 
 
@@ -305,7 +338,7 @@ def _run(which: str, seeds: list[int]) -> dict:
     print(f"\ngrid: {len(segs)} pre-registered segments, "
           f"{len({s.family for s in segs})} families")
     wins = seed_windows(frame, seeds)
-    print_headline(wins)
+    print_headline(wins, (which,))
     res = evaluate_grid(wins, segs, which, seeds)
     label = ("DISCOVERY ≤2024 — Δ = model log-loss − market log-loss (negative = we are better)"
              if which == "discovery"
