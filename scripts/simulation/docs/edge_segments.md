@@ -77,10 +77,17 @@ longshot instead, and on this sample they demonstrably do:
 | underdog, proportional de-vig | | | +1.2 pp | +1.05 |
 | underdog, power de-vig | | | +0.1 pp | +0.07 |
 | **proportional, genuine longshots (p < 0.30, n = 480)** | 22.9 % | 18.3 % | **+4.5 pp** | +2.51 |
+| power, the same longshots | | | +2.5 pp | +1.40 |
 
 Flat-backing those sub-0.30 dogs returns −26 % against a 4.8 % overround.
 This lab scores against the power de-vig and keeps `market_prop` in the
-frame so the numbers reconcile with the rest of the repo.
+frame so the numbers reconcile with the rest of the repo — but note the
+last row: **power under-corrects the tail too**, and the paired log-loss
+difference between the two de-vigs is 0.0010 nats with a bootstrap CI of
+[−0.0004, +0.0024], i.e. power is the better-motivated choice and not a
+demonstrably better-calibrated one. (The Shin figures quoted in early
+drafts came from an ad-hoc implementation; there is no Shin code in this
+repo.)
 
 **What is NOT evidence for this, and was the first draft's evidence:** the
 regression slope of the outcome on the market logit — 1.163 (proportional)
