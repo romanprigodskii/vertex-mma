@@ -1,4 +1,4 @@
-# Where does the model beat the book — 87 slices, one survivor, and a scraper that is lying
+# Where does the model beat the book — 87 slices, one survivor, and a backfill that matched on names alone
 
 Branch `lab/edge-segments`. The question: the model's probabilities differ
 from the closing line constantly, so there ought to be pockets — a boxer
@@ -18,13 +18,14 @@ nevertheless gives that favourite ≥5 pp more than the book, flat-staking
 the favourite returned **+11.5 % over 281 bets across 163 events**
 (bootstrap CI [+2.3 %, +20.4 %], P(ROI ≤ 0) = 0.007).
 
-Every claim was then handed to an independent skeptic told to refute it.
-That pass **changed the headline twice** and is the reason this document
-reads the way it does — §8 is the list of what it cost. The short version:
-one statistic in this lab was computed wrong (§8.1), the odds are not the
-closing line the repo says they are (§8.3), and the project's own odds
-backfill is currently writing *upcoming* fights' prices into historical
-rows (§8.4).
+Every claim was then handed to an independent skeptic told to refute it,
+and §8 is the list of what that cost. It changed the headline twice: one
+statistic in this lab was computed wrong and fixing it produced the one
+survivor (§8.1), and one of the lab's own findings about the data had to be
+retracted after measuring rather than reading docstrings — the prices ARE
+the closing line (§8.3). What is genuinely broken is narrower and now
+fixed: the odds backfill has always resolved matchups on fighter names
+alone, which put a September 2026 line onto a December 2025 fight (§8.4).
 
 ---
 
