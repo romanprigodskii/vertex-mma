@@ -60,8 +60,14 @@ one this lab was opened to run — was underpowered by construction. What
 found something was the composition-adjusted contrast (§3) and the money
 column, not the raw Δ.
 
-**The ceiling is not a scraping gap.** Running the full history backfill
-(682 events) added **20 bouts** — and revealed why (§8.4).
+**The ceiling is not permanent, and lifting it is the highest-value work
+this lab found.** Running the full history backfill (682 events) added
+**20 bouts**, because BestFightOdds archived event pages no longer carry
+the book columns for their own card. But the *fighter* pages do, and they
+carry more than the event pages ever did: per bout, the **opening price,
+the closing range across books, and the entire line movement** as a decimal
+series in a `data-sparkline` attribute. Covington's page alone spans his
+whole career. That is the source §9 is about.
 
 ---
 
@@ -235,8 +241,8 @@ y ~ sigmoid( b·logit(market) + c·logit(model) )        no intercept
 | window | n | model | market | c | p |
 |---|---|---|---|---|---|
 | discovery ≤2024 | 1,191 | 0.6480 | 0.6177 | +0.215 | 0.126 |
-| confirmation 2025-26 | 596 | 0.6092 | 0.5892 | +0.469 | **0.012** |
-| all | 1,787 | 0.6350 | 0.6082 | **+0.302** | **0.006** |
+| confirmation 2025-26 | 596 | 0.6092 | 0.5899 | +0.478 | **0.010** |
+| all | 1,787 | 0.6350 | 0.6085 | **+0.306** | **0.006** |
 
 Per year, fixed-effect pooled: c = +0.315 (se 0.110, z = 2.87).
 
@@ -408,46 +414,66 @@ title reigns that began after the bout, contaminating 755 of 17,644
 confirmation. And `best_params.json` was tuned on the 2024 val window that
 the pool later scores (122 of 1,191 discovery bouts).
 
-### 8.3 The prices are not the closing line
+### 8.3 The prices ARE the closing line — the first draft of this section was wrong
 
-`export.py` documents `market_prob_a` as "the CLOSING line" and this lab
-inherited the phrase. It is not supported. `bout_external_odds` holds one
-row per bout with no history, **2,251 of 2,278 rows have `fetched_at` after
-the event date**, and the writer is `run_backfill.py` — whose own docstring
-calls what it scrapes "opening lines" and whose parser takes the median
-across sportsbook cells of an archived event page. The 6-hourly cron cannot
-have written them: it filters `status IN ('scheduled','in_progress')`.
+An earlier version of this document claimed `market_prob_a` is not the
+closing line, on the grounds that 2,251 of 2,278 rows have `fetched_at`
+after the event and the writer's docstring says "opening lines". Both facts
+are true and the inference from them was wrong: scraping an archive
+*retrospectively* is a perfectly good way to obtain a closing price, and
+what BestFightOdds stores is the close.
 
-Everything in this document should therefore read "the archived market
-price", not "the closing line" — including, by inheritance,
-`docs/winner_batch.md`'s gap-to-the-closing-line framing.
+Settled by measurement rather than by reading docstrings. Six bouts across
+2021-2025, stored value against the opening price and the closing range
+midpoint from the fighter page:
 
-### 8.4 `run_backfill.py` is currently corrupting the odds table
+| bout | ours | open | close mid | \|Δ open\| | \|Δ close\| |
+|---|---|---|---|---|---|
+| Neal – Ponzinibbio | 2.050 | 1.870 | 2.046 | 0.180 | **0.004** |
+| Bautista – Kelleher | 1.532 | 1.714 | 1.524 | 0.182 | **0.008** |
+| Silva – Mitchell | 1.488 | 1.250 | 1.504 | 0.238 | **0.016** |
+| Blanchfield – Santos | 1.606 | 1.704 | 1.627 | 0.098 | **0.021** |
+| Lemos – Lucindo | 2.120 | 1.800 | 2.150 | 0.320 | **0.030** |
+| Pantoja – Royval | 1.588 | 1.400 | 1.481 | 0.188 | 0.107 |
 
-Chased down after the leakage audit flagged the provenance. BestFightOdds
-no longer serves a historical odds grid on archived event pages. Fetching
-`/events/ufc-268-usman-vs-covington-2-2261` (November 2021) and running the
-repo's own parser over it returns **132 matchups, none of them from
-UFC 268** — they are the sidebar of *currently priced* upcoming events
-(UFC 330, UFC Sacramento, ACA 206…), identical on every page. The same
-holds for UFC 311.
+Mean distance to the open 0.201, to the close 0.031. The repo's
+"gap to the closing line" framing — here, in `winner_batch.md`, and on the
+public `/model` page — stands. What is wrong is `run_backfill.py`'s own
+docstring, which calls what it scrapes opening lines.
 
-So the run this lab commissioned fetched 682 pages, harvested the same
-upcoming-events sidebar 682 times, and matched it into the DB by name pair
-and date proximity. It created 20 rows and touched ~2,000, and **45 of the
-1,787 priced bouts now carry a different price than they did before it**
-— 42 of them 2026 bouts, 3 pre-2026, two of those moved by more than 18
-probability points, which is not a re-scrape of the same fight.
+### 8.4 The backfill matched on names alone — one row damaged, fixed
 
-Bounded and measured: every headline number reproduces with those 45
-excluded (c = +0.303 p = 0.007; the favourite rule +9.7 % / +15.6 %). But
-**do not run `run_backfill.py` again until its parser rejects matchups
-whose event does not match the page requested.** As written it will keep
-writing today's prices onto historical bouts.
+BestFightOdds archived event pages no longer carry the book columns for
+their own card (`with odds: 0` on a valid 2020 slug), which is why the run
+this lab commissioned added only 20 bouts. That much was diagnosed
+correctly. The rest of the first draft's account was not: it reported that
+the scraper had harvested the site's upcoming-events sidebar off every
+page. It had not — that was an artefact of testing with an invented slug,
+which BestFightOdds 302s to the homepage. A **valid** slug returns 200 and
+the parser correctly scopes to that event.
 
-It also clobbers the 6-hourly cron's winner prices with page medians — the
-method backfill guards against exactly this with
-`UPSERT_PRESERVE_WINNER_SQL`, the winner backfill does not.
+The real defect is one line deep. `match_matchups_to_bouts` uses
+`parent_event_date` for a ±21-day candidate filter and for the tie-break
+that separates rematches — and `run_backfill.py` has never passed it. Every
+backfill run therefore resolved each matchup against the whole bout table
+on fighter names alone.
+
+Damage, enumerated rather than estimated: 45 of the 1,787 priced bouts
+changed value. 42 are 2026 bouts re-scraped inside their own closing range;
+one 2023 row moved 3.3 pp and I verified it stayed inside the true range;
+one is real. **Joshua Van vs Alexandre Pantoja, December 2025, received the
+closing line of their September 2026 rematch** — Pantoja closed 1.4255-1.5405
+in December and 1.8696-1.9709 for September, and the row held the second.
+Repaired in place from the archived December close (2.775 / 1.483),
+`created_at` untouched.
+
+Fixed on branch `fix/odds-matcher-rematch`: the matchup's own
+`event_date_text` now supplies the date the filter always needed, an
+undated matchup is skipped rather than matched on names, and a pair that
+qualifies in two different years is refused outright. Seven tests, including
+the Van–Pantoja regression.
+
+Every headline number in this document is unchanged by the repair.
 
 ---
 
@@ -457,17 +483,24 @@ Two of these are cheap and both are about the *price* side, which is where
 the measurement is starved — not the model side, which eight prior labs
 have already worked over.
 
-1. **Fix the backfill, then stop destroying the line history.**
-   `bout_external_odds` is one row per (bout, source) with
-   `ON CONFLICT DO UPDATE`, so only one number per bout ever survives.
-   Opening line, movement, and therefore closing-line value are
-   unrecoverable. An append-only price table would make CLV measurable —
-   and CLV separates a real edge from 281 lucky bets on a tenth of the
-   sample.
-2. **Find out what price we are actually holding.** §8.3 leaves the basis
-   genuinely ambiguous, and the difference between beating an opener and
-   beating a close is the difference between a business and a curiosity.
-   Capturing live prices going forward answers it in one fight week.
+1. **Scrape the fighter pages, not the event pages.** This is the big one.
+   Each row on a fighter page carries `[open, close-low, close-high]` plus
+   the full movement as a decimal series, for every bout of that fighter's
+   career. Three consequences, in ascending order of importance:
+   *coverage* — the 1,787-bout ceiling is an event-page limitation, not a
+   BestFightOdds one; *the open* — an edge measured against a close is a
+   lower bound on the same edge against an opener, and §6's rule can only
+   be sized properly once both are on the table; and *CLV* — closing-line
+   value is the statistic that separates a real edge from 281 lucky bets,
+   at roughly a tenth of the sample size, and the sparkline is exactly the
+   series it needs. The plumbing already exists: search → fighter page
+   works today (a Referer header is required; the event-page route does
+   not need to change).
+2. **Stop overwriting.** `bout_external_odds` is one row per (bout, source)
+   with `ON CONFLICT DO UPDATE`, so only one number per bout survives and
+   every re-scrape destroys what was there. An append-only price table is
+   the natural home for what step 1 would collect, and the repair in §8.4
+   would have been a `SELECT` rather than a scrape.
 3. **A genuine forward test of §6.** The rule is post-hoc; log its picks
    prospectively and read them in a year. At 26 bets a year and an ROI
    standard error near 10 % per 100 bets, that is a two-to-three-year
