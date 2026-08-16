@@ -84,30 +84,117 @@ class MatchedOdds:
     method_b_dec_decimal: float | None = None
 
 
+_MONTHS = {
+    m: i
+    for i, m in enumerate(
+        ["jan", "feb", "mar", "apr", "may", "jun",
+         "jul", "aug", "sep", "oct", "nov", "dec"],
+        start=1,
+    )
+}
+_DATE_TEXT_RE = re.compile(
+    r"([A-Za-z]{3,9})\s+(\d{1,2})(?:st|nd|rd|th)?(?:\s*,?\s*(\d{4}))?"
+)
+
+
+def parse_event_date_text(text: str | None) -> tuple[int, int, int | None] | None:
+    """(month, day, year|None) from bfo's `June 6th` / `Dec 11th 2021`.
+
+    The parser hands the raw string through and leaves resolution to the
+    caller (see `MatchupOdds.event_date_text`). This is that resolution, and
+    it lives here because the matcher is the only thing that needs it.
+    """
+    if not text:
+        return None
+    m = _DATE_TEXT_RE.search(text.strip())
+    if m is None:
+        return None
+    month = _MONTHS.get(m.group(1)[:3].lower())
+    if month is None:
+        return None
+    day = int(m.group(2))
+    if not 1 <= day <= 31:
+        return None
+    return month, day, int(m.group(3)) if m.group(3) else None
+
+
+def _date_compatible(
+    bout_date: date, md: tuple[int, int, int | None], tol: int = DATE_TOLERANCE_DAYS
+) -> bool:
+    """Is `bout_date` within `tol` days of the bfo month/day?
+
+    With no year on the page, the month/day is anchored in the bout's own
+    year and its two neighbours, so a page dated `Jan 3rd` still reaches a
+    bout on December 28th.
+    """
+    month, day, year = md
+    years = (year,) if year is not None else (
+        bout_date.year - 1, bout_date.year, bout_date.year + 1
+    )
+    for y in years:
+        try:
+            anchor = date(y, month, day)
+        except ValueError:
+            continue
+        if abs((bout_date - anchor).days) <= tol:
+            return True
+    return False
+
+
 def match_matchups_to_bouts(
     matchups: Iterable[MatchupOdds],
     db_bouts: list[DBBout],
     *,
     parent_event_date: date | None = None,
     event_url: str | None = None,
+    require_date: bool = True,
 ) -> list[MatchedOdds]:
     """For each bfo matchup, find the best-match DBBout by combined
     name similarity + date proximity. Skips matchups with no candidate
-    above the similarity threshold."""
+    above the similarity threshold.
+
+    DATE FILTERING IS NOT OPTIONAL, and this is why. `run_backfill.py` never
+    passed `parent_event_date`, so for every backfill run the ±21-day filter
+    and the rematch tie-break below were both dead code and every matchup was
+    resolved on fighter names alone — against the WHOLE bout table. On
+    2026-08-15 that wrote the closing line of the September 2026 Van–Pantoja
+    rematch onto their December 2025 fight, moving that bout's stored
+    probability by 18.5 points.
+
+    So the date now comes from the matchup itself (`event_date_text`, which
+    the parser has always carried) whenever the caller does not supply one,
+    and a matchup that cannot be dated at all is SKIPPED rather than matched
+    on names — an undated matchup is exactly the case that caused the damage.
+    `require_date=False` restores the old behaviour for a caller that really
+    wants it; nothing in this repo does.
+
+    Rematches are refused rather than guessed: if two candidate bouts in
+    DIFFERENT years both clear the name threshold, there is no evidence in
+    hand to choose between them, and writing the wrong one is worse than
+    writing neither.
+    """
     out: list[MatchedOdds] = []
     for m in matchups:
+        md = parse_event_date_text(m.event_date_text)
+        if parent_event_date is None and md is None and require_date:
+            continue
         best: tuple[float, float, float, DBBout, bool] | None = None
+        qualifying_years: set[int] = set()
         for bout in db_bouts:
             # If we know the bfo event's calendar date, filter early.
             if parent_event_date is not None:
                 if abs((bout.event_date - parent_event_date).days) > DATE_TOLERANCE_DAYS:
                     continue
+            elif md is not None and not _date_compatible(bout.event_date, md):
+                continue
             score, side_min, inverted = _pair_similarity(
                 m.fighter_a_name,
                 m.fighter_b_name,
                 bout.fighter_a_name,
                 bout.fighter_b_name,
             )
+            if score >= NAME_SIMILARITY_THRESHOLD and side_min >= MIN_SIDE_SIMILARITY:
+                qualifying_years.add(bout.event_date.year)
             # Tie-break equal-score candidates (scratched-and-rebooked pairs,
             # rematches) by date proximity to the page's event when known.
             date_rank = (
@@ -118,6 +205,10 @@ def match_matchups_to_bouts(
             if best is None or (score, date_rank) > (best[0], best[1]):
                 best = (score, date_rank, side_min, bout, inverted)
         if best is None or best[0] < NAME_SIMILARITY_THRESHOLD:
+            continue
+        if len(qualifying_years) > 1:
+            # Same pair, two different years, both inside the window: a
+            # rematch we cannot resolve. Refuse.
             continue
         score, _date_rank, side_min, bout, inverted = best
         if side_min < MIN_SIDE_SIMILARITY:
