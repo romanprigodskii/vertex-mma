@@ -158,7 +158,7 @@ export const CHAMPIONSHIP_HISTORY: readonly ChampionshipReign[] = [
   // ============================================================
   // WELTERWEIGHT
   // ============================================================
-  { slug: "islam-makhachev-275aca",      weightClass: "welterweight", startDate: "2025-11-15", endDate: null,         defenses: 0 },
+  { slug: "islam-makhachev-275aca",      weightClass: "welterweight", startDate: "2025-11-15", endDate: null,         defenses: 1 },
   { slug: "jack-della-maddalena-6b453b", weightClass: "welterweight", startDate: "2025-05-10", endDate: "2025-11-15", defenses: 0 },
   { slug: "belal-muhammad-b1b072",       weightClass: "welterweight", startDate: "2024-07-27", endDate: "2025-05-10", defenses: 0 },
   { slug: "leon-edwards-f1fac9",         weightClass: "welterweight", startDate: "2022-08-20", endDate: "2024-07-27", defenses: 2 }, // Usman 3, Covington
@@ -278,7 +278,7 @@ export const CHAMPIONSHIP_HISTORY: readonly ChampionshipReign[] = [
   // ============================================================
   // WOMEN'S STRAWWEIGHT (uses strawweight enum)
   // ============================================================
-  { slug: "mackenzie-dern-7447e9",     weightClass: "strawweight", startDate: "2025-10-25", endDate: null,         defenses: 0 }, // won vacant title vs Jandiroba at UFC 321
+  { slug: "mackenzie-dern-7447e9",     weightClass: "strawweight", startDate: "2025-10-25", endDate: null,         defenses: 1 }, // won vacant title vs Jandiroba at UFC 321
   { slug: "zhang-weili-1ebe20",        weightClass: "strawweight", startDate: "2022-11-12", endDate: "2025-08-28", defenses: 3, endReason: "vacated" }, // reign 2 — Lemos, Yan Xiaonan, Suarez; vacated 2025-08-28 to move to FlyW (Wave 13: corrected from Dern-win date 2025-10-25)
   { slug: "carla-esparza-d91066",      weightClass: "strawweight", startDate: "2022-05-07", endDate: "2022-11-12", defenses: 0 }, // reign 2
   { slug: "rose-namajunas-47b632",     weightClass: "strawweight", startDate: "2021-04-24", endDate: "2022-05-07", defenses: 1 }, // reign 2 — Zhang 2
