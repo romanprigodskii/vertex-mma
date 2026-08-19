@@ -442,6 +442,75 @@ Mean distance to the open 0.201, to the close 0.031. The repo's
 public `/model` page — stands. What is wrong is `run_backfill.py`'s own
 docstring, which calls what it scrapes opening lines.
 
+### 8.3b How the price basis was actually established
+
+§8.3's first version was settled by reading; this is the measurement, and it
+is the version that belongs in anything published. Script:
+`scripts/odds_scraper/scripts/verify_price_basis.py`.
+
+**The referent.** Bestfightodds *fighter* pages, not our own table. Our table
+keeps one number per fighter per bout; a fighter page renders
+`[open, close-low, close-high]` for every bout of that fighter's career, and
+both sides of a bout appear as consecutive rows, so one page yields the
+opening and closing prices for BOTH fighters. To be explicit about what this
+does and does not establish: same publisher, different page, different
+columns. It is not independent corroboration of bestfightodds' numbers — it
+is a check of which of its own two quantities we stored, which is the
+question that was asked.
+
+**The units, which is where the first write-up went wrong.** Distances were
+originally quoted in decimal odds, where a mean of 0.350 invites the reader
+to convert it and conclude the number is impossible. Everything below is in
+PROBABILITY, both sides de-vigged proportionally the same way `export.py`
+builds `market_prob_a`.
+
+**The sample.** Deterministic pseudo-random over every priced bout,
+`ORDER BY md5(bout_id || 'price-basis-v1')`, drawn once, no re-draws. 60
+drawn, 50 resolved; 6 dropped for having no dated fighter-page row (the
+rematch guard, or the bout is not listed) and 4 for an unreachable fighter
+page. Both attrition reasons are about name-matchability on bestfightodds,
+not about price. A row is accepted only if its own printed date is within 10
+days of the DB event date, so a rematch cannot answer for the wrong fight.
+
+| statistic (probability points) | mean | median |
+|---|---|---|
+| \|p_ours − p_open\| | 0.0765 | 0.0605 |
+| **\|p_ours − p_close\|** | **0.0094** | **0.0068** |
+| \|p_open − p_close\| — how far the line actually moves | 0.0753 | |
+
+Closer to the close in **48 of 50**. The two exceptions are bouts where open
+and close nearly coincide, so both distances are under 2 points and the
+ordering is noise. The third row is the sanity check the whole thing needs:
+an MMA line really does travel about 7.5 points from open to close, and our
+stored number recovers essentially all of that travel.
+
+### 8.3c De-vig sensitivity — the effects are invariant, one BH verdict is not
+
+Every segment recomputed against both market probabilities, on both windows:
+
+| | max shift | median shift |
+|---|---|---|
+| raw Δ, discovery | 0.29 SE | 0.073 SE |
+| adjusted Δ, discovery | 0.26 SE | 0.065 SE |
+| raw Δ, confirmation | 0.35 SE | 0.088 SE |
+| adjusted Δ, confirmation | 0.38 SE | 0.087 SE |
+
+So no segment's effect size moves materially. **The Benjamini-Hochberg
+decision is a different matter, and it is not invariant:**
+
+| segment | Δ_adj power | q | Δ_adj proportional | q |
+|---|---|---|---|---|
+| `long_win_streak_4plus` | −0.0637 | 0.0105 | −0.0610 | 0.0084 |
+| `both_ranked_elite` | −0.0412 | **0.0593** | −0.0407 | **0.0416** |
+
+The second segment's estimate moves by 0.0005 nats — about 0.03 of a
+standard error — and its verdict changes from "not significant" to
+"significant" because the q-value crosses 0.05. The lab's own result
+(`long_win_streak_4plus`) passes under both, so nothing here is retracted;
+but any claim of the form "N segments survive multiplicity" has to name the
+de-vig it used, and a hard threshold that a 0.03-SE nudge can flip is worth
+saying out loud rather than hiding behind a preprocessing default.
+
 ### 8.4 The backfill matched on names alone — one row damaged, fixed
 
 BestFightOdds archived event pages no longer carry the book columns for

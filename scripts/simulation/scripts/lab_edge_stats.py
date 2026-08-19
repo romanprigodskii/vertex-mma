@@ -141,7 +141,12 @@ def bucket_adjusted_contrast(
     """
     S = np.asarray(sel, dtype=float)
     codes = pd.Categorical(buckets).codes
-    keep = codes >= 0
+    # A single non-finite Δ poisons the whole least-squares fit and the
+    # function then returns NaN for the entire segment, which reads as "not
+    # estimable" rather than "one row was missing". Three bouts added by an
+    # odds backfill had no cached proportional price and were enough to blank
+    # every segment in a de-vig sensitivity run.
+    keep = (codes >= 0) & np.isfinite(np.asarray(d, dtype=float))
     if keep.sum() < 10:
         return float("nan"), float("nan")
     d, S, codes, clusters = d[keep], S[keep], codes[keep], np.asarray(clusters)[keep]
