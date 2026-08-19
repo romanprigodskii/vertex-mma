@@ -16,7 +16,9 @@ discontinuous across ±100, so their median is undefined there). That's
 robust to:
   * one book with an extreme line (off-market)
   * not-all-books-covering-this-bout (NULLs)
-and is close enough to true opening line for our ML feature."""
+and is the right summary of the CLOSING line the archive holds (see
+`scripts/run_backfill.py` — this docstring used to say "opening", and it
+was wrong)."""
 
 from __future__ import annotations
 

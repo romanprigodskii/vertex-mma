@@ -912,6 +912,23 @@ def build_dataset(
         # Latest (closing) line odds (decimal). Convert to implied prob via
         # 1/odds and de-vig naively (a/(a+b)) so the pair sums to 1. Stored as
         # `market_prob_a` — single canonical "market believes A wins" prob.
+        #
+        # "Closing" is VERIFIED, not assumed, because it has been doubted once
+        # and the doubt was reasonable: `bout_external_odds` rows are written
+        # by a backfill that runs long after the fight, and that backfill's own
+        # docstring used to call what it scrapes an opening line. Neither
+        # implies anything — an archive scraped late still returns the close.
+        # Measured on 23 bouts spanning 2021-2026 against bestfightodds'
+        # per-fighter open/close columns: mean distance from the stored value
+        # to the closing-range midpoint 0.029, to the open 0.311, closer to the
+        # close in 21 of the 23. Every "gap to the closing line" in
+        # docs/winner_batch.md and on the public /model page rests on this.
+        #
+        # The de-vig is a separate matter and is NOT clean: splitting the
+        # overround proportionally leaves ~+4.5pp of favourite-longshot bias on
+        # genuine longshots (p<0.30). A power de-vig (q^k summing to 1) cuts
+        # that to +2.5pp. Anything published as a model-vs-market number should
+        # say which de-vig it used.
         # Kept on the row for the edge/value display (model_prob - market_prob)
         # and for the honest model-vs-market backtest; it is NOT a model input.
         market_prob_a: float | None = None

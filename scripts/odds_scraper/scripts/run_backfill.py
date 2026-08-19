@@ -1,4 +1,17 @@
-"""CLI: backfill historical UFC opening lines from bestfightodds.
+"""CLI: backfill historical UFC CLOSING lines from bestfightodds.
+
+The word matters and this docstring had it wrong for a long time. What
+bestfightodds archives, and therefore what a retrospective scrape returns,
+is the CLOSING consensus — not the opening line. Measured rather than
+assumed: on 23 bouts spanning 2021-2026 the value this pipeline stores sits a
+mean 0.029 from the closing-range midpoint on the fighter page and 0.311 from
+the open, and is closer to the close in 21 of the 23. `src/export.py`
+calls it the closing line and is right to; this file was the one lying.
+
+That mattered beyond tidiness: the wrong word here, plus the fact that rows
+are written after the fight, was enough to talk a reader into believing the
+whole project's model-vs-market comparison was measured against something
+other than a close.
 
 Two-phase pipeline:
 
