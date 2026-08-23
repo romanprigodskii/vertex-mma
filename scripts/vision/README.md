@@ -56,6 +56,24 @@ independent check, and it costs nothing to run.
   here rather than assumed, because it is exactly where MMA's outcome
   variance lives.
 
+## Measured throughput
+
+Benchmarked on one fight (6 374 frames, M3, yolo11m-pose, MPS):
+
+| | |
+|---|---|
+| Inference | **17.2 frames/s** — 6.2 min per fight |
+| Frames carrying a detection | **99 %** (6 287 / 6 374) |
+| Persons per frame | ~3.6 — so the referee and cornermen are in there too |
+| Skeletons | 8.7 MB per fight |
+
+Which prices the thing that actually matters. The 40-fight pilot is
+~4 h. Every completed bout since 2010 is 7 582 fights, 24.9 M frames at
+5 fps, and therefore **~400 h — seventeen days of the laptop doing
+nothing else**, plus 66 GB of skeletons. That is the number that makes
+the gate worth running first, and the number a rented GPU would cut to
+under two days.
+
 ## Install
 
 ```bash
