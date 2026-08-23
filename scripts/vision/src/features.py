@@ -92,10 +92,16 @@ def _body_geometry(row) -> dict | None:
 
     # Keypoints occluded — fall back to the box, which still carries the
     # standing/grounded distinction even when joints are unrecoverable.
+    #
+    # Scale off the box's LONGEST side, not its height. A fighter lying
+    # down has a short, wide box: height/3 would under-read his torso by
+    # a factor of two or more, inflating every separation measured
+    # against it and filing the ground exchange under "distance" — a bug
+    # that would corrupt precisely the case this pipeline exists to test.
     return {
         "cx": (row["x1"] + row["x2"]) / 2.0,
         "cy": (row["y1"] + row["y2"]) / 2.0,
-        "torso": h / 3.0,           # a torso is roughly a third of a standing body
+        "torso": max(h, w) / 3.0,   # a torso is roughly a third of a body's length
         "tilt": float("nan"),
         "aspect": aspect,
     }
