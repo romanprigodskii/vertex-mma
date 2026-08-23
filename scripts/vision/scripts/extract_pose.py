@@ -51,6 +51,11 @@ def main() -> None:
                     help="spread the sample across the ground-share range "
                          "instead of taking the most recent N")
     ap.add_argument("--overwrite", action="store_true")
+    ap.add_argument("--download-only", action="store_true",
+                    help="fetch and normalise, skip pose (lets the network "
+                         "work run while the torch install finishes)")
+    ap.add_argument("--pose-only", action="store_true",
+                    help="assume video is already cached; never hit the network")
     ap.add_argument("--keep-video", action="store_true",
                     help="keep the source download (default: delete after pose)")
     args = ap.parse_args()
@@ -59,9 +64,21 @@ def main() -> None:
     if args.limit:
         fights = _sample(fights, args.limit) if args.stratify else fights[: args.limit]
 
+    # If YouTube starts refusing, stop asking. Grinding through forty
+    # rejections is how a session gets flagged, and the rejections are
+    # not independent — the first one already told us the answer.
+    BLOCK_MARKERS = ("not a bot", "Sign in to confirm", "HTTP Error 429")
+    MAX_CONSECUTIVE_BLOCKS = 3
+    consecutive_blocks = 0
+
     done = failed = 0
     for i, f in enumerate(fights, 1):
         out = pose.skeleton_path(f.youtube_video_id)
+        if args.download_only and fetch.normalised_path(f.youtube_video_id).exists() \
+                and not args.overwrite:
+            print(f"[{i}/{len(fights)}] cached  {f.title[:60]}")
+            done += 1
+            continue
         if out.exists() and not args.overwrite:
             print(f"[{i}/{len(fights)}] cached  {f.title[:60]}")
             done += 1
@@ -70,7 +87,19 @@ def main() -> None:
         print(f"[{i}/{len(fights)}] {f.title[:60]}")
         t0 = time.time()
         try:
-            normalised = fetch.prepare(f.youtube_video_id)
+            if args.pose_only:
+                normalised = fetch.normalised_path(f.youtube_video_id)
+                if not normalised.exists():
+                    raise FileNotFoundError(f"{normalised.name} not cached")
+            else:
+                if not fetch.video_path(f.youtube_video_id).exists():
+                    fetch.polite_pause()
+                normalised = fetch.prepare(f.youtube_video_id)
+            consecutive_blocks = 0
+            if args.download_only:
+                done += 1
+                print(f"    fetched in {time.time() - t0:.0f}s")
+                continue
             pose.extract(f.youtube_video_id, normalised, overwrite=args.overwrite)
             done += 1
             if not args.keep_video:
@@ -79,7 +108,17 @@ def main() -> None:
         except Exception as exc:  # noqa: BLE001
             failed += 1
             print(f"    FAILED: {exc}")
-            traceback.print_exc(limit=2)
+            message = str(exc)
+            if any(m in message for m in BLOCK_MARKERS):
+                consecutive_blocks += 1
+                if consecutive_blocks >= MAX_CONSECUTIVE_BLOCKS:
+                    print(f"\n  aborting: {consecutive_blocks} consecutive refusals from "
+                          f"YouTube — the cookie jar is stale or the session is flagged. "
+                          f"Re-export cookies rather than retrying.")
+                    break
+            else:
+                consecutive_blocks = 0
+                traceback.print_exc(limit=2)
 
     print(f"\ndone: {done}   failed: {failed}")
 

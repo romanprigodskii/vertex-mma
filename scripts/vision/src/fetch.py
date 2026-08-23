@@ -13,7 +13,10 @@ both are safe to delete.
 
 from __future__ import annotations
 
+import os
+import random
 import subprocess
+import time
 from pathlib import Path
 
 DATA = Path(__file__).resolve().parents[1] / "data"
@@ -28,6 +31,36 @@ NORM_DIR = DATA / "normalised"
 # level features are wanted.
 TARGET_FPS = 5
 TARGET_HEIGHT = 720
+
+# YouTube refuses anonymous downloads outright ("sign in to confirm
+# you're not a bot"), so a cookie jar is not optional. Read it from a
+# FILE rather than from the browser: --cookies-from-browser needs the
+# macOS keychain on every single invocation, which cannot run unattended
+# and, if waved through with "always allow", leaves a standing grant on
+# Chrome Safe Storage for anything running as this user. One export, one
+# approval, no residue.
+#
+# The path is an env var and the file lives outside the repo because it
+# IS a live session credential. Never commit it, never log it.
+COOKIES_ENV = "VERTEX_YT_COOKIES"
+
+# Forty sequential requests from one address is what tripped the bot
+# check in the first place. Pace them.
+SLEEP_MIN_SECONDS = 4
+SLEEP_MAX_SECONDS = 11
+
+
+def _cookie_args() -> list[str]:
+    path = os.environ.get(COOKIES_ENV)
+    if not path:
+        return []
+    if not Path(path).exists():
+        raise FileNotFoundError(f"{COOKIES_ENV}={path} does not exist")
+    return ["--cookies", path]
+
+
+def polite_pause() -> None:
+    time.sleep(random.uniform(SLEEP_MIN_SECONDS, SLEEP_MAX_SECONDS))
 
 
 def video_path(video_id: str) -> Path:
@@ -50,6 +83,7 @@ def download(video_id: str, *, overwrite: bool = False) -> Path:
         "--merge-output-format", "mp4",
         "--no-playlist",
         "--retries", "3",
+        *_cookie_args(),
         "-o", str(out),
         f"https://www.youtube.com/watch?v={video_id}",
     ]
