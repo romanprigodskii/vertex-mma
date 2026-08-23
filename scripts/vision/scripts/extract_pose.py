@@ -15,12 +15,41 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src import fetch, pose  # noqa: E402
-from src.manifest import read_manifest  # noqa: E402
+from src.manifest import Fight, read_manifest  # noqa: E402
+
+# The gate is a correlation, so the sample has to span the thing being
+# correlated. Taking the most recent N would instead sample one era of
+# broadcast camera work — a confound dressed up as convenience.
+STRATA = ((0.00, 0.05), (0.05, 0.15), (0.15, 0.30), (0.30, 0.50), (0.50, 1.01))
+SAMPLE_SEED = 7
+
+
+def _sample(fights: list[Fight], limit: int) -> list[Fight]:
+    """Even draw across ground-share strata, deterministic."""
+    import random
+
+    rng = random.Random(SAMPLE_SEED)
+    buckets: list[list[Fight]] = []
+    for lo, hi in STRATA:
+        b = [f for f in fights if lo <= f.ground_strike_share < hi]
+        rng.shuffle(b)
+        buckets.append(b)
+
+    picked: list[Fight] = []
+    while len(picked) < limit and any(buckets):
+        for b in buckets:
+            if b and len(picked) < limit:
+                picked.append(b.pop())
+    picked.sort(key=lambda f: f.event_date)
+    return picked
 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--limit", type=int, default=None, help="stop after N fights")
+    ap.add_argument("--stratify", action="store_true",
+                    help="spread the sample across the ground-share range "
+                         "instead of taking the most recent N")
     ap.add_argument("--overwrite", action="store_true")
     ap.add_argument("--keep-video", action="store_true",
                     help="keep the source download (default: delete after pose)")
@@ -28,7 +57,7 @@ def main() -> None:
 
     fights = read_manifest()
     if args.limit:
-        fights = fights[: args.limit]
+        fights = _sample(fights, args.limit) if args.stratify else fights[: args.limit]
 
     done = failed = 0
     for i, f in enumerate(fights, 1):
