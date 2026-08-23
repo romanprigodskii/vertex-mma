@@ -13,6 +13,7 @@ measured on the same frame it is used in.
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass
 
 import numpy as np
@@ -114,59 +115,121 @@ def _is_grounded(body: dict) -> bool:
     return not np.isnan(tilt) and tilt > GROUND_TILT_DEGREES
 
 
+def _geometry_frame(df: pd.DataFrame) -> pd.DataFrame:
+    """Vectorised _body_geometry over every detected person at once.
+
+    The per-frame Python loop this replaces cost minutes per fight, which
+    is survivable for a 40-fight pilot and not survivable for 7 582. Same
+    arithmetic, same constants — just done in numpy rather than one
+    `iterrows` call per body.
+    """
+    kx = np.stack(df["kx"].to_numpy())          # (n, 17)
+    ky = np.stack(df["ky"].to_numpy())
+    kc = np.stack(df["kc"].to_numpy())
+
+    x1 = df["x1"].to_numpy(float); x2 = df["x2"].to_numpy(float)
+    y1 = df["y1"].to_numpy(float); y2 = df["y2"].to_numpy(float)
+    w = np.maximum(1e-6, x2 - x1)
+    h = np.maximum(1e-6, y2 - y1)
+    aspect = h / w
+
+    shoulders_ok = (kc[:, L_SHOULDER] >= MIN_KP_CONF) & (kc[:, R_SHOULDER] >= MIN_KP_CONF)
+    hips_ok = (kc[:, L_HIP] >= MIN_KP_CONF) & (kc[:, R_HIP] >= MIN_KP_CONF)
+    ok = shoulders_ok & hips_ok
+
+    sx = (kx[:, L_SHOULDER] + kx[:, R_SHOULDER]) / 2.0
+    sy = (ky[:, L_SHOULDER] + ky[:, R_SHOULDER]) / 2.0
+    hx = (kx[:, L_HIP] + kx[:, R_HIP]) / 2.0
+    hy = (ky[:, L_HIP] + ky[:, R_HIP]) / 2.0
+
+    dx, dy = sx - hx, sy - hy
+    torso_kp = np.hypot(dx, dy)
+    ok = ok & (torso_kp >= 1e-3)
+
+    tilt = np.where(ok, np.degrees(np.arctan2(np.abs(dx), np.abs(dy))), np.nan)
+    # Box fallback scales off the LONGEST side: a fighter lying down has a
+    # short, wide box, and height/3 would halve his torso and inflate
+    # every separation measured against it.
+    cx = np.where(ok, hx, (x1 + x2) / 2.0)
+    cy = np.where(ok, hy, (y1 + y2) / 2.0)
+    torso = np.where(ok, torso_kp, np.maximum(h, w) / 3.0)
+
+    return pd.DataFrame(
+        {
+            "frame_idx": df["frame_idx"].to_numpy(),
+            "person_rank": df["person_rank"].to_numpy(),
+            "cx": cx, "cy": cy, "torso": torso, "tilt": tilt,
+            "aspect": aspect, "area": w * h,
+        }
+    )
+
+
 def compute(video_id: str, skeletons: pd.DataFrame) -> PoseFeatures:
     if skeletons.empty:
         return PoseFeatures(video_id, 0, 0, 0.0, 0.0, *([float("nan")] * 7))
 
     n_frames = int(skeletons["n_frames"].iloc[0])
+    geo = _geometry_frame(skeletons)
 
-    separations: list[float] = []
-    states: list[str] = []
-    tilts: list[float] = []
-    ambiguous = 0
-
-    for _, frame in skeletons.groupby("frame_idx", sort=True):
-        frame = frame.sort_values("person_rank")
-        bodies = [b for b in (_body_geometry(r) for _, r in frame.iterrows()) if b]
-        if len(bodies) < MIN_BODIES:
-            continue
-
-        areas = [
-            (r["x2"] - r["x1"]) * (r["y2"] - r["y1"])
-            for _, r in frame.iterrows()
-        ]
-        # The referee is in nearly every frame and is sometimes bigger
-        # than a fighter folded up on the mat. Track how often the third
-        # body rivals the second — that is this pipeline's contamination
-        # proxy, and the first suspect if the gate correlates weakly.
-        if len(areas) >= 3 and areas[1] > 0 and areas[2] / areas[1] > 0.8:
-            ambiguous += 1
-
-        a, b = bodies[0], bodies[1]
-        scale = (a["torso"] + b["torso"]) / 2.0
-        if scale < 1e-3:
-            continue
-        sep = float(np.hypot(a["cx"] - b["cx"], a["cy"] - b["cy"])) / scale
-        separations.append(sep)
-
-        pair_tilts = [t for t in (a["tilt"], b["tilt"]) if not np.isnan(t)]
-        if pair_tilts:
-            tilts.append(float(np.mean(pair_tilts)))
-
-        grounded = _is_grounded(a) and _is_grounded(b)
-        if grounded and sep < CLINCH_SEPARATION * 1.5:
-            states.append("ground")
-        elif sep < CLINCH_SEPARATION:
-            states.append("clinch")
-        else:
-            states.append("distance")
-
-    scored = len(states)
-    if scored == 0:
+    # person_rank is the area ordering assigned at extraction, so rank 0
+    # and rank 1 are the two biggest bodies in the frame.
+    pair = geo[geo["person_rank"] <= 1]
+    counts = pair.groupby("frame_idx")["person_rank"].size()
+    usable_frames = counts[counts >= MIN_BODIES].index
+    pair = pair[pair["frame_idx"].isin(usable_frames)].sort_values(
+        ["frame_idx", "person_rank"]
+    )
+    if pair.empty:
         return PoseFeatures(video_id, n_frames, 0, 0.0, 0.0, *([float("nan")] * 7))
 
-    sep_arr = np.asarray(separations)
-    counts = pd.Series(states).value_counts(normalize=True)
+    a = pair[pair["person_rank"] == 0].set_index("frame_idx")
+    b = pair[pair["person_rank"] == 1].set_index("frame_idx")
+    common = a.index.intersection(b.index)
+    a, b = a.loc[common], b.loc[common]
+
+    scale = (a["torso"].to_numpy() + b["torso"].to_numpy()) / 2.0
+    keep = scale >= 1e-3
+    a, b, scale = a[keep], b[keep], scale[keep]
+    if len(scale) == 0:
+        return PoseFeatures(video_id, n_frames, 0, 0.0, 0.0, *([float("nan")] * 7))
+
+    sep = np.hypot(
+        a["cx"].to_numpy() - b["cx"].to_numpy(),
+        a["cy"].to_numpy() - b["cy"].to_numpy(),
+    ) / scale
+
+    grounded = (
+        ((a["aspect"].to_numpy() < GROUND_ASPECT) | (a["tilt"].to_numpy() > GROUND_TILT_DEGREES))
+        & ((b["aspect"].to_numpy() < GROUND_ASPECT) | (b["tilt"].to_numpy() > GROUND_TILT_DEGREES))
+    )
+    is_ground = grounded & (sep < CLINCH_SEPARATION * 1.5)
+    is_clinch = ~is_ground & (sep < CLINCH_SEPARATION)
+    is_distance = ~is_ground & ~is_clinch
+
+    scored = len(sep)
+
+    # The referee is in nearly every frame and is sometimes bigger than a
+    # fighter folded up on the mat. How often the third body rivals the
+    # second is this pipeline's contamination proxy — the first suspect
+    # if the gate correlates weakly.
+    top3 = geo[geo["person_rank"] <= 2]
+    areas = top3.pivot_table(index="frame_idx", columns="person_rank",
+                             values="area", aggfunc="first")
+    ambiguous = 0
+    if {1, 2}.issubset(areas.columns):
+        rival = areas.reindex(a.index)
+        with np.errstate(invalid="ignore", divide="ignore"):
+            ratio = rival[2].to_numpy() / rival[1].to_numpy()
+        ambiguous = int(np.nansum(ratio > 0.8))
+
+    # Frames where neither body gave a confident torso are all-NaN, and
+    # nanmean is entitled to complain about them. They are expected —
+    # that is the occlusion this pipeline is measuring — so silence the
+    # warning rather than the data.
+    stacked = np.vstack([a["tilt"].to_numpy(), b["tilt"].to_numpy()])
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        tilts = np.nanmean(stacked, axis=0)
 
     return PoseFeatures(
         video_id=video_id,
@@ -174,11 +237,11 @@ def compute(video_id: str, skeletons: pd.DataFrame) -> PoseFeatures:
         frames_scored=scored,
         coverage=scored / n_frames if n_frames else 0.0,
         ambiguity_rate=ambiguous / scored,
-        frac_ground=float(counts.get("ground", 0.0)),
-        frac_clinch=float(counts.get("clinch", 0.0)),
-        frac_distance=float(counts.get("distance", 0.0)),
-        mean_separation=float(sep_arr.mean()),
-        p90_separation=float(np.percentile(sep_arr, 90)),
-        separation_volatility=float(np.diff(sep_arr).std()) if len(sep_arr) > 1 else 0.0,
-        mean_tilt=float(np.mean(tilts)) if tilts else float("nan"),
+        frac_ground=float(is_ground.mean()),
+        frac_clinch=float(is_clinch.mean()),
+        frac_distance=float(is_distance.mean()),
+        mean_separation=float(sep.mean()),
+        p90_separation=float(np.percentile(sep, 90)),
+        separation_volatility=float(np.diff(sep).std()) if scored > 1 else 0.0,
+        mean_tilt=float(np.nanmean(tilts)) if np.any(~np.isnan(tilts)) else float("nan"),
     )

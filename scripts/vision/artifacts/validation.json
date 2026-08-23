@@ -1,0 +1,6 @@
+{
+  "verdict": "inconclusive",
+  "reason": "16 fights cleared coverage >= 0.5; the gate needs 30",
+  "fights_total": 17,
+  "fights_dropped_low_coverage": 1
+}
