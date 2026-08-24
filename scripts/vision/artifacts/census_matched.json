@@ -1715,6 +1715,149 @@
       "title": "Kyle Daukaus vs Gerald Meerschaert | FULL FIGHT | UFC Freedom 250",
       "duration": 267,
       "new": false
+    },
+    {
+      "bout_id": "70b8a0db-7db0-4b4f-b47d-cc9531ca08ad",
+      "a": "2c867c4e-5ec8-4672-8fbb-0c4e6e34ca49",
+      "b": "4c85a0dc-aa53-4054-b1cf-db8efd003612",
+      "date": "2024-11-23",
+      "secs": 900,
+      "video_id": "OVI60aMHwl8",
+      "title": "Carlos Ulberg vs Volkan Oezdemir | FULL FIGHT | UFC London",
+      "duration": 962,
+      "new": true
+    },
+    {
+      "bout_id": "73262b71-b143-4709-bccd-98c68ac535d7",
+      "a": "f62942c7-5916-4b06-8ace-0a008bc89831",
+      "b": "d63d5586-56d3-4b12-b522-2908c4fe920a",
+      "date": "2022-05-14",
+      "secs": 671,
+      "video_id": "u1QCxVEfEiw",
+      "title": "Jan Blachowicz vs Aleksandar Rakic | FULL FIGHT | UFC London",
+      "duration": 829,
+      "new": true
+    },
+    {
+      "bout_id": "a7807c70-6d1c-454e-bc3c-567960b2adbe",
+      "a": "0550fe63-ca8d-4b14-ac36-feadecaabb3d",
+      "b": "f11c252c-51ef-4d37-9ed0-60b498ac3eee",
+      "date": "2024-09-07",
+      "secs": 1500,
+      "video_id": "KGqD2fbQCGw",
+      "title": "Sean Brady vs Gilbert Burns | FULL FIGHT | UFC London",
+      "duration": 1762,
+      "new": true
+    },
+    {
+      "bout_id": "433b018f-3e70-4f9d-98c3-44952709bd41",
+      "a": "3810e8b7-f4ed-4e09-bbae-1553bccde114",
+      "b": "bf51b9c5-805c-4cf8-821b-eb05ca58f203",
+      "date": "2023-12-16",
+      "secs": 1500,
+      "video_id": "GYk9wzhgT4U",
+      "title": "Leon Edwards vs Colby Covington | FULL FIGHT | UFC London",
+      "duration": 1685,
+      "new": true
+    },
+    {
+      "bout_id": "194bb1c4-75d4-435f-ad06-abcbf107fc3a",
+      "a": "69307366-9882-47e0-a1a2-3de8b84b76e5",
+      "b": "bdc98c61-9336-4e97-a80d-33e156aed6ba",
+      "date": "2025-02-22",
+      "secs": 255,
+      "video_id": "FB0DzfiiUwk",
+      "title": "Jean Silva vs Melsik Baghdasaryan | FULL FIGHT | UFC 314",
+      "duration": 390,
+      "new": true
+    },
+    {
+      "bout_id": "9adb03c6-dd07-433b-a55f-f764dbe2cad6",
+      "a": "522db2ca-2dab-48a9-bb79-527a4d87644b",
+      "b": "35b0b79d-408b-440d-9d56-a9edefa9eb55",
+      "date": "2024-12-07",
+      "secs": 639,
+      "video_id": "Beth3o2Ha1c",
+      "title": "Bryce Mitchell vs Kron Gracie | FULL FIGHT | UFC 314",
+      "duration": 733,
+      "new": true
+    },
+    {
+      "bout_id": "d6590c6a-a800-4213-8d84-22ce42218afc",
+      "a": "7434326b-5595-443c-8fc2-fce52b171323",
+      "b": "b46d53d7-33fb-47da-b83c-b4aab73bbbc8",
+      "date": "2024-07-27",
+      "secs": 202,
+      "video_id": "Rq0z4g_XQME",
+      "title": "Paddy Pimblett vs King Green | FULL FIGHT | UFC 314",
+      "duration": 500,
+      "new": true
+    },
+    {
+      "bout_id": "8365c62a-7306-4916-8430-ccf7068e7616",
+      "a": "b7bd6cde-957a-4601-b0c6-28955eb0325b",
+      "b": "d5b03237-3dbf-4f54-9572-e16c51582fa5",
+      "date": "2022-05-07",
+      "secs": 317,
+      "video_id": "b-6k93ab-Sg",
+      "title": "Michael Chandler vs Tony Ferguson | FULL FIGHT | UFC 314",
+      "duration": 534,
+      "new": true
+    },
+    {
+      "bout_id": "f952917c-39e4-4813-ab77-bba8907d696a",
+      "a": "0e971c49-ae89-4db5-a6f2-1707e489af27",
+      "b": "566e1ae4-93ac-446a-8bd7-9c891240fdd2",
+      "date": "2024-09-14",
+      "secs": 900,
+      "video_id": "Poa5qLgcvS8",
+      "title": "Diego Lopes vs Brian Ortega | FULL FIGHT | UFC 314",
+      "duration": 1086,
+      "new": true
+    },
+    {
+      "bout_id": "a9315097-35b4-42a6-91cc-76393e9db057",
+      "a": "5fdac950-9efc-4fa8-aaf0-8ba7545c2656",
+      "b": "ee8d8502-7870-4339-a5d5-c29691582b13",
+      "date": "2022-07-02",
+      "secs": 1500,
+      "video_id": "jEd5TSGyWtw",
+      "title": "Alexander Volkanovski vs Max Holloway 3 | FULL FIGHT | UFC 314",
+      "duration": 1612,
+      "new": true
+    },
+    {
+      "bout_id": "4b32b412-d4b0-4121-949d-5b47cef9669d",
+      "a": "a3c1b51c-79c8-4aef-a99b-1509bde5d365",
+      "b": "1f7ec6fa-aa8b-4220-a630-260585170459",
+      "date": "2024-05-04",
+      "secs": 1500,
+      "video_id": "gdunLZJQvtU",
+      "title": "Alexandre Pantoja vs Steve Erceg | FULL FIGHT | UFC 310",
+      "duration": 1783,
+      "new": true
+    },
+    {
+      "bout_id": "4179feb6-1f88-4657-8bf9-829219cc06a6",
+      "a": "a751d0a1-8b25-45c2-8c42-a9a81c2c80ae",
+      "b": "f578e3f7-3ddf-4d95-8aed-9dcb13b4445a",
+      "date": "2021-12-11",
+      "secs": 662,
+      "video_id": "lBJ_x4ifVyI",
+      "title": "Charles Oliveira vs Dustin Poirier | FULL FIGHT | UFC 309",
+      "duration": 838,
+      "new": true
+    },
+    {
+      "bout_id": "cda9db87-acdb-4024-bf0b-289bfad6cb9d",
+      "a": "08caa6df-8dd9-4608-bfcc-37e46d38f2b0",
+      "b": "5fdac950-9efc-4fa8-aaf0-8ba7545c2656",
+      "date": "2024-02-17",
+      "secs": 512,
+      "video_id": "P5TIENxxReI",
+      "title": "Ilia Topuria vs Alexander Volkanovski | FULL FIGHT | UFC 308",
+      "duration": 693,
+      "new": true
     }
   ]
 }
