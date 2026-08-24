@@ -15,7 +15,9 @@ from __future__ import annotations
 
 import os
 import random
+import shutil
 import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -50,6 +52,26 @@ SLEEP_MIN_SECONDS = 4
 SLEEP_MAX_SECONDS = 11
 
 
+def _binary(name: str) -> str:
+    """Resolve a helper binary, preferring the one beside this interpreter.
+
+    pip and uv install console scripts into the venv's bin/, which is on
+    PATH for an activated shell but NOT for a subprocess launched from a
+    venv interpreter invoked by absolute path — which is exactly how this
+    runs on the GPU box. Looking next to sys.executable first costs
+    nothing locally and is the difference between working and not there.
+    """
+    local = Path(sys.executable).parent / name
+    if local.exists():
+        return str(local)
+    found = shutil.which(name)
+    if found:
+        return found
+    raise FileNotFoundError(
+        f"{name} not found beside {sys.executable} or on PATH"
+    )
+
+
 def _cookie_args() -> list[str]:
     path = os.environ.get(COOKIES_ENV)
     if not path:
@@ -78,7 +100,7 @@ def download(video_id: str, *, overwrite: bool = False) -> Path:
         return out
     VIDEO_DIR.mkdir(parents=True, exist_ok=True)
     cmd = [
-        "yt-dlp",
+        _binary("yt-dlp"),
         "-f", f"bestvideo[height<={TARGET_HEIGHT}]+bestaudio/best[height<={TARGET_HEIGHT}]",
         "--merge-output-format", "mp4",
         "--no-playlist",
@@ -103,7 +125,7 @@ def normalise(video_id: str, *, overwrite: bool = False) -> Path:
         return out
     NORM_DIR.mkdir(parents=True, exist_ok=True)
     cmd = [
-        "ffmpeg", "-y", "-loglevel", "error",
+        _binary("ffmpeg"), "-y", "-loglevel", "error",
         "-i", str(src),
         "-vf", f"fps={TARGET_FPS},scale=-2:{TARGET_HEIGHT}",
         "-an",                      # audio is dead weight here
