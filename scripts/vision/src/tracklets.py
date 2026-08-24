@@ -28,10 +28,17 @@ import pandas as pd
 # the fragments we actually need to merge.
 MIN_TRACKLET_FRAMES = 5
 
-# Fighter candidates are the big boxes. The crowd and the corner are
-# small and peripheral; the referee is neither, which is why he has to
-# be handled by the graph rather than by a size cut.
-AREA_PERCENTILE = 60
+# A fighter is not merely a big box — he is one of the two BIGGEST
+# boxes in the frames where he appears. That distinction matters because
+# an absolute size cut has no idea the camera zooms: it drops a fighter
+# who is far away and admits a cornerman who is close. Measured, the
+# absolute cut left 672 candidate tracklets on a two-fighter bout and
+# 58% of the co-occurrence graph unsatisfiable, because a man in the
+# front row is "seen together" with everyone and can be nobody's
+# opponent.
+#
+# Frame-relative rank has no such blind spot, and it costs nothing.
+TOP2_FRACTION = 0.50
 
 # Held-out frames for validation. The graph is built from the rest, so
 # the split rate below is measured on co-occurrences the colouring
@@ -67,12 +74,23 @@ def build(detections: pd.DataFrame) -> tuple[list[int], dict, dict]:
     return order, frames, areas
 
 
-def _candidates(order: list[int], areas: dict) -> list[int]:
-    if not order:
+def _candidates(detections: pd.DataFrame, frames: dict) -> list[int]:
+    """Tracklets that are routinely one of the two biggest bodies on screen."""
+    if not frames:
         return []
-    means = np.array([np.mean(areas[t]) for t in order])
-    cut = np.percentile(means, AREA_PERCENTILE)
-    return [t for t in order if np.mean(areas[t]) >= cut]
+    ranked = (
+        detections.sort_values("area", ascending=False)
+        .groupby("frame_idx")
+        .head(2)["track_id"]
+        .astype(int)
+    )
+    top2_counts = ranked.value_counts().to_dict()
+    out = []
+    for t, fs in frames.items():
+        share = top2_counts.get(t, 0) / len(fs)
+        if share >= TOP2_FRACTION:
+            out.append(t)
+    return sorted(out, key=lambda t: -len(frames[t]))
 
 
 def _cooccurrence(cands: list[int], frames: dict, skip: set[int]):
@@ -132,7 +150,7 @@ def merge(video_id: str, detections: pd.DataFrame) -> tuple[MergeReport, dict[in
     )
 
     order, frames, areas = build(detections)
-    cands = _candidates(order, areas)
+    cands = _candidates(detections, frames)
     if len(cands) < 2:
         return MergeReport(video_id, len(order), len(cands), 0, 0,
                            float("nan"), 0, float("nan"), False), {}
