@@ -29,6 +29,66 @@ ARTIFACTS = Path(__file__).resolve().parents[1] / "artifacts"
 TRACKER_CFG = Path(__file__).resolve().parents[1] / "artifacts" / "botsort_reid.yaml"
 
 
+def signatures(video_path: Path, det: pd.DataFrame) -> dict:
+    """One colour signature per tracklet, averaged over all its frames.
+
+    This is the same descriptor that failed as a per-frame identity cue,
+    and the difference is not the descriptor — it is that a tracklet
+    offers tens to hundreds of frames to average, and is then asked for
+    a single bit rather than a label per frame.
+
+    The box's outer quarter is dropped on each side: at the edges it is
+    canvas, cage and crowd, and averaging those in is how a signature
+    becomes the arena's colour instead of the fighter's.
+    """
+    import cv2
+
+    wanted = {}
+    for _, r in det.iterrows():
+        wanted.setdefault(int(r["frame_idx"]), []).append(r)
+
+    acc: dict[int, list] = {}
+    cap = cv2.VideoCapture(str(video_path))
+    idx = 0
+    while True:
+        ok, frame = cap.read()
+        if not ok:
+            break
+        rows = wanted.get(idx)
+        if rows:
+            hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+            H, W = hsv.shape[:2]
+            for r in rows:
+                x0, y0, x1, y1 = (float(r["x1"]), float(r["y1"]),
+                                  float(r["x2"]), float(r["y2"]))
+                dx, dy = (x1 - x0) * tracklets.BOX_INSET, (y1 - y0) * tracklets.BOX_INSET
+                a = max(0, int(x0 + dx)); b = min(W, int(x1 - dx))
+                c = max(0, int(y0 + dy)); d = min(H, int(y1 - dy))
+                if b - a < 4 or d - c < 4:
+                    continue
+                patch = hsv[c:d, a:b].reshape(-1, 3)
+                patch = patch[patch[:, 1] >= 60]           # colour, not grey
+                if len(patch) < 30:
+                    continue
+                h = np.bincount(
+                    (patch[:, 0].astype(int) * tracklets.APPEARANCE_BINS) // 180,
+                    minlength=tracklets.APPEARANCE_BINS,
+                ).astype(float)
+                acc.setdefault(int(r["track_id"]), []).append(h / h.sum())
+        idx += 1
+    cap.release()
+
+    out = {}
+    for t, hs in acc.items():
+        if len(hs) < tracklets.MIN_GROUP_FRAMES:
+            continue
+        v = np.mean(hs, axis=0)
+        n = np.linalg.norm(v)
+        if n > 1e-9:
+            out[t] = v / n
+    return out
+
+
 def track_video(video_path: Path) -> pd.DataFrame:
     from ultralytics import YOLO
 
@@ -45,8 +105,10 @@ def track_video(video_path: Path) -> pd.DataFrame:
         b = r.boxes.xyxy.cpu().numpy()
         ids = r.boxes.id.cpu().numpy().astype(int)
         area = (b[:, 2] - b[:, 0]) * (b[:, 3] - b[:, 1])
-        for t, a in zip(ids, area):
-            rows.append({"frame_idx": i, "track_id": int(t), "area": float(a)})
+        for k, (t, a) in enumerate(zip(ids, area)):
+            rows.append({"frame_idx": i, "track_id": int(t), "area": float(a),
+                         "x1": float(b[k, 0]), "y1": float(b[k, 1]),
+                         "x2": float(b[k, 2]), "y2": float(b[k, 3])})
     return pd.DataFrame(rows)
 
 
@@ -66,7 +128,11 @@ def main() -> None:
         if det.empty:
             print(f"[{i}/{len(fights)}] no detections  {f.title[:40]}")
             continue
-        rep, _ = tracklets.merge(vid, det)
+        sig = signatures(fetch.normalised_path(vid), det)
+        rep_graph, _ = tracklets.merge(vid, det)
+        rep, _ = tracklets.merge(vid, det, signatures=sig)
+        print(f"      graph only: {rep_graph.holdout_split:.2f}  "
+              f"+appearance: {rep.holdout_split:.2f}  ({len(sig)} signatures)")
         reports.append({**asdict(rep), "title": f.title[:40]})
         flag = "OK " if rep.usable else "no "
         print(f"[{i}/{len(fights)}] {flag} holdout split={rep.holdout_split:.2f} "

@@ -47,6 +47,15 @@ TOP2_FRACTION = 0.50
 HOLDOUT_FRACTION = 0.30
 SEED = 7
 
+# Appearance is only asked ONE question per disconnected component:
+# does its colouring line up with the reference component, or is it
+# flipped? That is a single bit against hundreds of frames of evidence,
+# which is why it can work here after per-frame colour failed — there
+# the same descriptor had to carry a decision per frame.
+APPEARANCE_BINS = 12
+MIN_GROUP_FRAMES = 15
+BOX_INSET = 0.25          # keep the middle of the box, drop the background
+
 
 @dataclass(frozen=True)
 class MergeReport:
@@ -135,13 +144,103 @@ def _two_colour(cands: list[int], edges: dict) -> tuple[dict[int, int], float, i
     components = int((vals < 1e-9).sum())   # zero eigenvalues count pieces
     labels = {t: int(vecs[idx[t], -1] > 0) for t in cands}
 
+    # The spectral cut is a relaxation and stops short of the real
+    # optimum. Frustration measured 0.22-0.33 on real fights — those are
+    # co-occurrence constraints being violated INSIDE a component, where
+    # the graph does have an opinion and the colouring is ignoring it.
+    #
+    # A greedy pass fixes what the relaxation left on the table: flip any
+    # single node that reduces the violated weight, repeat until nothing
+    # helps. Local optima are a risk in general; here the objective is
+    # exact and cheap to evaluate, so the pass costs nothing and can only
+    # move frustration down.
+    adjacency: dict[int, list[tuple[int, float]]] = {t: [] for t in cands}
+    for (a, b), c in edges.items():
+        adjacency[a].append((b, float(c)))
+        adjacency[b].append((a, float(c)))
+
+    for _ in range(20):
+        moved = False
+        for t in cands:
+            same = sum(c for u, c in adjacency[t] if labels[u] == labels[t])
+            other = sum(c for u, c in adjacency[t] if labels[u] != labels[t])
+            if same > other:            # violating more weight than it satisfies
+                labels[t] = 1 - labels[t]
+                moved = True
+        if not moved:
+            break
+
     total = sum(edges.values())
     violated = sum(c for (a, b), c in edges.items() if labels[a] == labels[b])
     frustration = violated / total if total else 0.0
     return labels, frustration, components
 
 
-def merge(video_id: str, detections: pd.DataFrame) -> tuple[MergeReport, dict[int, int]]:
+def _components(cands: list[int], edges: dict) -> dict[int, int]:
+    """Connected components of the co-occurrence graph, by union-find."""
+    parent = {t: t for t in cands}
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    for (a, b) in edges:
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[ra] = rb
+    roots = {}
+    out = {}
+    for t in cands:
+        r = find(t)
+        out[t] = roots.setdefault(r, len(roots))
+    return out
+
+
+def link_components(labels: dict[int, int], comp_of: dict[int, int],
+                    signatures: dict[int, np.ndarray]) -> dict[int, int]:
+    """Decide, per component, whether its two colours are flipped.
+
+    Within a component the colouring is pinned by the co-occurrence
+    constraint. Across components there is no constraint at all — they
+    never shared a frame — so the graph is silent and something else has
+    to speak. Each component contributes exactly one bit.
+    """
+    comps = sorted(set(comp_of.values()))
+    if len(comps) < 2:
+        return labels
+
+    def group_sig(comp: int, colour: int) -> np.ndarray | None:
+        sigs = [signatures[t] for t in labels
+                if comp_of[t] == comp and labels[t] == colour and t in signatures]
+        return np.mean(sigs, axis=0) if sigs else None
+
+    # The biggest component is the reference; everything aligns to it.
+    sizes = {c: sum(1 for t in comp_of if comp_of[t] == c) for c in comps}
+    ref = max(sizes, key=sizes.get)
+    ref_sig = {c: group_sig(ref, c) for c in (0, 1)}
+    if ref_sig[0] is None or ref_sig[1] is None:
+        return labels
+
+    out = dict(labels)
+    for comp in comps:
+        if comp == ref:
+            continue
+        a, b = group_sig(comp, 0), group_sig(comp, 1)
+        if a is None or b is None:
+            continue
+        keep = np.dot(a, ref_sig[0]) + np.dot(b, ref_sig[1])
+        flip = np.dot(a, ref_sig[1]) + np.dot(b, ref_sig[0])
+        if flip > keep:
+            for t in comp_of:
+                if comp_of[t] == comp:
+                    out[t] = 1 - out[t]
+    return out
+
+
+def merge(video_id: str, detections: pd.DataFrame,
+          signatures: dict[int, np.ndarray] | None = None) -> tuple[MergeReport, dict[int, int]]:
     rng = np.random.default_rng(SEED)
     all_frames = detections["frame_idx"].astype(int).unique()
     holdout = set(
@@ -157,6 +256,11 @@ def merge(video_id: str, detections: pd.DataFrame) -> tuple[MergeReport, dict[in
 
     edges = _cooccurrence(cands, frames, skip=holdout)
     labels, frustration, components = _two_colour(cands, edges)
+
+    if signatures:
+        comp_of = _components(cands, edges)
+        components = len(set(comp_of.values()))
+        labels = link_components(labels, comp_of, signatures)
 
     # Validation on frames the graph never saw.
     held = detections[detections["frame_idx"].isin(holdout)]
