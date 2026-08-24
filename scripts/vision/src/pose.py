@@ -24,7 +24,12 @@ SKELETON_DIR = DATA / "skeletons"
 
 # yolo11m-pose: the accuracy/throughput knee on an M3. The x variant is
 # ~2.5x slower for a few points of AP that occlusion will eat anyway.
+#
+# Pinned to data/models rather than left to land in whatever the current
+# working directory happens to be — ultralytics downloads to CWD, which
+# put 40 MB of weights in the repo root the first time this ran.
 MODEL_NAME = "yolo11m-pose.pt"
+MODEL_DIR = DATA / "models"
 
 # Keep more people than there are fighters. Two is the answer we expect;
 # storing four means a frame where the referee outranks a grounded
@@ -54,7 +59,8 @@ def _load_model():
 
     import torch
 
-    model = YOLO(MODEL_NAME)
+    MODEL_DIR.mkdir(parents=True, exist_ok=True)
+    model = YOLO(str(MODEL_DIR / MODEL_NAME))
     device = "mps" if torch.backends.mps.is_available() else "cpu"
     return model, device
 
