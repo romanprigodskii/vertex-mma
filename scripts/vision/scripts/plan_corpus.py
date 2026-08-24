@@ -76,6 +76,8 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--min-history", type=int, default=3,
                     help="prior bouts on tape each corner needs")
+    ap.add_argument("--fighters", type=int, default=None,
+                    help="write the actual fetch list for this many fighters")
     args = ap.parse_args()
 
     bouts = load()
@@ -104,6 +106,24 @@ def main() -> None:
         {"since": SINCE, "min_history": args.min_history, "curve": rows},
         indent=2))
     print(f"\nwritten: {ARTIFACTS / 'corpus_plan.json'}")
+
+    if args.fighters:
+        chosen = set(ranked[: args.fighters])
+        wanted = [
+            {"bout_id": bid, "date": date, "fighter_a": na, "fighter_b": nb,
+             "query": f"{na} vs {nb}"}
+            for bid, date, a, b, na, nb in bouts
+            if a in chosen and b in chosen
+        ]
+        path = ARTIFACTS / "fetch_list.json"
+        path.write_text(json.dumps(
+            {"since": SINCE, "fighters": args.fighters,
+             "bouts": len(wanted), "list": wanted}, indent=2, ensure_ascii=False))
+        print(f"fetch list  : {len(wanted)} bouts -> {path}")
+        print(f"span        : {wanted[0]['date']} .. {wanted[-1]['date']}")
+        print("\nfirst five:")
+        for w in wanted[:5]:
+            print(f"  {w['date']}  {w['query'][:52]}")
 
 
 if __name__ == "__main__":
