@@ -34,6 +34,17 @@ from src.manifest import Fight, read_manifest  # noqa: E402
 # address is the pattern that got us the bot check in the first place.
 FETCH_WORKERS = 4
 
+# Pose is NOT GPU-bound. Measured on a 4090 with 20 videos queued: GPU
+# utilisation 1%, one fight taking 227 s. The cost is OpenCV decoding
+# frames on a CPU core and a single-threaded Python loop handing them to
+# the model — the accelerator spends its time waiting.
+#
+# So the fix for throughput is more decoders, not a bigger GPU. Each
+# worker holds its own model (~2 GB of VRAM) and takes a different
+# fight, so the one thing that would actually corrupt output — two
+# processes writing one parquet — cannot happen.
+POSE_WORKERS = 6
+
 # Signals that YouTube is refusing rather than merely failing. Grinding
 # through the rest of the list after these only makes the session look
 # worse — the first refusal already carried the information.
@@ -44,7 +55,11 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--holdout", action="store_true")
     ap.add_argument("--limit", type=int, default=None)
-    ap.add_argument("--workers", type=int, default=FETCH_WORKERS)
+    ap.add_argument("--workers", type=int, default=FETCH_WORKERS,
+                    help="parallel downloaders")
+    ap.add_argument("--pose-workers", type=int, default=POSE_WORKERS,
+                    help="parallel pose extractors; raise until the GPU is "
+                         "actually busy, not until the CPU count runs out")
     ap.add_argument("--keep-video", action="store_true")
     args = ap.parse_args()
 
@@ -111,10 +126,11 @@ def main() -> None:
                                 "Re-export cookies rather than retrying.")
                             blocked.set()
 
-    def poser() -> None:
+    def poser(n: int) -> None:
         while True:
             item = pose_q.get()
             if item is None:
+                pose_q.put(None)          # pass the sentinel to the next worker
                 return
             f, path = item
             vid = f.youtube_video_id
@@ -125,26 +141,29 @@ def main() -> None:
                 pose.extract(vid, path, progress=False)
                 with lock:
                     stats["posed"] += 1
-                say(f"[pose] {f.title[:44]} in {time.time()-t0:.0f}s "
+                say(f"[pose{n}] {f.title[:44]} in {time.time()-t0:.0f}s "
                     f"({stats['posed']}/{len(todo)})")
                 if not args.keep_video:
                     fetch.video_path(vid).unlink(missing_ok=True)
             except Exception:  # noqa: BLE001
                 with lock:
                     stats["pose_failed"] += 1
-                say(f"[pose] FAILED {vid}")
+                say(f"[pose{n}] FAILED {vid}")
                 traceback.print_exc(limit=2)
 
     workers = [threading.Thread(target=fetcher, args=(i,), daemon=True)
                for i in range(args.workers)]
-    pose_thread = threading.Thread(target=poser, daemon=True)
+    posers = [threading.Thread(target=poser, args=(i,), daemon=True)
+              for i in range(args.pose_workers)]
     for w in workers:
         w.start()
-    pose_thread.start()
+    for p in posers:
+        p.start()
     for w in workers:
         w.join()
     pose_q.put(None)
-    pose_thread.join()
+    for p in posers:
+        p.join()
 
     print(f"\nfetched {stats['fetched']}  posed {stats['posed']}  "
           f"fetch failures {stats['fetch_failed']}  pose failures {stats['pose_failed']}")
