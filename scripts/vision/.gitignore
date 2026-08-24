@@ -3,3 +3,4 @@ data/
 # artifacts/ IS committed — the manifest, the features and the gate's
 # verdict are the record of what was run and what it said. Video and
 # skeletons are regenerable; a verdict you can't point at is not.
+cookies.txt
