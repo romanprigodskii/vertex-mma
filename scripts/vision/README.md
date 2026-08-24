@@ -71,6 +71,52 @@ the holdout is simply an easier draw. The honest effect of the occlusion
 fix is the same-set comparison: **+0.037 on the primary, which is
 modest, and +0.311 on distance, which is not.**
 
+## Identity — validated (2026-08-24)
+
+Two bodies in the SAME frame cannot be the same fighter. That constraint
+is free, exact, and independent of lighting, pose and clothing. Build a
+graph whose edges are "seen together", cut it so that almost every edge
+crosses the boundary, and the fragments merge themselves.
+
+**16 of 16 fights, median held-out split 0.902** against a 0.80 bar
+fixed in advance. Stratified over duration, 192 s to 1842 s, none of
+them among the four the method was tuned on; and within each fight the
+score is computed on 30% of frames excluded when the graph was built.
+
+The in-sample median was 0.896, so the holdout came out **higher** —
+which is the opposite of what tuning looks like.
+
+Three things that mattered, each found by measurement:
+
+1. **Max cut, not min.** The first version used the Fiedler vector, which
+   keeps connected things together. Frustration 0.98, split 0.08 — both
+   pinned at the wrong end, which is what an inverted objective looks
+   like rather than a weak one.
+2. **Frame-relative candidates.** An absolute area cut ignores zoom: it
+   drops a distant fighter and admits a near cornerman, who is then
+   "seen with" everyone and can be nobody's opponent. 672 candidates
+   became 310, frustration 0.55 became 0.32.
+3. **Greedy refinement.** The spectral cut is a relaxation and stopped
+   short. Flipping any node that violates more weight than it satisfies
+   took the median from 0.785 to 0.896.
+
+Component count turned out NOT to predict failure, though it looked
+like it did across four fights. The holdout carries one bout with 27
+components — twice the worst tuning case — scoring 0.90.
+
+## What did NOT work, so it is not re-tried
+
+- **Per-frame shorts colour.** Split 0.53 / 0.72 / 0.29 against a 0.80
+  bar, the last below the 0.50 a coin gives. On bright red against
+  white, the median hue gap was 14 of 90, and filtering to saturated
+  pixels made it *worse* — what absence of signal looks like.
+- **More frames.** 37% / 28% / 41% top-2 persistence at 5 / 10 / 15 fps.
+  Tripling the corpus run buys nothing.
+- **Appearance-linking of disconnected components.** Built, works
+  mechanically (3 of 4 components linked), and changes the score by
+  exactly zero — those components are small fragments that never appear
+  as the top-two pair.
+
 ## Tracking is not the answer to identity
 
 A decline detector needs to know WHICH fighter a skeleton belongs to.
