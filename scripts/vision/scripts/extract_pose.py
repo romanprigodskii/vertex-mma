@@ -23,11 +23,18 @@ from src.manifest import Fight, read_manifest  # noqa: E402
 STRATA = ((0.00, 0.05), (0.05, 0.15), (0.15, 0.30), (0.30, 0.50), (0.50, 1.01))
 SAMPLE_SEED = 7
 
+# The pilot's size, so --holdout can reconstruct exactly which fights it
+# drew and refuse to draw them again.
+PILOT_SIZE = 40
 
-def _sample(fights: list[Fight], limit: int) -> list[Fight]:
+
+def _sample(fights: list[Fight], limit: int,
+            exclude: set[str] | None = None) -> list[Fight]:
     """Even draw across ground-share strata, deterministic."""
     import random
 
+    if exclude:
+        fights = [f for f in fights if f.youtube_video_id not in exclude]
     rng = random.Random(SAMPLE_SEED)
     buckets: list[list[Fight]] = []
     for lo, hi in STRATA:
@@ -47,6 +54,9 @@ def _sample(fights: list[Fight], limit: int) -> list[Fight]:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--limit", type=int, default=None, help="stop after N fights")
+    ap.add_argument("--holdout", action="store_true",
+                    help="draw from fights the pilot never touched — the only "
+                         "honest way to score a rule tuned on the pilot")
     ap.add_argument("--stratify", action="store_true",
                     help="spread the sample across the ground-share range "
                          "instead of taking the most recent N")
@@ -61,7 +71,11 @@ def main() -> None:
     args = ap.parse_args()
 
     fights = read_manifest()
-    if args.limit:
+    if args.holdout:
+        pilot = {f.youtube_video_id for f in _sample(fights, PILOT_SIZE)}
+        fights = _sample(fights, args.limit or 10**9, exclude=pilot)
+        print(f"holdout draw: {len(fights)} fights, none of them in the pilot {PILOT_SIZE}")
+    elif args.limit:
         fights = _sample(fights, args.limit) if args.stratify else fights[: args.limit]
 
     # If YouTube starts refusing, stop asking. Grinding through forty

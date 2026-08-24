@@ -1,0 +1,45 @@
+{
+  "verdict": "pass",
+  "thresholds": {
+    "pass_rho": 0.5,
+    "weak_rho": 0.25,
+    "max_p": 0.01,
+    "min_coverage": 0.5,
+    "min_fights": 30
+  },
+  "fights_total": 39,
+  "fights_used": 39,
+  "fights_dropped_low_coverage": 0,
+  "median_coverage": 0.9701090141835658,
+  "median_ambiguity_rate": 0.14602409638554217,
+  "primary": {
+    "name": "frac_ground ~ ground_strike_share",
+    "n": 39,
+    "rho": 0.6529641477184813,
+    "p_value": 4.999750012499375e-05,
+    "verdict": "pass"
+  },
+  "secondary": [
+    {
+      "name": "frac_ground ~ control_share",
+      "n": 39,
+      "rho": 0.9114833758320269,
+      "p_value": 4.999750012499375e-05,
+      "verdict": "pass"
+    },
+    {
+      "name": "frac_distance ~ distance_strike_share",
+      "n": 39,
+      "rho": 0.6778700280672644,
+      "p_value": 4.999750012499375e-05,
+      "verdict": "pass"
+    },
+    {
+      "name": "mean_separation ~ distance_strike_share",
+      "n": 39,
+      "rho": -0.20135655403610944,
+      "p_value": 0.21743912804359783,
+      "verdict": "fail"
+    }
+  ]
+}

@@ -138,9 +138,9 @@ def run(df: pd.DataFrame) -> dict:
     }
 
 
-def write_report(df: pd.DataFrame) -> Path:
+def write_report(df: pd.DataFrame, suffix: str = "") -> Path:
     report = run(df)
     ARTIFACTS.mkdir(parents=True, exist_ok=True)
-    path = ARTIFACTS / "validation.json"
+    path = ARTIFACTS / f"validation{suffix}.json"
     path.write_text(json.dumps(report, indent=2))
     return path
