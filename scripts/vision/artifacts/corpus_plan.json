@@ -1,0 +1,54 @@
+{
+  "since": "2015-01-01",
+  "min_history": 3,
+  "curve": [
+    {
+      "fighters": 100,
+      "fetch": 260,
+      "testable": 89,
+      "yield": 0.3423076923076923
+    },
+    {
+      "fighters": 150,
+      "fetch": 490,
+      "testable": 206,
+      "yield": 0.4204081632653061
+    },
+    {
+      "fighters": 200,
+      "fetch": 724,
+      "testable": 328,
+      "yield": 0.4530386740331492
+    },
+    {
+      "fighters": 300,
+      "fetch": 1237,
+      "testable": 625,
+      "yield": 0.5052546483427648
+    },
+    {
+      "fighters": 400,
+      "fetch": 1752,
+      "testable": 936,
+      "yield": 0.5342465753424658
+    },
+    {
+      "fighters": 600,
+      "fetch": 2699,
+      "testable": 1446,
+      "yield": 0.5357539829566507
+    },
+    {
+      "fighters": 900,
+      "fetch": 3816,
+      "testable": 1956,
+      "yield": 0.5125786163522013
+    },
+    {
+      "fighters": 1862,
+      "fetch": 5799,
+      "testable": 2528,
+      "yield": 0.43593723055699257
+    }
+  ]
+}
