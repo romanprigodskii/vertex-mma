@@ -17,3 +17,20 @@ pair-split rate across 3 fights: 0.53 / 0.72 / 0.29   (0.50 = chance)
 on Lesnar vs Mir, bright red against white: median hue gap 14 of 90,
 and filtering to saturated pixels made it WORSE (14 -> 11), which is
 what a signal that is not there looks like.
+
+--- 2026-08-24, third pass: the metric was wrong, not the tracker ---
+"top-2 persistence" counted how often two SINGLE ids dominate, which a
+renumbering destroys even when tracking is locally fine.
+
+Measured properly on the same 60 s clip (5 fps, ReID on):
+  pair of two largest bodies unchanged between consecutive frames: 79%
+  shot cuts in those 60 s: 2  (median frame-to-frame hist corr = 1.00)
+  large tracklets: 21, lengths 191, 70, 64, 55, 38, 36, 33, 19, 19, 15...
+
+One fighter holds a single id for 191 of 300 frames. The other is
+fragmented into ~6-10 pieces — he is the one going underneath and being
+re-acquired. Cuts are NOT the cause; this is one continuous shot.
+
+So the problem is not per-frame labelling. It is merging ~20 tracklets
+into 2 identities, with 15-70 frames of appearance evidence per
+tracklet instead of one.
