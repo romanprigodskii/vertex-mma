@@ -26,6 +26,34 @@ So the gate is deliberately not "does it make money". It is
 "does it measure anything at all", tested against ground truth we did
 not have to guess at.
 
+## Verdict — PASS (2026-08-24)
+
+Ran on 39 fights; 38 cleared the coverage floor.
+
+| correlation | rho | p | |
+|---|---|---|---|
+| **frac_ground ~ ground_strike_share** (primary) | **+0.636** | 0.0001 | **pass** |
+| frac_ground ~ control_share | +0.848 | 0.0000 | pass |
+| frac_distance ~ distance_strike_share | +0.290 | 0.077 | weak |
+| mean_separation ~ distance_strike_share | −0.242 | 0.145 | fail |
+
+Pose recovers where a fight happened on the vertical axis, and recovers
+it well — the agreement with control time is stronger than with the
+strike split, which makes sense, since control time is the thing
+"both bodies horizontal" most directly is.
+
+It does NOT recover distance vs clinch. The separation term even comes
+out with the wrong sign. A broadcast camera foreshortens: two fighters
+at range with one behind the other read as adjacent, and no threshold on
+apparent separation fixes a projection problem. Build on verticality;
+do not build on distance without depth.
+
+What this licenses is narrow. The gate asked whether pose measures
+anything real, and the answer is yes. It says nothing about whether pose
+sees anything the closing line doesn't — that is a different question
+against a fixed n, an MDE of 0.0036, and a market that already contains
+everyone's film study.
+
 ## The corpus
 
 `bout_video` already maps 112 YouTube uploads to bouts. Two are
