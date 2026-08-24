@@ -6,3 +6,14 @@ AI agents: READ /etc/vast-agents-guide.md (also linked as ./AGENTS.md) before ac
   10     601    62      10.3          28%        5.0
   15     901    62       6.9          41%        4.6
 NOT VIABLE — best persistence 41% at 15 fps. Identity needs an appearance cue (shorts colour, corner assignment), not more frames.
+
+--- re-test 2026-08-24, same clip, after finding with_reid defaults to False ---
+motion only (the first probe)      ids=71  top2 persistence=39%
+with ReID + 150-frame buffer       ids=70  top2 persistence=44%
+target for a usable identity: 80%
+
+--- hand-crafted shorts colour, same target ---
+pair-split rate across 3 fights: 0.53 / 0.72 / 0.29   (0.50 = chance)
+on Lesnar vs Mir, bright red against white: median hue gap 14 of 90,
+and filtering to saturated pixels made it WORSE (14 -> 11), which is
+what a signal that is not there looks like.
