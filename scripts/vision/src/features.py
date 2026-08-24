@@ -38,10 +38,26 @@ GROUND_ASPECT = 1.45
 # Torso tilted this far off vertical is not a stance.
 GROUND_TILT_DEGREES = 45.0
 
-# A frame needs two plausible bodies to say anything about configuration.
-# Crowd shots, graphics and single-fighter replays fail this and are
-# excluded rather than guessed at.
+# A frame needs two plausible bodies to say anything about the RELATIVE
+# configuration. Crowd shots, graphics and single-fighter replays fail
+# this and are excluded rather than guessed at.
 MIN_BODIES = 2
+
+# ...but a single body can still settle the question on its own, and the
+# overlay showed exactly when. Two fighters entangled on the mat get
+# merged by the detector into ONE wide, flat box; the opponent stops
+# being a separate detection precisely because he is underneath. The old
+# rule demanded that BOTH bodies read as grounded, which is backwards —
+# it threw away the frame (Lesnar vs Mir at 3:30) or, worse, paired the
+# top fighter with a cornerman at the frame edge and filed a mounted
+# ground-and-pound as DISTANCE (6:40, separation 3.25 torsos).
+#
+# So: a box wider than it is tall is a body on the mat, full stop, and
+# the missing second body is evidence rather than a gap. Measured on
+# those frames — 0.80 and 0.55 for the two ground cases against 1.34 for
+# a standing exchange — the boundary sits comfortably at 1.0.
+STRONG_GROUND_ASPECT = 1.0
+STRONG_GROUND_TILT = 55.0
 
 
 @dataclass(frozen=True)
@@ -106,6 +122,13 @@ def _body_geometry(row) -> dict | None:
         "tilt": float("nan"),
         "aspect": aspect,
     }
+
+
+def _strongly_grounded(aspect, tilt):
+    """Flat enough to settle the frame without a second body to confirm."""
+    return (aspect < STRONG_GROUND_ASPECT) | (
+        ~np.isnan(tilt) & (tilt > STRONG_GROUND_TILT)
+    )
 
 
 def _is_grounded(body: dict) -> bool:
@@ -173,6 +196,12 @@ def compute(video_id: str, skeletons: pd.DataFrame) -> PoseFeatures:
 
     # person_rank is the area ordering assigned at extraction, so rank 0
     # and rank 1 are the two biggest bodies in the frame.
+    lead = geo[geo["person_rank"] == 0].set_index("frame_idx")
+    lead_ground = pd.Series(
+        _strongly_grounded(lead["aspect"].to_numpy(), lead["tilt"].to_numpy()),
+        index=lead.index,
+    )
+
     pair = geo[geo["person_rank"] <= 1]
     counts = pair.groupby("frame_idx")["person_rank"].size()
     usable_frames = counts[counts >= MIN_BODIES].index
@@ -202,11 +231,21 @@ def compute(video_id: str, skeletons: pd.DataFrame) -> PoseFeatures:
         ((a["aspect"].to_numpy() < GROUND_ASPECT) | (a["tilt"].to_numpy() > GROUND_TILT_DEGREES))
         & ((b["aspect"].to_numpy() < GROUND_ASPECT) | (b["tilt"].to_numpy() > GROUND_TILT_DEGREES))
     )
-    is_ground = grounded & (sep < CLINCH_SEPARATION * 1.5)
+    # A strongly grounded lead body overrides the pair geometry: whatever
+    # the second detection is, a fighter that flat is not at range.
+    lead_flat = lead_ground.reindex(a.index).fillna(False).to_numpy()
+    is_ground = lead_flat | (grounded & (sep < CLINCH_SEPARATION * 1.5))
     is_clinch = ~is_ground & (sep < CLINCH_SEPARATION)
     is_distance = ~is_ground & ~is_clinch
 
-    scored = len(sep)
+    # Frames the detector could only find one body in. If that body is
+    # flat, it is a ground exchange with the opponent occluded, and
+    # dropping it biased frac_ground DOWN on exactly the ground-heavy
+    # fights the gate correlates against.
+    solo = lead.index.difference(a.index)
+    solo_ground = int(lead_ground.reindex(solo).fillna(False).sum())
+
+    scored = len(sep) + solo_ground
 
     # The referee is in nearly every frame and is sometimes bigger than a
     # fighter folded up on the mat. How often the third body rivals the
@@ -237,9 +276,9 @@ def compute(video_id: str, skeletons: pd.DataFrame) -> PoseFeatures:
         frames_scored=scored,
         coverage=scored / n_frames if n_frames else 0.0,
         ambiguity_rate=ambiguous / scored,
-        frac_ground=float(is_ground.mean()),
-        frac_clinch=float(is_clinch.mean()),
-        frac_distance=float(is_distance.mean()),
+        frac_ground=float((is_ground.sum() + solo_ground) / scored),
+        frac_clinch=float(is_clinch.sum() / scored),
+        frac_distance=float(is_distance.sum() / scored),
         mean_separation=float(sep.mean()),
         p90_separation=float(np.percentile(sep, 90)),
         separation_volatility=float(np.diff(sep).std()) if scored > 1 else 0.0,
