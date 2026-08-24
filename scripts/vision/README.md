@@ -54,6 +54,39 @@ sees anything the closing line doesn't — that is a different question
 against a fixed n, an MDE of 0.0036, and a market that already contains
 everyone's film study.
 
+## Held-out verdict — PASS (2026-08-24)
+
+35 fights the pipeline had never seen, extracted on a rented 4090, zero
+fetch or pose failures. Both feature rules scored on the SAME fights,
+neither tuned on them:
+
+| rule | coverage | rho ~ ground | rho ~ control | rho ~ distance |
+|---|---|---|---|---|
+| pre-fix | 0.935 | +0.700 | +0.774 | +0.291 |
+| **current** | **0.966** | **+0.737** | **+0.840** | **+0.602** |
+
+Read it carefully. The jump from the pilot's +0.653 to +0.737 is NOT the
+fix getting better — the old rule also scores higher here (+0.700), so
+the holdout is simply an easier draw. The honest effect of the occlusion
+fix is the same-set comparison: **+0.037 on the primary, which is
+modest, and +0.311 on distance, which is not.**
+
+## Tracking is not the answer to identity
+
+A decline detector needs to know WHICH fighter a skeleton belongs to.
+Frame-to-frame tracking was the obvious route and it does not work, at
+any sampling rate worth paying for:
+
+| fps | distinct ids | top-2 persistence |
+|---|---|---|
+| 5 | 51 | 37% |
+| 10 | 62 | 28% |
+| 15 | 62 | 41% |
+
+Tripling the frame rate — and therefore tripling a 400 h corpus run —
+buys nothing. Identity needs an appearance cue (shorts colour, corner
+assignment), not more frames.
+
 ## The corpus
 
 `bout_video` already maps 112 YouTube uploads to bouts. Two are

@@ -1,6 +1,45 @@
 {
-  "verdict": "inconclusive",
-  "reason": "11 fights cleared coverage >= 0.5; the gate needs 30",
-  "fights_total": 11,
-  "fights_dropped_low_coverage": 0
+  "verdict": "pass",
+  "thresholds": {
+    "pass_rho": 0.5,
+    "weak_rho": 0.25,
+    "max_p": 0.01,
+    "min_coverage": 0.5,
+    "min_fights": 30
+  },
+  "fights_total": 35,
+  "fights_used": 35,
+  "fights_dropped_low_coverage": 0,
+  "median_coverage": 0.9662772172065852,
+  "median_ambiguity_rate": 0.15272296764009471,
+  "primary": {
+    "name": "frac_ground ~ ground_strike_share",
+    "n": 35,
+    "rho": 0.7366578024364626,
+    "p_value": 4.999750012499375e-05,
+    "verdict": "pass"
+  },
+  "secondary": [
+    {
+      "name": "frac_ground ~ control_share",
+      "n": 35,
+      "rho": 0.8397759103641457,
+      "p_value": 4.999750012499375e-05,
+      "verdict": "pass"
+    },
+    {
+      "name": "frac_distance ~ distance_strike_share",
+      "n": 35,
+      "rho": 0.6020451102627717,
+      "p_value": 0.00039998000099995,
+      "verdict": "pass"
+    },
+    {
+      "name": "mean_separation ~ distance_strike_share",
+      "n": 35,
+      "rho": -0.15156184488234506,
+      "p_value": 0.38603069846507676,
+      "verdict": "fail"
+    }
+  ]
 }

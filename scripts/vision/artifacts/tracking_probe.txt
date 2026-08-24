@@ -1,0 +1,8 @@
+Welcome to vast.ai. If authentication fails, try again after a few seconds, and double check your ssh key.
+Have fun!
+AI agents: READ /etc/vast-agents-guide.md (also linked as ./AGENTS.md) before acting on or describing this instance: it is the operating guide. ('vast-capabilities' shows live state only, not the guide.)
+ fps  frames   ids  ids/100f  top2 persist  infer fps
+   5     300    51      17.0          37%        3.8
+  10     601    62      10.3          28%        5.0
+  15     901    62       6.9          41%        4.6
+NOT VIABLE — best persistence 41% at 15 fps. Identity needs an appearance cue (shorts colour, corner assignment), not more frames.
