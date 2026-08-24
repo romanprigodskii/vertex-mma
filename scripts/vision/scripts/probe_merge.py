@@ -14,6 +14,8 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict
 from pathlib import Path
 
@@ -27,6 +29,24 @@ from src.manifest import read_manifest  # noqa: E402
 
 ARTIFACTS = Path(__file__).resolve().parents[1] / "artifacts"
 TRACKER_CFG = Path(__file__).resolve().parents[1] / "artifacts" / "botsort_reid.yaml"
+
+# The four fights the merge method was tuned on, pinned by id rather than
+# recomputed. The original selection was "whatever video happens to be
+# cached", which on a fresh box silently resolves to a DIFFERENT four —
+# and a holdout that quietly includes your training set is worse than no
+# holdout at all, because it looks like evidence.
+TUNED_ON = (
+    "Kjq4Jz1XuiI",   # Salkilld vs Mullarkey      240 s
+    "y6RxnkLDxqI",   # Dvalishvili vs Yan 1      1620 s
+    "W6Row8U6OzQ",   # Daukaus vs Meerschaert     267 s
+    "AfTsPnieFqQ",   # Saint Denis vs Dariush     333 s
+)
+
+# Long fights were where the method failed before the greedy pass, so
+# duration is the axis the holdout has to span — sampling by recency
+# would stack it with whatever the UFC uploaded lately.
+DURATION_STRATA = ((0, 400), (400, 700), (700, 1200), (1200, 10_000))
+HOLDOUT_SEED = 11
 
 
 def signatures(video_path: Path, det: pd.DataFrame) -> dict:
@@ -115,30 +135,80 @@ def track_video(video_path: Path) -> pd.DataFrame:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--limit", type=int, default=6)
+    ap.add_argument("--holdout", action="store_true",
+                    help="stratified draw over duration from fights the merge "
+                         "method has never been tuned on")
+    ap.add_argument("--jobs", type=int, default=1,
+                    help="fights processed at once. Tracking is CPU-decode "
+                         "bound, so this is the knob that uses the machine — "
+                         "one job leaves 127 of 128 cores idle.")
+    ap.add_argument("--cached-only", action="store_true",
+                    help="only fights whose video is already on disk")
     args = ap.parse_args()
 
-    fights = [f for f in read_manifest()
-              if fetch.normalised_path(f.youtube_video_id).exists()][: args.limit]
-    print(f"{len(fights)} fights with cached video\n")
+    fights = list(read_manifest())
+    if args.cached_only:
+        fights = [f for f in fights
+                  if fetch.normalised_path(f.youtube_video_id).exists()]
+
+    if args.holdout:
+        import random
+
+        rng = random.Random(HOLDOUT_SEED)
+        pool = [f for f in fights if f.youtube_video_id not in TUNED_ON]
+        buckets = []
+        for lo, hi in DURATION_STRATA:
+            b = [f for f in pool if lo <= f.duration_seconds < hi]
+            rng.shuffle(b)
+            buckets.append(b)
+        picked = []
+        while len(picked) < (args.limit or len(pool)) and any(buckets):
+            for b in buckets:
+                if b and len(picked) < (args.limit or len(pool)):
+                    picked.append(b.pop())
+        fights = sorted(picked, key=lambda f: f.duration_seconds)
+        print(f"holdout: {len(fights)} fights, none of them among the four "
+              f"the method was tuned on")
+        print(f"duration span: {fights[0].duration_seconds}s "
+              f"- {fights[-1].duration_seconds}s\n")
+    else:
+        fights = fights[: args.limit]
+        print(f"{len(fights)} fights\n")
 
     reports = []
-    for i, f in enumerate(fights, 1):
+    lock = threading.Lock()
+    done = [0]
+
+    def handle(f):
         vid = f.youtube_video_id
-        det = track_video(fetch.normalised_path(vid))
-        if det.empty:
-            print(f"[{i}/{len(fights)}] no detections  {f.title[:40]}")
-            continue
-        sig = signatures(fetch.normalised_path(vid), det)
-        rep_graph, _ = tracklets.merge(vid, det)
-        rep, _ = tracklets.merge(vid, det, signatures=sig)
-        print(f"      graph only: {rep_graph.holdout_split:.2f}  "
-              f"+appearance: {rep.holdout_split:.2f}  ({len(sig)} signatures)")
-        reports.append({**asdict(rep), "title": f.title[:40]})
-        flag = "OK " if rep.usable else "no "
-        print(f"[{i}/{len(fights)}] {flag} holdout split={rep.holdout_split:.2f} "
-              f"(n={rep.holdout_pairs:4d})  frustration={rep.frustration:.2f}  "
-              f"tracklets={rep.tracklets:3d}->{rep.candidates:2d}  comp={rep.components}  "
-              f"{f.title[:34]}")
+        try:
+            if not fetch.normalised_path(vid).exists():
+                fetch.prepare(vid)
+            det = track_video(fetch.normalised_path(vid))
+            if det.empty:
+                return None
+            sig = signatures(fetch.normalised_path(vid), det)
+            rep, _ = tracklets.merge(vid, det, signatures=sig)
+        except Exception as exc:  # noqa: BLE001
+            with lock:
+                done[0] += 1
+                print(f"[{done[0]}/{len(fights)}] FAILED {str(exc)[:60]}  "
+                      f"{f.title[:34]}", flush=True)
+            return None
+        with lock:
+            done[0] += 1
+            flag = "OK " if rep.usable else "no "
+            print(f"[{done[0]}/{len(fights)}] {flag} split={rep.holdout_split:.2f} "
+                  f"(n={rep.holdout_pairs:4d})  frustration={rep.frustration:.2f}  "
+                  f"cand={rep.candidates:3d} comp={rep.components:2d}  "
+                  f"{f.duration_seconds:5d}s  {f.title[:30]}", flush=True)
+        return {**asdict(rep), "title": f.title[:40],
+                "duration": f.duration_seconds}
+
+    with ThreadPoolExecutor(max_workers=args.jobs) as pool:
+        for r in pool.map(handle, fights):
+            if r:
+                reports.append(r)
 
     if not reports:
         return
