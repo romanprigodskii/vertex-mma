@@ -54,15 +54,29 @@ def skeleton_path(video_id: str) -> Path:
     return SKELETON_DIR / f"{video_id}.parquet"
 
 
+def pick_device() -> str:
+    """CUDA on a rented box, MPS on the laptop, CPU as a last resort.
+
+    The laptop was always going to be the wrong machine for this: 400 h
+    for the 2010+ corpus, and a thermally throttled one at that. Nothing
+    else here is device-specific, so this one function is the whole
+    port.
+    """
+    import torch
+
+    if torch.cuda.is_available():
+        return "cuda"
+    if torch.backends.mps.is_available():
+        return "mps"
+    return "cpu"
+
+
 def _load_model():
     from ultralytics import YOLO
 
-    import torch
-
     MODEL_DIR.mkdir(parents=True, exist_ok=True)
     model = YOLO(str(MODEL_DIR / MODEL_NAME))
-    device = "mps" if torch.backends.mps.is_available() else "cpu"
-    return model, device
+    return model, pick_device()
 
 
 def extract(video_id: str, video_file: Path, *, overwrite: bool = False,

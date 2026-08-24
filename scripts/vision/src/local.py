@@ -25,7 +25,6 @@ import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 
-from .db import get_connection
 from .manifest import ARTIFACTS, MAX_SLACK_SECONDS, MIN_SLACK_SECONDS, ROUND_SECONDS
 
 VIDEO_SUFFIXES = {".mp4", ".mkv", ".mov", ".m4v", ".webm", ".ts"}
@@ -113,6 +112,8 @@ def _load_bouts(conn) -> dict[tuple[str, str], dict]:
 
 
 def match_directory(directory: Path) -> list[LocalMatch]:
+    from .db import get_connection
+
     files = sorted(
         p for p in directory.rglob("*") if p.suffix.lower() in VIDEO_SUFFIXES
     )

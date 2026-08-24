@@ -14,7 +14,6 @@ import json
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from .db import get_connection
 
 ARTIFACTS = Path(__file__).resolve().parents[1] / "artifacts"
 
@@ -99,6 +98,11 @@ order by e.date desc
 
 def load_corpus() -> tuple[list[Fight], list[dict]]:
     """Return (usable fights, rejected rows with the reason)."""
+    # Imported here, not at module scope: the rented GPU box reads the
+    # manifest JSON and never touches Postgres, and an import-time
+    # DATABASE_URL check would make src.manifest unimportable there.
+    from .db import get_connection
+
     with get_connection() as conn, conn.cursor() as cur:
         cur.execute(_QUERY, {"round_seconds": ROUND_SECONDS})
         cols = [d.name for d in cur.description]
