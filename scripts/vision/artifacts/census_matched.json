@@ -1,17 +1,6 @@
 {
   "matched": [
     {
-      "bout_id": "d5fbfabc-e166-4cf8-b782-074576d4ba19",
-      "a": "6303971d-caef-450e-9dc8-1695dd034461",
-      "b": "c6dae1d7-57d1-4f06-abf4-365245adf238",
-      "date": "2008-12-27",
-      "secs": 201,
-      "video_id": "9V03KpJBEaw",
-      "title": "Free Fight: Rampage Jackson vs Wanderlei Silva | UFC 92, 2008 | On This Day",
-      "duration": 355,
-      "new": false
-    },
-    {
       "bout_id": "7dbd3c09-b6cd-447c-bd93-fc4376139eb7",
       "a": "08caa6df-8dd9-4608-bfcc-37e46d38f2b0",
       "b": "a751d0a1-8b25-45c2-8c42-a9a81c2c80ae",
@@ -133,6 +122,17 @@
       "new": true
     },
     {
+      "bout_id": "858de60e-b7e6-4ba4-9b47-e048bdbaeefd",
+      "a": "f578e3f7-3ddf-4d95-8aed-9dcb13b4445a",
+      "b": "9cd31dba-2977-4245-b949-399fc71f223b",
+      "date": "2018-04-14",
+      "secs": 933,
+      "video_id": "GoUjizSdLEw",
+      "title": "Dustin Poirier vs Justin Gaethje 1 | FULL FIGHT",
+      "duration": 1244,
+      "new": false
+    },
+    {
       "bout_id": "31d747e0-9ed8-40b8-9285-ba04315689fb",
       "a": "bfa89e81-7dc7-42be-99d9-2fc05176a193",
       "b": "e1d4d2dd-df8f-49aa-abfc-a264e21be2f7",
@@ -141,6 +141,17 @@
       "video_id": "_-dxHXd9B2Y",
       "title": "Islam Makhachev vs Arman Tsarukyan | FULL FIGHT | UFC Classics",
       "duration": 963,
+      "new": false
+    },
+    {
+      "bout_id": "82eb7285-782b-4b16-ad56-575b166dd330",
+      "a": "11c236f4-98ff-417a-964b-a5da4f59c0b2",
+      "b": "31c31b3c-1c7e-4fdc-b22b-5f8c05551cc4",
+      "date": "2025-06-28",
+      "secs": 900,
+      "video_id": "nwO2UPz7p28",
+      "title": "Joshua Van vs Brandon Royval | FULL FIGHT | UFC 328",
+      "duration": 1034,
       "new": false
     },
     {
@@ -221,6 +232,17 @@
       "new": false
     },
     {
+      "bout_id": "4b8ed803-4ba5-406b-81a3-d91d99b53532",
+      "a": "cb7ff08a-8da9-41ee-b59d-633b7cfe1440",
+      "b": "ee8d8502-7870-4339-a5d5-c29691582b13",
+      "date": "2013-08-17",
+      "secs": 900,
+      "video_id": "BCOy-PG8EIw",
+      "title": "Conor McGregor vs Max Holloway 1 | FULL FIGHT",
+      "duration": 960,
+      "new": false
+    },
+    {
       "bout_id": "670e78e8-339c-4a67-9870-2b396d7860f4",
       "a": "530ff252-cecc-470a-aa74-3e06e8d80fe1",
       "b": "f7875a59-9a56-43b8-97dd-cbe3bb51cc02",
@@ -241,6 +263,28 @@
       "title": "Israel Adesanya vs Alex Pereira 2 | FULL FIGHT",
       "duration": 789,
       "new": false
+    },
+    {
+      "bout_id": "c4074b64-3e05-445a-9b27-2f882099d9dd",
+      "a": "9cd31dba-2977-4245-b949-399fc71f223b",
+      "b": "ff480296-3bd0-422a-bd0a-02a42b452a03",
+      "date": "2025-03-08",
+      "secs": 900,
+      "video_id": "2LSLy-Pkh7Y",
+      "title": "Justin Gaethje vs Rafael Fiziev 2 | FULL FIGHT | UFC 324",
+      "duration": 1045,
+      "new": false
+    },
+    {
+      "bout_id": "c5b1c9d0-3c50-48ae-a35e-5c6abd04d856",
+      "a": "ee8d8502-7870-4339-a5d5-c29691582b13",
+      "b": "f578e3f7-3ddf-4d95-8aed-9dcb13b4445a",
+      "date": "2025-07-19",
+      "secs": 1500,
+      "video_id": "1sohmZFeCY4",
+      "title": "Max Holloway vs Dustin Poirier 3 | FULL FIGHT | UFC 329",
+      "duration": 1708,
+      "new": true
     },
     {
       "bout_id": "7d69c83c-eab7-4fc3-b94b-bc06d7c7c741",
@@ -295,6 +339,28 @@
       "video_id": "P1Yl0iKipxs",
       "title": "Khamzat Chimaev vs Dricus Du Plessis | FULL FIGHT | UFC 328",
       "duration": 1713,
+      "new": false
+    },
+    {
+      "bout_id": "fc72b0d8-d98a-41c5-ad65-852d0ecd06ea",
+      "a": "f632ffb4-0842-4a66-9c53-57c03b49f2d7",
+      "b": "3e53b24a-bc7e-4359-a9ba-45cc75168f7f",
+      "date": "2015-01-31",
+      "secs": 1500,
+      "video_id": "InHMy4Z1U8o",
+      "title": "Anderson Silva vs Nick Diaz | FULL FIGHT | UFC Classics",
+      "duration": 1645,
+      "new": false
+    },
+    {
+      "bout_id": "cbdd6f5c-f450-4d00-baac-9ff732996559",
+      "a": "21b72bf2-b393-4d0e-a37b-574a15bffa23",
+      "b": "cf7c4948-785b-43e8-9df5-d142202e44c2",
+      "date": "2019-04-13",
+      "secs": 1500,
+      "video_id": "J19ORjYOehE",
+      "title": "Israel Adesanya vs Kelvin Gastelum | FULL FIGHT | 2025 Hall of Fame Inductee",
+      "duration": 1610,
       "new": false
     },
     {
@@ -408,6 +474,17 @@
       "new": false
     },
     {
+      "bout_id": "4b8ed803-4ba5-406b-81a3-d91d99b53532",
+      "a": "cb7ff08a-8da9-41ee-b59d-633b7cfe1440",
+      "b": "ee8d8502-7870-4339-a5d5-c29691582b13",
+      "date": "2013-08-17",
+      "secs": 900,
+      "video_id": "JAVUsC9iV9E",
+      "title": "Conor McGregor vs Max Holloway 1 | FULL FIGHT | UFC 329",
+      "duration": 983,
+      "new": true
+    },
+    {
       "bout_id": "13c798e4-720f-4595-83f1-bf253c5aacd7",
       "a": "b5b7a4e4-1e58-4c41-bb8a-f7f646c4cf06",
       "b": "166ba471-0c95-4d84-89d3-000efa1f1a66",
@@ -427,6 +504,17 @@
       "video_id": "X82ClCsaAKs",
       "title": "UFC APEX Banger: Paddy Pimblett vs Luigi Vendramini | FREE FIGHT",
       "duration": 407,
+      "new": false
+    },
+    {
+      "bout_id": "11a2b525-3d29-4a53-ad39-50dc85162622",
+      "a": "638ae913-db76-4aa5-a990-c586e7ab0c86",
+      "b": "deb42e6f-8b86-4147-8aa3-e386adec6c74",
+      "date": "2025-12-06",
+      "secs": 444,
+      "video_id": "MA31jigTReo",
+      "title": "Tatsuro Taira vs Brandon Moreno | FULL FIGHT | UFC 328",
+      "duration": 579,
       "new": false
     },
     {
@@ -482,6 +570,17 @@
       "video_id": "fMgVtMxusfw",
       "title": "Rafael Fiziev vs Ignacio Bahamondes | FULL FIGHT | UFC Baku",
       "duration": 969,
+      "new": true
+    },
+    {
+      "bout_id": "8365c62a-7306-4916-8430-ccf7068e7616",
+      "a": "b7bd6cde-957a-4601-b0c6-28955eb0325b",
+      "b": "d5b03237-3dbf-4f54-9572-e16c51582fa5",
+      "date": "2022-05-07",
+      "secs": 317,
+      "video_id": "eed-e7O1MfE",
+      "title": "Michael Chandler vs Tony Ferguson | FULL FIGHT | UFC Freedom 250",
+      "duration": 532,
       "new": true
     },
     {
@@ -650,6 +749,39 @@
       "new": false
     },
     {
+      "bout_id": "d0ce3887-ffe0-4134-ab38-12a529779fde",
+      "a": "5b20a271-17d1-4191-9e67-2b2bce897b74",
+      "b": "31ede6a7-f5cf-4c76-a4d2-1eaf16606bb6",
+      "date": "2016-07-08",
+      "secs": 1500,
+      "video_id": "cINJim4gWN4",
+      "title": "Free Fight: Joanna Jedrzejczyk vs Claudia Gadelha 2 | TUF 23 Finale, 2016",
+      "duration": 1686,
+      "new": false
+    },
+    {
+      "bout_id": "971dfcba-2fd6-4736-9769-66dc1f70e4a6",
+      "a": "87f15205-ec70-4068-aacc-2b981e2e6c71",
+      "b": "f632ffb4-0842-4a66-9c53-57c03b49f2d7",
+      "date": "2016-02-27",
+      "secs": 1500,
+      "video_id": "EUKi2pmD6B4",
+      "title": "Michael Bisping vs Anderson Silva | FULL FIGHT | UFC Classics",
+      "duration": 1889,
+      "new": false
+    },
+    {
+      "bout_id": "56e4ca42-fbc4-4f09-ad7d-b08dfb447429",
+      "a": "38837a6b-370d-4ee6-9c92-494c3fa7a38e",
+      "b": "0d9370c0-eb66-474d-96ca-77ef5f84bb9b",
+      "date": "2018-06-09",
+      "secs": 1500,
+      "video_id": "7CAkyfHMhhA",
+      "title": "Robert Whittaker vs. Yoel Romero 2 Full Fight - EA Alter Egos Champion Series",
+      "duration": 1669,
+      "new": true
+    },
+    {
       "bout_id": "d86acc5a-6829-493d-9dda-448dc31b48eb",
       "a": "603c4fc2-3f00-4f1c-aa1e-182d3bced1b7",
       "b": "73bd2879-1e2c-4f41-b8f0-be31432ccd73",
@@ -683,6 +815,17 @@
       "new": true
     },
     {
+      "bout_id": "3279c5c9-6993-481d-813b-5545e54c0641",
+      "a": "8c7e5112-4ebc-4f5f-bbe0-d7f599bf45bf",
+      "b": "00994ecb-933f-43e6-b1e0-11d8ab6976c4",
+      "date": "2026-03-07",
+      "secs": 107,
+      "video_id": "wP3Xm2kYwjk",
+      "title": "INSANE KNOCKOUT | Gregory Rodrigues vs Brunno Ferreira 2 | FULL FIGHT",
+      "duration": 232,
+      "new": true
+    },
+    {
       "bout_id": "f82d0644-d30d-457e-ae29-e4776ae2a20a",
       "a": "fb446335-6150-404a-b5b5-952345253a10",
       "b": "e72290f8-a2df-4576-8403-9f30ec7c3cb2",
@@ -692,6 +835,39 @@
       "title": "Manuel Torres vs Grant Dawson | FULL FIGHT | UFC Baku",
       "duration": 292,
       "new": true
+    },
+    {
+      "bout_id": "61e44f34-4951-42ec-a637-f8ea71dfd83f",
+      "a": "c103e8a1-ed54-480a-bd19-7e31dcd577e8",
+      "b": "f486b7b5-d77d-4a97-9261-cb2852b66d8d",
+      "date": "2014-07-05",
+      "secs": 1500,
+      "video_id": "tQgA4UJt9jA",
+      "title": "Free Fight: Chris Weidman vs Lyoto Machida | UFC 175, 2014",
+      "duration": 1698,
+      "new": false
+    },
+    {
+      "bout_id": "649a95e2-8246-46d0-8fa4-49c65da85911",
+      "a": "4232153c-9fb2-4f76-806c-b486ea848b07",
+      "b": "5b20a271-17d1-4191-9e67-2b2bce897b74",
+      "date": "2020-03-07",
+      "secs": 1500,
+      "video_id": "i_AL3LLUnHY",
+      "title": "Zhang Weili vs Joanna Jędrzejczyk 1 | FULL FIGHT | UFC Classics",
+      "duration": 1728,
+      "new": false
+    },
+    {
+      "bout_id": "7bd98524-718e-4835-85cc-a5590ec72c79",
+      "a": "5fdac950-9efc-4fa8-aaf0-8ba7545c2656",
+      "b": "0e971c49-ae89-4db5-a6f2-1707e489af27",
+      "date": "2025-04-12",
+      "secs": 1500,
+      "video_id": "qe3n4Mx4RyQ",
+      "title": "Alexander Volkanovski vs Diego Lopes 1 | FULL FIGHT | UFC 325",
+      "duration": 1725,
+      "new": false
     },
     {
       "bout_id": "0538fb76-d275-4a3d-82d5-4bc2b5500561",
@@ -782,6 +958,39 @@
       "new": false
     },
     {
+      "bout_id": "7a6668eb-106d-44b9-bb87-41ac8a2e547f",
+      "a": "4391fcf7-6154-4ac7-903b-4f2935354c1a",
+      "b": "46049b5c-002e-4b1a-8746-d49187a8fc5e",
+      "date": "2014-03-15",
+      "secs": 1500,
+      "video_id": "xAF1674POQY",
+      "title": "Johny Hendricks vs Robbie Lawler 1 | FULL FIGHT | UFC Classics",
+      "duration": 1655,
+      "new": false
+    },
+    {
+      "bout_id": "82e10502-ace1-4e1d-8544-272525ec5a5f",
+      "a": "3e53b24a-bc7e-4359-a9ba-45cc75168f7f",
+      "b": "40c67538-624e-48c7-9959-61f1635f8dbd",
+      "date": "2003-09-26",
+      "secs": 724,
+      "video_id": "mP9-MWwcFhc",
+      "title": "UFC Debut: Nick Diaz vs Jeremy Jackson 3 | Free Fight",
+      "duration": 942,
+      "new": false
+    },
+    {
+      "bout_id": "ca352025-b3c1-4ac4-8f55-02e63b609b41",
+      "a": "4aece785-eb14-43a7-b2b4-086175ecd932",
+      "b": "833f1fe7-84e3-495b-828b-4581cb98c179",
+      "date": "2014-10-25",
+      "secs": 1500,
+      "video_id": "K63PJBKuA4U",
+      "title": "UFC Classic: José Aldo vs Chad Mendes 2 | FULL FIGHT",
+      "duration": 1592,
+      "new": false
+    },
+    {
       "bout_id": "d2a434e2-0712-4cc4-85e9-fbcb64a0266e",
       "a": "31c31b3c-1c7e-4fdc-b22b-5f8c05551cc4",
       "b": "deb42e6f-8b86-4147-8aa3-e386adec6c74",
@@ -815,17 +1024,6 @@
       "new": false
     },
     {
-      "bout_id": "a7375ba9-b33c-4634-8b25-0552e49ff8af",
-      "a": "1cdb5e0f-e8c5-4267-a60e-8dc8c70ebf15",
-      "b": "d1626a07-45bc-4b93-8f2d-37449f4f476f",
-      "date": "2016-12-10",
-      "secs": 900,
-      "video_id": "ZEdSfXwwA6w",
-      "title": "Cub Swanson vs Doo-ho Choi | HALL OF FAME FULL FIGHT  🏆 | UFC Classics",
-      "duration": 1056,
-      "new": false
-    },
-    {
       "bout_id": "a4bc2812-2ff7-441a-aff0-96bd16a954ae",
       "a": "60312c20-91ef-46f9-838d-b490c054c25b",
       "b": "8719302f-7a97-4f2d-8d6a-9a7abb21f32f",
@@ -848,15 +1046,26 @@
       "new": false
     },
     {
-      "bout_id": "bcefc07e-db81-4cf2-b093-1644a3d2124c",
-      "a": "2c867c4e-5ec8-4672-8fbb-0c4e6e34ca49",
-      "b": "612f6e46-9227-44b2-a4ef-373af620092c",
-      "date": "2025-09-27",
-      "secs": 267,
-      "video_id": "KyQtlRUEqQ0",
-      "title": "Carlos Ulberg vs Dominick Reys | FULL FIGHT | UFC 327",
-      "duration": 576,
-      "new": true
+      "bout_id": "a7665fdf-3bc1-4abd-be0f-66a1ee91e0a5",
+      "a": "31c31b3c-1c7e-4fdc-b22b-5f8c05551cc4",
+      "b": "638ae913-db76-4aa5-a990-c586e7ab0c86",
+      "date": "2024-10-12",
+      "secs": 1500,
+      "video_id": "hWagdO7F8r4",
+      "title": "Brandon Royval vs Tatsuro Taira | FULL FIGHT | UFC Vegas 112",
+      "duration": 1630,
+      "new": false
+    },
+    {
+      "bout_id": "fc7b770d-ea3a-4c3c-9048-80e0156b7d99",
+      "a": "d5b03237-3dbf-4f54-9572-e16c51582fa5",
+      "b": "77a52e71-9c70-423e-9e07-e26260a63bd3",
+      "date": "2016-11-05",
+      "secs": 1500,
+      "video_id": "PzrI9PY8gw4",
+      "title": "Tony Ferguson vs Rafael dos Anjos | FULL FIGHT | UFC Classics",
+      "duration": 1633,
+      "new": false
     },
     {
       "bout_id": "ebb62586-82ed-439f-803e-1c8ea27abe00",
@@ -870,6 +1079,17 @@
       "new": false
     },
     {
+      "bout_id": "c3668e72-fc1b-4f30-96e1-8a080bc0c048",
+      "a": "c47c6d08-a406-40c1-968c-3b4c0d350484",
+      "b": "289caad6-1017-4321-bd85-2bfbe976f24a",
+      "date": "2023-03-11",
+      "secs": 1500,
+      "video_id": "y6RxnkLDxqI",
+      "title": "Merab Dvalishvili vs Petr Yan 1 | FULL FIGHT | UFC 323",
+      "duration": 1620,
+      "new": false
+    },
+    {
       "bout_id": "c0afadea-b40a-4ae7-b4e8-a80931ee0375",
       "a": "d40e3753-3f13-433e-8dad-c7699dd8f0e2",
       "b": "dc8004d9-c060-424e-8fed-60a0c1449abe",
@@ -879,6 +1099,28 @@
       "title": "UFC Debut: Stipe Miocic vs Joey Beltran | Free Fight",
       "duration": 1383,
       "new": false
+    },
+    {
+      "bout_id": "232b1d8f-6415-41bb-8d29-fa8553d131db",
+      "a": "deb42e6f-8b86-4147-8aa3-e386adec6c74",
+      "b": "a863a036-f618-4403-a99c-68a9e5a68885",
+      "date": "2016-10-01",
+      "secs": 143,
+      "video_id": "weIO61HTogM",
+      "title": "UFC Debut: Brandon Moreno vs Louis Smolka | Free Fight",
+      "duration": 525,
+      "new": false
+    },
+    {
+      "bout_id": "da3592e7-d74a-433c-83ee-dc5f13738287",
+      "a": "4584fcb7-6f2e-4bde-aaca-157b7463e9ea",
+      "b": "31c31b3c-1c7e-4fdc-b22b-5f8c05551cc4",
+      "date": "2025-12-13",
+      "secs": 198,
+      "video_id": "2ATpcdFj0sg",
+      "title": "Manel Kape vs Brandon Royval | FULL FIGHT | UFC Vegas 119",
+      "duration": 522,
+      "new": true
     },
     {
       "bout_id": "540e1520-6235-420d-b1b0-3f614a29e3e0",
@@ -969,6 +1211,17 @@
       "new": false
     },
     {
+      "bout_id": "d9b16aaa-51da-40cb-93f5-b8f94532550e",
+      "a": "b03212ea-e8c6-4c6e-b708-b13deeb643f7",
+      "b": "c6dae1d7-57d1-4f06-abf4-365245adf238",
+      "date": "2007-12-29",
+      "secs": 900,
+      "video_id": "yz6E5UFWs4k",
+      "title": "Chuck Liddell vs Wanderlei Silva | FULL FIGHT | UFC Classics",
+      "duration": 944,
+      "new": false
+    },
+    {
       "bout_id": "21727f7d-4d16-428f-bad0-9c0ac2a6c6af",
       "a": "74b7092f-9ea2-4e7b-b71c-46fb932ca084",
       "b": "595ece39-7773-48b0-aaff-107bc7346bac",
@@ -1013,6 +1266,28 @@
       "new": true
     },
     {
+      "bout_id": "d86b330a-a0a8-4273-a03f-35c268347794",
+      "a": "cb7ff08a-8da9-41ee-b59d-633b7cfe1440",
+      "b": "cfc80c70-4fbc-4e0e-8ad9-b557d9c8bc9d",
+      "date": "2016-08-20",
+      "secs": 1500,
+      "video_id": "W9jPiCO35wk",
+      "title": "Conor McGregor vs Nate Diaz 2 | FULL FIGHT",
+      "duration": 1709,
+      "new": true
+    },
+    {
+      "bout_id": "eae34a9f-fc11-49ff-98b4-69fa00107095",
+      "a": "dd2abc3a-f477-456a-bf0e-5ae528dbbe44",
+      "b": "132a1f42-a65b-4e89-94e9-9d9953a029ee",
+      "date": "2009-07-11",
+      "secs": 408,
+      "video_id": "hFHP7aBbGmg",
+      "title": "Brock Lesnar vs Frank Mir 2 | FULL FIGHT | UFC Classics",
+      "duration": 557,
+      "new": false
+    },
+    {
       "bout_id": "c5b0ea42-363b-4d2a-a07c-a3942d49b12c",
       "a": "624f4d7e-22e3-42a7-ae30-208281f6fa6d",
       "b": "74b7092f-9ea2-4e7b-b71c-46fb932ca084",
@@ -1033,6 +1308,28 @@
       "title": "Anthony Hernandez vs Michel Pereira | FULL FIGHT | UFC Sacramento",
       "duration": 1543,
       "new": true
+    },
+    {
+      "bout_id": "eae34a9f-fc11-49ff-98b4-69fa00107095",
+      "a": "dd2abc3a-f477-456a-bf0e-5ae528dbbe44",
+      "b": "132a1f42-a65b-4e89-94e9-9d9953a029ee",
+      "date": "2009-07-11",
+      "secs": 408,
+      "video_id": "WD2-K7dsqYM",
+      "title": "Brock Lesnar vs Frank Mir 2 | FULL FIGHT | UFC Classics",
+      "duration": 567,
+      "new": false
+    },
+    {
+      "bout_id": "65318723-f5b4-4dfb-a825-3441367b1f16",
+      "a": "f632ffb4-0842-4a66-9c53-57c03b49f2d7",
+      "b": "950d3f33-2fc5-4693-8a65-7057c597a9e9",
+      "date": "2010-08-07",
+      "secs": 1390,
+      "video_id": "DpLaqnwFQEY",
+      "title": "Anderson Silva vs Chael Sonnen 1 | FULL FIGHT",
+      "duration": 1700,
+      "new": false
     },
     {
       "bout_id": "82492d39-ed7c-4dd3-b757-bf5791198eba",
@@ -1057,6 +1354,28 @@
       "new": false
     },
     {
+      "bout_id": "2524f6b1-011f-4199-81d0-e8026461341a",
+      "a": "89fe4454-81c2-4c14-8e1a-3952973ff9d4",
+      "b": "b5b7a4e4-1e58-4c41-bb8a-f7f646c4cf06",
+      "date": "2017-11-04",
+      "secs": 461,
+      "video_id": "2sDiRbsha4A",
+      "title": "TJ Dillashaw vs Cody Garbrandt 1 | FULL FIGHT | UFC Classics",
+      "duration": 720,
+      "new": false
+    },
+    {
+      "bout_id": "5940c19e-19eb-468f-bb0f-9b54253ad047",
+      "a": "d7205dd2-fad0-48ef-a8c6-067d2a7a3f40",
+      "b": "9cd31dba-2977-4245-b949-399fc71f223b",
+      "date": "2017-12-02",
+      "secs": 839,
+      "video_id": "z4e8VupwS2w",
+      "title": "Eddie Alvarez vs Justin Gaethje | FULL FIGHT | UFC Classics",
+      "duration": 986,
+      "new": false
+    },
+    {
       "bout_id": "b916e771-7591-4d33-a59e-0d6157e5b227",
       "a": "05d4c6c4-730a-4098-9830-fa828e4c2156",
       "b": "556ca61f-0b70-4a10-9c2c-d8c4359baae1",
@@ -1065,6 +1384,17 @@
       "video_id": "YzJjSBV5jsg",
       "title": "Rashad Evans vs Forrest Griffin | FULL FIGHT | UFC Classics",
       "duration": 824,
+      "new": false
+    },
+    {
+      "bout_id": "b3debeab-7f16-45ee-837c-f4096f7e6aa5",
+      "a": "e872250a-b4fe-45ae-a263-edd59de32888",
+      "b": "7c48f1fd-db66-4a50-9e9b-24122b6428f0",
+      "date": "2009-05-23",
+      "secs": 900,
+      "video_id": "43m0uap7SZ4",
+      "title": "Free Fight: Matt Hughes vs Matt Serra | UFC 98, 2009",
+      "duration": 982,
       "new": false
     },
     {
@@ -1109,6 +1439,17 @@
       "video_id": "zea_QpSpfGs",
       "title": "UFC Debut: Israel Adesanya vs Rob Wilkinson | Free Fight",
       "duration": 853,
+      "new": false
+    },
+    {
+      "bout_id": "88b7d0d7-9df6-4e78-add3-0eab421e65c0",
+      "a": "a751d0a1-8b25-45c2-8c42-a9a81c2c80ae",
+      "b": "34079753-fde5-462e-9944-eb7d8d4bbf37",
+      "date": "2010-08-01",
+      "secs": 41,
+      "video_id": "0u_s6dGMNyg",
+      "title": "UFC Debut: Charles Oliveira vs Darren Elkins | Free Fight",
+      "duration": 426,
       "new": false
     },
     {
@@ -1200,6 +1541,28 @@
       "new": false
     },
     {
+      "bout_id": "f88d6d3f-ac25-4ee9-b057-5f71c32f9d0b",
+      "a": "37f85b69-c609-4bfe-b759-b7f64a49c3ed",
+      "b": "143630d4-7f65-49da-a9ed-e3c278917e34",
+      "date": "2026-02-21",
+      "secs": 743,
+      "video_id": "kQ8NRlPTML0",
+      "title": "Sean Strickland vs Anthony Hernandez | FULL FIGHT | UFC 328",
+      "duration": 907,
+      "new": false
+    },
+    {
+      "bout_id": "ffa833fc-42cc-4679-ab12-1166de48ec3d",
+      "a": "530ff252-cecc-470a-aa74-3e06e8d80fe1",
+      "b": "cc9cda96-3273-4b7e-8967-c91185066224",
+      "date": "2024-03-09",
+      "secs": 1500,
+      "video_id": "OY_ISlQoCvI",
+      "title": "Sean O'Malley vs Marlon Vera 2 | FULL FIGHT | UFC 324",
+      "duration": 1742,
+      "new": false
+    },
+    {
       "bout_id": "ff67aff7-8e8a-4072-b77c-a42c8633e0f6",
       "a": "595ece39-7773-48b0-aaff-107bc7346bac",
       "b": "f24e0cd8-0470-4a21-b42c-311bbc78ab0e",
@@ -1211,6 +1574,39 @@
       "new": true
     },
     {
+      "bout_id": "f88080e5-f54c-46b6-9788-f170574bd380",
+      "a": "f7875a59-9a56-43b8-97dd-cbe3bb51cc02",
+      "b": "834b27df-2cd9-4468-b547-4ce47079c6d0",
+      "date": "2023-04-29",
+      "secs": 1270,
+      "video_id": "1dZb-vV83ew",
+      "title": "BRUTAL KNOCKOUT | Song Yadong vs Ricky Simón | FULL FIGHT | UFC 324",
+      "duration": 1494,
+      "new": false
+    },
+    {
+      "bout_id": "2e355868-36f7-47e1-bfea-8003301791b6",
+      "a": "4584fcb7-6f2e-4bde-aaca-157b7463e9ea",
+      "b": "15de5c52-3049-4be7-8e7e-6f14b4ab7520",
+      "date": "2024-12-14",
+      "secs": 717,
+      "video_id": "DLWw25BN-Nc",
+      "title": "Manel Kape vs Bruno Silva | FULL FIGHT | UFC Vegas 112",
+      "duration": 1068,
+      "new": false
+    },
+    {
+      "bout_id": "872396b7-cbd7-4491-915e-985a91aa3241",
+      "a": "736146c2-e7cf-4165-8ed4-77f086abf6b5",
+      "b": "deb42e6f-8b86-4147-8aa3-e386adec6c74",
+      "date": "2022-01-22",
+      "secs": 1500,
+      "video_id": "OW_uA-X3HOg",
+      "title": "Deiveson Figueiredo vs Brandon Moreno 3 | FULL FIGHT | UFC Macau",
+      "duration": 1732,
+      "new": true
+    },
+    {
       "bout_id": "bef643ec-1b66-4d60-a65f-322017bd3811",
       "a": "4bde1fc3-50ba-4f30-9f9a-441c8c50f3ba",
       "b": "b3fb2e7f-b904-4327-879f-d20ca7d2b952",
@@ -1219,6 +1615,17 @@
       "video_id": "anJOjUK0ey8",
       "title": "Alonzo Menifield vs Julius Walker | FULL FIGHT | UFC Macau",
       "duration": 1000,
+      "new": true
+    },
+    {
+      "bout_id": "dc26c069-dca2-46b7-b757-6fbbbfb7fb09",
+      "a": "b7da46c8-80b8-4da0-8556-67c45ef50c11",
+      "b": "f4ecde30-2b59-4dd2-a2bf-5c040b0d04db",
+      "date": "2025-11-01",
+      "secs": 214,
+      "video_id": "PcrgLm758JU",
+      "title": "Steve Garcia vs David Onama | FULL FIGHT | UFC Freedom 250",
+      "duration": 500,
       "new": true
     },
     {
@@ -1255,17 +1662,6 @@
       "new": true
     },
     {
-      "bout_id": "da691431-3215-4011-b8d2-251045e4b613",
-      "a": "74a3cd9a-bb55-40ef-bd23-4a6f88ba86b4",
-      "b": "45521972-0c54-40c5-8b3b-2f57381afcf2",
-      "date": "2026-02-21",
-      "secs": 900,
-      "video_id": "i13GNjSS6Mc",
-      "title": "Michel Pereira vs Zachary Reese | FULL FIGHT | UFC Baku",
-      "duration": 1169,
-      "new": true
-    },
-    {
       "bout_id": "66e15e33-d30a-488c-85a4-bc500472737f",
       "a": "f022cdd2-13ea-4c1f-a478-9df8140aad89",
       "b": "0550fe63-ca8d-4b14-ac36-feadecaabb3d",
@@ -1297,6 +1693,17 @@
       "title": "Manel Kape vs Asu Almabayev | FULL FIGHT | UFC Vegas 112",
       "duration": 884,
       "new": false
+    },
+    {
+      "bout_id": "9dbfc388-40d3-464e-994b-3dacc735dded",
+      "a": "1f49c6a7-9619-4211-9c99-e54e2f1ce983",
+      "b": "c32a19f3-0e86-474e-9a31-a960fd3d18e7",
+      "date": "2011-10-08",
+      "secs": 1134,
+      "video_id": "9jpBlAiA3BM",
+      "title": "Frankie Edgar vs Gray Maynard 3 Full Fight - EA Alter Egos: Hall of Fame",
+      "duration": 1274,
+      "new": true
     },
     {
       "bout_id": "1c1648cb-46c2-4d79-ab15-1c0d78212271",
