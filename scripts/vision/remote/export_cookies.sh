@@ -24,18 +24,18 @@ else
   echo "auto-detected most recently used profile: $PROFILE"
 fi
 
-NAME=$(python3 - "$CHROME/$PROFILE/Preferences" <<'PY'
+# Reported, not assumed. A silent export from the wrong profile looks
+# exactly like a correct one until it is already on rented hardware.
+python3 - "$CHROME/$PROFILE/Preferences" <<'PY' || true
 import json, sys
 try:
     p = json.load(open(sys.argv[1]))
-    prof = p.get("profile", {})
-    accounts = p.get("account_info", [{}])
-    print(f'{prof.get("name","(unnamed)")}  |  {accounts[0].get("email","(not signed in)")}')
+    name = p.get("profile", {}).get("name", "(unnamed)")
+    mails = ", ".join(a.get("email", "?") for a in p.get("account_info", []))
+    print(f"profile   : {name}  |  {mails or '(not signed in)'}")
 except Exception:
-    print("(could not read)")
+    print("profile   : (could not read Preferences)")
 PY
-)
-echo "profile   : $NAME"
 
 yt-dlp --cookies-from-browser "chrome:$PROFILE" --cookies cookies.txt \
        --simulate --skip-download --quiet \
