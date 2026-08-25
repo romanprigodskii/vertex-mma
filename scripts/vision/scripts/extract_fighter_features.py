@@ -83,12 +83,19 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--jobs", type=int, default=6)
     ap.add_argument("--limit", type=int, default=None)
+    ap.add_argument("--cached-only", action="store_true",
+                    help="skip anything not already on disk — for debugging "
+                         "the pipeline without paying for a machine to "
+                         "re-download what is already here")
     args = ap.parse_args()
 
     pm = _probe_merge()
     anchor = json.loads((ARTIFACTS / "anchor.json").read_text())["bouts"]
     anchor = [a for a in anchor if a["video_id"]
               and a["control_a"] + a["control_b"] > 0]
+    if args.cached_only:
+        anchor = [a for a in anchor
+                  if fetch.normalised_path(a["video_id"]).exists()]
     if args.limit:
         anchor = anchor[: args.limit]
     print(f"{len(anchor)} bouts with video and an anchor\n")
@@ -107,7 +114,8 @@ def main() -> None:
             stats = per_track_stats(det)
             stats = stats[stats["track_id"].isin(labels)]
             att = attribute.attribute(a["bout_id"], labels, stats,
-                                      a["control_a"], a["control_b"])
+                                      a["control_a"], a["control_b"],
+                                      a["sig_a"], a["sig_b"])
         except Exception as exc:  # noqa: BLE001
             with lock:
                 done[0] += 1
