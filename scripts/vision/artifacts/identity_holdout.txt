@@ -1,0 +1,22 @@
+identity holdout, 16 fights never used to tune the method
+stratified over duration 192-1842 s; 30% of frames held out within each fight
+
+[1/16] OK  split=0.94 (n= 214)  frustration=0.21  cand= 38 comp= 1    192s  Brock Lesnar vs Alistair Overe
+[2/16] OK  split=0.85 (n= 319)  frustration=0.21  cand= 54 comp= 3    253s  Arnold Allen vs Dan Hooker | F
+[3/16] OK  split=0.95 (n= 361)  frustration=0.15  cand= 60 comp= 5    363s  Jon Jones vs Chael Sonnen | FU
+[4/16] OK  split=0.92 (n= 430)  frustration=0.16  cand= 61 comp= 1    355s  Free Fight: Rampage Jackson vs
+[5/16] OK  split=0.90 (n= 483)  frustration=0.19  cand=119 comp=12    451s  Derrick Lewis vs Tallison Teix
+[6/16] OK  split=0.93 (n= 521)  frustration=0.17  cand= 78 comp= 7    473s  Azamat Murzakanov vs Aleksanda
+[7/16] OK  split=0.95 (n= 598)  frustration=0.21  cand=104 comp=10    525s  UFC Debut: Brandon Moreno vs L
+[8/16] OK  split=0.92 (n= 616)  frustration=0.20  cand=104 comp= 6    569s  Alex Pereira vs Magomed Ankala
+[9/16] OK  split=0.89 (n= 893)  frustration=0.16  cand=117 comp= 4    790s  Diego Lopes vs Jean Silva | FU
+[10/16] OK  split=0.89 (n=1122)  frustration=0.17  cand=145 comp= 4    887s  Bo Nickal vs Rodolfo Vieira | 
+[11/16] OK  split=0.88 (n=1181)  frustration=0.19  cand=158 comp= 3    907s  Sean Strickland vs Anthony Her
+[12/16] OK  split=0.92 (n=1205)  frustration=0.19  cand=163 comp=10   1051s  UFC Debut: Francis Ngannou vs 
+[13/16] OK  split=0.90 (n=1642)  frustration=0.19  cand=270 comp=11   1275s  UFC Debut: Henry Cejudo vs Dus
+[14/16] OK  split=0.90 (n=1407)  frustration=0.18  cand=322 comp=27   1700s  Anderson Silva vs Chael Sonnen
+[15/16] OK  split=0.89 (n=2224)  frustration=0.18  cand=455 comp=19   1805s  UFC APEX Banger: TJ Dillashaw 
+[16/16] OK  split=0.89 (n=2295)  frustration=0.16  cand=331 comp=23   1842s  Jose Aldo vs Chad Mendes 2 | F
+
+16/16 usable   median split 0.902   median frustration 0.183
+(in-sample on the 4 tuned-on fights was 0.896 — the holdout is higher)

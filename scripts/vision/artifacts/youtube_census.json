@@ -1,0 +1,944 @@
+{
+  "per_source": {
+    "search:FULL FIGHT": {
+      "returned": 0,
+      "new_fights": 0
+    },
+    "search:Free Fight": {
+      "returned": 514,
+      "new_fights": 138
+    },
+    "search:UFC Classics": {
+      "returned": 405,
+      "new_fights": 10
+    },
+    "search:UFC Debut": {
+      "returned": 500,
+      "new_fights": 15
+    },
+    "search:Fight Night": {
+      "returned": 513,
+      "new_fights": 10
+    },
+    "search:vs": {
+      "returned": 518,
+      "new_fights": 9
+    },
+    "playlists": {
+      "returned": 800,
+      "new_fights": 0
+    }
+  },
+  "fights": [
+    {
+      "id": "9V03KpJBEaw",
+      "duration": "355",
+      "title": "Free Fight: Rampage Jackson vs Wanderlei Silva | UFC 92, 2008 | On This Day"
+    },
+    {
+      "id": "aPA6kHYSRrg",
+      "duration": "343",
+      "title": "Ilia Topuria vs Charles Oliveira | FULL FIGHT"
+    },
+    {
+      "id": "Mbd_v78zsVc",
+      "duration": "1689",
+      "title": "Islam Makhachev vs Alexander Volkanovski 1 | FULL FIGHT"
+    },
+    {
+      "id": "CK93Pgxgztw",
+      "duration": "956",
+      "title": "Paddy Pimblett vs Michael Chandler | FULL FIGHT | UFC 329"
+    },
+    {
+      "id": "iJE9otJOQMM",
+      "duration": "1369",
+      "title": "Dricus Du Plessis vs Israel Adesanya | FULL FIGHT | UFC Oklahoma City"
+    },
+    {
+      "id": "0FlMvfWELZ8",
+      "duration": "790",
+      "title": "Diego Lopes vs Jean Silva | FULL FIGHT | UFC 325"
+    },
+    {
+      "id": "9yv28rKSYpY",
+      "duration": "1487",
+      "title": "Stephen Thompson vs Kevin Holland | FULL FIGHT"
+    },
+    {
+      "id": "0UYEVxvh2kI",
+      "duration": "1096",
+      "title": "Jon Jones vs Daniel Cormier 2 | FULL FIGHT | UFC Classics"
+    },
+    {
+      "id": "Pzi8UFEWRxI",
+      "duration": "630",
+      "title": "Jon Jones vs Lyoto Machida | FULL FIGHT | UFC Classics"
+    },
+    {
+      "id": "m3N1WuErSlg",
+      "duration": "1702",
+      "title": "Dustin Poirier vs Dan Hooker | FULL FIGHT | UFC Classics"
+    },
+    {
+      "id": "vi60whbGWmM",
+      "duration": "702",
+      "title": "Mauricio Ruffy vs Rafael Fiziev | FULL FIGHT | UFC Freedom 250"
+    },
+    {
+      "id": "VIT91lzhQEs",
+      "duration": "671",
+      "title": "Ciryl Gane vs Serghei Spivac | FULL FIGHT | UFC Freedom 250"
+    },
+    {
+      "id": "GoUjizSdLEw",
+      "duration": "1244",
+      "title": "Dustin Poirier vs Justin Gaethje 1 | FULL FIGHT"
+    },
+    {
+      "id": "_-dxHXd9B2Y",
+      "duration": "963",
+      "title": "Islam Makhachev vs Arman Tsarukyan | FULL FIGHT | UFC Classics"
+    },
+    {
+      "id": "nwO2UPz7p28",
+      "duration": "1034",
+      "title": "Joshua Van vs Brandon Royval | FULL FIGHT | UFC 328"
+    },
+    {
+      "id": "AgoyvEWTRfA",
+      "duration": "1323",
+      "title": "Max Holloway vs Brian Ortega Full Fight - EA Alter Egos Champion Series"
+    },
+    {
+      "id": "mQCvriuwRDo",
+      "duration": "935",
+      "title": "UFC Classic: Yoel Romero vs Paulo Costa | FULL FIGHT"
+    },
+    {
+      "id": "N86epPb_HpA",
+      "duration": "551",
+      "title": "NASTY KNOCKOUT | Carlos Prates vs Leon Edwards | FULL FIGHT | UFC Perth"
+    },
+    {
+      "id": "CB72KoTVHvY",
+      "duration": "288",
+      "title": "Quillan Salkilld vs Beneil Dariush | FULL FIGHT | UFC Vegas 120"
+    },
+    {
+      "id": "3tr0JTbsi8A",
+      "duration": "959",
+      "title": "Petr Yan vs Marcus McGhee | FULL FIGHT | UFC 323"
+    },
+    {
+      "id": "VAUmgZ7dZCc",
+      "duration": "1163",
+      "title": "Ian Machado Garry vs Belal Muhammad | FULL FIGHT | UFC 330"
+    },
+    {
+      "id": "hIpyHEgXfm4",
+      "duration": "947",
+      "title": "Khabib Nurmagomedov vs Dustin Poirier | FULL FIGHT | UFC Classics"
+    },
+    {
+      "id": "BCOy-PG8EIw",
+      "duration": "960",
+      "title": "Conor McGregor vs Max Holloway 1 | FULL FIGHT"
+    },
+    {
+      "id": "oflDi1pCvyo",
+      "duration": "1008",
+      "title": "Sean O'Malley vs Song Yadong | FULL FIGHT | UFC Freedom 250"
+    },
+    {
+      "id": "vx3vs0p6TEs",
+      "duration": "789",
+      "title": "Israel Adesanya vs Alex Pereira 2 | FULL FIGHT"
+    },
+    {
+      "id": "2LSLy-Pkh7Y",
+      "duration": "1045",
+      "title": "Justin Gaethje vs Rafael Fiziev 2 | FULL FIGHT | UFC 324"
+    },
+    {
+      "id": "1sohmZFeCY4",
+      "duration": "1708",
+      "title": "Max Holloway vs Dustin Poirier 3 | FULL FIGHT | UFC 329"
+    },
+    {
+      "id": "La-ryOHYYw0",
+      "duration": "1129",
+      "title": "Alexander Volkanovski vs Yair Rodriguez | FULL FIGHT | UFC 325"
+    },
+    {
+      "id": "-Dkp5HBB9qw",
+      "duration": "1650",
+      "title": "Kamaru Usman vs Joaquin Buckley | FULL FIGHT | UFC Oklahoma City"
+    },
+    {
+      "id": "m8Lngrf6ijQ",
+      "duration": "812",
+      "title": "Shara Magomedov vs Armen Petrosyan | FULL FIGHT | UFC Baku"
+    },
+    {
+      "id": "zsqFEzTt7JU",
+      "duration": "1136",
+      "title": "King Green vs Tony Ferguson | FULL FIGHT"
+    },
+    {
+      "id": "P1Yl0iKipxs",
+      "duration": "1713",
+      "title": "Khamzat Chimaev vs Dricus Du Plessis | FULL FIGHT | UFC 328"
+    },
+    {
+      "id": "InHMy4Z1U8o",
+      "duration": "1645",
+      "title": "Anderson Silva vs Nick Diaz | FULL FIGHT | UFC Classics"
+    },
+    {
+      "id": "J19ORjYOehE",
+      "duration": "1610",
+      "title": "Israel Adesanya vs Kelvin Gastelum | FULL FIGHT | 2025 Hall of Fame Inductee"
+    },
+    {
+      "id": "gJUgS7TyNwk",
+      "duration": "1705",
+      "title": "Islam Makhachev vs Jack Della Maddalena | FULL FIGHT | UFC 330"
+    },
+    {
+      "id": "dj0r8DKjJtE",
+      "duration": "1696",
+      "title": "Magomed Ankalaev vs Alex Pereira | FULL FIGHT | UFC Abu Dhabi"
+    },
+    {
+      "id": "MB715WENxys",
+      "duration": "1707",
+      "title": "Georges St-Pierre vs Nick Diaz | FULL FIGHT | UFC Classics"
+    },
+    {
+      "id": "n_KzCRNlcjA",
+      "duration": "1674",
+      "title": "Dominick Cruz vs TJ Dillashaw | FULL FIGHT | UFC Classics"
+    },
+    {
+      "id": "E5WW-aOGRdI",
+      "duration": "366",
+      "title": "Terrance McKinney vs Chris Duncan | FULL FIGHT | UFC Vegas 115"
+    },
+    {
+      "id": "-QANVeelqyc",
+      "duration": "1106",
+      "title": "Josh Hokit vs Curtis Blaydes | FULL FIGHT | UFC Freedom 250"
+    },
+    {
+      "id": "oUhTr6haywI",
+      "duration": "818",
+      "title": "Daniel Rodriguez vs Santiago Ponzinibbio | FULL FIGHT | UFC Belgrade"
+    },
+    {
+      "id": "yruaaEGyxdg",
+      "duration": "1633",
+      "title": "Ian Machado Garry vs Carlos Prates | FULL FIGHT"
+    },
+    {
+      "id": "kGbR2LYPg7w",
+      "duration": "953",
+      "title": "Paulo Costa vs Roman Kopylov | FULL FIGHT | UFC 327"
+    },
+    {
+      "id": "HuYDJieZSQk",
+      "duration": "1805",
+      "title": "UFC APEX Banger: TJ Dillashaw vs Cory Sandhagen | FREE FIGHT"
+    },
+    {
+      "id": "JAVUsC9iV9E",
+      "duration": "983",
+      "title": "Conor McGregor vs Max Holloway 1 | FULL FIGHT | UFC 329"
+    },
+    {
+      "id": "lGXQFpdtGQY",
+      "duration": "1636",
+      "title": "Cody Garbrandt vs Dominick Cruz Full Fight - EA Alter Egos: PRIME II"
+    },
+    {
+      "id": "AV484dgQuc4",
+      "duration": "467",
+      "title": "Free Fight: Robbie Lawler vs Melvin Manhoef | Strikeforce, 2010"
+    },
+    {
+      "id": "X82ClCsaAKs",
+      "duration": "407",
+      "title": "UFC APEX Banger: Paddy Pimblett vs Luigi Vendramini | FREE FIGHT"
+    },
+    {
+      "id": "MA31jigTReo",
+      "duration": "579",
+      "title": "Tatsuro Taira vs Brandon Moreno | FULL FIGHT | UFC 328"
+    },
+    {
+      "id": "cyD_tQ-5XtE",
+      "duration": "253",
+      "title": "Arnold Allen vs Dan Hooker | FULL FIGHT | UFC Vegas 117"
+    },
+    {
+      "id": "P65mAfnAFhk",
+      "duration": "1633",
+      "title": "Benson Henderson vs Nate Diaz | FULL FIGHT | UFC Classics"
+    },
+    {
+      "id": "ow3PM0Uburw",
+      "duration": "484",
+      "title": "Bogdan Guskov vs Nikita Krylov | FULL FIGHT | UFC Abu Dhabi"
+    },
+    {
+      "id": "KzgArfCZ3hU",
+      "duration": "1742",
+      "title": "Robbie Lawler vs Carlos Condit | FULL FIGHT"
+    },
+    {
+      "id": "fMgVtMxusfw",
+      "duration": "969",
+      "title": "Rafael Fiziev vs Ignacio Bahamondes | FULL FIGHT | UFC Baku"
+    },
+    {
+      "id": "eed-e7O1MfE",
+      "duration": "532",
+      "title": "Michael Chandler vs Tony Ferguson | FULL FIGHT | UFC Freedom 250"
+    },
+    {
+      "id": "qboF_sSuTLk",
+      "duration": "1243",
+      "title": "Free Fight: Leonard Garcia vs Korean Zombie 1 | WEC, 2010"
+    },
+    {
+      "id": "tvovnBdRcxo",
+      "duration": "1677",
+      "title": "Georges St-Pierre vs Carlos Condit | FULL FIGHT | UFC Classics"
+    },
+    {
+      "id": "YCE8TDYj7aU",
+      "duration": "723",
+      "title": "Conor McGregor vs Eddie Alvarez | FULL FIGHT"
+    },
+    {
+      "id": "-Ai-Qdew9wQ",
+      "duration": "1049",
+      "title": "Khamzat Chimaev vs Kamaru Usman | FULL FIGHT | UFC 294"
+    },
+    {
+      "id": "PCJBnCVlLQ0",
+      "duration": "996",
+      "title": "Paddy Pimblett vs Michael Chandler | FULL FIGHT | UFC 324"
+    },
+    {
+      "id": "JOREpJ7ANPA",
+      "duration": "1078",
+      "title": "Georges St-Pierre vs Michael Bisping Full Fight - EA Alter Egos: NYC Champs"
+    },
+    {
+      "id": "HnnPPhcIBjQ",
+      "duration": "1003",
+      "title": "Aiemann Zahabi vs Marlon Vera | FULL FIGHT | UFC Freedom 250"
+    },
+    {
+      "id": "1Ob1W3n-m7s",
+      "duration": "348",
+      "title": "CRAZIEST 2 MINUTES EVER | Baraniewski vs Aslan | FULL FIGHT"
+    },
+    {
+      "id": "kvTje31choo",
+      "duration": "1610",
+      "title": "Aljamain Sterling vs Brian Ortega | FULL FIGHT | UFC Vegas 116"
+    },
+    {
+      "id": "qwPBPiUzgag",
+      "duration": "197",
+      "title": "Amanda Nunes vs Ronda Rousey | FULL FIGHT"
+    },
+    {
+      "id": "Kjq4Jz1XuiI",
+      "duration": "240",
+      "title": "Quillan Salkilld vs Jamie Mullarkey | FULL FIGHT | UFC Perth"
+    },
+    {
+      "id": "BV3FcAecXL0",
+      "duration": "363",
+      "title": "Jon Jones vs Chael Sonnen | FULL FIGHT | UFC 159"
+    },
+    {
+      "id": "OER1kmnXb_w",
+      "duration": "1704",
+      "title": "Jack Della Maddalena vs Belal Muhammad | FULL FIGHT | UFC Perth"
+    },
+    {
+      "id": "-y2SEefVNtE",
+      "duration": "335",
+      "title": "On This Day: Royce Gracie vs Ken Shamrock (1993) | UFC 1 Free Fight"
+    },
+    {
+      "id": "btCBlJhNPqw",
+      "duration": "2106",
+      "title": "Free Fight: Jose Aldo vs Urijah Faber | WEC 48, 2010"
+    },
+    {
+      "id": "ONurh1UOQHg",
+      "duration": "1357",
+      "title": "UFC Debut: Jon Jones vs Andre Gusmao | Free Fight"
+    },
+    {
+      "id": "aW8lSafHAYQ",
+      "duration": "493",
+      "title": "Alex Pereira vs Jiří Procházka 2 | FULL FIGHT | UFC Freedom 250"
+    },
+    {
+      "id": "AMQdqJo0fHc",
+      "duration": "192",
+      "title": "Youssef Zalal vs Josh Emmett | FULL FIGHT | UFC Vegas 116"
+    },
+    {
+      "id": "cINJim4gWN4",
+      "duration": "1686",
+      "title": "Free Fight: Joanna Jedrzejczyk vs Claudia Gadelha 2 | TUF 23 Finale, 2016"
+    },
+    {
+      "id": "EUKi2pmD6B4",
+      "duration": "1889",
+      "title": "Michael Bisping vs Anderson Silva | FULL FIGHT | UFC Classics"
+    },
+    {
+      "id": "7CAkyfHMhhA",
+      "duration": "1669",
+      "title": "Robert Whittaker vs. Yoel Romero 2 Full Fight - EA Alter Egos Champion Series"
+    },
+    {
+      "id": "lyUhQLeAV4o",
+      "duration": "451",
+      "title": "Derrick Lewis vs Tallison Teixeira | FULL FIGHT | UFC Freedom 250"
+    },
+    {
+      "id": "to9GcH1mEGQ",
+      "duration": "481",
+      "title": "Conor McGregor vs Donald Cerrone | FULL FIGHT | UFC 329"
+    },
+    {
+      "id": "43_Kq9EYL8Q",
+      "duration": "337",
+      "title": "KNOCKED OUT COLD | Uroš Medić vs Geoff Neal | FULL FIGHT"
+    },
+    {
+      "id": "wP3Xm2kYwjk",
+      "duration": "232",
+      "title": "INSANE KNOCKOUT | Gregory Rodrigues vs Brunno Ferreira 2 | FULL FIGHT"
+    },
+    {
+      "id": "FubjPQzq9Y0",
+      "duration": "292",
+      "title": "Manuel Torres vs Grant Dawson | FULL FIGHT | UFC Baku"
+    },
+    {
+      "id": "tQgA4UJt9jA",
+      "duration": "1698",
+      "title": "Free Fight: Chris Weidman vs Lyoto Machida | UFC 175, 2014"
+    },
+    {
+      "id": "i_AL3LLUnHY",
+      "duration": "1728",
+      "title": "Zhang Weili vs Joanna Jędrzejczyk 1 | FULL FIGHT | UFC Classics"
+    },
+    {
+      "id": "qe3n4Mx4RyQ",
+      "duration": "1725",
+      "title": "Alexander Volkanovski vs Diego Lopes 1 | FULL FIGHT | UFC 325"
+    },
+    {
+      "id": "EZQjN9_U_t8",
+      "duration": "519",
+      "title": "Melquizael Costa vs Dan Ige | FULL FIGHT | UFC Vegas 117"
+    },
+    {
+      "id": "pVpJwya8GGk",
+      "duration": "973",
+      "title": "Khabib Nurmagomedov vs Rafael dos Anjos | FULL FIGHT"
+    },
+    {
+      "id": "zkaZdhdqjns",
+      "duration": "927",
+      "title": "Alexandre Pantoja vs Kai Kara-France | FULL FIGHT | UFC 323"
+    },
+    {
+      "id": "os2SVSVXWDA",
+      "duration": "921",
+      "title": "Renato Moicano vs Benoît Saint Denis | FULL FIGHT | UFC Vegas 115"
+    },
+    {
+      "id": "EsHBCWnaZFc",
+      "duration": "959",
+      "title": "Kyoji Horiguchi vs Amir Albazi | FULL FIGHT | UFC Vegas 119"
+    },
+    {
+      "id": "IcOHCCyxJ4s",
+      "duration": "853",
+      "title": "Yoel Romero vs Tim Kennedy | FULL FIGHT | UFC Classics"
+    },
+    {
+      "id": "DyvjV3Lt8Pw",
+      "duration": "192",
+      "title": "Brock Lesnar vs Alistair Overeem | FULL FIGHT | UFC 141"
+    },
+    {
+      "id": "yoUbQxvDVss",
+      "duration": "754",
+      "title": "Ronda Rousey vs Miesha Tate 2 | FULL FIGHT | UFC 168"
+    },
+    {
+      "id": "MQcXEWPesAw",
+      "duration": "715",
+      "title": "Khabib Nurmagomedov vs Justin Gaethje | FULL FIGHT"
+    },
+    {
+      "id": "xAF1674POQY",
+      "duration": "1655",
+      "title": "Johny Hendricks vs Robbie Lawler 1 | FULL FIGHT | UFC Classics"
+    },
+    {
+      "id": "mP9-MWwcFhc",
+      "duration": "942",
+      "title": "UFC Debut: Nick Diaz vs Jeremy Jackson 3 | Free Fight"
+    },
+    {
+      "id": "K63PJBKuA4U",
+      "duration": "1592",
+      "title": "UFC Classic: José Aldo vs Chad Mendes 2 | FULL FIGHT"
+    },
+    {
+      "id": "ERDcidLCuSQ",
+      "duration": "2079",
+      "title": "Brandon Royval vs Brandon Moreno 2 | FULL FIGHT | UFC Vegas 112"
+    },
+    {
+      "id": "iICLaxg9N2g",
+      "duration": "473",
+      "title": "Azamat Murzakanov vs Aleksandar Rakic | FULL FIGHT | UFC 327"
+    },
+    {
+      "id": "UNrKhjdcAfw",
+      "duration": "1707",
+      "title": "Merab Dvalishvili vs Cory Sandhagen | FULL FIGHT | UFC 323"
+    },
+    {
+      "id": "ZEdSfXwwA6w",
+      "duration": "1056",
+      "title": "Cub Swanson vs Doo-ho Choi | HALL OF FAME FULL FIGHT  🏆 | UFC Classics"
+    },
+    {
+      "id": "34KiUn8cRG8",
+      "duration": "569",
+      "title": "Alex Pereira vs Magomed Ankalaev 2 | FULL FIGHT | UFC Classics"
+    },
+    {
+      "id": "_OE9thpvgr8",
+      "duration": "1180",
+      "title": "UFC Debut: Georges St-Pierre vs Karo Parisyan | Free Fight"
+    },
+    {
+      "id": "hWagdO7F8r4",
+      "duration": "1630",
+      "title": "Brandon Royval vs Tatsuro Taira | FULL FIGHT | UFC Vegas 112"
+    },
+    {
+      "id": "PzrI9PY8gw4",
+      "duration": "1633",
+      "title": "Tony Ferguson vs Rafael dos Anjos | FULL FIGHT | UFC Classics"
+    },
+    {
+      "id": "_joyJ4C-CKo",
+      "duration": "661",
+      "title": "Don Frye vs Yoshihiro Takayama | PRIDE FULL FIGHT"
+    },
+    {
+      "id": "KyQtlRUEqQ0",
+      "duration": "576",
+      "title": "Carlos Ulberg vs Dominick Reys | FULL FIGHT | UFC 327"
+    },
+    {
+      "id": "Aze-JvepC3E",
+      "duration": "1051",
+      "title": "UFC Debut: Francis Ngannou vs Luis Henrique | Free Fight"
+    },
+    {
+      "id": "SLlFedB76JU",
+      "duration": "1093",
+      "title": "Magomed 'CHANCO' Zaynukov vs Lucas Caldas | FULL FIGHT"
+    },
+    {
+      "id": "y6RxnkLDxqI",
+      "duration": "1620",
+      "title": "Merab Dvalishvili vs Petr Yan 1 | FULL FIGHT | UFC 323"
+    },
+    {
+      "id": "l2-ixT5FJJE",
+      "duration": "1383",
+      "title": "UFC Debut: Stipe Miocic vs Joey Beltran | Free Fight"
+    },
+    {
+      "id": "vInofmlPu3w",
+      "duration": "1020",
+      "title": "The Korean Zombie vs Dustin Poirier | FULL FIGHT | UFC Classics"
+    },
+    {
+      "id": "weIO61HTogM",
+      "duration": "525",
+      "title": "UFC Debut: Brandon Moreno vs Louis Smolka | Free Fight"
+    },
+    {
+      "id": "2ATpcdFj0sg",
+      "duration": "522",
+      "title": "Manel Kape vs Brandon Royval | FULL FIGHT | UFC Vegas 119"
+    },
+    {
+      "id": "G4C3ej0oyoM",
+      "duration": "201",
+      "title": "Andre Arlovski vs Tim Sylvia | FREE FIGHT | EA Alter Egos"
+    },
+    {
+      "id": "OyaDaWlPt5A",
+      "duration": "324",
+      "title": "Song Yadong vs Marlon Moraes | FULL FIGHT | UFC Macau"
+    },
+    {
+      "id": "h9KBcib8pHc",
+      "duration": "258",
+      "title": "GOAT KNOCKOUT 🚨 Holloway vs Gaethje | FULL FIGHT"
+    },
+    {
+      "id": "AfTsPnieFqQ",
+      "duration": "333",
+      "title": "Benoit Saint Denis vs Beneil Dariush | FULL FIGHT | UFC 325"
+    },
+    {
+      "id": "xPZxupLTCg0",
+      "duration": "1091",
+      "title": "Derrick Lewis vs Alexander Volkov | FULL FIGHT | UFC Classics"
+    },
+    {
+      "id": "xnbX7hYesLk",
+      "duration": "860",
+      "title": "UFC 8 Free Fight: Ken Shamrock vs Kimo Leopoldo (1996)"
+    },
+    {
+      "id": "V_vrF7N7Cu8",
+      "duration": "521",
+      "title": "Free Fight: Nick Diaz vs Paul Daley | Strikeforce, 2011"
+    },
+    {
+      "id": "JuBBIJ7adjM",
+      "duration": "1173",
+      "title": "Khabib Nurmagomedov vs Conor McGregor | FULL FIGHT | UFC Classic"
+    },
+    {
+      "id": "zzkPye_OuYo",
+      "duration": "1713",
+      "title": "Justin Gaethje vs Paddy Pimblett | FULL FIGHT | UFC Freedom 250"
+    },
+    {
+      "id": "nGcK0ilhu9c",
+      "duration": "995",
+      "title": "Ilia Topuria vs Max Holloway | FULL FIGHT"
+    },
+    {
+      "id": "ZH3sb_--GHA",
+      "duration": "887",
+      "title": "Bo Nickal vs Rodolfo Vieira | FULL FIGHT | UFC Freedom 250"
+    },
+    {
+      "id": "hkcgrSJ8zSE",
+      "duration": "528",
+      "title": "Tony Ferguson vs Edson Barboza | FULL FIGHT | UFC Classics"
+    },
+    {
+      "id": "yz6E5UFWs4k",
+      "duration": "944",
+      "title": "Chuck Liddell vs Wanderlei Silva | FULL FIGHT | UFC Classics"
+    },
+    {
+      "id": "a6B2uVbD10U",
+      "duration": "1043",
+      "title": "Dan Hooker vs Mateusz Gamrot | FULL FIGHT | UFC 325"
+    },
+    {
+      "id": "pVdUbo2NojI",
+      "duration": "618",
+      "title": "Brock Lesnar vs Shane Carwin | FULL FIGHT | UFC Classics"
+    },
+    {
+      "id": "le69DBh7YwY",
+      "duration": "656",
+      "title": "Don Frye vs Yoshihiro Takayama 💪 | PRIDE FULL FIGHT (2002)"
+    },
+    {
+      "id": "hoQdMji2y1M",
+      "duration": "849",
+      "title": "Conor McGregor vs Chad Mendes | FULL FIGHT"
+    },
+    {
+      "id": "mOsBzj-3NB8",
+      "duration": "790",
+      "title": "Diego Lopes vs Jean Silva | FULL FIGHT | UFC Freedom 250"
+    },
+    {
+      "id": "W9jPiCO35wk",
+      "duration": "1709",
+      "title": "Conor McGregor vs Nate Diaz 2 | FULL FIGHT"
+    },
+    {
+      "id": "hFHP7aBbGmg",
+      "duration": "557",
+      "title": "Brock Lesnar vs Frank Mir 2 | FULL FIGHT | UFC Classics"
+    },
+    {
+      "id": "yaaHIM5e6CI",
+      "duration": "709",
+      "title": "Benoit Saint-Denis vs Dan Hooker | FULL FIGHT | UFC 329"
+    },
+    {
+      "id": "8WGYLzHURl4",
+      "duration": "1543",
+      "title": "Anthony Hernandez vs Michel Pereira | FULL FIGHT | UFC Sacramento"
+    },
+    {
+      "id": "WD2-K7dsqYM",
+      "duration": "567",
+      "title": "Brock Lesnar vs Frank Mir 2 | FULL FIGHT | UFC Classics"
+    },
+    {
+      "id": "xyYLwL7Yj3A",
+      "duration": "1171",
+      "title": "Free Fight: Big Nog vs Bob Sapp | PRIDE FC, 2002"
+    },
+    {
+      "id": "DpLaqnwFQEY",
+      "duration": "1700",
+      "title": "Anderson Silva vs Chael Sonnen 1 | FULL FIGHT"
+    },
+    {
+      "id": "135PnZFXmic",
+      "duration": "1104",
+      "title": "Sean O'Malley vs Petr Yan | FULL FIGHT"
+    },
+    {
+      "id": "P9IrK0Dflb4",
+      "duration": "411",
+      "title": "Randy Couture vs Lyoto Machida | FULL FIGHT | UFC Classics"
+    },
+    {
+      "id": "2sDiRbsha4A",
+      "duration": "720",
+      "title": "TJ Dillashaw vs Cody Garbrandt 1 | FULL FIGHT | UFC Classics"
+    },
+    {
+      "id": "z4e8VupwS2w",
+      "duration": "986",
+      "title": "Eddie Alvarez vs Justin Gaethje | FULL FIGHT | UFC Classics"
+    },
+    {
+      "id": "YzJjSBV5jsg",
+      "duration": "824",
+      "title": "Rashad Evans vs Forrest Griffin | FULL FIGHT | UFC Classics"
+    },
+    {
+      "id": "43m0uap7SZ4",
+      "duration": "982",
+      "title": "Free Fight: Matt Hughes vs Matt Serra | UFC 98, 2009"
+    },
+    {
+      "id": "ez7gxXz6Gus",
+      "duration": "560",
+      "title": "Rampage Jackson vs Kevin Randleman | PRIDE FULL FIGHT"
+    },
+    {
+      "id": "m378HC3Htlw",
+      "duration": "1620",
+      "title": "Mateusz Gamrot vs Arman Tsarukyan | FULL FIGHT"
+    },
+    {
+      "id": "QBeA263yU3w",
+      "duration": "630",
+      "title": "UFC 5 Free Fight: Dan Severn vs Dave Beneteau (1995)"
+    },
+    {
+      "id": "T_jyPnHyytQ",
+      "duration": "992",
+      "title": "UFC Debut: Israel Adesanya vs Rob Wilkinson | Free Fight"
+    },
+    {
+      "id": "9h9gw_qtIr8",
+      "duration": "464",
+      "title": "UFC Debut: Darren Till vs Wendell de Oliveira | Free Fight"
+    },
+    {
+      "id": "zea_QpSpfGs",
+      "duration": "853",
+      "title": "UFC Debut: Israel Adesanya vs Rob Wilkinson | Free Fight"
+    },
+    {
+      "id": "0u_s6dGMNyg",
+      "duration": "426",
+      "title": "UFC Debut: Charles Oliveira vs Darren Elkins | Free Fight"
+    },
+    {
+      "id": "Gc5eZhgEb1c",
+      "duration": "724",
+      "title": "UFC Debut: Alexander Volkanovski vs Yusuke Kasuya | Free Fight"
+    },
+    {
+      "id": "bGouWj6AstM",
+      "duration": "1052",
+      "title": "UFC Debut: Jorge Masvidal vs Tim Means | Free Fight"
+    },
+    {
+      "id": "sLLsr3K7dtM",
+      "duration": "715",
+      "title": "UFC Debut: Tony Ferguson vs Ramsey Nijem | Free Fight"
+    },
+    {
+      "id": "b_UQ2qgu3tw",
+      "duration": "452",
+      "title": "UFC Debut: Amanda Nunes vs Sheila Gaff | Free Fight"
+    },
+    {
+      "id": "_4DP6Uyl0lE",
+      "duration": "464",
+      "title": "UFC Debut: Michael Bisping vs Eric Schafer | Free Fight"
+    },
+    {
+      "id": "g6-ijAuuUMw",
+      "duration": "830",
+      "title": "UFC Debut: Kamaru Usman vs Hayder Hassan | Free Fight"
+    },
+    {
+      "id": "5aSmtpzGPHo",
+      "duration": "1275",
+      "title": "UFC Debut: Henry Cejudo vs Dustin Kimura | Free Fight"
+    },
+    {
+      "id": "ahijnlf9FHU",
+      "duration": "287",
+      "title": "Islam Dulatov vs Vanilton Antunes | FULL FIGHT | DWCS"
+    },
+    {
+      "id": "Uts3hkYFmGQ",
+      "duration": "978",
+      "title": "UFC Debut: Jim Miller vs David Baron | Free Fight"
+    },
+    {
+      "id": "kQ8NRlPTML0",
+      "duration": "907",
+      "title": "Sean Strickland vs Anthony Hernandez | FULL FIGHT | UFC 328"
+    },
+    {
+      "id": "OY_ISlQoCvI",
+      "duration": "1742",
+      "title": "Sean O'Malley vs Marlon Vera 2 | FULL FIGHT | UFC 324"
+    },
+    {
+      "id": "BfD-eSOxI0k",
+      "duration": "632",
+      "title": "Ateba Gautier vs Yura Naito | FULL FIGHT | DWCS"
+    },
+    {
+      "id": "1UvtIoOk6N8",
+      "duration": "712",
+      "title": "Mateusz Gamrot vs Esteban Ribovics | FULL FIGHT | UFC Vegas 120"
+    },
+    {
+      "id": "W4-LEgjxokI",
+      "duration": "1654",
+      "title": "Yair Rodriguez vs The Korean Zombie Full Fight - EA Alter Egos: Prime Series 3"
+    },
+    {
+      "id": "1dZb-vV83ew",
+      "duration": "1494",
+      "title": "BRUTAL KNOCKOUT | Song Yadong vs Ricky Simón | FULL FIGHT | UFC 324"
+    },
+    {
+      "id": "DKmdkjrZT0g",
+      "duration": "1686",
+      "title": "Mackenzie Dern vs Virna Jandiroba | FULL FIGHT | UFC 330"
+    },
+    {
+      "id": "DLWw25BN-Nc",
+      "duration": "1068",
+      "title": "Manel Kape vs Bruno Silva | FULL FIGHT | UFC Vegas 112"
+    },
+    {
+      "id": "OW_uA-X3HOg",
+      "duration": "1732",
+      "title": "Deiveson Figueiredo vs Brandon Moreno 3 | FULL FIGHT | UFC Macau"
+    },
+    {
+      "id": "anJOjUK0ey8",
+      "duration": "1000",
+      "title": "Alonzo Menifield vs Julius Walker | FULL FIGHT | UFC Macau"
+    },
+    {
+      "id": "PcrgLm758JU",
+      "duration": "500",
+      "title": "Steve Garcia vs David Onama | FULL FIGHT | UFC Freedom 250"
+    },
+    {
+      "id": "HR0NwCuuPqQ",
+      "duration": "1089",
+      "title": "Donald 'Cowboy' Cerrone vs Rob McCullough | WEC 36 | FREE FIGHT"
+    },
+    {
+      "id": "6AfNHjSxqhw",
+      "duration": "573",
+      "title": "Zhang Mingyang vs Anthony Smith  | FULL FIGHT | UFC Macau"
+    },
+    {
+      "id": "03hLrU6s-Kk",
+      "duration": "1604",
+      "title": "Umar Nurmagomedov vs Cory Sandhagen | FULL FIGHT | UFC Shanghai"
+    },
+    {
+      "id": "RYEurjOVUBQ",
+      "duration": "473",
+      "title": "Gillian Robertson vs Marina Rodriguez | FULL FIGHT | UFC 330"
+    },
+    {
+      "id": "i13GNjSS6Mc",
+      "duration": "1169",
+      "title": "Michel Pereira vs Zachary Reese | FULL FIGHT | UFC Baku"
+    },
+    {
+      "id": "4O8jKxpLd0s",
+      "duration": "753",
+      "title": "Belal Muhammad vs Sean Brady | FULL FIGHT | UFC Vegas 118"
+    },
+    {
+      "id": "NQokR4Kq5Es",
+      "duration": "1010",
+      "title": "Beneil Dariush vs Renato Moicano | FULL FIGHT | UFC Perth"
+    },
+    {
+      "id": "5ad9k1c5ELY",
+      "duration": "884",
+      "title": "Manel Kape vs Asu Almabayev | FULL FIGHT | UFC Vegas 112"
+    },
+    {
+      "id": "9jpBlAiA3BM",
+      "duration": "1274",
+      "title": "Frankie Edgar vs Gray Maynard 3 Full Fight - EA Alter Egos: Hall of Fame"
+    },
+    {
+      "id": "W6Row8U6OzQ",
+      "duration": "267",
+      "title": "Kyle Daukaus vs Gerald Meerschaert | FULL FIGHT | UFC Freedom 250"
+    },
+    {
+      "id": "_gqDpmW9DCg",
+      "duration": "541",
+      "title": "Anthony Hernandez vs Jordan Wright | FULL FIGHT | DWCS"
+    }
+  ]
+}

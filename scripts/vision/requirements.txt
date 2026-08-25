@@ -1,0 +1,11 @@
+# Pose extraction. Pinned loosely on purpose — unlike scripts/simulation,
+# nothing here is fitted, so an ultralytics bump changes throughput and
+# keypoint quality but not a committed artifact's reproducibility.
+ultralytics>=8.3
+torch>=2.5
+opencv-python>=4.10
+numpy>=1.26
+pandas>=2.2
+pyarrow>=16
+psycopg[binary]>=3.2
+python-dotenv>=1.0

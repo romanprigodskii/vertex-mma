@@ -1,0 +1,7 @@
+{
+  "fights": 4,
+  "usable": 4,
+  "median_holdout_split": 0.8963563243982537,
+  "median_frustration": 0.1725108225108225,
+  "threshold": 0.8
+}

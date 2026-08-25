@@ -1,0 +1,36 @@
+Welcome to vast.ai. If authentication fails, try again after a few seconds, and double check your ssh key.
+Have fun!
+AI agents: READ /etc/vast-agents-guide.md (also linked as ./AGENTS.md) before acting on or describing this instance: it is the operating guide. ('vast-capabilities' shows live state only, not the guide.)
+ fps  frames   ids  ids/100f  top2 persist  infer fps
+   5     300    51      17.0          37%        3.8
+  10     601    62      10.3          28%        5.0
+  15     901    62       6.9          41%        4.6
+NOT VIABLE — best persistence 41% at 15 fps. Identity needs an appearance cue (shorts colour, corner assignment), not more frames.
+
+--- re-test 2026-08-24, same clip, after finding with_reid defaults to False ---
+motion only (the first probe)      ids=71  top2 persistence=39%
+with ReID + 150-frame buffer       ids=70  top2 persistence=44%
+target for a usable identity: 80%
+
+--- hand-crafted shorts colour, same target ---
+pair-split rate across 3 fights: 0.53 / 0.72 / 0.29   (0.50 = chance)
+on Lesnar vs Mir, bright red against white: median hue gap 14 of 90,
+and filtering to saturated pixels made it WORSE (14 -> 11), which is
+what a signal that is not there looks like.
+
+--- 2026-08-24, third pass: the metric was wrong, not the tracker ---
+"top-2 persistence" counted how often two SINGLE ids dominate, which a
+renumbering destroys even when tracking is locally fine.
+
+Measured properly on the same 60 s clip (5 fps, ReID on):
+  pair of two largest bodies unchanged between consecutive frames: 79%
+  shot cuts in those 60 s: 2  (median frame-to-frame hist corr = 1.00)
+  large tracklets: 21, lengths 191, 70, 64, 55, 38, 36, 33, 19, 19, 15...
+
+One fighter holds a single id for 191 of 300 frames. The other is
+fragmented into ~6-10 pieces — he is the one going underneath and being
+re-acquired. Cuts are NOT the cause; this is one continuous shot.
+
+So the problem is not per-frame labelling. It is merging ~20 tracklets
+into 2 identities, with 15-70 frames of appearance evidence per
+tracklet instead of one.
