@@ -1,7 +1,7 @@
 {
   "discovery_multiplicity": {
     "window": "discovery (<2025-01-01)",
-    "K": 86,
+    "K": 84,
     "n_bouts": 1191,
     "e_bh_cutoff": Infinity,
     "e_bh": [],
@@ -20,7 +20,7 @@
       "experience_pedigree__faded_former_ranked"
     ],
     "by": [],
-    "by_penalty": 5.037365647444025,
+    "by_penalty": 5.013973034584928,
     "top": [
       {
         "name": "physical_durability__both_iron_chins",

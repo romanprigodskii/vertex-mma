@@ -61,7 +61,8 @@ def priced(frame: pd.DataFrame, seed: int) -> pd.DataFrame:
 
 
 def segment_objects() -> list[Segment]:
-    return [Segment(**d) for d in SEGMENTS]
+    from lab_evalue_stages import _segs
+    return _segs(dedupe=True)
 
 
 def segment_rows(f: pd.DataFrame, seg: Segment) -> pd.DataFrame:

@@ -1,11 +1,11 @@
 {
   "segments": {
-    "n_segments": 86,
+    "n_segments": 84,
     "e_bh_threshold": Infinity,
     "e_bh_rejected": [],
     "bh_rejected": [],
     "by_rejected": [],
-    "by_penalty": 5.037365647444025,
+    "by_penalty": 5.013973034584928,
     "table": [
       {
         "name": "market_microstructure__coinflip_band",
@@ -1283,23 +1283,6 @@
         "paired_hi": 0.03985066634514265
       },
       {
-        "name": "division_context__womens_bouts",
-        "family": "division_context",
-        "n": 306,
-        "events": 175,
-        "e": 0.085056675280785,
-        "e_max": 0.9503421055490994,
-        "e_adaptive": 0.2654320503083143,
-        "c_final": 0.05,
-        "e_vigged": 0.019522628703205442,
-        "growth": -0.008053717244031415,
-        "bouts_needed": Infinity,
-        "crossing": -1,
-        "paired_delta": 0.033241522566175796,
-        "paired_lo": 0.003922665022796879,
-        "paired_hi": 0.0638749997816203
-      },
-      {
         "name": "division_context__womens_low_ufc_experience",
         "family": "division_context",
         "n": 219,
@@ -1315,23 +1298,6 @@
         "paired_delta": 0.04797989605976342,
         "paired_lo": 0.012129773997677923,
         "paired_hi": 0.08396479245989942
-      },
-      {
-        "name": "division_context__five_round_bouts",
-        "family": "division_context",
-        "n": 220,
-        "events": 192,
-        "e": 3.5767320623462773,
-        "e_max": 8.541138993173119,
-        "e_adaptive": 0.9511007765166288,
-        "c_final": 0.4,
-        "e_vigged": 0.9487774600616913,
-        "growth": 0.005792952508096107,
-        "bouts_needed": 517.1339259845854,
-        "crossing": -1,
-        "paired_delta": 0.006507072067712674,
-        "paired_lo": -0.02949078779198939,
-        "paired_hi": 0.04126931389240051
       },
       {
         "name": "gap__quick_turnaround_short_notice",
@@ -1789,8 +1755,8 @@
       0.20366739392014518
     ],
     "cs_final": [
-      -0.03786400000000001,
-      0.9070910000000001
+      -0.05313599999999996,
+      0.22939600000000016
     ],
     "cs_excludes_zero": false,
     "max_decimal": 1.909

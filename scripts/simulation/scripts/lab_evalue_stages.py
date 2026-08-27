@@ -15,7 +15,7 @@ import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
 import lab_evalue_common as ev  # noqa: E402
-from lab_edge_common import Segment  # noqa: E402
+from lab_edge_common import Segment, swap_expr  # noqa: E402
 from lab_edge_registry import SEGMENTS  # noqa: E402
 from src.config import ARTIFACTS_DIR  # noqa: E402
 
@@ -23,8 +23,30 @@ ALPHA = 0.05
 DISCOVERY_END = pd.Timestamp("2025-01-01")
 
 
-def _segs() -> list[Segment]:
-    return [Segment(**d) for d in SEGMENTS]
+def _segs(dedupe: bool = False) -> list[Segment]:
+    """The registry, optionally collapsed to distinct slices.
+
+    Two pairs of entries in the grid are the same expression proposed by two
+    different lenses (a five-round bout is both a market-microstructure and a
+    division-context hypothesis). docs/edge_segments.md collapses them and
+    charges multiplicity to 84, not 86. Charging 86 would be conservative
+    rather than wrong, but it would stop the two documents reconciling, and a
+    multiplicity count that cannot be reconciled is the one number in a
+    multiple-testing paper that has to be exactly right.
+    """
+    segs = [Segment(**d) for d in SEGMENTS]
+    if not dedupe:
+        return segs
+    seen: set[tuple[str, str]] = set()
+    out = []
+    for seg in segs:
+        key = tuple(sorted([seg.expr_a, swap_expr(seg.expr_a)]))
+        if seg.family != "post_hoc":
+            if key in seen:
+                continue
+            seen.add(key)
+        out.append(seg)
+    return out
 
 
 def _rows(f: pd.DataFrame, seg: Segment) -> pd.DataFrame:
@@ -55,7 +77,7 @@ def stage_discovery_multiplicity(f_all: pd.DataFrame) -> dict:
 
     f = f_all[f_all["event_date"] < DISCOVERY_END]
     rows = []
-    for seg in _segs():
+    for seg in _segs(dedupe=True):
         if seg.family == "post_hoc":
             continue
         s = _rows(f, seg)
