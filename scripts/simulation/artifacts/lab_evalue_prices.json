@@ -1,0 +1,240 @@
+{
+  "bases": {
+    "pool": {
+      "label": "whole priced pool",
+      "n": 1787,
+      "e_fair": 0.00036131441842447633,
+      "e_real": 3.066731450323461e-08,
+      "growth_fair": -0.004435233359561673,
+      "growth_real": -0.009681067948339752,
+      "margin_cost": 0.005245834588778079,
+      "bouts_needed_fair": Infinity,
+      "bouts_needed_real": Infinity
+    },
+    "overround": 1.0482170479874786,
+    "streak_full": {
+      "label": "streak, full pool",
+      "n": 308,
+      "e_fair": 150.93918680608937,
+      "e_real": 21.17595579611903,
+      "growth_fair": 0.01628856175101082,
+      "growth_real": 0.00991190382295696,
+      "margin_cost": 0.00637665792805386,
+      "bouts_needed_fair": 183.91631620686735,
+      "bouts_needed_real": 302.2358092918109
+    },
+    "streak_discovery": {
+      "label": "streak, discovery window",
+      "n": 198,
+      "e_fair": 31.38719348516026,
+      "e_real": 8.54249044942378,
+      "growth_fair": 0.01740606039863322,
+      "growth_real": 0.010833598924239992,
+      "margin_cost": 0.0065724614743932295,
+      "bouts_needed_fair": 172.10857626285298,
+      "bouts_needed_real": 276.52235369827946
+    },
+    "streak_replication": {
+      "label": "streak, replication window",
+      "n": 110,
+      "e_fair": 4.808941802249788,
+      "e_real": 2.4788972163904988,
+      "growth_fair": 0.014277064185290494,
+      "growth_real": 0.0082528526406475,
+      "margin_cost": 0.006024211544642994,
+      "bouts_needed_fair": 209.82831166651627,
+      "bouts_needed_real": 362.99354950301796
+    },
+    "declared_cut": {
+      "label": "declared cut lean>=0.05",
+      "n": 281,
+      "e_fair": 81.6852339241103,
+      "e_real": 18.818117861720907,
+      "growth_fair": 0.015668588079033284,
+      "growth_real": 0.010444199721739185,
+      "margin_cost": 0.005224388357294099,
+      "bouts_needed_fair": 191.19350502057623,
+      "bouts_needed_real": 286.8321511813388
+    },
+    "ladder": {
+      "thresholds (21)": {
+        "e_fair": 31.275615293239085,
+        "e_real": 8.46926198514375
+      },
+      "+ direction (42)": {
+        "e_fair": 15.641741121152922,
+        "e_real": 4.234944640521814
+      },
+      "+ statistic (63)": {
+        "e_fair": 10.431237496985865,
+        "e_real": 2.8235255403653987
+      }
+    }
+  },
+  "seeds": {
+    "per_seed": {
+      "42": {
+        "label": "seed 42",
+        "n": 308,
+        "e_fair": 150.93918680608937,
+        "e_real": 21.17595579611903,
+        "growth_fair": 0.01628856175101082,
+        "growth_real": 0.00991190382295696,
+        "margin_cost": 0.00637665792805386,
+        "bouts_needed_fair": 183.91631620686735,
+        "bouts_needed_real": 302.2358092918109
+      },
+      "7": {
+        "label": "seed 7",
+        "n": 308,
+        "e_fair": 115.00382606859621,
+        "e_real": 16.009354676104834,
+        "growth_fair": 0.015405731811595833,
+        "growth_real": 0.009003809151444882,
+        "margin_cost": 0.00640192266015095,
+        "bouts_needed_fair": 194.4556941656686,
+        "bouts_needed_real": 332.7183221196167
+      },
+      "13": {
+        "label": "seed 13",
+        "n": 308,
+        "e_fair": 67.7262342964789,
+        "e_real": 9.874327611934133,
+        "growth_fair": 0.01368660263937803,
+        "growth_real": 0.007434864345903377,
+        "margin_cost": 0.006251738293474653,
+        "bouts_needed_fair": 218.88063477015857,
+        "bouts_needed_real": 402.93032047109836
+      },
+      "99": {
+        "label": "seed 99",
+        "n": 308,
+        "e_fair": 56.21911431990022,
+        "e_real": 8.388596069483429,
+        "growth_fair": 0.013082002634832002,
+        "growth_real": 0.006905432378847573,
+        "margin_cost": 0.006176570255984429,
+        "bouts_needed_fair": 228.99645850686392,
+        "bouts_needed_real": 433.82254856776103
+      },
+      "2024": {
+        "label": "seed 2024",
+        "n": 308,
+        "e_fair": 86.36768694214955,
+        "e_real": 12.300584966480756,
+        "growth_fair": 0.014476018221207122,
+        "growth_real": 0.008148203959409033,
+        "margin_cost": 0.0063278142617980895,
+        "bouts_needed_fair": 206.94449452718246,
+        "bouts_needed_real": 367.6555334743073
+      }
+    },
+    "fair": {
+      "min": 56.21911431990022,
+      "median": 86.36768694214955,
+      "max": 150.93918680608937,
+      "all_reject": true
+    },
+    "real": {
+      "min": 8.388596069483429,
+      "median": 12.300584966480756,
+      "max": 21.17595579611903,
+      "all_reject": false
+    }
+  },
+  "devig": {
+    "power (reported)": {
+      "mean_favourite_price": 0.6624742945590332,
+      "streak": {
+        "label": "power (reported): streak",
+        "n": 308,
+        "e_fair": 150.93918680608937,
+        "e_real": 21.17595579611903,
+        "growth_fair": 0.01628856175101082,
+        "growth_real": 0.00991190382295696,
+        "margin_cost": 0.00637665792805386,
+        "bouts_needed_fair": 183.91631620686735,
+        "bouts_needed_real": 302.2358092918109
+      },
+      "streak_replication": {
+        "label": "power (reported): replication",
+        "n": 110,
+        "e_fair": 4.808941802249788,
+        "e_real": 2.4788972163904988,
+        "growth_fair": 0.014277064185290494,
+        "growth_real": 0.0082528526406475,
+        "margin_cost": 0.006024211544642994,
+        "bouts_needed_fair": 209.82831166651627,
+        "bouts_needed_real": 362.99354950301796
+      },
+      "ladder_fair": {
+        "thresholds (21)": 31.275615293239085,
+        "+ direction (42)": 15.641741121152922,
+        "+ statistic (63)": 10.431237496985865
+      },
+      "declared_cut_n": 281
+    },
+    "proportional": {
+      "mean_favourite_price": 0.6513355692209781,
+      "streak": {
+        "label": "proportional: streak",
+        "n": 308,
+        "e_fair": 87.0472058644747,
+        "e_real": 22.099720200200302,
+        "growth_fair": 0.014501462881967242,
+        "growth_real": 0.010050535544867338,
+        "margin_cost": 0.004450927337099904,
+        "bouts_needed_fair": 206.58138409465042,
+        "bouts_needed_real": 298.06692988453415
+      },
+      "streak_replication": {
+        "label": "proportional: replication",
+        "n": 110,
+        "e_fair": 3.7435381718954592,
+        "e_real": 2.3431506229625296,
+        "growth_fair": 0.01200028363166611,
+        "growth_real": 0.007740876762076024,
+        "margin_cost": 0.004259406869590087,
+        "bouts_needed_fair": 249.63845568190672,
+        "bouts_needed_real": 387.00167508551914
+      },
+      "ladder_fair": {
+        "thresholds (21)": 56.336738740851736,
+        "+ direction (42)": 28.17037142528348,
+        "+ statistic (63)": 18.782154066236032
+      },
+      "declared_cut_n": 317
+    },
+    "shin": {
+      "mean_favourite_price": 0.6585365947650715,
+      "streak": {
+        "label": "shin: streak",
+        "n": 308,
+        "e_fair": 120.63883418053172,
+        "e_real": 21.636764862787896,
+        "growth_fair": 0.015561042988928698,
+        "growth_real": 0.009981798522011679,
+        "margin_cost": 0.0055792444669170195,
+        "bouts_needed_fair": 192.51487677820703,
+        "bouts_needed_real": 300.1194891830222
+      },
+      "streak_replication": {
+        "label": "shin: replication",
+        "n": 110,
+        "e_fair": 4.364613267313556,
+        "e_real": 2.4370407505827965,
+        "growth_fair": 0.013395723516480785,
+        "growth_real": 0.008098040873828672,
+        "margin_cost": 0.0052976826426521136,
+        "bouts_needed_fair": 223.63348048116515,
+        "bouts_needed_real": 369.9329652972768
+      },
+      "ladder_fair": {
+        "thresholds (21)": 33.97418093099087,
+        "+ direction (42)": 16.989600597300953,
+        "+ statistic (63)": 11.32857105819486
+      },
+      "declared_cut_n": 292
+    }
+  }
+}
