@@ -240,6 +240,37 @@ def stage_roi(frame: pd.DataFrame) -> dict:
     return out
 
 
+def _crossing_distribution(p: np.ndarray, q: np.ndarray, *, horizon: int,
+                           reps: int = 20_000, chunk: int = 200) -> np.ndarray:
+    """First bout at which the wealth crosses 1/alpha, `reps` times.
+
+    Bouts are drawn with replacement from the pool, so the price mix is the
+    real one; the outcome is drawn from the ALTERNATIVE, so this is power and
+    not validity. A run that never crosses inside the horizon is recorded as
+    horizon+1, which keeps the quantiles honest rather than dropping it.
+    """
+    rng = np.random.default_rng(20260827)
+    first = np.full(reps, horizon + 1, dtype=np.int64)
+    thresh = np.log(1 / ALPHA)
+    for s0 in range(0, reps, chunk):
+        r = min(chunk, reps - s0)
+        idx = rng.integers(0, len(q), size=(r, horizon))
+        qq, pp = q[idx], p[idx]
+        lam = ev.clip_lambda(0.5 * ev.kelly_lambda(pp, qq), qq)
+        y = (rng.random((r, horizon)) < pp).astype(float)
+        logw = np.cumsum(np.log(np.maximum(1.0 + lam * (y - qq), ev.EPS)), axis=1)
+        hit = logw >= thresh
+        first[s0:s0 + r] = np.where(hit.any(axis=1), hit.argmax(axis=1) + 1, horizon + 1)
+    return first
+
+
+def _quantile(first: np.ndarray, power: float, horizon: int) -> int | None:
+    """The n by which `power` of runs have crossed, or None if none did in time."""
+    ordered = np.sort(first)
+    n = int(ordered[int(np.ceil(power * len(ordered))) - 1])
+    return n if n <= horizon else None
+
+
 def stage_power(frame: pd.DataFrame) -> dict:
     """What each instrument needs to see the same effect, on the same data.
 
@@ -249,6 +280,14 @@ def stage_power(frame: pd.DataFrame) -> dict:
     contrast on a 200-bout slice discards most of what each bout carries.
     The sequential bet keeps it. Both are computed here on the same
     simulated edge so the comparison is like for like.
+
+    LIKE FOR LIKE MEANS MATCHING THE POWER TOO. log(1/alpha)/g is the bout at
+    which EXPECTED log-wealth reaches the threshold, which is roughly the
+    median crossing -- comparing it against a fixed-n number computed at 80%
+    power flatters the sequential test by about a third. So the crossing
+    distribution is simulated: outcomes drawn under the true alternative, on
+    prices resampled from this pool, and the quantiles of the first crossing
+    read off. `n_sequential_80` is the honest counterpart of `n_fixed`.
     """
     from scipy.stats import norm
     f = priced(frame, PRIMARY_SEED)
@@ -268,15 +307,28 @@ def stage_power(frame: pd.DataFrame) -> dict:
             p * (np.log(p) - np.log(q)) + (1 - p) * (np.log(1 - p) - np.log(1 - q))
         ))
         n_fix = ((norm.ppf(0.95) + norm.ppf(0.80)) * sd / eff) ** 2 if eff > 0 else float("inf")
+        horizon = int(min(20_000, max(6_000, 6 * n_seq)))
+        first = _crossing_distribution(p, q, horizon=horizon)
+        n80 = _quantile(first, 0.80, horizon)
         out[f"{edge:.2f}"] = dict(
             growth_per_bout=g, n_sequential=n_seq,
             paired_sd=sd, paired_effect=eff, n_fixed=float(n_fix),
             ratio=float(n_fix / n_seq) if n_seq else None,
+            n_sequential_50=_quantile(first, 0.50, horizon),
+            n_sequential_80=n80, n_sequential_90=_quantile(first, 0.90, horizon),
+            power_at_n_sequential=float((first <= round(n_seq)).mean()),
+            ratio_at_80=float(n_fix / n80) if n80 else None,
+            replications=int(len(first)),
         )
+        r = out[f"{edge:.2f}"]
         print(f"\n  a true {edge:.0%} edge, alpha={ALPHA}:")
-        print(f"    sequential bet : {g:+.5f} nats/bout -> {n_seq:,.0f} bouts to e=1/alpha")
+        print(f"    sequential bet : {g:+.5f} nats/bout -> {n_seq:,.0f} bouts to e=1/alpha"
+              f"   (crossed by then in {r['power_at_n_sequential']:.0%} of runs)")
+        print(f"    sequential, matched at 80% power: {n80:,} bouts"
+              f"   (50%: {r['n_sequential_50']:,}, 90%: {r['n_sequential_90']:,})")
         print(f"    paired log-loss: effect {eff:.5f}, sd {sd:.3f} -> {n_fix:,.0f} bouts at 80% power")
-        print(f"    ratio: the fixed-n test needs {n_fix/n_seq:.0f}x more fights")
+        print(f"    ratio at matched power: the fixed-n test needs "
+              f"{r['ratio_at_80']:.1f}x more fights")
     return out
 
 

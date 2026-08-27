@@ -1768,7 +1768,13 @@
       "paired_sd": 0.06539934753578253,
       "paired_effect": 0.002223949286183228,
       "n_fixed": 5346.446400322824,
-      "ratio": 2.9708383268255463
+      "ratio": 2.9708383268255463,
+      "n_sequential_50": 1631,
+      "n_sequential_80": 2385,
+      "n_sequential_90": 2900,
+      "power_at_n_sequential": 0.5863,
+      "ratio_at_80": 2.2416966039089408,
+      "replications": 20000
     },
     "0.05": {
       "growth_per_bout": 0.0046260577310227305,
@@ -1776,7 +1782,13 @@
       "paired_sd": 0.10860834966936612,
       "paired_effect": 0.006192958527527761,
       "n_fixed": 1901.5083245864487,
-      "ratio": 2.936339593231239
+      "ratio": 2.936339593231239,
+      "n_sequential_50": 590,
+      "n_sequential_80": 864,
+      "n_sequential_90": 1056,
+      "power_at_n_sequential": 0.5832,
+      "ratio_at_80": 2.2008198201232045,
+      "replications": 20000
     }
   }
 }
