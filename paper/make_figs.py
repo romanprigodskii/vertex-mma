@@ -103,7 +103,7 @@ def fig_posthoc(f):
             ax2.text(b.get_x() + b.get_width() / 2, v + 1.1, f"{v:.1f}",
                      ha="center", fontsize=6.3)
     ax2.axhline(1 / ALPHA, color=INK, lw=0.8, ls=":")
-    ax2.text(2.45, 21.3, r"$1/\alpha$", fontsize=6.5, ha="right")
+    ax2.text(0.5, 21.0, r"$1/\alpha$", fontsize=6.5, ha="center")
     ax2.legend(fontsize=6.3, loc="upper right", handlelength=1.2, borderpad=0.2)
     ax2.set_xticks(x); ax2.set_xticklabels(labels, fontsize=6.8)
     ax2.set_ylabel("mixture e-value"); ax2.set_ylim(0, 40)
