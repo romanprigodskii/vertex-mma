@@ -1,6 +1,6 @@
 \documentclass{article}
 \usepackage[sglblindworkshop]{neurips_2026}
-\workshoptitle{E-values: from Statistics to ML}
+\workshoptitle{E-Values: From Statistics to ML}
 
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
@@ -25,20 +25,18 @@
 \maketitle
 
 \begin{abstract}
-E-values are motivated by a gambler betting against a null hypothesis. We report an audit in which the gambler is not a metaphor: the null is a price posted by a bookmaker, the stake is a stake, and the wealth process \emph{is} the e-process. The subject is a deployed UFC outcome forecaster and a pre-registered search for pockets where it beats the closing line --- 84 hypotheses over 1{,}787 priced bouts, originally analysed with paired log-loss and Benjamini--Hochberg. Re-asked as bets, three things change. (i) The 84 slices are overlapping subsets of one pool, so BH's guarantee is not established; its one favourable discovery survives neither Benjamini--Yekutieli nor e-BH. (ii) A segment the fixed-$n$ analysis reported as \emph{failing to replicate} ($p=0.30$) is, on the wealth scale, growing at the same rate in the replication window and simply $100$ bouts short of $1/\alpha$ --- optional continuation converts a refutation into a schedule. (iii) A post-hoc threshold rule, paid for by a mixture martingale, survives the search it actually ran ($e=31.3$) and dies once the direction it could also have searched is priced in ($e=15.6$). We report the ladder, not the winner.
+E-values are motivated by a gambler betting against a null hypothesis. We report an audit where the gambler is not a metaphor: the null is a bookmaker's posted price, the stake is a stake, and the wealth process \emph{is} the e-process. The subject is a deployed UFC forecaster and a pre-registered search for pockets where it beats the closing line: 84 hypotheses over 1{,}787 priced bouts, originally analysed with paired log-loss and Benjamini--Hochberg. Re-asked as bets, three things change. (i) The 84 slices are overlapping subsets of one pool, so BH's guarantee is not established; its one favourable discovery survives neither Benjamini--Yekutieli nor e-BH. (ii) A segment the fixed-$n$ analysis reported as \emph{failing to replicate} ($p=0.30$) is, on the wealth scale, growing at the same rate in the replication window and $100$ bouts short of $1/\alpha$: optional continuation converts a refutation into a schedule. (iii) A post-hoc threshold rule, paid for by a mixture martingale, survives the search it actually ran ($e=31.3$) and dies twice over --- once when the direction it could also have searched is priced in ($15.6$), and again when the bookmaker's margin is charged ($8.5$). We report the ladder, not the winner.
 \end{abstract}
 
 \section{A null hypothesis with money behind it}
 
-Testing by betting \citep{shafer2021,grunwald2024,ramdas2023} introduces its central object through a gambler whose capital cannot grow in expectation if the null is true. The gambler is usually a device. Here it is the situation itself.
+Testing by betting \citep{shafer2021,grunwald2024,vovk2021,ramdas2023} introduces its central object through a gambler whose capital cannot grow in expectation if the null is true. The gambler is usually a device. Here it is the situation itself.
 
-We audit \textsc{Vertex}, a deployed UFC bout-outcome model, against the closing line of a betting exchange. The substrate is a walk-forward out-of-fold pool: $4{,}141$ bouts scored between 2016 and 2026 by models refit at $32$ quarterly origins, of which $1{,}787$ across $225$ events carry an archived closing price. Two properties no simulation supplies:
+We audit \textsc{Vertex}, a deployed UFC bout-outcome model, against a betting exchange's closing line. The substrate is a walk-forward out-of-fold pool: $4{,}141$ bouts scored between 2016 and 2026 by models refit at $32$ quarterly origins, $1{,}787$ of them across $225$ events carrying an archived closing price. Two properties no simulation supplies:
 
-\textbf{The null is adversarial and external.} $H_0$ is not an assumption of convenience --- it is a number a counterparty posted with capital at risk, and a bettor who rejects it collects. Under $H_0$ the de-vigged closing probability $q_t$ is the true conditional probability of the outcome $y_t\in\{0,1\}$.
+\textbf{The null is adversarial and external.} $H_0$ is not an assumption of convenience --- it is a number a counterparty posted with capital at risk, and a bettor who rejects it collects. Under $H_0$ the de-vigged closing probability $q_t$ --- the two closing decimals stripped of their overround by the power method, solving $q_a^k+q_b^k=1$ per bout --- is the true conditional probability of the outcome $y_t\in\{0,1\}$. \textbf{Predictability is enforced by the calendar.} The model probability $p_t$ comes from a fit that saw only bouts strictly before its origin, and $q_t$ is posted before the fight; neither has to be argued into being predictable.
 
-\textbf{Predictability is enforced by the calendar.} The model probability $p_t$ comes from a fit that saw only bouts strictly before its origin, and $q_t$ is posted before the fight. Neither has to be argued into being predictable.
-
-The prior analysis of this pool \citep{vertexlab} declared $86$ candidate segments in a registry,\footnote{Pre-registration here means author-controlled version history, not third-party registration. The registry is a single source file whose commit (\texttt{8f9fcbd}) precedes the first scored artifact (\texttt{6b5fbd9}) in a public repository, and both are inspectable. That ordering establishes the hypotheses were fixed before they were scored; it does not establish that they were fixed before any contact with a pool already months in use, and no timestamp available to us would.} before scoring any of them, each with a stated mechanism for why a good market would be wrong in that exact place. Two pairs of those turn out to be the same filter proposed by different lenses, so the pre-registered family is $84$. Three further segments were added once results were visible; that report marks them post-hoc and excludes them from its multiplicity accounting, as we do here, and $84+3$ is the $87$ its title counts. It then measured each with a composition-adjusted paired log-loss contrast, cluster-robust by event, and charged multiplicity with BH. It also reported its own power: against a $3$ percentage-point edge the paired test has $10$--$15\%$ power, \emph{falling to $0$--$1\%$ once BH multiplicity is charged}, and would need ${\sim}89{,}900$ bouts. There are $1{,}787$. That report is the reason for this one: the instrument was known to be inadequate before its answers were read.
+The prior analysis of this pool \citep{vertexlab} declared $86$ candidate segments, each with a stated mechanism for why a good market would be wrong in that exact place, in a registry\footnote{Pre-registration here means author-controlled version history, not third-party registration: the registry is one inspectable source file whose commit (\texttt{8f9fcbd}) precedes the first scored artifact (\texttt{6b5fbd9}) in a public repository. That fixes the hypotheses before they were scored, not before any contact with a pool already months in use --- and no timestamp available to us would.} written before any of them was scored. Two pairs are the same filter proposed by different lenses, so the pre-registered family is $84$; three further segments, added once results were visible, are marked post-hoc there and excluded from multiplicity accounting here, and $84+3$ is the $87$ its title counts. It measured each with a composition-adjusted paired log-loss contrast, cluster-robust by event, and charged multiplicity with BH --- an instrument whose own power section reports $10$--$15\%$ against a $3$ percentage-point edge, \emph{$0$--$1\%$ once BH multiplicity is charged}, and ${\sim}89{,}900$ bouts needed. There are $1{,}787$. That report is the reason for this one: the instrument was known to be inadequate before its answers were read.
 
 \section{The wealth process}
 
@@ -47,54 +45,44 @@ For a bout with de-vigged closing probability $q$ and outcome $y$, and a predict
 M \;=\; 1 + \lambda\,(y-q), \qquad \lambda \in \left(-\tfrac{1}{1-q},\ \tfrac{1}{q}\right),
 \qquad \mathbb{E}_{H_0}[M] = 1 .
 \end{equation}
-The product over a segment's bouts \emph{in calendar order} is a non-negative test martingale; its terminal value is an e-value and, by Ville's inequality, its running maximum is anytime-valid. The growth-rate optimal stake under the alternative ``the model's $p$ is the truth'' is available in closed form,
-\begin{equation}
-\lambda^\star \;=\; \frac{p-q}{q(1-q)},
-\end{equation}
-the model's edge deflated by the market's own variance. We report fractional Kelly at $\lambda=\tfrac12\lambda^\star$, and, because that fraction is a free choice, also a predictable plug-in in the sense of \citet{wsr2024}, which learns the multiplier from past bouts only (\S\ref{sec:limits}).
+The product over a segment's bouts \emph{in calendar order} is a non-negative test martingale, so its terminal value is an e-value and, by Ville's inequality \citep{ville1939}, $\Pr_{H_0}(\sup_t M_t \ge 1/\alpha)\le\alpha$: it may be stopped at any time. Every segment filter is a function of pre-fight covariates, so membership is $\mathcal{F}_{t-1}$-measurable, and restricting the product to a segment is optional skipping ($\lambda_t=0$ off the segment), which preserves the martingale property. The growth-rate optimal stake under the alternative ``the model's $p$ is the truth'' is available in closed form as $\lambda^\star = (p-q)/[q(1-q)]$, the model's edge deflated by the market's own variance. We report fractional Kelly at $\lambda=\tfrac12\lambda^\star$ and, because that fraction is a free choice, a predictable plug-in \citep{wsr2024} that learns the multiplier from past bouts only (\S\ref{sec:limits}).
 
-\textbf{The margin is a supermartingale, not an excuse.} Write $f=\lambda q$ for the fraction of wealth the stake commits to the backed side, and $d$ for the decimal price the book actually offers on it; a fair book would offer $d=1/q$. Settling at $d$ instead gives $\mathbb{E}_{H_0}[M] = 1 - f(1-q\,d) \le 1$, since $q\,d<1$ whenever the book charges an overround. The deployable process is therefore a valid e-value, uniformly conservative, short of the statistical one by exactly what the margin costs. On this pool the mean overround is $1.0482$ and the shortfall $0.00525$ nats per bout: how much statistical evidence the bookmaker's cut consumes.
+\textbf{The margin is a supermartingale, not an excuse.} Write $f=\lambda q$ for the fraction of wealth the stake commits to the backed side and $d$ for the decimal the book offers on it; a fair book would offer $d=1/q$. Settling at $d$ gives $\mathbb{E}_{H_0}[M] = 1 - f(1-q\,d) \le 1$, since $q\,d<1$ whenever the book charges an overround: the deployable process is a valid e-value, uniformly conservative, short of the statistical one by exactly what the margin costs. On this pool the mean overround is $1.0482$ and the shortfall $0.00525$ nats per bout, so every e-value below is given at both prices, \emph{fair} and \emph{real} --- over a $300$-bout segment they differ by a factor of seven.
 
-\textbf{Validation before use.} Over $40{,}000$ replications under $H_0$, $\mathbb{E}[e]=1.000\pm0.003$; $\Pr(\sup_t e_t \ge 1/\alpha)$ is $0.021/0.058/0.142$ at $\alpha=0.05/0.10/0.20$; e-BH applied to $84$ pure nulls rejects nothing; the confidence sequence of \S\ref{sec:planning} covers the truth at \emph{every} $t$ in $98\%$ of runs.
+\textbf{Validation before use.} Under a true null --- same prices, same stakes, only the outcome resampled from $q$ --- $40{,}000$ replications give $\mathbb{E}[e]=0.985\pm0.018$ per segment, $\Pr(\sup_t e_t \ge 1/\alpha)$ of $0.029/0.067/0.151$ at $\alpha=0.05/0.10/0.20$, none of the $84$ above its own $\alpha$, e-BH rejecting at all in $74$ of the runs, and the confidence sequence of \S\ref{sec:planning} covering the truth at \emph{every} $t$ in $97.4\%$ of them.
 
 \textbf{Where the model actually stands.} Betting the model against the book over the whole priced pool gives $e = 3.6\times 10^{-4}$ at fair odds and $3.1\times10^{-8}$ at real ones. This is not a paper about beating a market, but about what can be honestly claimed inside a search that mostly failed.
 
 \section{The multiplicity charge BH was not licensed to make}
 
-The $84$ slices are overlapping subsets of one pool of $1{,}787$ bouts, scored by one model against one book: a single upset moves dozens of them together. BH's FDR guarantee requires independence or PRDS \citep{benjamini2001}, and neither is established here. Nor is the dependence of the benign kind that would make PRDS plausible without an argument: across the $3{,}486$ segment pairs, membership correlations run from $-0.49$ to $+0.84$ with half of them negative, and $83$ pairs share no bouts at all. The classical repair is Benjamini--Yekutieli, which charges $\sum_{i\le 84} 1/i = 5.01$. e-BH \citep{wang2022} is valid under \emph{arbitrary} dependence and charges nothing.
+The $84$ slices are overlapping subsets of one pool of $1{,}787$ bouts, scored by one model against one book: a single upset moves dozens of them together. BH's FDR guarantee requires independence or PRDS \citep{benjamini2001}, and neither is established here. Nor is the dependence of the benign kind that would make PRDS plausible without an argument: across the $3{,}486$ segment pairs, membership correlations run from $-0.49$ to $+0.84$, half of them negative, and $83$ pairs share no bouts at all. The classical repair is Benjamini--Yekutieli, which charges $\sum_{i\le 84} 1/i = 5.01$. e-BH \citep{wang2022} is valid under \emph{arbitrary} dependence and needs no dependence correction at all: its charge is $K/\alpha$ whatever the correlation structure turns out to be. On the discovery window the lab searched ($1{,}191$ bouts, the same $84$ hypotheses):
 
-On the discovery window the lab searched ($1{,}191$ bouts, the same $84$ hypotheses):
-
-\begin{center}\small
+\begin{center}\footnotesize
 \begin{tabular}{lccl}
 \toprule
 procedure & guarantee holds? & rejects & \\
 \midrule
 BH, paired statistic & not established & 4 & 1 favourable, 3 against \\
 Benjamini--Yekutieli ($\times 5.01$) & yes & 0 & \\
-e-BH, wealth statistic & yes & 0 & cutoff $e \ge 1680$ \\
+e-BH, wealth statistic & yes & 0 & cutoff $e \ge 1680$ ($k{=}1$) \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-The lab's single favourable discovery --- a fighter carrying a win streak of four or more, BH $q=0.016$ --- does not survive either procedure whose guarantee actually holds. The two valid procedures agree with each other and not with BH. That the pre-registered family returns nothing under a correction whose guarantee holds is also the best evidence available that it was not reverse-engineered: a registry written to fit what the data had already shown would not yield $84$ segments of which none survives.
-
-It would be wrong to read this as e-values buying less. The same segment's e-value on the full pool is $150.9$, and for a \emph{single} pre-specified hypothesis $e\ge 20$ is decisive evidence. What is expensive is not the machinery but the charge for having asked $84$ questions of a pool this size --- the same lesson the original analysis reached, in a currency where the arithmetic is visible.
+The lab's single favourable discovery --- a fighter carrying a win streak of four or more, BH $q=0.016$ --- does not survive either procedure whose guarantee actually holds. It would be wrong to read this as e-values buying less. The same segment's e-value on the full pool is $86.4$ at fair odds --- the median over the pool's five walk-forward seeds --- and $12.3$ at real ones, and for a \emph{single} pre-specified hypothesis $e\ge 20$ already rejects at $\alpha=0.05$. What is expensive is not the machinery but the charge for asking $84$ questions of a pool this size --- the original analysis's own lesson, in a currency where the arithmetic is visible.
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\textwidth]{figs/continuation.pdf}
-\caption{Wealth as a function of calendar time for every pre-registered segment (grey) and the two the analysis singled out (coloured). The dashed line is where the search stopped and the replication window began. A fixed-$n$ analysis must start a new test to the right of it; a test martingale does not.}
+\caption{Wealth over calendar time for every pre-registered segment (grey) and the two the analysis singled out (coloured); dashed, the same bets at the book's real prices. At the vertical rule the search stopped and the replication window began: a fixed-$n$ analysis must start a new test to the right of it, a test martingale need not.}
 \label{fig:cont}
 \end{figure}
 
 \section{``Failed to replicate'' and ``not yet'' are different findings}
 
-The original analysis froze its discovery window, selected the streak segment, and ran a fresh fixed-$n$ test on 2025--26. That test returned $p=0.30$ and was reported, correctly under its own logic, as a failure to replicate. It is the only move a fixed-$n$ design has: the second window buys a second test and nothing carries over.
+The original analysis froze its discovery window, selected the streak segment, and ran a fresh fixed-$n$ test on 2025--26. It returned $p=0.30$ and was reported, correctly under its own logic, as a failure to replicate --- the only move a fixed-$n$ design has, since the second window buys a second test and nothing carries over.
 
-On the wealth scale the same $110$ bouts read differently. The segment's log-growth in the replication window is $+0.0143$ nats per bout against $+0.0174$ in the window that selected it: $82\%$ of the discovery rate, the shrinkage one expects when a slice is chosen on the data that flatters it, but the same sign and the same order. The e-value accumulated there is $4.81$ --- real evidence, short of $1/\alpha=20$. At that growth rate, crossing needs $210$ bouts and $110$ have arrived. The $210$ is an extrapolation at a rate estimated on the same window, not a guarantee: the e-process is valid at whatever time it is stopped, but the date it crosses on is a forecast. The finding is not refuted. It is $100$ bouts short, and this segment yields about $71$ a year, so seventeen months and an e-process lets one simply keep multiplying rather than choose a stopping time in advance (Figure~\ref{fig:cont}). We report the pre-split wealth ($e=31.4$) but do not claim it: that is the window in which the segment was chosen.
-
-The effect is stable across the five walk-forward seeds the pool carries (e-values $56.2$ to $150.9$, all above $1/\alpha$), which the $q$-value machinery had no natural place to put.
+On the wealth scale the same $110$ bouts read differently. Log-growth in the replication window is $+0.0143$ nats per bout against $+0.0174$ in the window that selected it --- $82\%$ of the discovery rate, the shrinkage one expects when a slice is chosen on the data that flatters it, but the same sign and order. The e-value accumulated there is $4.81$ --- real evidence, short of $1/\alpha=20$. At that rate, crossing needs $210$ bouts and $110$ have arrived --- an extrapolation at a rate estimated on that same window, not a guarantee: the e-process is valid whenever it is stopped, but the date it crosses on is a forecast. The finding is not refuted; it is $100$ bouts short, and at about $71$ a year that is seventeen months of continuing to multiply rather than choosing a stopping time in advance (Figure~\ref{fig:cont}). At real odds the window pays $2.48$, the margin taking $0.0060$ of the $0.0143$, and the wait is $253$ bouts: three and a half years. We report the pre-split wealth ($31.4$ fair, $8.5$ real) but do not claim it: that is the window in which the segment was chosen. The effect is stable across the pool's five walk-forward seeds --- fair $56.2$ to $150.9$, all above $1/\alpha$; real $8.4$ to $21.2$, where only the most favourable clears it --- a spread $q$-values had no natural place to put.
 
 \section{Pricing the freedom a post-hoc rule used}
 \label{sec:posthoc}
@@ -102,41 +90,43 @@ The effect is stable across the five walk-forward seeds the pool carries (e-valu
 \begin{figure}[t]
 \centering
 \includegraphics[width=\textwidth]{figs/posthoc.pdf}
-\caption{Left: the e-value of each threshold on the model's lean toward the book's favourite. The declared cut at $0.05$ was chosen after this shape was visible. Right: a mixture martingale over progressively more of the freedom the search actually had. The finding survives paying for the threshold and does not survive paying for the direction.}
+\caption{Left: the e-value of each threshold on the model's lean toward the book's favourite; the declared cut at $0.05$ was chosen after this shape was visible. Right: a mixture over progressively more of the freedom the search had. At fair odds the finding pays for the threshold but not the direction; at real prices, neither.}
 \label{fig:posthoc}
 \end{figure}
 
-The largest effect in the original analysis is not a segment but a direction: where the model gives the book's favourite \emph{more} than the book does, flat-staking that favourite returned $+11.5\%$ over $281$ bets across $163$ events. The analysis declared this post-hoc: the cut at $\mathrm{lean}\ge 0.05$ was chosen after seeing the sweep was positive from $0.02$ to $0.22$ and peaked at $0.13$. A fixed-$n$ framework has no principled penalty for that.
+The largest effect in the original analysis is not a segment but a direction: where the model gives the book's favourite \emph{more} than the book does, flat-staking that favourite returned $+11.5\%$ over $281$ bets across $163$ events --- declared post-hoc there, because the cut at $\mathrm{lean}\ge 0.05$ was chosen after seeing the sweep was positive from $0.02$ to $0.22$ and peaked at $0.13$, and a fixed-$n$ framework has no principled penalty for that.
 
-A mixture martingale has one, fixed in advance rather than argued after: each threshold's wealth process is a martingale starting at $1$, so any convex combination is too, and the search is paid for by the prior mass not placed on the winner. The maximum over thresholds is $118.99$ and is not a valid e-value. The uniform mixture over the $21$ cuts is $e=31.3$, which clears $1/\alpha$. Widening the family to the $21$ cuts the search could also have taken in the opposite direction gives $e=15.6$, which does not. Adding the other disagreement statistic available on the same frame gives $10.4$.
+A mixture martingale has one, with weights that do not depend on which cut won \citep{robbins1970,howard2021}: each threshold's wealth process is a martingale starting at $1$, so any convex combination is too, and the search is paid for by the prior mass not on the winner. The maximum over thresholds, $118.99$, is not a valid e-value. The uniform mixture over the $21$ cuts is $e=31.3$, which clears $1/\alpha$. Widening the family to the $21$ cuts the search could also have taken in the opposite direction gives $15.6$, which does not. Adding the other disagreement statistic available on the same frame gives $10.4$. Those are fair odds; at the prices the book offered, the same mixtures are $8.5$, $4.2$ and $2.8$ --- a bettor paying the margin never clears $1/\alpha$ at all.
 
-We regard the ladder, not any rung, as the result: it converts ``this was post-hoc'' from a caveat into a quantity. This finding absorbs the threshold search, and not that search plus the direction.
+We regard the ladder, not any rung, as the result: it turns ``this was post-hoc'' from a caveat into a quantity. The finding absorbs the threshold search at fair odds, and neither the direction it could have taken nor the margin it would have paid.
 
 \section{What the sequential instrument needs}
 \label{sec:planning}
 
-A growth rate makes planning a calculation rather than a verdict. Against a true $3$ pp edge simulated on this pool's own price distribution, the half-Kelly bet grows at $0.00166$ nats per bout and reaches $e=1/\alpha$ in ${\sim}1{,}800$ bouts; the paired log-loss test needs ${\sim}5{,}346$ at $80\%$ power. At $5$ pp the figures are $648$ and $1{,}902$. The sequential test is roughly $3\times$ cheaper in fights, not because it is more powerful per observation, but because a paired contrast on a slice discards most of what each bout carries.
+A growth rate makes planning a calculation rather than a verdict. Against a true $3$ pp edge simulated on this pool's own prices, the half-Kelly bet grows at $0.00166$ nats per bout, so expected log-wealth reaches $\log(1/\alpha)$ in ${\sim}1{,}800$ bouts --- a $59\%$ chance of having crossed by then, not a power level. Matched at $80\%$ over $20{,}000$ simulated runs, the sequential test needs $2{,}385$ bouts to the paired log-loss test's $5{,}346$; at $5$ pp, $864$ to $1{,}902$. It is roughly twice as cheap in fights, not because it is more powerful per observation, but because a paired contrast on a slice discards most of what each bout carries.
 
-Anytime-validity is not free. For the directional rule the cluster bootstrap gives a $95\%$ ROI interval of $[+2.2\%, +20.4\%]$ --- valid at the one $n$ the analysis stopped at, chosen after watching the number. A hedged betting confidence sequence \citep{wsr2024}, valid at every $n$ simultaneously, gives $[-5.3\%, +22.9\%]$ and does not exclude zero.
+Anytime-validity is not free. On the directional rule the cluster bootstrap gives a $95\%$ ROI interval of $[+2.2\%, +20.4\%]$, valid at the one $n$ the analysis stopped at --- an $n$ chosen after watching the number. The hedged betting confidence sequence \citep{wsr2024}, valid at every $n$ at once, gives $[-5.3\%, +22.9\%]$ and does not exclude zero.
 
 \section{Limitations}
 \label{sec:limits}
 
-The stake is a free choice. Fractional Kelly at $0.25/0.5/1.0$ gives $e=26.0/150.9/115.3$ on the streak segment, and the predictable plug-in, which is not a choice, settles at $c=0.70$ and $e=63.1$. Every variant clears $1/\alpha$.
+The stake and the de-vig are both free choices, and neither carries the result. Fractional Kelly at $0.25/0.5/1.0$ gives $e=26.0/150.9/115.3$ on the streak segment's primary seed and the predictable plug-in, which is not a choice, settles at $c=0.70$, $e=63.1$; every variant clears $1/\alpha$. Under Shin's de-vig the rungs are $120.6$, $4.36$ and $34.0/17.0/11.3$; the proportional split, which flatters a favourite-backing rule, would \emph{raise} the ladder to $56.3/28.2/18.8$, not lower it.
 
-Boosting e-BH \citep{wang2022} would recover power but needs each e-value's null distribution, which a composite martingale null does not supply. Pre-specified family weights would be a better route, and were not specified.
+Boosting e-BH \citep{wang2022} would recover power but needs each e-value's null distribution, which a composite martingale null does not supply; weights fixed in advance would be the better route, and were not fixed.
 
-Three contaminations are inherited from the pool and were sized there: an age correction whose shipping decision used replication-window data; hyperparameters tuned on a window the pool later scores ($122$ of $1{,}191$ discovery bouts); and a derived rating that is not fully point-in-time ($21.9\%$ of bouts, worth $0.0011$ nats). Removing any of them moves the numbers unfavourably.
-
-Finally, this is one sport, one book, and one model. The construction generalises to any forecaster audited against a market price; the numbers do not.
+Three contaminations are inherited from the pool and sized there: an age correction shipped on replication-window data; hyperparameters tuned on a window the pool later scores ($122$ of $1{,}191$ discovery bouts); a rating not fully point-in-time ($21.9\%$ of bouts, $0.0011$ nats). Removing any moves the numbers unfavourably. And this is one sport, one book, one model: the construction generalises, the numbers do not.
 
 \bibliographystyle{plainnat}
 \begin{thebibliography}{9}
 \bibitem[Benjamini and Yekutieli(2001)]{benjamini2001} Y.~Benjamini and D.~Yekutieli. The control of the false discovery rate in multiple testing under dependency. \emph{Annals of Statistics}, 29(4):1165--1188, 2001.
 \bibitem[Gr\"unwald et al.(2024)]{grunwald2024} P.~Gr\"unwald, R.~de~Heide, and W.~Koolen. Safe testing. \emph{Journal of the Royal Statistical Society: Series B}, 86(5):1091--1128, 2024.
+\bibitem[Howard et al.(2021)]{howard2021} S.~R.~Howard, A.~Ramdas, J.~McAuliffe, and J.~Sekhon. Time-uniform, nonparametric, nonasymptotic confidence sequences. \emph{Annals of Statistics}, 49(2):1055--1080, 2021.
 \bibitem[Prigodskii(2026)]{vertexlab} R.~Prigodskii. Where does the model beat the book --- 87 slices, one survivor. Technical report, \textsc{Vertex MMA}, 2026. Registry, scoring code and full write-up: \url{https://github.com/romanprigodskii/vertex-mma/tree/8f9fcbd3ccd4eb65f9aa06d7615de0e3363914f7/scripts/simulation}
 \bibitem[Ramdas et al.(2023)]{ramdas2023} A.~Ramdas, P.~Gr\"unwald, V.~Vovk, and G.~Shafer. Game-theoretic statistics and safe anytime-valid inference. \emph{Statistical Science}, 38(4):576--601, 2023.
+\bibitem[Robbins(1970)]{robbins1970} H.~Robbins. Statistical methods related to the law of the iterated logarithm. \emph{Annals of Mathematical Statistics}, 41(5):1397--1409, 1970.
 \bibitem[Shafer(2021)]{shafer2021} G.~Shafer. Testing by betting: a strategy for statistical and scientific communication. \emph{Journal of the Royal Statistical Society: Series A}, 184(2):407--431, 2021.
+\bibitem[Ville(1939)]{ville1939} J.~Ville. \emph{\'Etude critique de la notion de collectif}. Gauthier-Villars, Paris, 1939.
+\bibitem[Vovk and Wang(2021)]{vovk2021} V.~Vovk and R.~Wang. E-values: calibration, combination and applications. \emph{Annals of Statistics}, 49(3):1736--1754, 2021.
 \bibitem[Wang and Ramdas(2022)]{wang2022} R.~Wang and A.~Ramdas. False discovery rate control with e-values. \emph{Journal of the Royal Statistical Society: Series B}, 84(3):822--852, 2022.
 \bibitem[Waudby-Smith and Ramdas(2024)]{wsr2024} I.~Waudby-Smith and A.~Ramdas. Estimating means of bounded random variables by betting. \emph{Journal of the Royal Statistical Society: Series B}, 86(1):1--27, 2024.
 \end{thebibliography}
