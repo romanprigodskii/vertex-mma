@@ -28,7 +28,7 @@ INK, ACC, MUT = "#1a1a1a", "#c1440e", "#8a8a8a"
 
 def fig_continuation(f):
     """Wealth over calendar time, with the window the lab had to throw away."""
-    fig, ax = plt.subplots(figsize=(5.5, 2.15))
+    fig, ax = plt.subplots(figsize=(5.5, 1.92))
     by = {s.name: s for s in S._segs()}
     styles = [
         ("form_momentum__long_win_streak_4plus", "win streak $\\geq$ 4", INK, "-"),
@@ -64,7 +64,7 @@ def fig_continuation(f):
 
 def fig_posthoc(f):
     """What each extra degree of post-hoc freedom costs the finding."""
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(5.5, 1.95), width_ratios=[1.2, 1])
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(5.5, 1.82), width_ratios=[1.2, 1])
     grid = np.round(np.arange(0.02, 0.2251, 0.01), 3)
     es, ns = [], []
     for th in grid:
