@@ -1,12 +1,12 @@
 {
   "model_version": "v0.14.0",
   "model_kind": "ensemble",
-  "trained_at": "2026-08-23T07:01:54.276826Z",
+  "trained_at": "2026-08-30T07:08:41.342409Z",
   "provenance": {
     "git": {
-      "sha": "1af69237115944e44ec3df3f94563a1a306f845a",
+      "sha": "a8a87a8315fc38a344108c5bc76bc9e4e8029ef0",
       "branch": "main",
-      "committed_at": "2026-08-19T17:20:01+05:00",
+      "committed_at": "2026-08-25T09:30:48+05:00",
       "dirty": false
     },
     "runtime": {
@@ -25,41 +25,41 @@
       "optuna": "4.9.0"
     },
     "dataset": {
-      "n_rows": 8691,
+      "n_rows": 8709,
       "n_columns": 178,
       "columns_sha256": "4aabcc4c3acef842e032cf61f7298c5e5e828bf834114ebefb8eaa1857a8cbd9",
       "event_date_min": "1994-03-11",
-      "event_date_max": "2026-08-22",
-      "content_sha256": "a6560c9a20ecaf1a880ef86c420526cffa4c77ad0de3f4eeaeb6f57a1ce6cda6"
+      "event_date_max": "2026-08-29",
+      "content_sha256": "5bfe9996751db57a6e02abd721fe106807954422391a74ffabae85a76ee271f4"
     },
     "iterations": {
       "split": {
-        "lgb_best_iteration": 163,
-        "lgb_trees": 163,
-        "cb_best_iteration": 231,
-        "cb_trees": 231,
+        "lgb_best_iteration": 171,
+        "lgb_trees": 171,
+        "cb_best_iteration": 219,
+        "cb_trees": 219,
         "logreg_n_iter": 7
       },
       "served": {
         "lgb_best_iteration": null,
-        "lgb_trees": 163,
+        "lgb_trees": 171,
         "cb_best_iteration": null,
-        "cb_trees": 231,
+        "cb_trees": 219,
         "logreg_n_iter": 7
       },
       "debut": {
         "split": {
           "lgb_best_iteration": 23,
           "lgb_trees": 23,
-          "cb_best_iteration": 31,
-          "cb_trees": 31,
+          "cb_best_iteration": 34,
+          "cb_trees": 34,
           "logreg_n_iter": 7
         },
         "served": {
           "lgb_best_iteration": null,
           "lgb_trees": 23,
           "cb_best_iteration": null,
-          "cb_trees": 31,
+          "cb_trees": 34,
           "logreg_n_iter": 6
         }
       }
@@ -331,64 +331,64 @@
   "blender": {
     "blend_mode": "weighted_mean",
     "val_blend_logloss": {
-      "logreg": 0.66142381378602,
-      "mean": 0.6295241631171498,
-      "weighted_mean": 0.6209156199430693
+      "logreg": 0.661680051967202,
+      "mean": 0.6298146388715576,
+      "weighted_mean": 0.6211204181297268
     },
     "weighted_mean_weights": {
-      "p_lgb_global": 0.07580305967873908,
-      "p_cb_global": 0.1328894768998129,
-      "p_logreg": 0.7913074634214481
+      "p_lgb_global": 0.08012962699503692,
+      "p_cb_global": 0.12157941318543158,
+      "p_logreg": 0.7982909598195316
     },
-    "blender_intercept": -0.6537455640345454,
+    "blender_intercept": -0.653099921519144,
     "blender_coefs": {
-      "p_lgb_global": 0.288106554879348,
-      "p_cb_global": 0.4095448752507305,
-      "p_logreg": 0.6749586217478556
+      "p_lgb_global": 0.31189150439938274,
+      "p_cb_global": 0.3804157796531327,
+      "p_logreg": 0.6771304504926283
     }
   },
   "metrics": {
     "train": {
       "n": 5350,
-      "accuracy": 0.6676635514018692,
-      "log_loss": 0.6089303288198391,
-      "brier": 0.21084029927852124,
-      "roc_auc": 0.7280921486351806,
+      "accuracy": 0.6633644859813084,
+      "log_loss": 0.6119747114853521,
+      "brier": 0.21218704135827474,
+      "roc_auc": 0.7237479435850126,
       "market_accuracy": 0.6499535747446611,
       "market_log_loss": 0.623407676928036,
       "market_brier": 0.2171823476729692,
       "market_n": 1077,
-      "model_accuracy_on_market": 0.6425255338904364,
-      "model_log_loss_on_market": 0.6151381475786403,
-      "model_brier_on_market": 0.21395165245871486
+      "model_accuracy_on_market": 0.6406685236768802,
+      "model_log_loss_on_market": 0.6181727953862513,
+      "model_brier_on_market": 0.21532008440013647
     },
     "val": {
       "n": 429,
-      "accuracy": 0.6386946386946387,
-      "log_loss": 0.6208135309335424,
-      "brier": 0.21608747378699586,
-      "roc_auc": 0.7107700334797165,
+      "accuracy": 0.6363636363636364,
+      "log_loss": 0.6209158723505236,
+      "brier": 0.21608554888488526,
+      "roc_auc": 0.7121613983216661,
       "market_accuracy": 0.7295081967213115,
       "market_log_loss": 0.5826003105680462,
       "market_brier": 0.19863200191823516,
       "market_n": 122,
-      "model_accuracy_on_market": 0.6639344262295082,
-      "model_log_loss_on_market": 0.6089496682242008,
-      "model_brier_on_market": 0.21073836190228856
+      "model_accuracy_on_market": 0.6557377049180327,
+      "model_log_loss_on_market": 0.6067302301381176,
+      "model_brier_on_market": 0.20971067583465539
     },
     "test": {
-      "n": 693,
-      "accuracy": 0.6637806637806638,
-      "log_loss": 0.6166994964758039,
-      "brier": 0.2137826391411922,
-      "roc_auc": 0.7192942942942944,
-      "market_accuracy": 0.6818181818181818,
-      "market_log_loss": 0.5981105472887682,
-      "market_brier": 0.20589081775833595,
-      "market_n": 616,
-      "model_accuracy_on_market": 0.6558441558441559,
-      "model_log_loss_on_market": 0.6222696939002432,
-      "model_brier_on_market": 0.21636885810230333
+      "n": 700,
+      "accuracy": 0.6614285714285715,
+      "log_loss": 0.6150198806273103,
+      "brier": 0.21300950286725132,
+      "roc_auc": 0.7214587219004615,
+      "market_accuracy": 0.6821829855537721,
+      "market_log_loss": 0.5988158133297433,
+      "market_brier": 0.20606680372200348,
+      "market_n": 623,
+      "model_accuracy_on_market": 0.6565008025682183,
+      "model_log_loss_on_market": 0.6202167167765192,
+      "model_brier_on_market": 0.2153967641478647
     }
   },
   "split_roles": {
@@ -399,43 +399,43 @@
   "clean_holdout_metric": "test",
   "served_model": {
     "refit_on_all_data": true,
-    "n_rows": 6472,
-    "trained_through": "2026-08-22",
+    "n_rows": 6479,
+    "trained_through": "2026-08-29",
     "note": "served weights = train+val+test; metrics are the split model's honest held-out estimate"
   },
   "test_breakdown_by_learner": {
     "p_lgb_global": {
-      "n": 693,
-      "accuracy": 0.6623376623376623,
-      "log_loss": 0.6299592325526921,
-      "brier": 0.2199344692485005,
-      "roc_auc": 0.7027694361027694
+      "n": 700,
+      "accuracy": 0.6542857142857142,
+      "log_loss": 0.6304811341525978,
+      "brier": 0.22017197905639982,
+      "roc_auc": 0.7028729426393115
     },
     "p_cb_global": {
-      "n": 693,
-      "accuracy": 0.658008658008658,
-      "log_loss": 0.6295272835157341,
-      "brier": 0.21965246440386574,
-      "roc_auc": 0.7022772772772773
+      "n": 700,
+      "accuracy": 0.6557142857142857,
+      "log_loss": 0.6221776204830006,
+      "brier": 0.2163437247636768,
+      "roc_auc": 0.7164932430221524
     },
     "p_logreg": {
-      "n": 693,
-      "accuracy": 0.6479076479076479,
-      "log_loss": 0.6234944680120538,
-      "brier": 0.2169607846054841,
-      "roc_auc": 0.7084084084084084
+      "n": 700,
+      "accuracy": 0.6485714285714286,
+      "log_loss": 0.6229583161239761,
+      "brier": 0.21668222146597868,
+      "roc_auc": 0.7097444455351591
     },
     "p_blended": {
-      "n": 693,
-      "accuracy": 0.6637806637806638,
-      "log_loss": 0.6166994964758039,
-      "brier": 0.2137826391411922,
-      "roc_auc": 0.7192942942942944
+      "n": 700,
+      "accuracy": 0.6614285714285715,
+      "log_loss": 0.6150198806273103,
+      "brier": 0.21300950286725132,
+      "roc_auc": 0.7214587219004615
     }
   },
   "n_train": 5350,
   "n_val": 429,
-  "n_test": 693,
+  "n_test": 700,
   "debut_specialist": {
     "feature_columns": [
       "diff_height",
@@ -561,33 +561,33 @@
     ],
     "exp_row_weight": 0.2,
     "metrics_test_debut_segment": {
-      "n": 168,
-      "accuracy": 0.5654761904761905,
-      "log_loss": 0.6609254976730587,
-      "brier": 0.23417766983430488,
-      "roc_auc": 0.6653409090909091,
-      "market_accuracy": 0.678082191780822,
-      "market_log_loss": 0.5678100618192838,
-      "market_brier": 0.19375017217715268,
-      "market_n": 146,
-      "model_accuracy_on_market": 0.541095890410959,
-      "model_log_loss_on_market": 0.6664188192297326,
-      "model_brier_on_market": 0.23691611630516174
+      "n": 179,
+      "accuracy": 0.5977653631284916,
+      "log_loss": 0.6595567882222255,
+      "brier": 0.23352050094640137,
+      "roc_auc": 0.6704802615036459,
+      "market_accuracy": 0.6710526315789473,
+      "market_log_loss": 0.5724865797941947,
+      "market_brier": 0.19596191367077373,
+      "market_n": 152,
+      "model_accuracy_on_market": 0.5855263157894737,
+      "model_log_loss_on_market": 0.6650986679574503,
+      "model_brier_on_market": 0.23627426152392306
     },
     "note": "serves bouts with >=1 UFC debutant; selection val = debut rows only; weaker than the market on this segment \u2014 probabilities are directional, not sharp"
   },
   "method_model": {
     "n_train": 5340,
     "n_val": 428,
-    "n_served_rows": 6461,
+    "n_served_rows": 6468,
     "n_features": 184,
     "use_levels": true,
-    "val_logloss": 0.8875966307658504,
+    "val_logloss": 0.8873986665668165,
     "val_logloss_constant_base_rates": 0.9904097333222688,
     "val_solo_logloss": {
-      "lgb": 0.8971410361999871,
-      "cb": 0.8885147577084163,
-      "logreg": 0.9172696379659495
+      "lgb": 0.8975202999582363,
+      "cb": 0.8883875062302473,
+      "logreg": 0.9173120069534284
     },
     "blend_weights": {
       "lgb": 0.0,
@@ -595,8 +595,8 @@
       "logreg": 0.19999999999999996
     },
     "best_iters": {
-      "lgb": 84,
-      "cb": 275
+      "lgb": 86,
+      "cb": 261
     },
     "train_base_rates": {
       "ko": 0.3308988764044944,
@@ -606,13 +606,13 @@
     "note": "conditional P(method | this side wins); serves via monte_carlo.simulate_bout(method_mix=...) and replaces METHOD_ANCHOR_LAMBDA on the non-debut segment"
   },
   "method_model_debut": {
-    "n_debut_rows": 2207,
+    "n_debut_rows": 2218,
     "n_train": 7296,
     "n_val_debut": 83,
-    "n_served_rows": 8668,
+    "n_served_rows": 8686,
     "n_features": 184,
     "exp_row_weight": 0.2,
-    "val_logloss": 0.8787246118134221,
+    "val_logloss": 0.8793351707272691,
     "val_logloss_debut_base_rates": 1.0254312552397822,
     "blend_weights": {
       "lgb": 0.7000000000000001,
@@ -621,7 +621,7 @@
     },
     "best_iters": {
       "lgb": 137,
-      "cb": 359
+      "cb": 562
     },
     "debut_base_rates": {
       "ko": 0.3532719836400818,
@@ -631,7 +631,7 @@
     "note": "conditional P(method | this side wins) for bouts with a UFC debutant; before v0.14.0 that segment had no method model and fell back to the simulator's hazards on router defaults"
   },
   "round_models": {
-    "n_bouts": 8611,
+    "n_bouts": 8629,
     "skipped": {
       "no_db_row": 0,
       "ungradeable_method": 23,
@@ -640,10 +640,10 @@
       "bad_timing": 0
     },
     "hazard_alpha": 0.0001,
-    "hazard_trained_through": "2026-08-22",
-    "n_decisions": 4032,
+    "hazard_trained_through": "2026-08-29",
+    "n_decisions": 4036,
     "decision_C": 10.0,
     "decision_temperature": 0.8,
-    "decision_trained_through": "2026-08-22"
+    "decision_trained_through": "2026-08-29"
   }
 }
