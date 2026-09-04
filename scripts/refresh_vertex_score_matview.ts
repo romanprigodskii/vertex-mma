@@ -48,14 +48,30 @@ async function relkind(name: string): Promise<string | null> {
   return rows[0]?.k ?? null;
 }
 
-/** Ordered "name:type" signature, so an added/renamed/retyped column shows up. */
+/**
+ * Ordered "name:type" signature, so an added/renamed/retyped column shows up.
+ *
+ * Reads pg_attribute, NOT information_schema.columns: the latter has no rows at
+ * all for a materialized view, so comparing through it reports an empty
+ * signature for the matview, calls that drift against the live view, and
+ * rebuilds from scratch on every single run — a full roster-wide pass nightly
+ * in place of a cheap refresh. Verified on prod: information_schema returns 49
+ * columns for the view and 0 for the matview, while pg_attribute returns the
+ * same 49 for both.
+ */
 async function signature(name: string): Promise<string> {
   const rows = await sql<{ sig: string }[]>`
-    SELECT column_name || ':' || data_type AS sig
-    FROM information_schema.columns
-    WHERE table_schema = 'public' AND table_name = ${name}
-    ORDER BY ordinal_position
+    SELECT a.attname || ':' || format_type(a.atttypid, a.atttypmod) AS sig
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    JOIN pg_attribute a ON a.attrelid = c.oid
+    WHERE n.nspname = 'public'
+      AND c.relname = ${name}
+      AND a.attnum > 0
+      AND NOT a.attisdropped
+    ORDER BY a.attnum
   `;
+  if (rows.length === 0) throw new Error(`${name} exposes no columns`);
   return rows.map((r) => r.sig).join(",");
 }
 
