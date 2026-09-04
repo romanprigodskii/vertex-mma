@@ -24,9 +24,17 @@
 #   7  compute_era_dominance      needs (1)
 #   8  compute_radar_aggregates   needs round stats + (2)
 #   9  compute_score_history      replays the vertex view (needs 1-8)
-#  10  materialize_vertex_score   copies view -> fighter columns
-#  11  materialize_divisional_score  needs (10)
-#  12  materialize_fighter_with_stats  refresh catalog matview last
+#  10  refresh_vertex_score_matview  rebuilds the fighter_vertex_score
+#                                 snapshot the site reads (Wave 62). MUST
+#                                 precede 11: that step copies from the same
+#                                 name, so refreshing first is what keeps the
+#                                 fighter columns and the served matview in
+#                                 agreement. It also makes 11 cheap — that
+#                                 script reads the view six times, which used
+#                                 to mean six full roster-wide passes.
+#  11  materialize_vertex_score   copies matview -> fighter columns
+#  12  materialize_divisional_score  needs (11)
+#  13  materialize_fighter_with_stats  refresh catalog matview last
 #
 # Called by scrape-stats.sh (daily) and scrape-full.sh (weekly). Writes to
 # stdout/stderr — the caller redirects that into the shared cron log.
@@ -85,6 +93,7 @@ for s in \
   compute_era_dominance \
   compute_radar_aggregates \
   compute_score_history \
+  refresh_vertex_score_matview \
   materialize_vertex_score \
   materialize_divisional_score \
   materialize_fighter_with_stats; do
