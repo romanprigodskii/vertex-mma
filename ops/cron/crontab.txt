@@ -14,16 +14,26 @@
 # Read-only. Logs `CARD DRIFT` when a bout is on one side and not the other.
 20 */6 * * * /opt/vertex-cron/verify-cards.sh
 
-# Daily 03:30 — live ufc.com/rankings -> ranking_snapshot, before the daily
+# The three jobs below moved 30 min earlier on 2026-09-04. Order and the 30 min
+# gaps between them are unchanged; what changed is the room left for the
+# recompute chain, which now also rebuilds the fighter_vertex_score matview
+# (Wave 62). That refresh measured 2,315 s on the starved instance the incident
+# left behind — the chain itself only takes ~6.5 min, so at 04:30 it would have
+# run past predict at 05:15 and predict would have scored on yesterday's
+# ratings. Starting at 04:00 gives the chain 75 min instead of 45. The refresh
+# cost falls as the instance recovers; the headroom is what makes that
+# irrelevant either way.
+
+# Daily 03:00 — live ufc.com/rankings -> ranking_snapshot, before the daily
 # recompute so fresh ranks land in scores the same day
-30 3 * * *   /opt/vertex-cron/rankings-refresh.sh
+0 3 * * *    /opt/vertex-cron/rankings-refresh.sh
 
-# Daily 04:00 — Sherdog pre-UFC histories for new + upcoming-bout fighters,
+# Daily 03:30 — Sherdog pre-UFC histories for new + upcoming-bout fighters,
 # before predict 05:15 so debutant records reach the model the same morning
-0 4 * * *    /opt/vertex-cron/sherdog-refresh.sh
+30 3 * * *   /opt/vertex-cron/sherdog-refresh.sh
 
-# Daily 04:30 — per-round bout stats + judge scorecards + full recompute
-30 4 * * *   /opt/vertex-cron/scrape-stats.sh
+# Daily 04:00 — per-round bout stats + judge scorecards + full recompute
+0 4 * * *    /opt/vertex-cron/scrape-stats.sh
 
 # Daily 05:15 — score upcoming bouts with the model (winner + Monte-Carlo
 # props) AFTER the stats+recompute so predictions use fresh features. Keeps
