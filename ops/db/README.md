@@ -68,8 +68,29 @@ Re-dump and re-restore, if it ever comes to that:
 Expect exactly two ignorable errors: `schema "public" already exists`, and the
 `auth.users` foreign key described above.
 
+## The other database
+
+`vertexboxing` moved onto the same instance on 2026-09-05, for the same reasons
+minus the latency one: that project is not deployed anywhere, so its database
+was paying Supabase rent to sit idle. It came across clean — 9 tables, 645,940
+rows, 48 indexes and 34 constraints identical on both sides — and it needed none
+of the special handling above: no RLS, no `auth.uid()` callers, no pgvector, no
+foreign keys into `auth`. Only the `extensions` schema, for the same qualified
+column defaults.
+
+It shrank from 725 MB to 328 MB on the way over. That difference was bloat, not
+data; a restore rewrites every table.
+
+That project runs on a laptop rather than on this box, and Postgres here is
+deliberately not published to the internet, so it connects over an SSH tunnel:
+`./scripts/db-tunnel.sh` in the vertexboxing repo forwards `127.0.0.1:5433` to
+this instance, and its `.env.local` already points there.
+
 ## Backups
 
 Supabase was taking daily backups. That is now this box's job — see
-`ops/db/backup.sh` and its cron entry. The whole database is ~24 MB compressed,
-so retention is cheap.
+`ops/db/backup.sh` and its cron entry at 02:00. It discovers the databases at
+run time instead of listing them, so one added later is not silently left
+unprotected, and it verifies each dump with `pg_restore --list` before pruning
+anything, because a backup nobody has ever read is not a backup. Both databases
+together are under 100 MB compressed, so 14 days of retention costs nothing.
