@@ -47,3 +47,6 @@
 # push refreshed artifacts if the weights changed, AFTER the full scrape +
 # recompute. Keeps the served weights from drifting (no-op when no new fights).
 0 7 * * 0    /opt/vertex-cron/retrain-refresh.sh
+
+# Daily 02:00 — back up the self-hosted Postgres (Supabase used to do this)
+0 2 * * *    /opt/vertex-cron/db-backup.sh
