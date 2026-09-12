@@ -11,8 +11,6 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 load_dotenv(PROJECT_ROOT / ".env.local")
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
-SUPABASE_URL = os.environ.get("NEXT_PUBLIC_SUPABASE_URL")
-SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
 
 if not DATABASE_URL:
     raise RuntimeError("DATABASE_URL is not set. Populate .env.local at the project root.")
@@ -48,8 +46,8 @@ def _patch_connection_string_for_dns(url: str) -> str:
 
 
 def get_connection() -> psycopg.Connection:
-    # TCP keepalives so the Supabase pooler doesn't drop the connection while it
-    # sits idle during slow UFC page/image fetches between DB writes.
+    # TCP keepalives so nothing between here and Postgres drops the connection
+    # while it sits idle during slow UFC page/image fetches between DB writes.
     return psycopg.connect(
         _patch_connection_string_for_dns(DATABASE_URL),
         autocommit=False,
