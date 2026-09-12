@@ -58,8 +58,15 @@ def fetch_ufc_image(name_en: str) -> tuple[UfcImage | None, str]:
     """Returns (UfcImage, reason). On failure UfcImage is None and reason says
     why. Network errors are caught and reported as 'network_error' so a flaky
     connection never crashes a long run."""
-    slug = ufc_slug(name_en)
-    page_url = UFC_ATHLETE_URL.format(slug=slug)
+    return fetch_ufc_image_at(UFC_ATHLETE_URL.format(slug=ufc_slug(name_en)))
+
+
+def fetch_ufc_image_at(page_url: str) -> tuple[UfcImage | None, str]:
+    """Same, but for an athlete page URL we already know is right.
+
+    Re-deriving the slug from a name is lossy — UFC disambiguates duplicates
+    (`-1` suffixes) and renames pages. When a previous run already recorded the
+    page that worked, refetching should go straight back to it."""
     try:
         with _client() as c:
             r = c.get(page_url)
