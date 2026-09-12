@@ -1,0 +1,40 @@
+# Fighter photos, served from the box that serves the site.
+#
+# They used to live in a Supabase storage bucket; that project is gone (the
+# hostname no longer even resolves), which took 2,400 fighter photos with it.
+# This is the replacement origin: a static nginx on a path-based Traefik router,
+# the same no-new-DNS trick /model uses, so the vertexmma.com certificate is
+# reused and every other path keeps flowing to the app.
+#
+# Files live in ./html/fighter-photos/<slug>/{full,thumbnail}.webp and are
+# published by scripts/photo_scraper/scripts/publish_photos.sh. Standalone
+# compose — the Coolify UI does not manage it.
+services:
+  photos:
+    image: nginx:alpine
+    container_name: photos-vertexmma
+    restart: unless-stopped
+    volumes:
+      - ./html:/usr/share/nginx/html:ro
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - coolify
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: coolify
+      traefik.http.routers.http-photos.entryPoints: http
+      traefik.http.routers.http-photos.rule: "Host(`vertexmma.com`) && PathPrefix(`/fighter-photos/`)"
+      traefik.http.routers.http-photos.priority: "100"
+      traefik.http.routers.http-photos.middlewares: redirect-to-https
+      traefik.http.routers.http-photos.service: photos-svc
+      traefik.http.routers.https-photos.entryPoints: https
+      traefik.http.routers.https-photos.rule: "Host(`vertexmma.com`) && PathPrefix(`/fighter-photos/`)"
+      traefik.http.routers.https-photos.priority: "100"
+      traefik.http.routers.https-photos.tls: "true"
+      traefik.http.routers.https-photos.tls.certresolver: letsencrypt
+      traefik.http.routers.https-photos.service: photos-svc
+      traefik.http.services.photos-svc.loadbalancer.server.port: "80"
+
+networks:
+  coolify:
+    external: true
