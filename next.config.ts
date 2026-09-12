@@ -23,15 +23,14 @@ const nextConfig: NextConfig = {
   },
   images: {
     remotePatterns: [
+      // Fighter photos are served by the static nginx in ops/photos, on this
+      // same host behind a path-based Traefik router. They used to come from a
+      // Supabase storage bucket; that project was deleted, so those patterns
+      // are gone — nothing should be able to re-introduce a dependency on it.
       {
         protocol: "https",
-        hostname: "ctixvxfmgrthnspfofsc.supabase.co",
-        pathname: "/storage/v1/object/public/fighter-photos/**",
-      },
-      {
-        protocol: "https",
-        hostname: "*.supabase.co",
-        pathname: "/storage/v1/object/public/**",
+        hostname: "vertexmma.com",
+        pathname: "/fighter-photos/**",
       },
       {
         protocol: "https",
