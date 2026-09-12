@@ -1,0 +1,107 @@
+# Self-hosted Supabase Auth (GoTrue), on the box that serves the site.
+#
+# The hosted Supabase project was deleted, which took the auth service with it —
+# sign-in, sign-up and every session check pointed at a hostname that no longer
+# resolves. This is the replacement: the same GoTrue that backed the hosted
+# project, talking to the Postgres we already run, so the application code keeps
+# using @supabase/ssr unchanged and only its URL and keys move.
+#
+# Only the auth service is self-hosted. The rest of the platform is not needed:
+# the app reads the database through Drizzle rather than PostgREST, and fighter
+# photos are served by ops/photos. No Kong either — Traefik does the one bit of
+# routing Kong would have done, below.
+#
+# Routing: supabase-js builds its endpoints as <url>/auth/v1/..., so the client
+# is pointed at https://vertexmma.com/supabase and Traefik strips the
+# /supabase/auth/v1 prefix before handing the request to GoTrue, which serves
+# at its own root. Path-based again, so no new DNS record and no second
+# certificate.
+#
+# Secrets live in .env next to this file (not in git). See README.md.
+services:
+  auth:
+    image: supabase/auth:v2.197.0
+    container_name: auth-vertexmma
+    restart: unless-stopped
+    depends_on:
+      dbcheck:
+        condition: service_completed_successfully
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: "9999"
+      API_EXTERNAL_URL: https://vertexmma.com/supabase
+
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${AUTH_DB_PASSWORD}@vertex-postgres:5432/vertexmma?search_path=auth&sslmode=disable
+
+      GOTRUE_SITE_URL: https://vertexmma.com
+      GOTRUE_URI_ALLOW_LIST: https://vertexmma.com/**,http://localhost:3000/**
+
+      GOTRUE_JWT_SECRET: ${GOTRUE_JWT_SECRET}
+      GOTRUE_JWT_EXP: "3600"
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_JWT_ADMIN_ROLES: service_role
+
+      GOTRUE_DISABLE_SIGNUP: "false"
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
+      GOTRUE_EXTERNAL_PHONE_ENABLED: "false"
+      GOTRUE_SMS_AUTOCONFIRM: "true"
+
+      # Whether a new account must click a link before it can sign in. With no
+      # mail transport configured that link can never arrive, so signup would
+      # dead-end; autoconfirm keeps registration working and flips off the
+      # moment SMTP is set. See README.md.
+      GOTRUE_MAILER_AUTOCONFIRM: ${GOTRUE_MAILER_AUTOCONFIRM:-true}
+      GOTRUE_MAILER_URLPATHS_CONFIRMATION: /auth/callback
+      GOTRUE_MAILER_URLPATHS_RECOVERY: /auth/callback
+      GOTRUE_MAILER_URLPATHS_EMAIL_CHANGE: /auth/callback
+      GOTRUE_MAILER_URLPATHS_INVITE: /auth/callback
+      GOTRUE_SMTP_HOST: ${GOTRUE_SMTP_HOST:-}
+      GOTRUE_SMTP_PORT: ${GOTRUE_SMTP_PORT:-587}
+      GOTRUE_SMTP_USER: ${GOTRUE_SMTP_USER:-}
+      GOTRUE_SMTP_PASS: ${GOTRUE_SMTP_PASS:-}
+      GOTRUE_SMTP_ADMIN_EMAIL: ${GOTRUE_SMTP_ADMIN_EMAIL:-noreply@vertexmma.com}
+      GOTRUE_SMTP_SENDER_NAME: Vertex MMA
+
+      GOTRUE_PASSWORD_MIN_LENGTH: "8"
+      GOTRUE_SECURITY_REFRESH_TOKEN_ROTATION_ENABLED: "true"
+      GOTRUE_SECURITY_REFRESH_TOKEN_REUSE_INTERVAL: "10"
+      GOTRUE_RATE_LIMIT_EMAIL_SENT: "30"
+      GOTRUE_LOG_LEVEL: info
+    networks:
+      - coolify
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: coolify
+      traefik.http.middlewares.supabase-auth-strip.stripprefix.prefixes: /supabase/auth/v1
+      traefik.http.routers.http-supabase-auth.entryPoints: http
+      traefik.http.routers.http-supabase-auth.rule: "Host(`vertexmma.com`) && PathPrefix(`/supabase/auth/v1`)"
+      traefik.http.routers.http-supabase-auth.priority: "110"
+      traefik.http.routers.http-supabase-auth.middlewares: redirect-to-https
+      traefik.http.routers.http-supabase-auth.service: supabase-auth-svc
+      traefik.http.routers.https-supabase-auth.entryPoints: https
+      traefik.http.routers.https-supabase-auth.rule: "Host(`vertexmma.com`) && PathPrefix(`/supabase/auth/v1`)"
+      traefik.http.routers.https-supabase-auth.priority: "110"
+      traefik.http.routers.https-supabase-auth.tls: "true"
+      traefik.http.routers.https-supabase-auth.tls.certresolver: letsencrypt
+      traefik.http.routers.https-supabase-auth.middlewares: supabase-auth-strip
+      traefik.http.routers.https-supabase-auth.service: supabase-auth-svc
+      traefik.http.services.supabase-auth-svc.loadbalancer.server.port: "9999"
+
+  # GoTrue crashes rather than waits if Postgres is not accepting connections
+  # yet, and a crash-looping auth service is indistinguishable from a broken
+  # one. This just blocks until the database answers.
+  dbcheck:
+    image: postgres:17-alpine
+    container_name: auth-vertexmma-dbcheck
+    restart: "no"
+    command: >-
+      sh -c 'until pg_isready -h vertex-postgres -p 5432 -U postgres; do
+      echo "waiting for postgres"; sleep 2; done'
+    networks:
+      - coolify
+
+networks:
+  coolify:
+    external: true
