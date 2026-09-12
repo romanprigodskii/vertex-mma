@@ -33,8 +33,9 @@ Coolify UI does not manage it.
            avatars/<auth-user-id>/avatar.webp
 
 `html/avatars` is bind-mounted into the application container at `/app/avatars`
-(Coolify persistent storage) and the app writes uploads straight into it — see
-`src/lib/avatar-store.ts`. Avatars used to go through Supabase Storage; with the
+(Coolify persistent storage, owned `1001:65533` — the `nextjs` user the image
+runs as, which the volume's chown carries across redeploys) and the app writes
+uploads straight into it — see `src/lib/avatar-store.ts`. Avatars used to go through Supabase Storage; with the
 app and the origin on the same box, a shared directory replaces a storage
 service and an API key. `AVATAR_DIR` is the app's side of that mount; with it
 unset, uploads fail loudly instead of writing somewhere nothing serves.
