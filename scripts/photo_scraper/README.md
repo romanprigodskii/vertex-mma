@@ -1,14 +1,22 @@
 # Vertex MMA — Photo Scraper
 
-Resolves Wikipedia articles for fighters in the Vertex MMA database, downloads the article photo (license-permitting), normalizes it to WebP, uploads to Supabase Storage, and updates the fighter row.
+Resolves Wikipedia articles for fighters in the Vertex MMA database, downloads the article photo (license-permitting), normalizes it to WebP, writes it into the local photo store, and updates the fighter row. `publish_photos.sh` then rsyncs the store to the origin that serves it ([`ops/photos`](../../ops/photos)).
+
+Photos used to be uploaded straight to a Supabase storage bucket. That project was deleted, taking 2,400 photos with it; [`rehost_photos.py`](scripts/rehost_photos.py) refetched them from the sources every row had recorded.
 
 ## Prerequisites
 
-1. `.env.local` at the project root with `DATABASE_URL`, `NEXT_PUBLIC_SUPABASE_URL`, and `SUPABASE_SERVICE_ROLE_KEY`.
-2. Run the two SQL scripts in **Supabase → SQL Editor** before fetching anything:
-   - [`drizzle/migrations/0001_fighter_with_stats_view.sql`](../../drizzle/migrations/0001_fighter_with_stats_view.sql)
-   - [`drizzle/migrations/0002_storage_bucket.sql`](../../drizzle/migrations/0002_storage_bucket.sql)
-3. Make sure the new `photo_*` columns have been applied (root `pnpm db:push`).
+1. `.env.local` at the project root with `DATABASE_URL`. Postgres is bound to
+   localhost on the VPS, so from a laptop that means a tunnel:
+   `ssh -fNL 5434:127.0.0.1:5433 root@<vps>`.
+2. SSH access to the VPS (`~/.ssh/vertexmma_vps_ed25519`) — publishing is an rsync.
+3. Make sure the `photo_*` columns have been applied (root `pnpm db:push`).
+
+Run it from a **residential connection**: ufc.com answers the VPS with a 403, so
+neither fetching nor a cron on the box can do this job.
+
+Optional overrides: `PHOTO_STORE_DIR` (default `~/.cache/vertexmma-photos`),
+`PHOTO_PUBLIC_BASE`, `PHOTO_REMOTE_HOST`, `PHOTO_REMOTE_ROOT`, `PHOTO_SSH_KEY`.
 
 ## Setup
 
@@ -30,6 +38,14 @@ pip install -r requirements.txt
 
 # Full enrichment.
 ./venv/bin/python scripts/fetch_photos.py
+
+# Repair: refetch every photo whose URL points at the dead Supabase bucket,
+# repoint the rows, then push the store to the origin.
+./venv/bin/python scripts/rehost_photos.py --dry-run --limit 5
+./venv/bin/python scripts/rehost_photos.py --publish
+
+# Push the store on its own.
+scripts/publish_photos.sh
 ```
 
 ## Etiquette
@@ -56,7 +72,7 @@ If nothing qualifies → `photo_fetch_status = 'no_match'`, `photo_url` stays NU
 
 ## Outputs
 
-- `scripts/photo_scraper/.errors.jsonl` — per-fighter non-fatal failures (storage upload, image decode).
+- `scripts/photo_scraper/.errors.jsonl` — per-fighter non-fatal failures (store write, image decode).
 - `fighter.photo_fetch_status` is the per-row outcome: `success | no_match | license_blocked | fetch_error`.
 
 ## Layout
@@ -72,11 +88,14 @@ scripts/photo_scraper/
     http.py
     wikipedia.py        # opensearch + REST summary + Commons license lookup
     image_processor.py  # Pillow: WebP full + 200x200 thumbnail
-    storage.py          # Supabase Storage REST upload
+    storage.py          # local photo store + rsync to the origin
     parsers/wikipedia_article.py  # reserved for future deep-parsing
     loaders/photo.py
     utils/logger.py, similarity.py
   scripts/
     _path.py
     fetch_photos.py     # CLI: --limit / --dry-run
+    fetch_photos_ufc.py # CLI: official UFC cutouts for fighters Wikipedia missed
+    rehost_photos.py    # CLI: refetch what the deleted bucket was holding
+    publish_photos.sh   # rsync the store to the origin
 ```
