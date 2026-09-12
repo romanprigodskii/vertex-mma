@@ -595,8 +595,6 @@
     "commentErrorRateLimited": "Slow down — wait a few seconds."
   },
   "auth": {
-    "continueWithGoogle": "Continue with Google",
-    "orDivider": "or",
     "showPassword": "Show password",
     "hidePassword": "Hide password",
     "signInTitle": "Sign in",

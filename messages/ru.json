@@ -595,8 +595,6 @@
     "commentErrorRateLimited": "Не спеши — подожди пару секунд."
   },
   "auth": {
-    "continueWithGoogle": "Войти через Google",
-    "orDivider": "или",
     "showPassword": "Показать пароль",
     "hidePassword": "Скрыть пароль",
     "signInTitle": "Вход",
