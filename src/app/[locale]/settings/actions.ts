@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { getTranslations } from "next-intl/server";
 
 import { checkAndUnlockAchievements } from "@/lib/achievements";
+import { AvatarStoreError, putAvatar } from "@/lib/avatar-store";
 import { userHasPassword } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { userProfile } from "@/lib/db/schema/users";
@@ -61,21 +62,21 @@ export async function updateProfileAction(
   return { success: true };
 }
 
-// Avatar uploads run entirely server-side. The browser POSTs the raw file
-// to this action; we validate it, write it to the avatars bucket via the
-// service-role client, then persist the public URL on user_profile.
+// Avatar uploads run entirely server-side. The browser POSTs the raw file to
+// this action; we validate it, write it into the directory the static origin
+// serves (see src/lib/avatar-store.ts), then persist the public URL.
 //
-// The storage path is derived from the authenticated session — NEVER from
-// client input — so a user can only ever overwrite their own avatar. That
-// guarantee no longer leans on storage RLS policies being present or
-// correct: the service role bypasses RLS, and the path is the boundary.
+// The path is derived from the authenticated session — NEVER from client input
+// — so a user can only ever overwrite their own avatar. That has always been
+// the real boundary; it used to sit in front of a storage service and now sits
+// in front of a filesystem, which changes nothing about the guarantee.
 const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
 
 // We sniff the actual leading bytes rather than trusting the browser-declared
-// file.type: the extension AND the stored content-type are both derived from
-// what the file genuinely is, so a renamed/mislabelled payload can never land
-// in storage with a mismatched content-type.
-function sniffAvatar(bytes: Buffer): { mime: string; ext: string } | null {
+// file.type: the stored extension is derived from what the file genuinely is,
+// so a renamed or mislabelled payload can never land on disk under an
+// extension the origin would then serve it as.
+function sniffAvatar(bytes: Buffer): { ext: string } | null {
   // PNG: 89 50 4E 47 0D 0A 1A 0A
   if (
     bytes.length >= 8 &&
@@ -88,7 +89,7 @@ function sniffAvatar(bytes: Buffer): { mime: string; ext: string } | null {
     bytes[6] === 0x1a &&
     bytes[7] === 0x0a
   ) {
-    return { mime: "image/png", ext: "png" };
+    return { ext: "png" };
   }
   // JPEG: FF D8 FF
   if (
@@ -97,7 +98,7 @@ function sniffAvatar(bytes: Buffer): { mime: string; ext: string } | null {
     bytes[1] === 0xd8 &&
     bytes[2] === 0xff
   ) {
-    return { mime: "image/jpeg", ext: "jpg" };
+    return { ext: "jpg" };
   }
   // WebP: "RIFF" .... "WEBP"
   if (
@@ -111,7 +112,7 @@ function sniffAvatar(bytes: Buffer): { mime: string; ext: string } | null {
     bytes[10] === 0x42 &&
     bytes[11] === 0x50
   ) {
-    return { mime: "image/webp", ext: "webp" };
+    return { ext: "webp" };
   }
   return null;
 }
@@ -146,16 +147,18 @@ export async function uploadAvatarAction(
   // Path comes from the session, not the upload — this is the real authz.
   const path = `${user.id}/avatar.${kind.ext}`;
 
-  const admin = createAdminClient();
-  const { error: uploadError } = await admin.storage
-    .from("avatars")
-    .upload(path, bytes, { upsert: true, contentType: kind.mime });
-  if (uploadError) return { error: uploadError.message };
-
-  const {
-    data: { publicUrl },
-  } = admin.storage.from("avatars").getPublicUrl(path);
-  // Cache-bust so the CDN-cached <img src> refreshes immediately.
+  let publicUrl: string;
+  try {
+    publicUrl = await putAvatar(path, bytes);
+  } catch (err) {
+    if (err instanceof AvatarStoreError) {
+      console.error("avatar upload:", err.message);
+      return { error: t("uploadFailed") };
+    }
+    throw err;
+  }
+  // Cache-bust so an already-cached <img src> refreshes immediately — the path
+  // is stable per user, so without this the old avatar sticks.
   const versionedUrl = `${publicUrl}?v=${Date.now()}`;
 
   const updated = await db

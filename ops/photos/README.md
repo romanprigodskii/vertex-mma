@@ -1,6 +1,9 @@
-# Fighter photo origin
+# Image origin
 
-Static nginx serving `https://vertexmma.com/fighter-photos/<slug>/{full,thumbnail}.webp`.
+Static nginx serving the images we host ourselves:
+
+* `https://vertexmma.com/fighter-photos/<slug>/{full,thumbnail}.webp`
+* `https://vertexmma.com/avatars/<auth-user-id>/avatar.<ext>`
 
 ## Why this exists
 
@@ -27,6 +30,14 @@ Coolify UI does not manage it.
       nginx.conf
       html/fighter-photos/<slug>/full.webp
                                 /thumbnail.webp
+           avatars/<auth-user-id>/avatar.webp
+
+`html/avatars` is bind-mounted into the application container at `/app/avatars`
+(Coolify persistent storage) and the app writes uploads straight into it — see
+`src/lib/avatar-store.ts`. Avatars used to go through Supabase Storage; with the
+app and the origin on the same box, a shared directory replaces a storage
+service and an API key. `AVATAR_DIR` is the app's side of that mount; with it
+unset, uploads fail loudly instead of writing somewhere nothing serves.
 
 ## Operating it
 
@@ -45,3 +56,7 @@ Check it is serving:
 
 A missing file is a normal 404, not an error: the app falls back to an initials
 tile whenever `photo_url` is NULL or the image fails to load.
+
+Two fighters have no photo at all — their UFC pages no longer carry an image —
+so their rows are NULL and they render as initials. A later
+`fetch_photos_ufc.py` run will pick them up if UFC ever republishes one.

@@ -1,4 +1,4 @@
-# Fighter photos, served from the box that serves the site.
+# Fighter photos and user avatars, served from the box that serves the site.
 #
 # They used to live in a Supabase storage bucket; that project is gone (the
 # hostname no longer even resolves), which took 2,400 fighter photos with it.
@@ -6,9 +6,11 @@
 # the same no-new-DNS trick /model uses, so the vertexmma.com certificate is
 # reused and every other path keeps flowing to the app.
 #
-# Files live in ./html/fighter-photos/<slug>/{full,thumbnail}.webp and are
-# published by scripts/photo_scraper/scripts/publish_photos.sh. Standalone
-# compose — the Coolify UI does not manage it.
+# Fighter photos live in ./html/fighter-photos/<slug>/{full,thumbnail}.webp and
+# are published by scripts/photo_scraper/scripts/publish_photos.sh. Avatars live
+# in ./html/avatars/<auth-user-id>/avatar.<ext> and are written directly by the
+# app, which bind-mounts that one directory. Standalone compose — the Coolify UI
+# does not manage it.
 services:
   photos:
     image: nginx:alpine
@@ -23,12 +25,12 @@ services:
       traefik.enable: "true"
       traefik.docker.network: coolify
       traefik.http.routers.http-photos.entryPoints: http
-      traefik.http.routers.http-photos.rule: "Host(`vertexmma.com`) && PathPrefix(`/fighter-photos/`)"
+      traefik.http.routers.http-photos.rule: "Host(`vertexmma.com`) && (PathPrefix(`/fighter-photos/`) || PathPrefix(`/avatars/`))"
       traefik.http.routers.http-photos.priority: "100"
       traefik.http.routers.http-photos.middlewares: redirect-to-https
       traefik.http.routers.http-photos.service: photos-svc
       traefik.http.routers.https-photos.entryPoints: https
-      traefik.http.routers.https-photos.rule: "Host(`vertexmma.com`) && PathPrefix(`/fighter-photos/`)"
+      traefik.http.routers.https-photos.rule: "Host(`vertexmma.com`) && (PathPrefix(`/fighter-photos/`) || PathPrefix(`/avatars/`))"
       traefik.http.routers.https-photos.priority: "100"
       traefik.http.routers.https-photos.tls: "true"
       traefik.http.routers.https-photos.tls.certresolver: letsencrypt
