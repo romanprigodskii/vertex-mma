@@ -237,7 +237,7 @@ export const CHAMPIONSHIP_HISTORY: readonly ChampionshipReign[] = [
   // ============================================================
   // FLYWEIGHT
   // ============================================================
-  { slug: "joshua-van-17e976",         weightClass: "flyweight", startDate: "2025-12-06", endDate: null,         defenses: 1 }, // beat Pantoja at UFC 323; def. Taira
+  { slug: "joshua-van-17e976",         weightClass: "flyweight", startDate: "2025-12-06", endDate: null,         defenses: 2 }, // beat Pantoja at UFC 323; def. Taira
   { slug: "alexandre-pantoja-a0f000",  weightClass: "flyweight", startDate: "2023-07-08", endDate: "2025-12-06", defenses: 4 }, // Royval 2, Erceg, Asakura, Kape
   { slug: "brandon-moreno-792be9",     weightClass: "flyweight", startDate: "2023-01-21", endDate: "2023-07-08", defenses: 0 }, // reign 3 undisputed — unified vs Figueiredo at UFC 283
   { slug: "brandon-moreno-792be9",     weightClass: "flyweight", startDate: "2022-07-30", endDate: "2023-01-21", defenses: 0, isInterim: true }, // UFC 277 vs Kara-France; unified at UFC 283 (def. Figueiredo)

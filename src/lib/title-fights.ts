@@ -11,10 +11,11 @@
  * files: every completed bout a champion had in their division during a
  * reign, plus every lost title challenge.
  *
- * 401 bouts.
+ * 402 bouts.
  */
 
 const CURATED_TITLE_BOUT_IDS: readonly string[] = [
+  "5ad14d0b-fe51-4830-944b-3e2d9f6ec181", // 2026-11-14 · UFC 334: Gane vs. Hokit · Kayla Harrison vs Amanda Nunes
   "f97224a1-1772-4dd4-97bc-ab21014675a4", // 2026-10-24 · UFC 333: Volkanovski vs. Evloev · Alexander Volkanovski vs Movsar Evloev
   "d52101df-d13a-469a-aa48-730cfd9fb0ea", // 2026-10-24 · UFC 333: Volkanovski vs. Evloev · Petr Yan vs Merab Dvalishvili
   "c9e78eb2-c0d3-4651-aabb-14376a6bd860", // 2026-09-19 · UFC 331: Van vs. Pantoja 2 · Joshua Van vs Alexandre Pantoja
