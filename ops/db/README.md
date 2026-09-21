@@ -28,9 +28,9 @@ came to $0.00 after included quotas.
 - **Reachable two ways**: as `vertex-postgres:5432` on the `coolify` docker
   network, which is how the app connects, and on `127.0.0.1:5433` on the host,
   which is how the cron scripts connect. No public port is published.
-- **Still on Supabase**: authentication (Google OAuth, sign-up and password
-  reset email) and the 5,036 fighter photos in storage. Those move separately;
-  self-hosted auth needs an SMTP provider, which Supabase was supplying.
+- **Auth and photos followed on 2026-09-12**, when the Supabase project turned
+  out to be deleted: see `ops/auth` and `ops/photos`. Nothing is on Supabase
+  any more.
 
 The password is in `/opt/vertex-db/pgpass` (mode 600) and appears in exactly two
 places: the Coolify environment variable, and the cron checkout's `.env.local`.

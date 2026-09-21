@@ -1,163 +1,100 @@
-# Email setup: Resend SMTP + custom templates
+# Email setup: Resend SMTP
 
-Goal: outbound auth emails (signup confirmation, password reset, magic link,
-email change) sent from `noreply@vertexmma.com` with dark Vertex MMA
-branding instead of the default Supabase-grey from `noreply@mail.app.supabase.io`.
+Goal: outbound auth emails (sign-up confirmation, password reset, email
+change) sent from `noreply@vertexmma.com` with the dark Vertex MMA templates.
 
-## Prerequisites
+Auth is self-hosted GoTrue (`ops/auth`), so everything that used to be a
+Supabase dashboard setting is now an environment variable in
+`/opt/vertex-auth/.env` on the VPS. The templates, subjects and link paths are
+already configured in `ops/auth/docker-compose.yml`; what is needed is an SMTP
+transport. Resend is the one the domain is set up for.
 
-- `vertexmma.com` registered and active on Cloudflare DNS
-- Supabase project with Auth enabled (the project this repo points at)
-- Cloudflare account access for DNS edits
+## State as of 2026-09-21
 
----
+- The Resend DNS records for `vertexmma.com` are live in Cloudflare: DKIM at
+  `resend._domainkey`, SPF and MX (`feedback-smtp.eu-west-1.amazonses.com`) at
+  `send`. They survived the Supabase deletion; nothing about them depended on it.
+- There is no `_dmarc` record.
+- The old API key was pasted into the Supabase dashboard and went with it. A new
+  one is the only missing piece.
 
-## Step 1 — Resend account
+## Step 1 — API key
 
-1. https://resend.com → sign up (use the email you'd want associated with the project).
-2. Verify the address.
-3. Free tier: 3 000 emails/month, 100/day. Comfortably enough for early users.
+1. https://resend.com → sign in with the account that owns the domain.
+2. **Domains** → `vertexmma.com` should show as verified. If the account or the
+   domain is gone, add the domain again: Resend issues new records to put in
+   Cloudflare (all **DNS only**, grey cloud — proxied breaks the lookups), then
+   **Verify**.
+3. **API Keys** → **Create API Key**. Name `vertexmma-production-smtp`,
+   permission **Sending access**, domain `vertexmma.com`. Copy the `re_…`
+   secret straight away; Resend never shows it again.
 
-## Step 2 — Add and verify the domain
+## Step 2 — Give it to GoTrue
 
-1. Resend Dashboard → **Domains** → **Add Domain**.
-2. Enter `vertexmma.com` (apex).
-3. Resend issues DNS records:
-   - **MX** for the return-path subdomain (value like `feedback-smtp.us-east-1.amazonses.com`)
-   - **TXT (SPF)** — `v=spf1 include:amazonses.com ~all`
-   - **TXT (DKIM)** — long key starting `p=...` at name `resend._domainkey`
-   - **TXT (DMARC)** — `v=DMARC1; p=none; rua=mailto:...` at name `_dmarc`
+On the VPS, in `/opt/vertex-auth/.env`:
 
-Keep the Resend tab open — you'll copy each value into Cloudflare.
+    GOTRUE_SMTP_HOST=smtp.resend.com
+    GOTRUE_SMTP_PORT=587
+    GOTRUE_SMTP_USER=resend
+    GOTRUE_SMTP_PASS=re_...
+    GOTRUE_MAILER_AUTOCONFIRM=false
 
-## Step 3 — Add DNS records in Cloudflare
+then `cd /opt/vertex-auth && docker compose up -d`.
 
-1. Cloudflare Dashboard → `vertexmma.com` → **DNS** → **Records**.
-2. For each Resend record click **Add record** and paste:
+`GOTRUE_MAILER_AUTOCONFIRM=false` is what makes sign-up send a confirmation
+email instead of signing the account in at once. Leave it `true` and mail still
+flows for password reset and email change, but addresses go unverified.
 
-   | Type | Name | Content | Priority | Proxy |
-   |------|------|---------|----------|-------|
-   | MX   | `send` (or whatever Resend specifies) | feedback host | 10 | DNS only |
-   | TXT  | `send` or `@` | SPF value | — | DNS only |
-   | TXT  | `resend._domainkey` | DKIM key | — | DNS only |
-   | TXT  | `_dmarc` | DMARC policy | — | DNS only |
+## Step 3 — End-to-end test
 
-   **All four must be `DNS only` (grey cloud) — proxied/orange-cloud breaks
-   the lookups Resend uses.**
+1. Sign up on https://vertexmma.com/signup with a real address.
+2. Expected: from `Vertex MMA <noreply@vertexmma.com>`, subject "Confirm your
+   email · Vertex MMA", dark body with an orange button. The button lands you on
+   the site, signed in.
+3. Sign out, run **Forgot password**, follow the email, set a new password,
+   sign in with it.
+4. Settings → change email: a link goes to both the old and the new address, and
+   the change applies only once both are clicked.
 
-3. Wait 5–30 min for DNS propagation.
-4. Resend Dashboard → Domains → `vertexmma.com` → **Verify**. Each record
-   should flip to ✅.
+## Step 4 (optional) — DMARC
 
-## Step 4 — Create an API key (used as SMTP password)
-
-1. Resend Dashboard → **API Keys** → **Create API Key**.
-2. Name: `vertexmma-production-smtp`. Permission: **Sending access**.
-   Domain: `vertexmma.com`.
-3. **Copy the secret immediately** (`re_xxx…`). Resend never shows it
-   again.
-
-Resend SMTP coordinates:
-
-| Field | Value |
-|-------|-------|
-| Host | `smtp.resend.com` |
-| Port | `465` (TLS) or `587` (STARTTLS) |
-| Username | `resend` |
-| Password | the API key you just copied |
-
-## Step 5 — Wire SMTP into Supabase
-
-1. Supabase Dashboard → your project → **Project Settings → Authentication
-   → SMTP Settings**.
-2. Toggle **Enable custom SMTP** = ON.
-3. Fill:
-   - **Sender name**: `Vertex MMA`
-   - **Sender email**: `noreply@vertexmma.com`
-   - **SMTP host**: `smtp.resend.com`
-   - **SMTP port**: `465`
-   - **SMTP user**: `resend`
-   - **SMTP password**: the API key from Step 4
-   - **Minimum interval**: leave default (1 s between emails)
-4. **Save**.
-
-Smoke test: Supabase Dashboard → Authentication → Users → pick any user →
-**Send password recovery email**. The mail should arrive from
-`noreply@vertexmma.com`.
-
-## Step 6 — Paste the custom HTML templates
-
-1. Supabase Dashboard → **Authentication → Email Templates**.
-2. For each template, paste the matching HTML from `email_templates/`:
-   - **Confirm signup** → `email_templates/confirm-signup.html`
-   - **Magic Link** → `email_templates/magic-link.html`
-   - **Reset Password** → `email_templates/reset-password.html`
-   - **Change Email Address** → `email_templates/email-change.html`
-3. Click **Save** on each.
-
-The Supabase preview pane sometimes renders the dark theme against a light
-backdrop — that's a preview-only quirk. Real-world clients honour the
-`background:#0a0a0a` set on the `<body>`.
-
-## Step 7 — End-to-end test
-
-1. From a browser (local dev or production), sign up with a real email.
-2. Expected:
-   - From: `Vertex MMA <noreply@vertexmma.com>`
-   - Subject: the one configured on the Supabase template
-   - Dark HTML body, orange "Confirm email" button, 6-char OTP fallback
-3. Click the button → flow completes.
-4. Spot-check the other three flows: password reset, magic-link sign-in,
-   email change.
+A `_dmarc` TXT record, e.g. `v=DMARC1; p=none; rua=mailto:<you>`, helps
+deliverability to Gmail and Outlook. `p=none` only asks for reports; it
+rejects nothing.
 
 ---
 
 ## Troubleshooting
 
 **Mail never arrives.**
-- Resend Dashboard → **Logs** → check outbound attempts.
-- If you see `400/403`: a DNS record is still pending; re-run **Verify**.
-- Cloudflare records must be `DNS only` (grey). Proxied won't resolve.
-- Look in spam — Gmail occasionally flags new domains on the first send.
+- `docker logs auth-vertexmma` — an SMTP error shows there, and the app shows
+  the user a generic error rather than a false success.
+- Resend Dashboard → **Logs** → outbound attempts. `403` usually means the
+  domain is not verified.
+- Look in spam — Gmail occasionally flags a new sender on its first send.
 
-**Mail still arrives from `noreply@mail.app.supabase.io`.**
-- Supabase SMTP Settings → "Enable custom SMTP" must be **ON**. Toggle off
-  re-enables the default Supabase sender.
+**Mail arrives, but grey and unbranded.** GoTrue could not fetch the template
+and fell back to its default: check that `auth-vertexmma-templates` is running.
 
-**Dark template renders as light.**
-- Some clients (especially Outlook) ignore `background-color` on `body`.
-  The card itself stays `#171717`, button stays orange, text stays
-  readable — the look just isn't fullscreen-black.
-- Gmail dark mode renders the template correctly.
+**The link lands on "link expired".** Links last an hour and work once. With
+PKCE, the link also has to be opened in the browser that asked for it — one
+opened on another device can't complete the exchange.
 
-## Limits — TWO caps in the signup pipeline, raise BOTH
+## Limits — two caps, raise both
 
-1. **Resend free tier: 3 000/month, 100/day.** The daily cap is what
-   throttles registrations first. Upgrade to Pro ($20/month → 50 000/month,
-   **daily cap removed entirely**) at resend.com → Billing. Pure billing
-   change: the API key, Supabase SMTP settings, and DNS stay as-is.
-2. **Supabase Auth email rate limit: 30/hour by default with custom
-   SMTP** — hidden second cap that bites BEFORE Resend under a signup
-   burst, even on a paid Resend plan. Raise it at Supabase Dashboard →
-   Authentication → Rate Limits → "Rate limit for sending emails"
-   (e.g. 300/hour).
+1. **Resend free tier: 3,000/month, 100/day.** The daily cap is what throttles
+   registrations first. Pro ($20/month) raises it to 50,000/month with no daily
+   cap; the API key and settings stay as they are.
+2. **GoTrue: 30 emails/hour across all users** (`GOTRUE_RATE_LIMIT_EMAIL_SENT`
+   in the compose file). It only bites in a burst — over a day, Resend's 100
+   runs out first — so there is no point raising it before the plan changes.
 
-Also consuming the same budget: password resets and email changes (an
-email change sends TWO — old-address confirm + new-address verify).
-Google OAuth signups send no email at all — the free relief valve.
-Disabling "Confirm email" (Supabase → Auth) removes signup emails
-entirely, at the cost of unverified addresses — not recommended past beta.
+Password resets and email changes draw on the same budget, and an email change
+sends two.
 
 ## Future
 
-- The Wave 36 email-change action issues both an "old-address confirm" and
-  a "new-address verify" — Supabase auto-uses the `Change Email Address`
-  template for the new-address half. The old-address half uses the
-  legacy reauth template (Supabase doesn't expose a separate template
-  slot for it).
-- Account-level notification preferences (opt out of, e.g., tier-upgrade
-  emails) — when added, route through the notification subsystem rather
-  than wiring per-template logic in Supabase.
-- Marketing/newsletter sends: use a separate sender like
-  `news@vertexmma.com` so transactional deliverability isn't impacted by
-  bulk reputation hits.
+- Marketing/newsletter sends: use a separate sender like `news@vertexmma.com`
+  so transactional deliverability isn't hit by bulk reputation.
+- The templates are English only. GoTrue has one template per type, so a
+  Russian version would mean branching inside the template on user metadata.
