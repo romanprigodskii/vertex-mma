@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 
 import { signUpAction } from "@/app/[locale]/signup/actions";
@@ -11,6 +11,7 @@ import { safeNext } from "@/lib/safe-redirect";
 
 export function SignUpForm() {
   const t = useTranslations("auth");
+  const router = useRouter();
   const searchParams = useSearchParams();
   const next = safeNext(searchParams.get("next"));
   const [pending, setPending] = React.useState(false);
@@ -26,6 +27,9 @@ export function SignUpForm() {
     setPending(false);
     if (res?.error) {
       setError(res.error);
+    } else if (res?.signedIn) {
+      router.push(next);
+      router.refresh();
     } else if (res?.success) {
       setSuccess(true);
     }

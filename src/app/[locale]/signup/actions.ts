@@ -14,7 +14,7 @@ const USERNAME_RE = /^[a-zA-Z0-9_]{3,30}$/;
 
 export async function signUpAction(
   formData: FormData,
-): Promise<{ error?: string; success?: boolean }> {
+): Promise<{ error?: string; success?: boolean; signedIn?: boolean }> {
   const t = await getTranslations("auth");
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
@@ -52,7 +52,7 @@ export async function signUpAction(
     h.get("origin") ??
     `${h.get("x-forwarded-proto") ?? "http"}://${h.get("host") ?? "localhost:3000"}`;
 
-  const { error } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
@@ -69,5 +69,9 @@ export async function signUpAction(
     return { error: mapAuthError(error, t) };
   }
 
+  // A session straight away means the auth server is not asking for email
+  // confirmation (see ops/auth), so there is no email to go and check: the
+  // cookies are already set and the form can send the user on, as sign-in does.
+  if (data.session) return { success: true, signedIn: true };
   return { success: true };
 }
