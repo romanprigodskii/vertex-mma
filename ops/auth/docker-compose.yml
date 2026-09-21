@@ -53,10 +53,16 @@ services:
       # dead-end; autoconfirm keeps registration working and flips off the
       # moment SMTP is set. See README.md.
       GOTRUE_MAILER_AUTOCONFIRM: ${GOTRUE_MAILER_AUTOCONFIRM:-true}
-      GOTRUE_MAILER_URLPATHS_CONFIRMATION: /auth/callback
-      GOTRUE_MAILER_URLPATHS_RECOVERY: /auth/callback
-      GOTRUE_MAILER_URLPATHS_EMAIL_CHANGE: /auth/callback
-      GOTRUE_MAILER_URLPATHS_INVITE: /auth/callback
+      # The link in an email is GoTrue's own /verify, which checks the token and
+      # then redirects to the app's /auth/callback with a code. GoTrue resolves
+      # these paths against API_EXTERNAL_URL as URL references, so an absolute
+      # path replaces its /supabase prefix rather than extending it — the prefix
+      # has to be spelled out here. Pointing them straight at /auth/callback
+      # sends a token the callback cannot use, and every link fails.
+      GOTRUE_MAILER_URLPATHS_CONFIRMATION: /supabase/auth/v1/verify
+      GOTRUE_MAILER_URLPATHS_RECOVERY: /supabase/auth/v1/verify
+      GOTRUE_MAILER_URLPATHS_EMAIL_CHANGE: /supabase/auth/v1/verify
+      GOTRUE_MAILER_URLPATHS_INVITE: /supabase/auth/v1/verify
       GOTRUE_SMTP_HOST: ${GOTRUE_SMTP_HOST:-}
       GOTRUE_SMTP_PORT: ${GOTRUE_SMTP_PORT:-587}
       GOTRUE_SMTP_USER: ${GOTRUE_SMTP_USER:-}
