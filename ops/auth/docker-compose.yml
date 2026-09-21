@@ -26,6 +26,8 @@ services:
     depends_on:
       dbcheck:
         condition: service_completed_successfully
+      templates:
+        condition: service_started
     environment:
       GOTRUE_API_HOST: 0.0.0.0
       GOTRUE_API_PORT: "9999"
@@ -70,6 +72,18 @@ services:
       GOTRUE_SMTP_ADMIN_EMAIL: ${GOTRUE_SMTP_ADMIN_EMAIL:-noreply@vertexmma.com}
       GOTRUE_SMTP_SENDER_NAME: Vertex MMA
 
+      # Bodies are fetched over HTTP, from the templates service below. If a
+      # fetch fails GoTrue quietly falls back to its own plain default, so a
+      # grey email is the symptom of that service being down.
+      GOTRUE_MAILER_TEMPLATES_CONFIRMATION: http://auth-vertexmma-templates/confirm-signup.html
+      GOTRUE_MAILER_TEMPLATES_RECOVERY: http://auth-vertexmma-templates/reset-password.html
+      GOTRUE_MAILER_TEMPLATES_MAGIC_LINK: http://auth-vertexmma-templates/magic-link.html
+      GOTRUE_MAILER_TEMPLATES_EMAIL_CHANGE: http://auth-vertexmma-templates/email-change.html
+      GOTRUE_MAILER_SUBJECTS_CONFIRMATION: Confirm your email · Vertex MMA
+      GOTRUE_MAILER_SUBJECTS_RECOVERY: Reset your password · Vertex MMA
+      GOTRUE_MAILER_SUBJECTS_MAGIC_LINK: Sign in to Vertex MMA
+      GOTRUE_MAILER_SUBJECTS_EMAIL_CHANGE: Confirm email change · Vertex MMA
+
       GOTRUE_PASSWORD_MIN_LENGTH: "8"
       GOTRUE_SECURITY_REFRESH_TOKEN_ROTATION_ENABLED: "true"
       GOTRUE_SECURITY_REFRESH_TOKEN_REUSE_INTERVAL: "10"
@@ -77,6 +91,7 @@ services:
       GOTRUE_LOG_LEVEL: info
     networks:
       - coolify
+      - templates
     labels:
       traefik.enable: "true"
       traefik.docker.network: coolify
@@ -108,6 +123,19 @@ services:
     networks:
       - coolify
 
+  # The email bodies in ./templates, served to GoTrue and to nothing else: it
+  # sits only on a network that has no route out and no Traefik labels.
+  templates:
+    image: nginx:1.27-alpine
+    container_name: auth-vertexmma-templates
+    restart: unless-stopped
+    volumes:
+      - ./templates:/usr/share/nginx/html:ro
+    networks:
+      - templates
+
 networks:
   coolify:
     external: true
+  templates:
+    internal: true
