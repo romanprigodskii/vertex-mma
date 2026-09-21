@@ -6,7 +6,6 @@ import { getTranslations } from "next-intl/server";
 
 import { checkAndUnlockAchievements } from "@/lib/achievements";
 import { AvatarStoreError, putAvatar } from "@/lib/avatar-store";
-import { userHasPassword } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { userProfile } from "@/lib/db/schema/users";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -229,21 +228,18 @@ export async function changeEmailAction(
   }
 
   // Changing the account email is the first step of a takeover (the new
-  // address can later drive password recovery). For password accounts,
-  // re-verify the current password before initiating the change — matching
-  // changePasswordAction — so a hijacked tab / borrowed session can't reroute
-  // the email on the live session alone. OAuth-only accounts have no password
-  // to verify and rely on Supabase's double-confirmation instead.
-  if (userHasPassword(user)) {
-    if (!user.email) return { error: t("currentPasswordWrong") };
-    const currentPassword = String(formData.get("currentPassword") ?? "");
-    if (!currentPassword) return { error: t("currentPasswordRequired") };
-    const { error: verifyError } = await supabase.auth.signInWithPassword({
-      email: user.email,
-      password: currentPassword,
-    });
-    if (verifyError) return { error: t("currentPasswordWrong") };
-  }
+  // address can later drive password recovery). Re-verify the current
+  // password before initiating the change — matching changePasswordAction —
+  // so a hijacked tab / borrowed session can't reroute the email on the live
+  // session alone.
+  if (!user.email) return { error: t("currentPasswordWrong") };
+  const currentPassword = String(formData.get("currentPassword") ?? "");
+  if (!currentPassword) return { error: t("currentPasswordRequired") };
+  const { error: verifyError } = await supabase.auth.signInWithPassword({
+    email: user.email,
+    password: currentPassword,
+  });
+  if (verifyError) return { error: t("currentPasswordWrong") };
 
   // Supabase auto-handles double-confirmation: a "Confirm change" link is
   // sent to the current address AND a "Confirm new address" link is sent
@@ -267,19 +263,16 @@ export async function deleteAccountAction(formData?: FormData): Promise<{
   // Account deletion is irreversible and cascades the entire profile, so it
   // demands step-up auth — a live session alone (hijacked tab, borrowed
   // device, stolen cookie, or a direct call bypassing the typed-DELETE prompt)
-  // must not be enough. Re-verify the current password for password accounts
-  // before touching anything. OAuth-only accounts have no password to verify,
-  // so they fall back to the deliberate typed-DELETE confirmation.
-  if (userHasPassword(user)) {
-    if (!user.email) return { error: t("currentPasswordWrong") };
-    const currentPassword = String(formData?.get("currentPassword") ?? "");
-    if (!currentPassword) return { error: t("currentPasswordRequired") };
-    const { error: verifyError } = await supabase.auth.signInWithPassword({
-      email: user.email,
-      password: currentPassword,
-    });
-    if (verifyError) return { error: t("currentPasswordWrong") };
-  }
+  // must not be enough. Re-verify the current password before touching
+  // anything.
+  if (!user.email) return { error: t("currentPasswordWrong") };
+  const currentPassword = String(formData?.get("currentPassword") ?? "");
+  if (!currentPassword) return { error: t("currentPasswordRequired") };
+  const { error: verifyError } = await supabase.auth.signInWithPassword({
+    email: user.email,
+    password: currentPassword,
+  });
+  if (verifyError) return { error: t("currentPasswordWrong") };
 
   const userId = user.id;
   // Clear session cookies first so the client lands on a signed-out state

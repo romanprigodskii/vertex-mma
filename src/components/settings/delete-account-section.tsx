@@ -8,11 +8,7 @@ import { useRouter } from "@/i18n/navigation";
 import { deleteAccountAction } from "@/app/[locale]/settings/actions";
 import { PasswordInput } from "@/components/auth/PasswordInput";
 
-export function DeleteAccountSection({
-  hasPassword,
-}: {
-  hasPassword: boolean;
-}) {
+export function DeleteAccountSection() {
   const router = useRouter();
   const t = useTranslations("settings");
   const [showConfirm, setShowConfirm] = React.useState(false);
@@ -22,21 +18,21 @@ export function DeleteAccountSection({
   const [error, setError] = React.useState<string | null>(null);
 
   const confirmed = confirmText === "DELETE";
-  const ready = confirmed && (!hasPassword || password.length > 0);
+  const ready = confirmed && password.length > 0;
 
   async function onConfirm() {
     if (!confirmed) {
       setError(t("typeDeleteExactly"));
       return;
     }
-    if (hasPassword && !password) {
+    if (!password) {
       setError(t("currentPasswordRequired"));
       return;
     }
     setError(null);
     setPending(true);
     const formData = new FormData();
-    if (hasPassword) formData.set("currentPassword", password);
+    formData.set("currentPassword", password);
     const res = await deleteAccountAction(formData);
     if (res?.error) {
       setPending(false);
@@ -92,22 +88,20 @@ export function DeleteAccountSection({
           {t("typeDeleteHint")}
         </p>
       ) : null}
-      {hasPassword ? (
-        <label className="mt-3 flex max-w-xs flex-col gap-1.5">
-          <span className="font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
-            {t("currentPassword")}
-          </span>
-          <PasswordInput
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete="current-password"
-            aria-label={t("currentPassword")}
-          />
-          <span className="font-sans text-[11px] text-foreground-subtle">
-            {t("confirmWithPassword")}
-          </span>
-        </label>
-      ) : null}
+      <label className="mt-3 flex max-w-xs flex-col gap-1.5">
+        <span className="font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
+          {t("currentPassword")}
+        </span>
+        <PasswordInput
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          autoComplete="current-password"
+          aria-label={t("currentPassword")}
+        />
+        <span className="font-sans text-[11px] text-foreground-subtle">
+          {t("confirmWithPassword")}
+        </span>
+      </label>
       {error ? (
         <p className="mt-2 font-sans text-sm text-streak-loss" role="alert">
           {error}

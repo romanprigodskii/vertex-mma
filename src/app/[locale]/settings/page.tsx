@@ -98,10 +98,7 @@ export default async function SettingsPage({
             <h2 className="mb-4 font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
               {t("sectionEmail")}
             </h2>
-            <ChangeEmailForm
-              currentEmail={user.email ?? ""}
-              hasPassword={user.hasPassword}
-            />
+            <ChangeEmailForm currentEmail={user.email ?? ""} />
           </section>
 
           <section>
@@ -115,7 +112,7 @@ export default async function SettingsPage({
             <h2 className="mb-4 font-sans text-[11px] font-medium uppercase tracking-widest text-streak-loss">
               {t("dangerZone")}
             </h2>
-            <DeleteAccountSection hasPassword={user.hasPassword} />
+            <DeleteAccountSection />
           </section>
         </Container>
       </main>

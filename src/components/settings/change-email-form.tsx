@@ -11,10 +11,9 @@ const INPUT_CLASS =
 
 interface Props {
   currentEmail: string;
-  hasPassword: boolean;
 }
 
-export function ChangeEmailForm({ currentEmail, hasPassword }: Props) {
+export function ChangeEmailForm({ currentEmail }: Props) {
   const t = useTranslations("settings");
   const [pending, setPending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -52,21 +51,19 @@ export function ChangeEmailForm({ currentEmail, hasPassword }: Props) {
           className="rounded-sm border border-foreground/10 bg-background-elevated/20 px-3 py-2 font-sans text-sm text-foreground-muted"
         />
       </label>
-      {hasPassword ? (
-        <label className="flex flex-col gap-1.5">
-          <span className="font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
-            {t("currentPassword")}
-          </span>
-          <PasswordInput
-            name="currentPassword"
-            required
-            autoComplete="current-password"
-          />
-          <span className="font-sans text-[11px] text-foreground-subtle">
-            {t("confirmWithPassword")}
-          </span>
-        </label>
-      ) : null}
+      <label className="flex flex-col gap-1.5">
+        <span className="font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
+          {t("currentPassword")}
+        </span>
+        <PasswordInput
+          name="currentPassword"
+          required
+          autoComplete="current-password"
+        />
+        <span className="font-sans text-[11px] text-foreground-subtle">
+          {t("confirmWithPassword")}
+        </span>
+      </label>
       <label className="flex flex-col gap-1.5">
         <span className="font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
           {t("newEmail")}
