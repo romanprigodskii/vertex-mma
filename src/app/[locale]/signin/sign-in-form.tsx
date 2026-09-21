@@ -58,7 +58,9 @@ export function SignInForm() {
         {t("signInWelcome")}
       </p>
 
-      <form onSubmit={onSubmit} className="mt-8 flex flex-col gap-4">
+      {/* POST so that a submit landing before hydration keeps the fields out
+          of the URL (history, logs, analytics) — the default GET puts them there. */}
+      <form method="post" onSubmit={onSubmit} className="mt-8 flex flex-col gap-4">
         <label className="flex flex-col gap-1.5">
           <span className="font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
             {t("email")}

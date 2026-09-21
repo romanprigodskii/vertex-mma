@@ -37,8 +37,10 @@ export function ChangeEmailForm({ currentEmail }: Props) {
     }
   }
 
+  // POST so that a submit landing before hydration keeps the fields out of
+  // the URL (history, logs, analytics) — the default GET puts them there.
   return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-4">
+    <form method="post" onSubmit={onSubmit} className="flex flex-col gap-4">
       <label className="flex flex-col gap-1.5">
         <span className="font-sans text-[11px] font-medium uppercase tracking-widest text-foreground-muted">
           {t("currentEmail")}
