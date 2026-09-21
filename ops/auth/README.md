@@ -45,8 +45,8 @@ and only the URL and the two keys changed.
 | --- | --- |
 | `GOTRUE_JWT_SECRET` | Signs access tokens. The anon and service-role keys are JWTs signed with it, so rotating it invalidates both. |
 | `AUTH_DB_PASSWORD` | Password for the `supabase_auth_admin` Postgres role. |
-| `GOTRUE_MAILER_AUTOCONFIRM` | `true` while there is no mail transport; `false` once there is. |
-| `GOTRUE_SMTP_*` | Empty until a provider is wired up. |
+| `GOTRUE_MAILER_AUTOCONFIRM` | `false` — confirmation required. `true` only if there is no mail transport. |
+| `GOTRUE_SMTP_*` | Resend; the password is the sending-only key described under Email. |
 
 The app's `NEXT_PUBLIC_SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` are
 JWTs minted from `GOTRUE_JWT_SECRET` with `{"role": "anon"}` and
@@ -54,10 +54,15 @@ JWTs minted from `GOTRUE_JWT_SECRET` with `{"role": "anon"}` and
 
 ## Email
 
-Everything but the transport is in place and was tested end to end on
-2026-09-21 against a local mail catcher (below): sign-up confirmation, password
-reset and the two-link email change all complete from the link in the email.
+Live since 2026-09-21, through Resend SMTP. Sign-up confirmation, password reset
+and the two-link email change were each run end to end on production — through
+Resend to its `delivered@resend.dev` test inbox, reading each message back
+through the Resend API and following its link.
 
+* **Transport** is Resend (`smtp.resend.com:587`, user `resend`). The password
+  is a *sending-only* API key named `vertexmma-gotrue-smtp`, scoped to
+  `vertexmma.com`, so the box never holds a key that can manage the account.
+  Replace it by creating another such key and swapping `GOTRUE_SMTP_PASS`.
 * **Links** go to GoTrue's own `/verify`, which checks the token and redirects to
   the app's `/auth/callback` with a code. The paths in the compose file carry
   the `/supabase` prefix explicitly — GoTrue resolves them against
@@ -69,34 +74,28 @@ reset and the two-link email change all complete from the link in the email.
   grey unbranded email means that service is down. Subjects are in the compose
   file. Links expire after an hour (`GOTRUE_MAILER_OTP_EXP`), and the templates
   say so — change both together.
+* **Confirmation is required** (`GOTRUE_MAILER_AUTOCONFIRM=false`): a new
+  account cannot sign in until its link is clicked.
 
-**What is missing is SMTP credentials**, so for now:
+If mail ever has to be switched off again, blank the `GOTRUE_SMTP_*` values and
+set `GOTRUE_MAILER_AUTOCONFIRM=true` — with no transport, a confirmation link
+could never arrive and sign-up would dead-end. Password reset then silently
+sends nothing, because GoTrue falls back to a no-op mailer.
 
-* `GOTRUE_MAILER_AUTOCONFIRM=true` — a new account is signed in immediately,
-  because a confirmation link could never arrive.
-* **Password reset does not work.** `/auth/forgot-password` accepts the address
-  and reports success (it deliberately never discloses whether an account
-  exists), but GoTrue's no-op mailer sends nothing.
+### Testing mail flows
 
-To switch mail on, with a Resend API key (`docs/email-setup.md`; the domain is
-already verified there and its DNS records are live):
+**Against production mail:** sign up through the site with
+`delivered+<anything>@resend.dev`. Resend accepts it and reports it delivered
+without an inbox behind it; the message, links included, can be read back with
+`GET https://api.resend.com/emails` and `/emails/<id>` using a key with full
+access. Delete the test user from `auth.users` afterwards — the
+`on_auth_user_deleted` trigger removes its profile. Every message counts
+against the Resend quota.
 
-    # /opt/vertex-auth/.env
-    GOTRUE_SMTP_HOST=smtp.resend.com
-    GOTRUE_SMTP_PORT=587
-    GOTRUE_SMTP_USER=resend
-    GOTRUE_SMTP_PASS=re_...
-    GOTRUE_MAILER_AUTOCONFIRM=false
-
-    cd /opt/vertex-auth && docker compose up -d
-
-Then sign up with a real address and run a password reset.
-
-### Testing mail without a provider
-
-An override pointing GoTrue at [Mailpit](https://mailpit.axllent.org) catches
-every message on the box. Messages are read through GoTrue's container, since
-the catcher sits on the internal network with nothing published:
+**Without sending anything:** an override points GoTrue at
+[Mailpit](https://mailpit.axllent.org), which catches every message on the box.
+Read them through GoTrue's container, since the catcher sits on the internal
+network with nothing published:
 
     # /opt/vertex-auth/docker-compose.mailtest.yml — delete when done
     services:
@@ -114,12 +113,10 @@ the catcher sits on the internal network with nothing published:
     docker compose -f docker-compose.yml -f docker-compose.mailtest.yml up -d
     docker exec auth-vertexmma wget -qO- http://auth-mailpit:8025/api/v1/messages
 
-With autoconfirm on, a reset still sends mail, so that flow can be tested
-without touching sign-up. Add `GOTRUE_MAILER_AUTOCONFIRM: "false"` to test
-confirmation and the two-link email change — autoconfirm also makes an email
-change complete on the first link — but keep that window short: a real sign-up
-during it waits on a mail that goes to the catcher. Afterwards, `docker compose
-up -d --remove-orphans` with the plain file and `docker rm -f auth-mailpit`.
+While the override is up, real users' mail goes to the catcher too, so keep the
+window short. Afterwards, `docker compose up -d --remove-orphans` with the plain
+file and `docker rm -f auth-mailpit`. Note that with autoconfirm on, an email
+change completes on the first of its two links, so test that flow with it off.
 
 ## No Google sign-in
 

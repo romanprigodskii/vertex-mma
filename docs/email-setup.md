@@ -6,17 +6,19 @@ change) sent from `noreply@vertexmma.com` with the dark Vertex MMA templates.
 Auth is self-hosted GoTrue (`ops/auth`), so everything that used to be a
 Supabase dashboard setting is now an environment variable in
 `/opt/vertex-auth/.env` on the VPS. The templates, subjects and link paths are
-already configured in `ops/auth/docker-compose.yml`; what is needed is an SMTP
-transport. Resend is the one the domain is set up for.
+configured in `ops/auth/docker-compose.yml`; the transport is Resend SMTP.
 
 ## State as of 2026-09-21
 
-- The Resend DNS records for `vertexmma.com` are live in Cloudflare: DKIM at
+Live. GoTrue sends through Resend with a sending-only key
+(`vertexmma-gotrue-smtp`), and every flow was tested end to end on production.
+The steps below are what it took, for when the key has to be replaced or the
+setup rebuilt.
+
+- The Resend DNS records for `vertexmma.com` are in Cloudflare: DKIM at
   `resend._domainkey`, SPF and MX (`feedback-smtp.eu-west-1.amazonses.com`) at
   `send`. They survived the Supabase deletion; nothing about them depended on it.
-- There is no `_dmarc` record.
-- The old API key was pasted into the Supabase dashboard and went with it. A new
-  one is the only missing piece.
+- There is no `_dmarc` record yet (Step 4).
 
 ## Step 1 — API key
 
@@ -25,9 +27,10 @@ transport. Resend is the one the domain is set up for.
    domain is gone, add the domain again: Resend issues new records to put in
    Cloudflare (all **DNS only**, grey cloud — proxied breaks the lookups), then
    **Verify**.
-3. **API Keys** → **Create API Key**. Name `vertexmma-production-smtp`,
+3. **API Keys** → **Create API Key**. Name `vertexmma-gotrue-smtp`,
    permission **Sending access**, domain `vertexmma.com`. Copy the `re_…`
-   secret straight away; Resend never shows it again.
+   secret straight away; Resend never shows it again. Never put a full-access
+   key on the server.
 
 ## Step 2 — Give it to GoTrue
 
