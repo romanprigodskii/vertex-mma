@@ -5,11 +5,15 @@ import { useTranslations } from "next-intl";
 
 import { resetPasswordAction } from "@/app/auth/reset-password/actions";
 import { PasswordInput } from "@/components/auth/PasswordInput";
+import { useMounted } from "@/hooks/use-mounted";
 import { Link } from "@/i18n/navigation";
 
 export function ResetPasswordForm({ invalid = false }: { invalid?: boolean }) {
   const t = useTranslations("auth");
   const [pending, setPending] = React.useState(false);
+  // Until hydration, submitting would be the browser's native POST, which
+  // reloads the page and drops what was typed. Hold the button until then.
+  const mounted = useMounted();
   const [error, setError] = React.useState<string | null>(null);
   const [success, setSuccess] = React.useState(false);
 
@@ -115,7 +119,7 @@ export function ResetPasswordForm({ invalid = false }: { invalid?: boolean }) {
 
         <button
           type="submit"
-          disabled={pending}
+          disabled={pending || !mounted}
           className="mt-2 rounded-sm bg-primary px-4 py-2.5 font-display text-sm uppercase tracking-widest text-background-base hover:opacity-90 disabled:opacity-50"
         >
           {pending ? t("updating") : t("updatePassword")}

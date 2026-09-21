@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 
 import { changeEmailAction } from "@/app/[locale]/settings/actions";
 import { PasswordInput } from "@/components/auth/PasswordInput";
+import { useMounted } from "@/hooks/use-mounted";
 
 const INPUT_CLASS =
   "rounded-sm border border-foreground/15 bg-background-elevated/30 px-3 py-2 font-sans text-sm text-foreground focus:border-primary focus:outline-none";
@@ -16,6 +17,9 @@ interface Props {
 export function ChangeEmailForm({ currentEmail }: Props) {
   const t = useTranslations("settings");
   const [pending, setPending] = React.useState(false);
+  // Until hydration, submitting would be the browser's native POST, which
+  // reloads the page and drops what was typed. Hold the button until then.
+  const mounted = useMounted();
   const [error, setError] = React.useState<string | null>(null);
   const [sent, setSent] = React.useState(false);
 
@@ -93,7 +97,7 @@ export function ChangeEmailForm({ currentEmail }: Props) {
       ) : null}
       <button
         type="submit"
-        disabled={pending}
+        disabled={pending || !mounted}
         className="self-start rounded-sm bg-primary px-4 py-2 font-display text-sm uppercase tracking-widest text-background-base hover:opacity-90 disabled:opacity-50"
       >
         {pending ? t("sending") : t("changeEmail")}

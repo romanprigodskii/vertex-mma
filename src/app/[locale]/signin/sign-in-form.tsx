@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 
 import { signInAction } from "@/app/[locale]/signin/actions";
 import { PasswordInput } from "@/components/auth/PasswordInput";
+import { useMounted } from "@/hooks/use-mounted";
 import { Link } from "@/i18n/navigation";
 import { safeNext } from "@/lib/safe-redirect";
 
@@ -32,6 +33,9 @@ export function SignInForm() {
           : null;
 
   const [pending, setPending] = React.useState(false);
+  // Until hydration, submitting would be the browser's native POST, which
+  // reloads the page and drops what was typed. Hold the button until then.
+  const mounted = useMounted();
   const [error, setError] = React.useState<string | null>(initialError);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -101,7 +105,7 @@ export function SignInForm() {
 
         <button
           type="submit"
-          disabled={pending}
+          disabled={pending || !mounted}
           className="mt-2 rounded-sm bg-primary px-4 py-2.5 font-display text-sm uppercase tracking-widest text-background-base hover:opacity-90 disabled:opacity-50"
         >
           {pending ? t("signingIn") : t("signIn")}
