@@ -34,6 +34,7 @@ scoreboard against the closing line — including the parts where the bookmaker 
 
 - [What you can do on it](#what-you-can-do-on-it)
 - [The prediction model](#the-prediction-model)
+- [Papers](#papers)
 - [The Vertex Score](#the-vertex-score)
 - [Data pipeline](#data-pipeline)
 - [Architecture](#architecture)
@@ -138,6 +139,25 @@ arbitraged against each other. House margin is 4% on the winner and 8% on props;
 consensus exists the model probability is clamped to ±15pp of it, and bouts with a debutant are only
 bettable when a real line exists (the debut specialist loses to the books on that segment, and the
 code says so).
+
+---
+
+## Papers
+
+Two papers came out of evaluating this model. Both are sole-authored and under review at NeurIPS 2026
+workshops.
+
+- **Testing by betting when the bets are real: an e-value audit of 84 pre-registered
+  market-efficiency hypotheses.** Re-tests the 84 segments where the model looked like it beat the
+  market as bets at the bookmaker's own prices, over 1,787 priced bouts. E-Values: From Statistics
+  to ML, with an extended version at NewInML.
+  [PDF](https://prigodskii.dev/papers/evalues.pdf) · [extended version](https://prigodskii.dev/papers/newinml.pdf)
+- **Measure the instrument first: detection floors for model selection and for LLM judges.**
+  Measures the smallest improvement this project's model-selection pipeline can detect: retraining
+  under another random seed reproduces 80% of the only improvement the winner leg ever shipped.
+  TAE: Can We Trust AI Evaluation? [PDF](https://prigodskii.dev/papers/tae.pdf)
+
+Both, with their charts: [prigodskii.dev/research](https://prigodskii.dev/research/).
 
 ---
 
