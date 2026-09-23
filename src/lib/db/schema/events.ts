@@ -3,6 +3,7 @@ import {
   bigserial,
   boolean,
   char,
+  check,
   index,
   integer,
   jsonb,
@@ -347,6 +348,70 @@ export const boutExternalOdds = pgTable(
   ],
 );
 
+// Append-only sportsbook quotes: one row per price a book posted, stamped
+// with when the BOOK posted it (drizzle/migrations/0100_bout_odds_quote.sql).
+// bout_external_odds keeps one price per (bout, source) and overwrites it;
+// this keeps every price, so the opening line, the close and the movement
+// between are all queryable. Only pre-bell prices are written, so the latest
+// row per (bout, book, market) is the close.
+//
+// Written by scripts/odds_scraper/scripts/load_betsapi.py.
+export const boutOddsQuote = pgTable(
+  "bout_odds_quote",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    boutId: uuid("bout_id")
+      .notNull()
+      .references(() => bout.id, { onDelete: "cascade" }),
+    /** The feed: 'betsapi'. */
+    source: text("source").notNull(),
+    /** The book as the feed spells it: 'Bet365', 'DraftKings', … */
+    book: text("book").notNull(),
+    /** 'winner' | 'total_rounds' */
+    market: text("market").notNull(),
+    /** total_rounds only: the over/under line; null for winner. */
+    line: real("line"),
+    /** winner: decimal price on bout.fighterAId / fighterBId, already in the
+     *  bout's orientation. */
+    priceA: real("price_a"),
+    priceB: real("price_b"),
+    /** total_rounds: decimal price on over / under the line. */
+    priceOver: real("price_over"),
+    priceUnder: real("price_under"),
+    /** When the book posted the price, not when we fetched it. */
+    quotedAt: timestamp("quoted_at", { withTimezone: true }).notNull(),
+    /** 'move' (Bet365's line history) | 'start' | 'kickoff' | 'end'. */
+    snapshot: text("snapshot").notNull(),
+    /** The feed's own id for the bout. */
+    externalId: text("external_id").notNull(),
+    recordedAt: timestamp("recorded_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("bout_odds_quote_bout_idx").on(
+      table.boutId,
+      table.market,
+      table.book,
+      table.quotedAt,
+    ),
+    unique("bout_odds_quote_unique")
+      .on(
+        table.boutId,
+        table.source,
+        table.book,
+        table.market,
+        table.line,
+        table.quotedAt,
+      )
+      .nullsNotDistinct(),
+    check(
+      "bout_odds_quote_prices_check",
+      sql`(market = 'winner' AND line IS NULL AND price_a > 1 AND price_b > 1 AND price_over IS NULL AND price_under IS NULL) OR (market = 'total_rounds' AND line IS NOT NULL AND price_over > 1 AND price_under > 1 AND price_a IS NULL AND price_b IS NULL)`,
+    ),
+  ],
+);
+
 // UFC publishes ~daily on YouTube — every event ships both per-fight
 // FULL FIGHT clips (highlights, 4-8 min) and a handful of full free-fight
 // uploads (15-25 min). We mirror that mapping here so a bout can have
@@ -385,5 +450,7 @@ export type BoutScorecard = typeof boutScorecard.$inferSelect;
 export type NewBoutScorecard = typeof boutScorecard.$inferInsert;
 export type BoutExternalOdds = typeof boutExternalOdds.$inferSelect;
 export type NewBoutExternalOdds = typeof boutExternalOdds.$inferInsert;
+export type BoutOddsQuote = typeof boutOddsQuote.$inferSelect;
+export type NewBoutOddsQuote = typeof boutOddsQuote.$inferInsert;
 export type BoutVideo = typeof boutVideo.$inferSelect;
 export type NewBoutVideo = typeof boutVideo.$inferInsert;
