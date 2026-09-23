@@ -28,10 +28,13 @@ from rapidfuzz import fuzz
 from .matcher import normalize_name
 
 SNAPSHOTS = ("start", "kickoff", "end")
-# time_status: 2 "to be fixed" (happened, result never entered) and 3 ended.
-# 4 postponed, 5 cancelled, 99 removed are prices on bouts that did not happen
-# that day and must not join one that did.
-HAPPENED = {"2", "3"}
+# time_status 3, ended, only. The 2026-09-23 load found status 2 ("to be
+# fixed") on 8 matched UFC bouts, and 6 were placeholder copies of a status-3
+# bout, listed at a round 00:00 or 03:00 instead of the real start — so their
+# `time` is not the bell, and a placeholder listed after the real bell would
+# let in-play prices through. Dropping status 2 costs two bouts. 4 postponed,
+# 5 cancelled, 99 removed are prices on bouts that did not happen that day.
+HAPPENED = {"3"}
 
 
 @dataclass(frozen=True)
@@ -147,21 +150,47 @@ DATE_WINDOW = (-1, 1)
 
 
 # The feed's name → ours, where the two are not spellings of each other and no
-# similarity threshold should be loose enough to bridge them. Each entry is a
-# fighter UFCStats lists under a ring name. Explicit and reviewed, never
-# inferred: widening PAIR_MIN/SIDE_MIN to catch these would also catch the
-# replacement opponents the floor exists to refuse.
+# similarity threshold should be loose enough to bridge them: fighters UFCStats
+# lists under a ring name or a shortened one. Explicit and reviewed, never
+# inferred — widening PAIR_MIN/SIDE_MIN to catch these would also catch the
+# replacement opponents the floor exists to refuse. Each was found by the
+# 2026-09-23 load as a feed bout whose other corner matched ours at >= 95 on
+# the same card, and checked to be the same person.
+#
+# An alias is an ADDITIONAL name, never a replacement: "Chris Duncan" is both
+# the Scottish lightweight (ours: Chris Duncan) and, on this feed, the English
+# middleweight (ours: Christian Leroy Duncan). Both stay reachable, and the
+# opponent decides which, as it does for every other bout.
 ALIASES = {
     "patricio freire": "patricio pitbull",
+    "lupita godinez": "loopy godinez",
+    "jose mariscal": "chepe mariscal",
+    "bobby green": "king green",
+    "ian garry": "ian machado garry",
+    "mike mathetha": "blood diamond",
+    "chris duncan": "christian leroy duncan",
+    "giovanna canuto": "gigi canuto",
+    "zarah fairn dos santos": "zarah fairn",
+    "mizuki inoue": "mizuki",
+    "hayisaer maheshate": "maheshate",
+    "maheshate maheshate": "maheshate",
+    "igor da silva": "igor severino",
 }
 
 
-def _name_score(x: str, y: str) -> float:
+def _similarity(x: str, y: str) -> float:
+    return max(fuzz.ratio(x, y), fuzz.token_sort_ratio(x, y))
+
+
+def _name_score(feed: str, ours: str) -> float:
     """Order-insensitive: the feed writes some Korean and Chinese names
-    surname-first ("Yoo Joo Sang") where UFCStats does not."""
-    nx, ny = normalize_name(x), normalize_name(y)
-    nx, ny = ALIASES.get(nx, nx), ALIASES.get(ny, ny)
-    return max(fuzz.ratio(nx, ny), fuzz.token_sort_ratio(nx, ny))
+    surname-first ("Yoo Joo Sang") where UFCStats does not. A feed name with
+    an alias scores as the better of its own spelling and the alias."""
+    nf, no = normalize_name(feed), normalize_name(ours)
+    best = _similarity(nf, no)
+    if nf in ALIASES:
+        best = max(best, _similarity(ALIASES[nf], no))
+    return best
 
 
 def pair_score(home: str, away: str, a: str, b: str) -> tuple[float, float, bool]:

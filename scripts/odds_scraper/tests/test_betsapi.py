@@ -149,6 +149,17 @@ def test_ring_name_matches_only_through_the_alias():
     assert m is not None and not m.swapped
 
 
+def test_an_alias_adds_a_name_and_takes_none_away():
+    """Two UFC fighters answer to "Chris Duncan" on this feed: the opponent
+    picks which, and the plain spelling still reaches the lightweight."""
+    ours = _ours(("Chris Duncan", "Mateusz Rebecki"),
+                 ("Christian Leroy Duncan", "Andrey Pulyaev"))
+    lw = match_bout("Chris Duncan", "Mateusz Rebecki", WHEN, ours)
+    mw = match_bout("Chris Duncan", "Andrey Pulyaev", WHEN, ours)
+    assert lw is not None and lw.bout_id == "b0"
+    assert mw is not None and mw.bout_id == "b1"
+
+
 def test_replacement_opponent_is_refused():
     """The feed kept the original booking; our card has the replacement."""
     ours = _ours(("Joshua Van", "Tatsuro Taira"))

@@ -50,6 +50,10 @@ JOIN event e ON e.id = b.event_id
 JOIN fighter fa ON fa.id = b.fighter_a_id
 JOIN fighter fb ON fb.id = b.fighter_b_id
 WHERE e.date >= '2016-08-01'
+  -- a price is evidence the bout was fought; a cancelled row of ours is at
+  -- best a duplicate of the real one (Davis v Aliev, 2026-07-25, is both) and
+  -- at worst the booking that never happened
+  AND b.status <> 'cancelled'
 """
 
 INSERT_SQL = """
@@ -83,10 +87,12 @@ def main() -> None:
     rows: list[tuple] = []
     unmatched: list[str] = []
     matched_to: dict[str, str] = {}
+    examined: set[str] = set()
     for eid, e in sorted(feed_bouts().items(), key=lambda kv: int(kv[1]["time"])):
         stats["feed UFC bouts"] += 1
+        examined.add(eid)
         if str(e.get("time_status")) not in HAPPENED:
-            stats["skipped: did not happen (postponed/cancelled)"] += 1
+            stats["skipped: not ended (status != 3)"] += 1
             continue
         s, h = load(SUMMARY / f"{eid}.json.gz"), load(HISTORY / f"{eid}.json.gz")
         if s is None:
@@ -96,8 +102,11 @@ def main() -> None:
         raw = history_quotes(h) + summary_quotes(s)
         qs = pre_bell(raw, bell)
         stats["quotes dropped as post-bell"] += len(raw) - len(qs)
+        if not raw:
+            stats["skipped: no price at all"] += 1
+            continue
         if not qs:
-            stats["skipped: no pre-bell price"] += 1
+            stats["skipped: only in-play prices"] += 1
             continue
         home, away = e["home"]["name"], e["away"]["name"]
         when = datetime.fromtimestamp(bell, timezone.utc)
@@ -139,10 +148,19 @@ def main() -> None:
         cur.execute("SELECT count(*) FROM bout_odds_quote WHERE source = %s", (SOURCE,))
         before = cur.fetchone()[0]
         cur.executemany(INSERT_SQL, rows)
+        # Rows an earlier run wrote from a feed bout this run looked at and
+        # did not choose — the rules got stricter (the status-2 placeholders of
+        # 2026-09-23). Only bouts this run EXAMINED are touched, so a run over a
+        # partial or missing cache can never empty the table.
+        rejected = sorted(examined - set(matched_to.values()))
+        cur.execute("DELETE FROM bout_odds_quote WHERE source = %s "
+                    "AND external_id = ANY(%s)", (SOURCE, rejected))
+        removed = cur.rowcount
         cur.execute("SELECT count(*) FROM bout_odds_quote WHERE source = %s", (SOURCE,))
         after = cur.fetchone()[0]
     conn.commit()
-    print(f"bout_odds_quote ({SOURCE}): {before:,} -> {after:,} rows")
+    print(f"bout_odds_quote ({SOURCE}): {before:,} -> {after:,} rows "
+          f"({removed:,} removed from feed bouts no longer chosen)")
 
 
 if __name__ == "__main__":
