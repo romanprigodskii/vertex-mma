@@ -52,6 +52,10 @@ back to 2021 on none. So `--prematch` sweeps the last PREMATCH_DAYS of cached
 bouts, ten to a call (both /v1/event/view, for the bet365 id, and the
 prematch call take a comma-separated batch), and a bout whose grid comes back
 empty is not cached, so a later sweep can still pick it up.
+
+Measured by the first full sweep (2026-09-23): 587 bouts in 70 days, 273
+boards, the oldest from 2026-08-15 — about five and a half weeks kept. A
+sweep at least every five weeks misses nothing.
 """
 
 from __future__ import annotations
