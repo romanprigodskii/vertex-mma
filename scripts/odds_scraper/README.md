@@ -87,6 +87,44 @@ a page without props never wipes previously captured lines. The
 captures the same method book for upcoming cards during fight week, so
 closing method lines accumulate going forward without backfills.
 
+## BetsAPI — every book, every move, with timestamps
+
+A second price feed, into its own append-only table `bout_odds_quote`
+(`drizzle/migrations/0100_bout_odds_quote.sql`), not into
+`bout_external_odds`. Per UFC bout: up to seven books (Bet365, DraftKings,
+10Bet, BWin, CloudBet, VirginBet, FonBet, Duelbits…) with an opening and a
+last pre-bell price each, and Bet365's full line movement — winner and
+total rounds, every quote stamped with when the book posted it. That is the
+opening line and CLV, which bestfightodds' stored close cannot give.
+
+```bash
+# BETSAPI_TOKEN=… in the project's .env.local
+venv/bin/python scripts/backfill_betsapi.py --league ufc   # download UFC (resumable)
+venv/bin/python scripts/backfill_betsapi.py                # then every other promotion
+venv/bin/python scripts/load_betsapi.py --dry-run          # match counts, no writes
+venv/bin/python scripts/load_betsapi.py                    # write (append-only, re-runnable)
+venv/bin/python tests/test_betsapi.py                      # corner + bell tests
+```
+
+The download writes raw JSON to `data/betsapi/` (gitignored) and nothing
+else; the loader reads only that cache, so reparsing costs no calls. Only
+pre-bell quotes are written — a book's last price is often in-play — so the
+latest row per `(bout_id, book, market)` is that book's close:
+
+```sql
+SELECT DISTINCT ON (bout_id, book) bout_id, book, price_a, price_b, quoted_at
+FROM bout_odds_quote
+WHERE market = 'winner'
+ORDER BY bout_id, book, quoted_at DESC;      -- ASC for the opening line
+```
+
+Checked on the first 47 shared bouts (2026-08/09): Bet365's close against
+the stored bestfightodds close, de-vigged, correlates 0.997 with a mean gap of
+1.4 probability points — the corners are right and no in-play price leaks in.
+
+Contender Series and Road to UFC bouts are downloaded but not loaded:
+UFCStats does not carry those cards, so no bout of ours can match them.
+
 ## After a backfill
 
 Retrain the simulation model so the richer odds coverage flows into
@@ -113,9 +151,13 @@ scripts/odds_scraper/
 │   ├── discovery.py          # fighter search + event harvesting
 │   ├── http.py               # rate-limited httpx client
 │   ├── matcher.py            # name+date fuzzy match → upsert
+│   ├── betsapi.py            # BetsAPI payload → pre-bell quotes; bout matching
 │   └── parser.py             # BS4 event-page parser
 ├── scripts/
 │   ├── run_backfill.py        # CLI orchestrator (winner moneylines)
-│   └── run_method_backfill.py # method prop lines for a date window
+│   ├── run_method_backfill.py # method prop lines for a date window
+│   ├── backfill_betsapi.py    # BetsAPI download → data/betsapi/
+│   └── load_betsapi.py        # data/betsapi/ → bout_odds_quote
+├── data/                     # (gitignored) BetsAPI raw cache
 └── venv/                     # (gitignored)
 ```
