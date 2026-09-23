@@ -41,6 +41,17 @@ empty bout: an empty file would read as "no prices" forever.
   venv/bin/python scripts/backfill_betsapi.py --league ufc     # pass 1
   venv/bin/python scripts/backfill_betsapi.py                  # pass 2
   venv/bin/python scripts/backfill_betsapi.py --rate 3600      # a monthly plan
+  venv/bin/python scripts/backfill_betsapi.py --prematch       # the full grid, while kept
+
+THE FULL MARKET GRID. `/v3/bet365/prematch` on a bout that has ENDED still
+returns Bet365's last pre-fight board: method of victory per fighter, method
+and round, round betting, goes the distance, total rounds, strike props. But
+BetsAPI keeps it for weeks, not years — measured 2026-09-23, UFC 330
+(2026-08-16) has it on 6 of 6 bouts, 2026-07-18 and every earlier date tried
+back to 2021 on none. So `--prematch` sweeps the last PREMATCH_DAYS of cached
+bouts, ten to a call (both /v1/event/view, for the bet365 id, and the
+prematch call take a comma-separated batch), and a bout whose grid comes back
+empty is not cached, so a later sweep can still pick it up.
 """
 
 from __future__ import annotations
@@ -68,7 +79,8 @@ SPORT = 162                                         # MMA
 CACHE = HERE / "data" / "betsapi"
 EVENTS = CACHE / "events"      # one file per day: the bouts that ended on it
 SUMMARY = CACHE / "summary"    # one file per bout: every book's start/kickoff/end
-HISTORY = CACHE / "history"    # one file per UFC bout: Bet365's every price
+HISTORY = CACHE / "history"    # one file per priced bout: Bet365's every price
+PREMATCH = CACHE / "prematch"  # one file per bout: Bet365's full market grid
 
 START = date(2016, 9, 1)       # the archive floor BetsAPI documents
 END = date.today() - timedelta(days=1)
@@ -85,6 +97,8 @@ LEAGUE = _arg("--league")      # "ufc" for pass 1
 WORKERS = 4
 
 UFC = re.compile(r"\bufc\b|ultimate fighter", re.I)
+PREMATCH_DAYS = 70             # comfortably past the ~5-9 weeks BetsAPI keeps
+BATCH = 10                     # ids per /v1/event/view and /v3/bet365/prematch call
 
 
 def is_ufc(e: dict) -> bool:
@@ -184,6 +198,36 @@ def fetch_history(eid: str) -> None:
         _save(f, get("/v2/event/odds", event_id=eid).get("results") or {})
 
 
+def fetch_prematch(eids: list[str]) -> None:
+    """Up to BATCH bouts: their bet365 ids, then Bet365's grid for each."""
+    view = get("/v1/event/view", event_id=",".join(eids)).get("results") or []
+    fi = {str(v["bet365_id"]): str(v["id"]) for v in view if v.get("bet365_id")}
+    if not fi:
+        return
+    for g in get("/v3/bet365/prematch", FI=",".join(fi)).get("results") or []:
+        eid = fi.get(str(g.get("FI")))
+        # an empty grid is the retention window closing, not "no markets":
+        # left uncached, so it is never mistaken for a bout without a board
+        if eid and ((g.get("main") or {}).get("sp")):
+            _save(PREMATCH / f"{eid}.json.gz", g)
+
+
+def sweep_prematch() -> None:
+    since = int(time.time()) - PREMATCH_DAYS * 86400
+    todo = []
+    for f in sorted(EVENTS.glob("*.json.gz"), reverse=True):
+        for e in load(f) or []:
+            if (e.get("id") and int(e.get("time") or 0) >= since
+                    and str(e.get("time_status")) in {"2", "3"}
+                    and not (PREMATCH / f"{e['id']}.json.gz").exists()):
+                todo.append(str(e["id"]))
+    todo = list(dict.fromkeys(todo))
+    print(f"prematch: {len(todo):,} bouts in the last {PREMATCH_DAYS} days", flush=True)
+    _run(fetch_prematch, [todo[i:i + BATCH] for i in range(0, len(todo), BATCH)],
+         "prematch")
+    print(f"prematch: {len(list(PREMATCH.glob('*.json.gz'))):,} grids cached", flush=True)
+
+
 def priced(res) -> bool:
     """Does any book on this bout carry a winner price at any snapshot?"""
     if not isinstance(res, dict):
@@ -217,17 +261,20 @@ def _run(fn, items, label: str) -> None:
 
 
 def main() -> None:
-    for p in (EVENTS, SUMMARY, HISTORY):
+    for p in (EVENTS, SUMMARY, HISTORY, PREMATCH):
         p.mkdir(parents=True, exist_ok=True)
         for f in p.glob("*.tmp"):
             f.unlink()
     for f in [*EVENTS.glob("*.json.gz"), *SUMMARY.glob("*.json.gz"),
-              *HISTORY.glob("*.json.gz")]:
+              *HISTORY.glob("*.json.gz"), *PREMATCH.glob("*.json.gz")]:
         if load(f) is None:
             print(f"  unreadable cache file dropped: {f.name}")
             f.unlink()
     if not TOKEN:
         raise SystemExit("set BETSAPI_TOKEN in .env.local")
+    if "--prematch" in sys.argv:
+        sweep_prematch()
+        return
 
     days = [END - timedelta(days=i) for i in range((END - START).days + 1)]
     listed = sum((EVENTS / f"{d:%Y%m%d}.json.gz").exists() for d in days)
@@ -246,17 +293,20 @@ def main() -> None:
         ufc = list(dict.fromkeys(str(e["id"]) for e in bouts if is_ufc(e)))
         _run(fetch_summary, [i for i in ids if not (SUMMARY / f"{i}.json.gz").exists()],
              "summary")
-        # Bet365's history is worth a call only where the summary shows a price
-        has = {i for i in ufc if priced(load(SUMMARY / f"{i}.json.gz"))}
-        _run(fetch_history, [i for i in ufc if i in has
+        # Bet365's history is worth a call only where the summary shows a
+        # price. Pass 1 takes it for UFC; pass 2 for every other promotion too,
+        # which is the pre-UFC career of the fighters the model rates at debut
+        hist = ufc if LEAGUE == "ufc" else ids
+        has = {i for i in hist if priced(load(SUMMARY / f"{i}.json.gz"))}
+        _run(fetch_history, [i for i in hist if i in has
                              and not (HISTORY / f"{i}.json.gz").exists()], "history")
         n_priced = sum(priced(load(SUMMARY / f"{i}.json.gz")) for i in ids
                        if (SUMMARY / f"{i}.json.gz").exists())
         print(f"{month[-1]} .. {month[0]}: {len(ids):,} bouts ({len(ufc):,} UFC), "
-              f"{n_priced:,} priced, {len(has):,} UFC histories", flush=True)
+              f"{n_priced:,} priced, {len(has):,} histories", flush=True)
         # the archive of EVENTS starts 2016-09, the archive of PRICES need not:
         # three months of listed UFC bouts with no price is that floor
-        u_priced = len(has)
+        u_priced = len(has & set(ufc))
         dry = dry + 1 if (len(ufc) >= 20 and u_priced == 0) else 0
         if dry >= 3 and "--all" not in sys.argv:
             print(f"no UFC prices for three months up to {month[0]} — the price "
