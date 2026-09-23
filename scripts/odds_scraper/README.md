@@ -118,9 +118,19 @@ WHERE market = 'winner'
 ORDER BY bout_id, book, quoted_at DESC;      -- ASC for the opening line
 ```
 
-Checked on the first 47 shared bouts (2026-08/09): Bet365's close against
-the stored bestfightodds close, de-vigged, correlates 0.997 with a mean gap of
-1.4 probability points — the corners are right and no in-play price leaks in.
+Prices start in 2023-01 (2022 and earlier: bouts listed, no prices). Checked
+on the full load (1,723 bouts, 1,119 shared with bestfightodds): Bet365's
+close against the stored bfo close, de-vigged, correlates 0.991 with a mean
+gap of 1.33 probability points, and scores the outcome no better than bfo's
+(log-loss 0.6003 vs 0.5999, paired +0.0004 nats, SE 0.0015) — the corners are
+right and no in-play price leaks in. Of the eight bouts more than 10 points
+apart, most are title fights where bfo is the outlier (Aspinall–Blaydes 0.59,
+Ankalaev–Pereira 0.68 where Bet365 and DraftKings agree on 0.42–0.46).
+
+Only feed status 3 (ended) is loaded: status 2 turned out to be placeholder
+copies listed at a round hour rather than the real start. A re-run deletes
+rows it wrote earlier from a feed bout it has now examined and rejected, and
+never touches a feed bout it did not examine.
 
 Contender Series and Road to UFC bouts are downloaded but not loaded:
 UFCStats does not carry those cards, so no bout of ours can match them.
