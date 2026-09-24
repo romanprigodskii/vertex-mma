@@ -145,9 +145,12 @@ def evaluate_probs(
     out: dict[str, float] = {
         "n": int(len(y)),
         "accuracy": float(accuracy_score(y, pred)),
-        "log_loss": float(log_loss(y, probs.clip(1e-4, 1 - 1e-4))),
+        "log_loss": float(log_loss(y, probs.clip(1e-4, 1 - 1e-4), labels=[0, 1])),
         "brier": float(brier_score_loss(y, probs)),
-        "roc_auc": float(roc_auc_score(y, probs)),
+        # undefined on a one-class window (a quarter's handful of debut bouts
+        # can be all wins); NaN rather than a crash that loses the whole run
+        "roc_auc": (float(roc_auc_score(y, probs)) if y.nunique() == 2
+                    else float("nan")),
     }
     if market_prob_a is not None:
         m = pd.Series(np.asarray(market_prob_a, dtype=float)).reset_index(drop=True)
@@ -158,7 +161,7 @@ def evaluate_probs(
             m_pred = (m_clipped >= 0.5).astype(int)
             # Market on the bouts that actually have odds.
             out["market_accuracy"] = float(accuracy_score(y_m, m_pred))
-            out["market_log_loss"] = float(log_loss(y_m, m_clipped))
+            out["market_log_loss"] = float(log_loss(y_m, m_clipped, labels=[0, 1]))
             out["market_brier"] = float(brier_score_loss(y_m, m_clipped))
             out["market_n"] = int(m_mask.sum())
             # MODEL on the SAME odds subset — the apples-to-apples comparison.
@@ -171,7 +174,7 @@ def evaluate_probs(
                 accuracy_score(y_m, (p_sub >= 0.5).astype(int))
             )
             out["model_log_loss_on_market"] = float(
-                log_loss(y_m, p_sub.clip(1e-4, 1 - 1e-4))
+                log_loss(y_m, p_sub.clip(1e-4, 1 - 1e-4), labels=[0, 1])
             )
             out["model_brier_on_market"] = float(brier_score_loss(y_m, p_sub))
     return out
