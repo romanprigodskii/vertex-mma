@@ -160,6 +160,18 @@ def test_an_alias_adds_a_name_and_takes_none_away():
     assert mw is not None and mw.bout_id == "b1"
 
 
+def test_two_henriques_reach_two_different_fighters():
+    """The feed calls both men by their given name + "Henrique"; UFCStats
+    calls one Souza and the other by his ring name. Each alias reaches its own
+    fighter, and neither card is confused for the other."""
+    ours = _ours(("Ding Meng", "Jose Souza"),
+                 ("Charles Johnson", "Eduardo Chapolin"))
+    ww = match_bout("Meng Ding", "Jose Henrique", WHEN, ours)
+    fw = match_bout("Charles Johnson", "Eduardo Henrique", WHEN, ours)
+    assert ww is not None and ww.bout_id == "b0" and not ww.swapped
+    assert fw is not None and fw.bout_id == "b1" and not fw.swapped
+
+
 def test_replacement_opponent_is_refused():
     """The feed kept the original booking; our card has the replacement."""
     ours = _ours(("Joshua Van", "Tatsuro Taira"))

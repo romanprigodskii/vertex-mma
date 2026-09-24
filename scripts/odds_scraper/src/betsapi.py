@@ -175,6 +175,15 @@ ALIASES = {
     "hayisaer maheshate": "maheshate",
     "maheshate maheshate": "maheshate",
     "igor da silva": "igor severino",
+    # Found by the pass-2 load (2026-09-24) the same way, identity checked on
+    # Tapology/ufc.com. The feed writes the full or Portuguese given name
+    # where UFCStats uses the short one or the ring name.
+    "zachary reese": "zach reese",
+    "jose medina": "jose daniel medina",
+    "beatriz mesquita": "bia mesquita",
+    "montserrat rendon": "montse rendon",
+    "jose henrique": "jose souza",            # José Henrique "Canela" Souza
+    "eduardo henrique": "eduardo chapolin",   # Eduardo "Chapolin" Henrique
 }
 
 
