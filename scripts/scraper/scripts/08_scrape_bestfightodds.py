@@ -27,6 +27,20 @@ across books (feeds model-vs-market backtests, matching
 scripts/odds_scraper's convention). Round/distance/scorecard prop
 variants are ignored.
 
+Every book's winner price also goes to bout_odds_quote, the append-only
+history (source 'bestfightodds', one row per book and CHANGE of price — a
+pass that sees the price it saw last time writes nothing). bout_external_odds
+keeps one overwritten row per bout, so the opening line and the movement to
+the close were lost on every pass; this keeps them. Two things differ from
+the BetsAPI rows in the same table:
+
+  * quoted_at is the pass that FIRST SAW the price, not when the book posted
+    it — bestfightodds does not say. The price was posted at most one cron
+    interval (6 h) before.
+  * the bell is not known either, so nothing is written after a conservative
+    cutoff on the card's date (see observation_cutoff): an in-play price in
+    this table would poison every close read from it.
+
 American → decimal conversion:
   +150 → 1 + 150/100 = 2.50
   -200 → 1 + 100/200 = 1.50
@@ -49,7 +63,8 @@ import statistics
 import time
 import unicodedata
 from dataclasses import dataclass, field
-from datetime import datetime
+import json
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import _path  # noqa: F401 — sets sys.path so `src.*` resolves
@@ -79,6 +94,9 @@ class ScrapedFight:
     winner_b_decimal: Optional[float]
     # keys: a_ko, a_sub, a_dec, b_ko, b_sub, b_dec → median decimal odds
     method_decimals: dict[str, float] = field(default_factory=dict)
+    # book name → (decimal on this row's A, decimal on B); only books that
+    # price BOTH sides
+    book_prices: dict[str, tuple[float, float]] = field(default_factory=dict)
 
 
 @dataclass
@@ -131,6 +149,40 @@ def _best_moneyline(row) -> Optional[float]:
         if best is None or dec > best:
             best = dec
     return best
+
+
+def _book_names(values_table) -> dict[str, str]:
+    """Header `th[data-b]` → the book's name (its first link's text; the
+    rest of the cell is a promo badge)."""
+    names: dict[str, str] = {}
+    for th in values_table.css("thead th[data-b]"):
+        link = th.css_first("a")
+        name = ((link.text() if link else th.text()) or "").strip()
+        if name:
+            names[th.attributes.get("data-b") or ""] = name
+    return names
+
+
+def _book_moneylines(row, names: dict[str, str]) -> dict[str, float]:
+    """Book name → decimal for one fighter row. Each price cell says whose it
+    is: `data-li="[book_id, side, matchup_id]"`."""
+    out: dict[str, float] = {}
+    for td in row.css("td.but-sg[data-li]"):
+        try:
+            book_id = str(json.loads(td.attributes.get("data-li") or "")[0])
+        except (ValueError, IndexError, TypeError):
+            continue
+        name = names.get(book_id)
+        if name is None:
+            continue
+        for span in td.css("span"):
+            text = (span.text() or "").strip()
+            if re.match(r"^[+\-]?\d+$", text):
+                dec = american_to_decimal(text)
+                if dec is not None:
+                    out[name] = dec
+                break
+    return out
 
 
 _CNADM_MATCHUP_RE = re.compile(r"/cnadm/matchups/(\d+)")
@@ -237,6 +289,7 @@ def parse_page(html: str, source_url: str) -> list[ScrapedEvent]:
             break
         if values_table is None:
             continue
+        books = _book_names(values_table)
 
         rows = values_table.css("tbody tr")
         fights: list[ScrapedFight] = []
@@ -280,6 +333,8 @@ def parse_page(html: str, source_url: str) -> list[ScrapedEvent]:
             name_b = (link_b.text() or "").strip()
             slug_b = (link_b.attributes.get("href") or "").rsplit("/", 1)[-1]
             ml_b = _best_moneyline(row_b)
+            by_a, by_b = _book_moneylines(row_a, books), _book_moneylines(row_b, books)
+            book_prices = {k: (by_a[k], by_b[k]) for k in by_a if k in by_b}
 
             # Prop rows trail the fighter pair until the next matchup
             # (next row whose <th> carries the cnadm admin anchor).
@@ -309,6 +364,7 @@ def parse_page(html: str, source_url: str) -> list[ScrapedEvent]:
                     winner_a_decimal=ml_a,
                     winner_b_decimal=ml_b,
                     method_decimals=methods,
+                    book_prices=book_prices,
                 )
             )
             i = j
@@ -463,6 +519,73 @@ def upsert_odds(
 
 
 # ---------------------------------------------------------------------------
+# Append-only quote history (bout_odds_quote)
+# ---------------------------------------------------------------------------
+
+# How long after 00:00 UTC of event.date (the card's LOCAL date) a pass may
+# still write. Measured on 161 UFC cards 2023-01..2026-09 against BetsAPI's
+# per-bout start times: the earliest first bout of any card started 7.0 h
+# after that midnight (Shenzhen, 2025-08-23); 8.2 Perth, 9.2 Singapore, 13.2
+# Abu Dhabi and Baku, 14.4 Riyadh, 15.7 the US, 16.0 Paris and London, 20.2
+# Canada, Brazil, Mexico. A country is on the late list only if it was
+# MEASURED at 13.2 h or later; anything else, and a card with no country,
+# gets the early cutoff. Both leave an hour's margin under the earliest start.
+LATE_START_COUNTRIES = frozenset({"US", "CA", "MX", "BR", "GB", "FR", "AE", "AZ", "SA"})
+LATE_CUTOFF = timedelta(hours=12)
+EARLY_CUTOFF = timedelta(hours=6)
+
+
+def observation_cutoff(event_date: datetime, country: str | None) -> datetime:
+    """The last moment a price seen for this card can be trusted pre-bell."""
+    start = event_date if event_date.tzinfo else event_date.replace(tzinfo=timezone.utc)
+    return start + (LATE_CUTOFF if (country or "").upper() in LATE_START_COUNTRIES
+                    else EARLY_CUTOFF)
+
+
+APPEND_QUOTE_SQL = """
+INSERT INTO bout_odds_quote
+  (bout_id, source, book, market, price_a, price_b, quoted_at, snapshot, external_id)
+SELECT %(bout)s::uuid, 'bestfightodds', %(book)s, 'winner', %(a)s, %(b)s,
+       %(now)s, 'observed', %(mu)s
+WHERE NOT EXISTS (
+  SELECT 1 FROM (
+    SELECT price_a, price_b FROM bout_odds_quote
+    WHERE bout_id = %(bout)s::uuid AND source = 'bestfightodds'
+      AND book = %(book)s AND market = 'winner'
+    ORDER BY quoted_at DESC LIMIT 1
+  ) last
+  WHERE last.price_a = %(a)s::real AND last.price_b = %(b)s::real
+)
+"""
+
+
+def append_quotes(
+    conn: psycopg.Connection,
+    bout_id: str,
+    fight: ScrapedFight,
+    swapped: bool,
+    now: datetime,
+) -> int:
+    """Write each book's winner price if it differs from that book's last
+    row for this bout. Returns the rows written (0 past the cutoff)."""
+    row = conn.execute(
+        "SELECT e.date, e.location_country FROM bout b "
+        "JOIN event e ON e.id = b.event_id WHERE b.id = %s::uuid",
+        (bout_id,),
+    ).fetchone()
+    if row is None or now >= observation_cutoff(row[0], row[1]):
+        return 0
+    written = 0
+    for book, (pa, pb) in sorted(fight.book_prices.items()):
+        a, b = (pb, pa) if swapped else (pa, pb)
+        cur = conn.execute(APPEND_QUOTE_SQL, {"bout": bout_id, "book": book,
+                                              "a": a, "b": b, "now": now,
+                                              "mu": fight.matchup_id})
+        written += cur.rowcount
+    return written
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -503,7 +626,7 @@ def main() -> int:
                 print(
                     f"  mu-{f.matchup_id}: {f.fighter_a_name} "
                     f"({f.winner_a_decimal}) vs {f.fighter_b_name} "
-                    f"({f.winner_b_decimal}){meth}"
+                    f"({f.winner_b_decimal}){meth} · {len(f.book_prices)} books"
                 )
         return 0
 
@@ -511,6 +634,8 @@ def main() -> int:
     matched = 0
     unmatched = 0
     written = 0
+    quotes = 0
+    now = datetime.now(timezone.utc)
     try:
         for ev in events:
             for fight in ev.fights:
@@ -537,6 +662,7 @@ def main() -> int:
                     continue
                 upsert_odds(conn, bout_id, fight, ev.source_url, swapped)
                 written += 1
+                quotes += append_quotes(conn, bout_id, fight, swapped, now)
             conn.commit()
             time.sleep(0.25)
     finally:
@@ -544,7 +670,7 @@ def main() -> int:
 
     log.info(
         f"Matched {matched} bouts ({unmatched} unmatched); "
-        f"wrote {written} odds rows."
+        f"wrote {written} odds rows, {quotes} new book quotes."
     )
     return 0
 

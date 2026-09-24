@@ -355,7 +355,12 @@ export const boutExternalOdds = pgTable(
 // between are all queryable. Only pre-bell prices are written, so the latest
 // row per (bout, book, market) is the close.
 //
-// Written by scripts/odds_scraper/scripts/load_betsapi.py.
+// Written by scripts/odds_scraper/scripts/load_betsapi.py (source 'betsapi':
+// quotedAt is when the book posted the price) and by the 6-hourly
+// scripts/scraper/scripts/08_scrape_bestfightodds.py (source 'bestfightodds',
+// one row per book per CHANGE of price: quotedAt is the first pass that saw
+// it, at most 6 h after the book posted it; nothing past a cutoff on the
+// card's date, since that feed has no bell).
 export const boutOddsQuote = pgTable(
   "bout_odds_quote",
   {
