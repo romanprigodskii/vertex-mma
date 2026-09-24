@@ -31,6 +31,13 @@ Usage (from scripts/simulation, venv active):
   python scripts/run_rolling_backtest.py
   python scripts/run_rolling_backtest.py --start 2025-07-01 --end 2026-07-01
   python scripts/run_rolling_backtest.py --step-months 3 --cache
+  python scripts/run_rolling_backtest.py --start 2023-01-01 --end 2026-10-01 \
+      --predictions data/rolling_predictions.parquet \
+      --report artifacts/rolling_backtest_clv.json      # + one row per scored bout
+
+`--predictions` keeps the per-bout out-of-sample probabilities the pooled
+metrics are computed from — the input of lab_clv_open.py, which needs them
+bout by bout to set against the opening line.
 """
 
 from __future__ import annotations
@@ -208,6 +215,7 @@ def run(
     end: str = DEFAULT_END,
     step_months: int = DEFAULT_STEP_MONTHS,
     use_cache: bool = False,
+    predictions_path: Path | None = None,
 ) -> dict:
     df = load_dataset(use_cache)
     df = df[df["target_a_wins"].notna()].reset_index(drop=True)
@@ -241,9 +249,17 @@ def run(
     per_origin: list[dict] = []
     # Accumulated out-of-sample predictions across all origins, per segment.
     pooled: dict[str, dict[str, list]] = {
-        seg: {"p": [], "p_raw": [], "y": [], "market": [], "origin": []}
+        seg: {"p": [], "p_raw": [], "y": [], "market": [], "origin": [],
+              "bout_id": [], "event_id": [], "event_date": [], "fighter_a_id": []}
         for seg in ("main", "debut")
     }
+
+    def _keep_ids(seg: str, mask: np.ndarray) -> None:
+        # meta_all is in the dataset's own fighter order, which is not always
+        # the bout table's; fighter_a_id travels with p so a reader can tell
+        rows = meta_all.loc[mask]
+        for col in ("bout_id", "event_id", "event_date", "fighter_a_id"):
+            pooled[seg][col].extend(rows[col].astype(str).tolist())
 
     for origin in origins:
         val_start = origin - pd.DateOffset(months=VAL_MONTHS)
@@ -288,6 +304,7 @@ def run(
                 mk.tolist() if mk is not None else [np.nan] * len(y_sc)
             )
             pooled["main"]["origin"].extend([str(origin.date())] * len(y_sc))
+            _keep_ids("main", sc)
 
         # ── DEBUT specialist: trained on ALL rows with experienced rows
         # down-weighted; early stopping / blender on DEBUT val rows only.
@@ -315,6 +332,7 @@ def run(
                 mk_d.tolist() if mk_d is not None else [np.nan] * len(y_d)
             )
             pooled["debut"]["origin"].extend([str(origin.date())] * len(y_d))
+            _keep_ids("debut", sc_d)
 
         seg_txt = " · ".join(
             f"{k} n={v['n']} acc={v['accuracy']:.3f} ll={v['log_loss']:.3f}"
@@ -365,6 +383,14 @@ def run(
     }
     REPORT_PATH.write_text(json.dumps(payload, indent=2, default=str))
     console.log(f"wrote {REPORT_PATH}")
+    if predictions_path is not None:
+        preds = pd.concat(
+            [pd.DataFrame(buf).assign(segment=seg) for seg, buf in pooled.items()
+             if buf["y"]],
+            ignore_index=True,
+        )
+        preds.to_parquet(predictions_path, index=False)
+        console.log(f"wrote {len(preds):,} per-bout predictions to {predictions_path}")
     return payload
 
 
@@ -443,6 +469,24 @@ def main() -> None:
         help="reuse data/rolling_dataset.parquet instead of rebuilding from Postgres",
     )
     ap.add_argument(
+        "--predictions",
+        type=Path,
+        default=None,
+        metavar="PATH",
+        help="also write one row per scored bout (parquet) — lab_clv_open.py's input",
+    )
+    ap.add_argument(
+        "--report",
+        type=Path,
+        default=None,
+        metavar="PATH",
+        help=(
+            "write the report here instead of artifacts/rolling_backtest.json — "
+            "that file carries the README's committed window, and a run over any "
+            "other window must not overwrite it"
+        ),
+    )
+    ap.add_argument(
         "--uncorrected",
         action="store_true",
         help=(
@@ -473,7 +517,9 @@ def main() -> None:
         )
         slug = "_".join(c.replace("diff_", "") for c in CORRECTOR_TERMS)
         REPORT_PATH = ARTIFACTS_DIR / f"rolling_backtest_{slug}.json"
-    run(args.start, args.end, args.step_months, args.cache)
+    if args.report is not None:
+        REPORT_PATH = args.report
+    run(args.start, args.end, args.step_months, args.cache, args.predictions)
 
 
 if __name__ == "__main__":
