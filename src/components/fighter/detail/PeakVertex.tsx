@@ -53,10 +53,11 @@ export async function PeakVertex({ info }: PeakVertexProps) {
   const dateRange = heldAcrossBouts
     ? `${peakDate} → ${lastPeakBout.eventDate}`
     : peakDate;
-  // ±4 tolerance — within 4 points of peak still reads as "at peak" rather
-  // than rendering a noisy "-2 vs current" while also claiming "still at peak".
-  const AT_PEAK_TOLERANCE = 4;
-  const isCurrentAtPeak = delta != null && delta >= -AT_PEAK_TOLERANCE;
+  // No tolerance: the card prints both numbers, so "at peak" beside a lower
+  // current score is a contradiction the reader can see (it used to say
+  // "99 · currently at peak" next to a 95 Current octagon). Below the peak
+  // by any amount → "-N vs current" / "Eased since the peak".
+  const isCurrentAtPeak = delta != null && delta >= 0;
 
   return (
     <section
@@ -145,8 +146,7 @@ export async function PeakVertex({ info }: PeakVertexProps) {
             </div>
           ) : isAtPeak ? (
             // No bout ended the peak — but live score can have eased below it
-            // via inactivity / time-decay. Treat within ±AT_PEAK_TOLERANCE as
-            // still at peak; only flag "softened" once the gap exceeds it.
+            // via inactivity / time-decay, which reads as "softened".
             currentScore != null && !isCurrentAtPeak ? (
               <div className="text-[11px] uppercase tracking-widest text-foreground-subtle">
                 {t("softenedSincePeak")}
