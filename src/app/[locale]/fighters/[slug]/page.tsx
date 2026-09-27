@@ -39,7 +39,11 @@ import {
 import { listNewsForFighter } from "@/lib/news";
 import { getPeakVertex } from "@/lib/score-history";
 import { getSimilarFighters } from "@/lib/similar-fighters";
-import { clampHeadline, headlineScore } from "@/lib/vertex-tier";
+import {
+  clampHeadline,
+  displayDivision,
+  headlineScore,
+} from "@/lib/vertex-tier";
 
 export const dynamic = "force-dynamic";
 
@@ -63,9 +67,14 @@ export async function generateMetadata({
   const recordSuffix = `${fighter.wins_total}-${fighter.losses_total}${
     fighter.draws_total > 0 ? `-${fighter.draws_total}` : ""
   }`;
+  const divisionKey = displayDivision({
+    rosterStatus: fighter.roster_status,
+    currentDivision: fighter.current_division,
+    weightClassPrimary: fighter.weight_class_primary,
+  });
   const division =
-    fighter.weight_class_primary && tWeight.has(fighter.weight_class_primary)
-      ? tWeight(fighter.weight_class_primary)
+    divisionKey && tWeight.has(divisionKey)
+      ? tWeight(divisionKey)
       : tFighter("metaTitleFallback");
   return {
     title: `${fighter.name_en} · ${division}`,

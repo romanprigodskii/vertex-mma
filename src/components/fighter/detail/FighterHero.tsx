@@ -8,6 +8,7 @@ import type { FighterDetail } from "@/lib/fighter-detail";
 import { getCountryFlag } from "@/lib/fighter-helpers";
 import { formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { displayDivision } from "@/lib/vertex-tier";
 
 function computeAge(dob: string | null): number | null {
   if (!dob) return null;
@@ -111,10 +112,15 @@ export async function FighterHero({ fighter, championEntry }: FighterHeroProps) 
   const age = computeAge(fighter.dob);
   const flag = getCountryFlag(fighter.country_code);
   const countryLabel = countryName(fighter.country_code, locale);
-  const weightLabel = fighter.weight_class_primary
-    ? tWeight.has(fighter.weight_class_primary)
-      ? tWeight(fighter.weight_class_primary)
-      : fighter.weight_class_primary
+  const division = displayDivision({
+    rosterStatus: fighter.roster_status,
+    currentDivision: fighter.current_division,
+    weightClassPrimary: fighter.weight_class_primary,
+  });
+  const weightLabel = division
+    ? tWeight.has(division)
+      ? tWeight(division)
+      : division
     : null;
   const statusLabel =
     fighter.status && tFighter.has(`status.${fighter.status}`)

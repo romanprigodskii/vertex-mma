@@ -173,6 +173,30 @@ export function headlineScore(input: HeadlineScoreInput): HeadlineScore {
   };
 }
 
+/**
+ * The division a fighter is LABELLED with, on the same active/retired split
+ * as headlineScore: an active fighter is named by the division they fight in
+ * now (current_division — their last bout's), a retired one by the division
+ * of their career (weight_class_primary), since a legend's last bout can be a
+ * one-off. Without this a champion who moved up read "LIGHTWEIGHT" under their
+ * welterweight belt. A catchweight/openweight last bout names no division, so
+ * it falls back to the career one (6 active flyweights et al. would otherwise
+ * read "CATCHWEIGHT").
+ */
+const NON_DIVISIONS: ReadonlySet<string> = new Set(["catchweight", "openweight"]);
+
+export function displayDivision(input: {
+  rosterStatus: string | null;
+  currentDivision: string | null;
+  weightClassPrimary: string | null;
+}): string | null {
+  const status = (input.rosterStatus ?? "unknown") as RosterStatus;
+  if (RETIRED_ROSTER_STATUSES.has(status)) return input.weightClassPrimary;
+  const current = input.currentDivision;
+  if (current && !NON_DIVISIONS.has(current)) return current;
+  return input.weightClassPrimary;
+}
+
 /** Clamp a raw score to the 0–100 integer the UI renders. Raw all-time values
  *  can exceed 100 for sort ordering; the tier breaks are calibrated on [0,100]. */
 export function clampHeadline(value: number | null): number | null {

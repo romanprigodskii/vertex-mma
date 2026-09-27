@@ -15,6 +15,7 @@ import { Link } from "@/i18n/navigation";
 import { CHAMPION_BY_SLUG } from "@/lib/champions";
 import { ATTRIBUTE_KEYS, computeAttributes } from "@/lib/fighter-attributes";
 import { getFightHistory, getFighterBySlug } from "@/lib/fighter-detail";
+import { displayDivision } from "@/lib/vertex-tier";
 
 export const dynamic = "force-dynamic";
 
@@ -53,6 +54,11 @@ export default async function FighterCardPage({ params }: PageProps) {
   const tAttr = await getTranslations({ locale, namespace: "fighter.attribute" });
   const tWeight = await getTranslations({ locale, namespace: "weight" });
 
+  const division = displayDivision({
+    rosterStatus: fighter.roster_status,
+    currentDivision: fighter.current_division,
+    weightClassPrimary: fighter.weight_class_primary,
+  });
   // All card-face strings resolved server-side and threaded into the client
   // component (it can't use hooks for these), reusing the shared attribute and
   // weight-class namespaces.
@@ -64,9 +70,7 @@ export default async function FighterCardPage({ params }: PageProps) {
     attributes: Object.fromEntries(
       ATTRIBUTE_KEYS.map((k) => [k, tAttr(k)]),
     ) as Record<string, string>,
-    weightLabel: fighter.weight_class_primary
-      ? tWeight(fighter.weight_class_primary)
-      : null,
+    weightLabel: division && tWeight.has(division) ? tWeight(division) : null,
     attributesHeading: t("cardAttributesHeading"),
     ufcCareer: t("cardUfcCareer"),
     record: t("cardRecordLabel"),
