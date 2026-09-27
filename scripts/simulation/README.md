@@ -1,9 +1,9 @@
 # Vertex MMA — Simulation (Phase 1)
 
-LightGBM-based winner predictor for upcoming UFC bouts. Writes one row
-per scheduled bout to `bout_simulation`; the `/bouts/[id]` page reads
-that row and renders a "Vertex Simulation" panel when the bout hasn't
-happened yet.
+Ensemble (LightGBM + CatBoost + logistic regression) winner predictor for
+upcoming UFC bouts. Writes one row per scheduled bout to `bout_simulation`;
+the `/bouts/[id]` page reads that row and renders a "Vertex Simulation"
+panel when the bout hasn't happened yet.
 
 ## Phase 1 scope
 
@@ -323,7 +323,7 @@ scripts/simulation/
 │   ├── features.py         # row → A-B diff matrix (column order locked)
 │   ├── method_model.py     # P(ko/sub/dec | this side wins) — the method leg
 │   ├── rank_export.py      # point-in-time UFC rankings (built, gated, unused)
-│   ├── train.py            # LightGBM + isotonic + metrics + save
+│   ├── train.py            # ensemble fit + metrics + save (no calibrator)
 │   └── predict.py          # load artifacts → upsert bout_simulation
 ├── scripts/
 │   ├── run_train.py        # CLI: full pipeline (export → features → train)

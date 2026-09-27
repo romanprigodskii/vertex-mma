@@ -137,7 +137,7 @@ function clampProb(p: number): number {
 /**
  * Reconcile the raw MC method probabilities so each side's three method
  * cells (ko/sub/dec) sum to the ENSEMBLE winner prob for that side, not the
- * MC's standalone winner prob. The ensemble (LightGBM + isotonic) is the
+ * MC's standalone winner prob. The ensemble (LightGBM + CatBoost + LogReg) is the
  * better model of WHICH fighter wins; the MC is the better model of HOW.
  * Keeps the MC's relative method MIX, rescales the LEVEL. Mirrors
  * reconcileMcMethodProbs in bout-simulation.ts but stays DB-free here.

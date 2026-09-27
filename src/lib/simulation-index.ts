@@ -21,7 +21,8 @@ export interface SimulationIndexBout {
   isTitleFight: boolean;
   isMainEvent: boolean;
   scheduledRounds: number;
-  /** Calibrated P(A wins) from the ensemble (see scripts/simulation). */
+  /** Blended P(A wins) from the ensemble — not post-hoc calibrated (see
+   *  scripts/simulation/src/ensemble.py). */
   probA: number;
   probB: number;
   predictedWinnerId: string | null;
@@ -53,7 +54,7 @@ export interface SimulationIndexEvent {
  * "Upcoming" = bout.status is neither 'completed' (those are graded in the
  * accuracy view) nor 'cancelled' (scratched fights / scheduled bouts left
  * behind on a past event). We pull from bout_simulation
- * (the calibrated ensemble headline number), join the matching
+ * (the ensemble headline number), join the matching
  * bout_simulation_rounds row when present (Phase 3 MC summary), and
  * surface enough fighter context (name, photo) to render the card
  * inline without round-tripping to /bouts/[id].

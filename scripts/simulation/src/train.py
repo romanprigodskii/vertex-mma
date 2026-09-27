@@ -1,5 +1,5 @@
-"""Train the EnsembleModel (LightGBM + XGBoost + LogReg, blended on the
-val split). Artifacts go to scripts/simulation/artifacts/ensemble/."""
+"""Train the EnsembleModel (LightGBM + CatBoost + LogReg, blended on the
+val split, no post-hoc calibrator). Artifacts go to scripts/simulation/artifacts/ensemble/."""
 
 from __future__ import annotations
 
