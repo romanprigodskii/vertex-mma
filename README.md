@@ -144,8 +144,8 @@ code says so).
 
 ## Papers
 
-Two papers came out of evaluating this model. Both are sole-authored and under review at NeurIPS 2026
-workshops.
+Two papers came out of evaluating this model, both sole-authored. The first is under review at a
+NeurIPS 2026 workshop; the second is a working paper.
 
 - **Testing by betting when the bets are real: an e-value audit of 84 pre-registered
   market-efficiency hypotheses.** Re-tests the 84 segments where the model looked like it beat the
@@ -155,7 +155,7 @@ workshops.
 - **Measure the instrument first: detection floors for model selection and for LLM judges.**
   Measures the smallest improvement this project's model-selection pipeline can detect: retraining
   under another random seed reproduces 80% of the only improvement the winner leg ever shipped.
-  TAE: Can We Trust AI Evaluation? [PDF](https://prigodskii.dev/papers/tae.pdf)
+  Working paper. [PDF](https://prigodskii.dev/papers/floors.pdf)
 
 Both, with their charts: [prigodskii.dev/research](https://prigodskii.dev/research/).
 
