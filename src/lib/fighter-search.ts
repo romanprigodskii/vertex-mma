@@ -14,6 +14,8 @@ export type FighterSearchResult = {
   photo_silhouette_url: string | null;
   photo_thumbnail_url: string | null;
   weight_class_primary: string | null;
+  current_division: string | null;
+  roster_status: string | null;
   country_code: string | null;
   wins_total: number | null;
   losses_total: number | null;
@@ -54,6 +56,8 @@ export async function searchFighters(
         f.photo_silhouette_url,
         f.photo_thumbnail_url,
         f.weight_class_primary::text,
+        f.current_division,
+        f.roster_status::text AS roster_status,
         f.country_code,
         fsa.wins_total,
         fsa.losses_total,

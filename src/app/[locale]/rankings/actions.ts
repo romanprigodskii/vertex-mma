@@ -13,6 +13,7 @@ import {
 import { userProfile } from "@/lib/db/schema/users";
 import { searchFighters } from "@/lib/fighter-search";
 import { createClient } from "@/lib/supabase/server";
+import { displayDivision } from "@/lib/vertex-tier";
 
 import { RANKING_LIMITS, RankingError } from "./ranking-constants";
 
@@ -84,7 +85,11 @@ export async function searchFightersForPicker(
     name: r.name_en,
     nickname: r.nickname,
     photo_thumbnail_url: r.photo_thumbnail_url,
-    weight_class: r.weight_class_primary,
+    weight_class: displayDivision({
+      rosterStatus: r.roster_status,
+      currentDivision: r.current_division,
+      weightClassPrimary: r.weight_class_primary,
+    }),
   }));
 }
 
