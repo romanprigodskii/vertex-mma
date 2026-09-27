@@ -11,6 +11,7 @@ import { type ChampionEntry } from "@/lib/champions";
 import type { FighterDetail } from "@/lib/fighter-detail";
 import { getCountryFlag } from "@/lib/fighter-helpers";
 import { cn } from "@/lib/utils";
+import { displayDivision } from "@/lib/vertex-tier";
 
 const PALETTE: readonly string[] = [
   "oklch(0.35 0.12 27)",
@@ -125,10 +126,15 @@ function FighterIdentity({ fighter, champion, align }: IdentityProps) {
   const tWeight = useTranslations("weight");
   const flag = getCountryFlag(fighter.country_code);
   const weightLabel = (() => {
-    if (!fighter.weight_class_primary) return null;
-    const key = fighter.weight_class_primary.replace(/-/g, "_");
+    const division = displayDivision({
+      rosterStatus: fighter.roster_status,
+      currentDivision: fighter.current_division,
+      weightClassPrimary: fighter.weight_class_primary,
+    });
+    if (!division) return null;
+    const key = division.replace(/-/g, "_");
     if (tWeight.has(key)) return tWeight(key as "lightweight");
-    return fighter.weight_class_primary;
+    return division;
   })();
   const denom = fighter.wins_total + fighter.losses_total;
   const wr = denom > 0 ? Math.round((fighter.wins_total / denom) * 100) : null;
