@@ -7,7 +7,11 @@ import { Search } from "lucide-react";
 
 import { useRouter } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
-import { clampHeadline, headlineScore } from "@/lib/vertex-tier";
+import {
+  clampHeadline,
+  displayDivision,
+  headlineScore,
+} from "@/lib/vertex-tier";
 
 const OPEN_EVENT = "fighter-search:open";
 
@@ -23,6 +27,7 @@ interface SearchResult {
   name_en: string;
   nickname: string | null;
   weight_class_primary: string | null;
+  current_division: string | null;
   country_code: string | null;
   photo_thumbnail_url: string | null;
   roster_status: string | null;
@@ -339,7 +344,13 @@ export function FighterSearchPalette() {
                         ) : null}
                       </p>
                       <p className="truncate font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
-                        {weightLabel(r.weight_class_primary)}
+                        {weightLabel(
+                          displayDivision({
+                            rosterStatus: r.roster_status,
+                            currentDivision: r.current_division,
+                            weightClassPrimary: r.weight_class_primary,
+                          }),
+                        )}
                         {r.country_code
                           ? ` · ${countryName(r.country_code)}`
                           : ""}

@@ -12,6 +12,7 @@ import type {
   FighterCatalogRow,
 } from "@/lib/fighter-search";
 import { cn } from "@/lib/utils";
+import { displayDivision } from "@/lib/vertex-tier";
 
 interface PickerSlot {
   slug: string | null;
@@ -156,51 +157,58 @@ function PickerInput({ label, slot, onSelect, onClear }: PickerInputProps) {
 
         {open && results.length > 0 ? (
           <ul className="absolute left-0 right-0 top-full z-30 mt-1 max-h-72 overflow-y-auto rounded-md border border-foreground/15 bg-background-overlay shadow-elevation-2">
-            {results.map((f) => (
-              <li key={f.slug}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    onSelect({ slug: f.slug, name: f.name_en });
-                    setOpen(false);
-                    setResults([]);
-                  }}
-                  className="flex w-full items-center gap-3 px-3 py-2 text-left transition-colors hover:bg-foreground/[0.04] focus-visible:bg-foreground/[0.04]"
-                >
-                  <FighterAvatar
-                    name={f.name_en}
-                    photoUrl={f.photo_url}
-                    size="sm"
-                    imageSizes="48px"
-                  />
-                  <div className="flex min-w-0 flex-col">
-                    <span className="truncate font-sans text-sm text-foreground">
-                      {f.name_en}
-                    </span>
-                    <span className="flex items-center gap-1.5 font-sans text-[11px] text-foreground-subtle">
-                      <span className="font-mono tabular">
-                        {f.wins_total}-{f.losses_total}
+            {results.map((f) => {
+              const division = displayDivision({
+                rosterStatus: f.roster_status,
+                currentDivision: f.current_division,
+                weightClassPrimary: f.weight_class_primary,
+              });
+              return (
+                <li key={f.slug}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onSelect({ slug: f.slug, name: f.name_en });
+                      setOpen(false);
+                      setResults([]);
+                    }}
+                    className="flex w-full items-center gap-3 px-3 py-2 text-left transition-colors hover:bg-foreground/[0.04] focus-visible:bg-foreground/[0.04]"
+                  >
+                    <FighterAvatar
+                      name={f.name_en}
+                      photoUrl={f.photo_url}
+                      size="sm"
+                      imageSizes="48px"
+                    />
+                    <div className="flex min-w-0 flex-col">
+                      <span className="truncate font-sans text-sm text-foreground">
+                        {f.name_en}
                       </span>
-                      {f.weight_class_primary ? (
-                        <>
-                          <span aria-hidden className="text-foreground-subtle/40">
-                            ·
-                          </span>
-                          <span className="uppercase tracking-widest">
-                            {(() => {
-                              const key = f.weight_class_primary.replace(/-/g, "_");
-                              return tWeight.has(key)
-                                ? tWeight(key as "lightweight")
-                                : f.weight_class_primary.replace(/_/g, " ");
-                            })()}
-                          </span>
-                        </>
-                      ) : null}
-                    </span>
-                  </div>
-                </button>
-              </li>
-            ))}
+                      <span className="flex items-center gap-1.5 font-sans text-[11px] text-foreground-subtle">
+                        <span className="font-mono tabular">
+                          {f.wins_total}-{f.losses_total}
+                        </span>
+                        {division ? (
+                          <>
+                            <span aria-hidden className="text-foreground-subtle/40">
+                              ·
+                            </span>
+                            <span className="uppercase tracking-widest">
+                              {(() => {
+                                const key = division.replace(/-/g, "_");
+                                return tWeight.has(key)
+                                  ? tWeight(key as "lightweight")
+                                  : division.replace(/_/g, " ");
+                              })()}
+                            </span>
+                          </>
+                        ) : null}
+                      </span>
+                    </div>
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         ) : null}
       </div>

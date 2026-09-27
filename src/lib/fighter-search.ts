@@ -186,6 +186,10 @@ export type FighterCatalogRow = {
   photo_silhouette_url: string | null;
   photo_thumbnail_url: string | null;
   weight_class_primary: string | null;
+  /** Last bout's division. Label cards through displayDivision()
+   *  (vertex-tier.ts) — never weight_class_primary alone, or a champion who
+   *  moved up reads under the old division. */
+  current_division: string | null;
   country_code: string | null;
   stance: string | null;
   status: string | null;
@@ -633,6 +637,7 @@ export async function searchFightersWithFilters(
       f.photo_silhouette_url,
       f.photo_thumbnail_url,
       f.weight_class_primary::text AS weight_class_primary,
+      f.current_division,
       f.country_code,
       f.stance::text AS stance,
       f.status::text AS status,
@@ -745,6 +750,7 @@ export async function getFightersBySlug(
       f.photo_silhouette_url,
       f.photo_thumbnail_url,
       f.weight_class_primary::text AS weight_class_primary,
+      f.current_division,
       f.country_code,
       f.stance::text AS stance,
       f.status::text AS status,

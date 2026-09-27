@@ -8,7 +8,12 @@ import { WEIGHT_CLASSES } from "@/lib/constants";
 import { getCountryFlag } from "@/lib/fighter-helpers";
 import type { FighterCatalogRow } from "@/lib/fighter-search";
 import { cn } from "@/lib/utils";
-import { classifyAndStyle, clampHeadline, headlineScore } from "@/lib/vertex-tier";
+import {
+  classifyAndStyle,
+  clampHeadline,
+  displayDivision,
+  headlineScore,
+} from "@/lib/vertex-tier";
 
 const WEIGHT_LABELS: Record<string, string> = Object.fromEntries(
   WEIGHT_CLASSES.map((w) => [w.id, w.label]),
@@ -109,10 +114,15 @@ export function FighterCard({
   // calibrated against [0, 100].
   const displayScore = clampHeadline(shownValue);
   const weightLabel = (() => {
-    if (!fighter.weight_class_primary) return null;
-    const key = fighter.weight_class_primary.replace(/-/g, "_");
+    const division = displayDivision({
+      rosterStatus: fighter.roster_status,
+      currentDivision: fighter.current_division,
+      weightClassPrimary: fighter.weight_class_primary,
+    });
+    if (!division) return null;
+    const key = division.replace(/-/g, "_");
     if (tWeight.has(key)) return tWeight(key as "lightweight");
-    return WEIGHT_LABELS[fighter.weight_class_primary] ?? null;
+    return WEIGHT_LABELS[division] ?? null;
   })();
   const flag = getCountryFlag(fighter.country_code);
   const hasNickname = Boolean(fighter.nickname?.trim());
