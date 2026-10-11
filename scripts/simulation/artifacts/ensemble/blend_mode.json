@@ -1,1 +1,1 @@
-{"blend_mode": "weighted_mean", "blend_weights": [0.08770052012547196, 0.10767281236060729, 0.8046266675139208], "val_blend_logloss": {"logreg": 0.6620397338903896, "mean": 0.6301224564041359, "weighted_mean": 0.6210798360005885}}
+{"blend_mode": "weighted_mean", "blend_weights": [0.0852692054150364, 0.11153241326104009, 0.8031983813239235], "val_blend_logloss": {"logreg": 0.6606637228608729, "mean": 0.6288630952648218, "weighted_mean": 0.6208512113922644}}
