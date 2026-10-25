@@ -205,7 +205,7 @@ export const CHAMPIONSHIP_HISTORY: readonly ChampionshipReign[] = [
   // ============================================================
   // FEATHERWEIGHT
   // ============================================================
-  { slug: "alexander-volkanovski-e12489", weightClass: "featherweight", startDate: "2025-04-12", endDate: null,         defenses: 1 }, // reign 2 — Lopes 2
+  { slug: "alexander-volkanovski-e12489", weightClass: "featherweight", startDate: "2025-04-12", endDate: null,         defenses: 2 }, // reign 2 — Lopes 2
   { slug: "ilia-topuria-54f64b",          weightClass: "featherweight", startDate: "2024-02-17", endDate: "2025-02-19", defenses: 1, endReason: "vacated" }, // Holloway; vacated to LW (announcement)
   { slug: "yair-rodriguez-cbf5e6",        weightClass: "featherweight", startDate: "2023-02-12", endDate: "2023-07-08", defenses: 0, isInterim: true }, // UFC 284 vs Emmett; lost unification vs Volk at UFC 290
   { slug: "alexander-volkanovski-e12489", weightClass: "featherweight", startDate: "2019-12-14", endDate: "2024-02-17", defenses: 4 }, // reign 1 — Holloway 2, Ortega, Korean Zombie, Rodriguez
@@ -219,7 +219,7 @@ export const CHAMPIONSHIP_HISTORY: readonly ChampionshipReign[] = [
   // ============================================================
   // BANTAMWEIGHT
   // ============================================================
-  { slug: "petr-yan-d661ce",          weightClass: "bantamweight", startDate: "2025-12-06", endDate: null,         defenses: 0 }, // reign 2 — beat Merab at UFC 323
+  { slug: "petr-yan-d661ce",          weightClass: "bantamweight", startDate: "2025-12-06", endDate: null,         defenses: 1 }, // reign 2 — beat Merab at UFC 323
   { slug: "merab-dvalishvili-c03520", weightClass: "bantamweight", startDate: "2024-09-14", endDate: "2025-12-06", defenses: 3 }, // Umar, O'Malley 2, Sandhagen
   { slug: "sean-o-malley-b50a42",     weightClass: "bantamweight", startDate: "2023-08-19", endDate: "2024-09-14", defenses: 1 }, // Vera 2
   { slug: "aljamain-sterling-cb696e", weightClass: "bantamweight", startDate: "2021-03-06", endDate: "2023-08-19", defenses: 3 }, // Yan 2, Cejudo, Dillashaw
