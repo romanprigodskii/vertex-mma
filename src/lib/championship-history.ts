@@ -250,7 +250,7 @@ export const CHAMPIONSHIP_HISTORY: readonly ChampionshipReign[] = [
   // ============================================================
   // WOMEN'S BANTAMWEIGHT (uses bantamweight enum)
   // ============================================================
-  { slug: "kayla-harrison-1af117",     weightClass: "bantamweight", startDate: "2025-06-07", endDate: null,         defenses: 0 }, // beat Pena at UFC 316
+  { slug: "kayla-harrison-1af117",     weightClass: "bantamweight", startDate: "2025-06-07", endDate: null,         defenses: 1 }, // beat Pena at UFC 316
   { slug: "julianna-pena-3253b1",      weightClass: "bantamweight", startDate: "2024-10-05", endDate: "2025-06-07", defenses: 0 }, // reign 2
   { slug: "raquel-pennington-fc169c",  weightClass: "bantamweight", startDate: "2024-01-20", endDate: "2024-10-05", defenses: 0 },
   { slug: "amanda-nunes-80fa82",       weightClass: "bantamweight", startDate: "2022-07-30", endDate: "2023-06-10", defenses: 1, endReason: "retired" }, // reign 2 — Aldana; retired
